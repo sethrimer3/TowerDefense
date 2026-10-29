@@ -67,8 +67,14 @@ function freeze(sim: DefendSim, e: Enemy, seconds: number, mark = true) {
  * when the enemies are where the step finds them), the rime, and the
  * cooldown. False while it cools down. */
 export function castFrostNova(sim: DefendSim, at: Point): boolean {
-  if (sim.frostRemaining > 0) return false;
-  sim.frostReadyAt = sim.time + FROST_NOVA.cooldown;
+  const gate = sim.scenario?.spellGate;
+  if (gate) {
+    if (!gate.canCast("frostNova")) return false;
+    gate.spend("frostNova");
+  } else {
+    if (sim.frostRemaining > 0) return false;
+    sim.frostReadyAt = sim.time + FROST_NOVA.cooldown;
+  }
   const { blizzard } = ranks(sim), r = frostReach(sim), time = sim.bonuses.frostTime;
   sim.frostBursts.push({ x: at.x, y: at.y, r, t: 0, nova: true, damage: 0, freeze: FROST_NOVA.freeze * time, hit: false });
   sim.rime.push({

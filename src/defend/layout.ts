@@ -46,6 +46,8 @@ export const QUARTERS_W = TILES_W * QUARTER;
 export const QUARTERS_H = TILES_H * QUARTER;
 /** Cells across a quarter tile. */
 export const QC = SUB / QUARTER;
+/** The same one-quarter clear ring used by city and scenario buildings. */
+export const structureClearance = (rect: Rect): Rect => ({ x: rect.x - QC, y: rect.y - QC, w: rect.w + 2 * QC, h: rect.h + 2 * QC });
 /** A spot on the board's grid of quarter tiles. */
 export type QuarterPos = { qx: number; qy: number };
 export const quarterKey = (q: QuarterPos) => `${q.qx},${q.qy}`;
@@ -392,7 +394,7 @@ function fitOne(p: Placement, cityTiles: Set<string>, cells: FitCells): FittedSt
   const free = !huddles(p.kind);
   const uid = p.uid + 1;
   for (const i of rectCells(rect)) cells.foot[i] = uid;
-  if (free) for (const i of rectCells({ x: rect.x - QC, y: rect.y - QC, w: rect.w + 2 * QC, h: rect.h + 2 * QC })) cells.near[i] ||= uid;
+  if (free) for (const i of rectCells(structureClearance(rect))) cells.near[i] ||= uid;
   return { uid: p.uid, kind: p.kind, tx: p.tx, ty: p.ty, rect, inside: blockTiles(p.tx, p.ty, p.span).every((k) => cityTiles.has(k)) };
 }
 

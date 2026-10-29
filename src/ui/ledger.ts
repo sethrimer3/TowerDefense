@@ -663,7 +663,8 @@ export class Ledger {
       this.pathMotesTopic = topic;
     }
     const { nodes, edges } = pathMoteScene(tree, canvas);
-    this.pathMotes.draw(canvas, time, { nodes, edges, picked: this.picked[topic] ?? null, pixel: 2, reduced });
+    // The tree doesn't pan: the motes fill the canvas, a pixel a CSS pixel.
+    this.pathMotes.draw(canvas, time, { nodes, edges, picked: this.picked[topic] ?? null, area: { x: 0, y: 0, w: canvas.clientWidth, h: canvas.clientHeight }, view: { x: 0, y: 0, s: 1 }, pixel: 1, reduced });
   }
 
   /** A path rank just learned at `key`: the motes round it burst outward. */
@@ -672,7 +673,7 @@ export class Ledger {
     const node = canvas && this.root.querySelector<HTMLElement>(`.path-tree [data-pick="${key}"] .path-medal`);
     if (!canvas || !node) return;
     const c = canvas.getBoundingClientRect(), r = node.getBoundingClientRect();
-    this.pathMotes.burst(r.left + r.width / 2 - c.left, r.top + r.height / 2 - c.top, canvas);
+    this.pathMotes.burst(r.left + r.width / 2 - c.left, r.top + r.height / 2 - c.top);
   }
 
   // ── Each frame and each second ──────────────────────────────────────────

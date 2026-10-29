@@ -8,23 +8,39 @@
  * (`SIZES`), so the big ones swing wide round the turns the small ones
  * follow closely. A purchase's `burst` pushes them outward for a moment.
  *
- * Presentation only: positions are a fraction of the canvas, its randomness
+ * The motes live in the tree's own space: they fill `MoteScene.area`, the
+ * space the player can pan round (a little beyond the tree), and are drawn
+ * through `MoteScene.view`, the tree's pan and zoom, so they pan and zoom
+ * with it.
+ *
+ * Presentation only: positions are a fraction of the area, its randomness
  * from `stream("effects")`, and nothing is drawn under Reduce Motion. The
- * page hands it the nodes' centres and branches in canvas (CSS) pixels each
- * frame (`TreeMotes.draw`); `UpgradeGraph` and the Study's spell trees each
- * keep one. */
+ * page hands it the nodes' centres and branches in the tree's own pixels
+ * each frame (`TreeMotes.draw`); `UpgradeGraph` and the Study's spell trees
+ * each keep one. */
 import { stream } from "../random.ts";
 
 const fx = stream("effects");
 
 type Size = { w: number; h: number };
-/** An upgrade's centre, in CSS pixels of the canvas. */
+/** A box in the tree's own pixels. */
+export type MoteArea = { x: number; y: number; w: number; h: number };
+/** An upgrade's centre, in the tree's own pixels. */
 export type MoteNode = { id: string; x: number; y: number };
 /** What one frame shows: the upgrades, the branches (each from an upgrade
- * to the one it opens), the one picked, the size of a mote pixel in CSS
- * pixels (the tree's own art pixel, so motes sit on its grid), and whether
- * motion is reduced. */
-export type MoteScene = { nodes: readonly MoteNode[]; edges: readonly (readonly [string, string])[]; picked: string | null; pixel: number; reduced: boolean };
+ * to the one it opens), the one picked, the area the motes fill and the
+ * view onto it (a point of the tree at (x, y) shows at CSS pixel
+ * `view.x + x * view.s`), the size of a mote pixel on screen in CSS pixels,
+ * and whether motion is reduced. */
+export type MoteScene = {
+  nodes: readonly MoteNode[];
+  edges: readonly (readonly [string, string])[];
+  picked: string | null;
+  area: MoteArea;
+  view: { x: number; y: number; s: number };
+  pixel: number;
+  reduced: boolean;
+};
 
 /** The three mote sizes, in pixels across: how many of every hundred motes
  * have each, how fast (per second) each eases toward the fluid's velocity,
@@ -66,15 +82,16 @@ export class TreeMotes {
   private pulses: Pulse[] = [];
   private last = 0;
   private elapsed = 0;
-  private area = 0;
+  private seeded = 0;
+  private area: MoteArea = { x: 0, y: 0, w: 1, h: 1 };
 
   /** How many motes there are (tests). */
   get count() { return this.motes.length; }
 
-  /** A purchase's outward push from (x, y), CSS pixels of the canvas. */
-  burst(x: number, y: number, canvas: { clientWidth: number; clientHeight: number }) {
-    const w = canvas.clientWidth, h = canvas.clientHeight;
-    if (w && h) this.pulses.push({ x: x / w, y: y / h, age: 0 });
+  /** A purchase's outward push from (x, y), in the tree's own pixels. */
+  burst(x: number, y: number) {
+    const a = this.area;
+    this.pulses.push({ x: (x - a.x) / a.w, y: (y - a.y) / a.h, age: 0 });
   }
 
   draw(canvas: HTMLCanvasElement, time: number, scene: MoteScene) {
@@ -90,24 +107,28 @@ export class TreeMotes {
       this.last = 0;
       return;
     }
-    this.seed({ w, h });
+    const area = (this.area = { ...scene.area, w: Math.max(1, scene.area.w), h: Math.max(1, scene.area.h) }), size = { w: area.w, h: area.h };
+    this.seed(size);
     const dt = this.frameTime(time);
-    this.advance(dt, scene, { w, h });
+    this.advance(dt, scene, size);
     // One mote pixel is a whole number of device pixels, on one grid.
     const unit = Math.max(1, Math.round(scene.pixel * dpr));
+    const { x: vx, y: vy, s } = scene.view;
     for (const m of this.motes) {
-      this.move(m, dt, { w, h });
-      paint(ctx, m, unit, width, height, time);
+      this.move(m, dt, size);
+      const x = (vx + (area.x + m.x * area.w) * s) * dpr, y = (vy + (area.y + m.y * area.h) * s) * dpr;
+      if (x < -3 * unit || y < -3 * unit || x > width || y > height) continue;
+      paint(ctx, m, unit, x, y, time);
     }
     ctx.globalAlpha = 1;
   }
 
-  /** As many motes as the canvas's area calls for, kept as it resizes. */
+  /** As many motes as the area calls for, kept as it grows and shrinks. */
   private seed({ w, h }: Size) {
     const area = w * h;
-    if (Math.abs(area - this.area) < this.area * 0.2) return;
-    this.area = area;
-    const want = Math.min(320, Math.max(90, Math.round(area / 1100)));
+    if (Math.abs(area - this.seeded) < this.seeded * 0.2) return;
+    this.seeded = area;
+    const want = Math.min(600, Math.max(90, Math.round(area / 1100)));
     while (this.motes.length > want) this.motes.pop();
     while (this.motes.length < want)
       this.motes.push({ x: fx(), y: fx(), vx: 0, vy: 0, size: pickSize(fx()), alpha: 0.35 + fx() * 0.45, phase: fx() * Math.PI * 2 });
@@ -148,7 +169,7 @@ export class TreeMotes {
   }
 
   private step(dt: number, scene: MoteScene, { w, h }: Size) {
-    const nextU = new Float32Array(N * N), nextV = new Float32Array(N * N);
+    const nextU = new Float32Array(N * N), nextV = new Float32Array(N * N), { x: ax, y: ay } = this.area;
     const at = new Map(scene.nodes.map((n) => [n.id, n]));
     const edges = scene.edges.flatMap(([a, b]) => {
       const from = at.get(a), to = at.get(b);
@@ -159,7 +180,7 @@ export class TreeMotes {
     for (let y = 0; y < N; y++)
       for (let x = 0; x < N; x++) {
         const i = y * N + x;
-        const [fx, fy] = forceAt((x / (N - 1)) * w, (y / (N - 1)) * h, scene, edges);
+        const [fx, fy] = forceAt(ax + (x / (N - 1)) * w, ay + (y / (N - 1)) * h, scene, edges);
         const bx = x - this.u[i] * dt * (N - 1), by = y - this.v[i] * dt * (N - 1);
         nextU[i] = sampleField(this.u, N, bx, by) * (1 - blend) + (fx / w) * blend;
         nextV[i] = sampleField(this.v, N, bx, by) * (1 - blend) + (fy / h) * blend;
@@ -188,8 +209,8 @@ function eachInterior(fn: (i: number) => void) {
   for (let y = 1; y < N - 1; y++) for (let x = 1; x < N - 1; x++) fn(y * N + x);
 }
 
-/** The force at (px, py), CSS pixels: a swirl round every upgrade, and a
- * current along every branch. */
+/** The force at (px, py), the tree's own pixels: a swirl round every
+ * upgrade, and a current along every branch. */
 function forceAt(px: number, py: number, scene: MoteScene, edges: { from: MoteNode; to: MoteNode }[]): [number, number] {
   let fx = 0, fy = 0;
   for (const n of scene.nodes) {
@@ -219,15 +240,15 @@ function burst(m: { x: number; y: number }, p: Pulse, { w, h }: Size): [number, 
   return r > 1 ? [((dx / r) * force) / w, ((dy / r) * force) / h] : [0, 0];
 }
 
-/** A mote as gold pixels on the grid `unit` device pixels a pixel, fading
- * near the edges it wraps across and glinting now and then; the bigger
- * ones lit at their top left. */
-function paint(ctx: CanvasRenderingContext2D, m: Mote, unit: number, width: number, height: number, time: number) {
+/** A mote at device pixel (px, py) as gold pixels on the grid `unit` device
+ * pixels a pixel, fading near the area's edges it wraps across and glinting
+ * now and then; the bigger ones lit at their top left. */
+function paint(ctx: CanvasRenderingContext2D, m: Mote, unit: number, px: number, py: number, time: number) {
   const edge = Math.min(1, m.x * 30, (1 - m.x) * 30, m.y * 30, (1 - m.y) * 30);
   const glint = 0.8 + 0.2 * Math.sin(time / 380 + m.phase);
   ctx.globalAlpha = m.alpha * edge * glint;
   const s = SIZES[m.size], side = s.side * unit;
-  const x = Math.floor((m.x * width) / unit) * unit, y = Math.floor((m.y * height) / unit) * unit;
+  const x = Math.floor(px / unit) * unit, y = Math.floor(py / unit) * unit;
   ctx.fillStyle = s.body;
   ctx.fillRect(x, y, side, side);
   if (s.side > 1) {

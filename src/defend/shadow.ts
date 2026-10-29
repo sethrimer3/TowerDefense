@@ -135,7 +135,10 @@ function cut(sim: DefendSim, s: Soldier, e: Enemy, st: ReturnType<typeof shadowS
   s.edge = Math.min(SHADE.cap, (s.edge ?? 1) * (1 + st.rate));
   if (st.bleed && e.hp > 0 && bleeds(e.kind)) {
     const dps = hit * SHADOW_BLEED.share[st.bleed], time = SHADOW_BLEED.time[st.bleed];
-    if (!e.bleed || e.bleed.dps * e.bleed.t < dps * time) e.bleed = { dps, t: time };
+    if (!e.bleed || e.bleed.dps * e.bleed.t < dps * time) {
+      const origin = sim.tallyOrigin(s);
+      e.bleed = { dps, t: time, ...(origin ? { origin } : {}) };
+    }
   }
 }
 
@@ -144,7 +147,7 @@ export function stepBleed(sim: DefendSim, dt: number) {
   for (const e of sim.enemies) {
     const b = e.bleed;
     if (!b) continue;
-    if (e.hp > 0) sim.hurtEnemy(e, b.dps * Math.min(dt, b.t), false, "melee");
+    if (e.hp > 0) sim.hurtEnemy(e, b.dps * Math.min(dt, b.t), false, "melee", undefined, false, "physical", 0, b.origin);
     if ((b.t -= dt) <= 0) delete e.bleed;
   }
 }

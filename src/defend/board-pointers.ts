@@ -26,6 +26,8 @@ import type { DefendRenderer } from "./render.ts";
 import { paintIcon } from "./structure-art.ts";
 
 export type PointerHost = {
+  /** A scenario may keep its native palette under a different element ID. */
+  paletteSelector?: string;
   renderer(): DefendRenderer | null;
   /** A battle-only aiming handle; an additional pointer cancels it and pinches. */
   aim?(e: PointerEvent): BoardAim | null;
@@ -241,7 +243,7 @@ export class BoardPointers {
       cellX: c.fx,
       cellY: fy,
       overBoard: c.inside,
-      overPalette: !!(document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest?.("#defend-palette"),
+      overPalette: !!(document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest?.(this.host.paletteSelector ?? "#defend-palette"),
     };
   }
 

@@ -1,6 +1,6 @@
 import { decodeProfile, type PlayerProfile } from "./profile/model.ts";
 import { decodeSiege, type SiegeSave } from "./campaign/siege-progress.ts";
-import { decodeCampaigns, type CampaignSave } from "./campaign/sim.ts";
+import { decodeCampaigns, emptyCampaigns, type CampaignSave } from "./campaign/sim.ts";
 /** The one save, kept in localStorage under its own key (another game served
  * from the same site never shares it). Loading is defensive: `defaults()`
  * defines every field, and `decode()` keeps only what is well formed. */
@@ -61,7 +61,7 @@ export type Save = {
   forgeClock: number;
   defend: DefendSave;
   /** Optional so existing saves retain their original shape. */
-  campaigns?: CampaignSave;
+  campaigns: CampaignSave;
   siege?: SiegeSave;
   profile?: PlayerProfile;
   /** The mine as last saved (null until it first runs). */
@@ -89,6 +89,7 @@ export function defaults(): Save {
     forgeJob: null,
     forgeClock: 0,
     defend: defaultDefendSave(),
+    campaigns: emptyCampaigns(),
     mine: null,
     library: null,
     settings: defaultSettings(),

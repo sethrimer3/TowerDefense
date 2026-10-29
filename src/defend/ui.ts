@@ -1,5 +1,6 @@
 import {t} from "../i18n/index.ts";
 import { MagicCircle } from "../magic-circle/render.ts";
+import { SpellBar, STRIKE_SPELLS, castStrike } from "../ui/spell-bar.ts";
 import { buildingTree, foundNodes, hasTree, mergedFrom, respecBuilding, undoUpgrade, rootOf, specialtyLabel, specialtyOf, stepName, targetKind, upgradeBuilding, type PaletteKind, type SpecialtyTarget } from "../specializations.ts";
 import { pathById, type PathId } from "../knowledge-paths.ts";
 import { SIDE_UI, graftedGraph, mapCardHtml, mapCount, mapGraph, mapWeb, sharedBranches, specialtyCircle, treeAllocated, treeBeyond, treeCardHtml, treeStep, type SideKind, type SideUi } from "../ui/specialty.ts";
@@ -10,7 +11,7 @@ import { gravesNear } from "./necromancy.ts";
 import { meteorReach } from "./meteor.ts";
 import { frostReach } from "./frost-nova.ts";
 import { dropSpots } from "./reinforcements.ts";
-import { journalHTML, paintJournal } from "./journal.ts";
+import { allEnemyKinds, journalHTML, paintJournal } from "./journal.ts";
 import { paintPortraits } from "./journal-portrait.ts";
 import { wavePickerHTML } from "./wave-picker.ts";
 import { areaForWave, areaStyle, type AreaId } from "./areas.ts";
@@ -81,6 +82,8 @@ export type DefendHost = {
   /** The park grass and pond effects are on. */
   effects(): boolean;
   devMode(): boolean;
+  /** Dev: the enemy journal shows every species, discovered or not. */
+  allJournal?(): boolean;
   healthbars?(): boolean;
   /** Enemies, and your troops, drawn as plain squares. */
   simpleEnemies?(): boolean;
@@ -128,6 +131,7 @@ function sideOfDrag(drag: Drag): SideKind | undefined {
 }
 
 export class DefendPage {
+  private spellBar?: SpellBar;
   private host: DefendHost;
   private root: HTMLElement;
   private phase: "build" | "sim" | "over" = "build";
@@ -348,6 +352,14 @@ export class DefendPage {
     this.bindSpecialty();
     this.renderer = new DefendRenderer(this.root.querySelector("#defend-canvas")!);
     const canvas = this.renderer.canvas;
+    canvas.addEventListener("pointermove", (e) => {
+      if (!this.spellBar) return;
+      const p = this.renderer!.toCell(e.clientX, e.clientY);
+      this.spellBar.point = { x: p.fx, y: p.fy };
+    });
+    this.root.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") this.spellBar?.cancel();
+    });
     canvas.addEventListener("pointerdown", (e) => this.pointers.down(e));
     canvas.addEventListener("contextmenu", (e) => e.preventDefault());
     canvas.addEventListener(
@@ -361,7 +373,7 @@ export class DefendPage {
     this.journal = this.root.querySelector<HTMLDialogElement>(".defend-journal-dialog")!;
     this.journal.addEventListener("close", () => { this.lastTime = 0; this.root.querySelector<HTMLButtonElement>("#defend-journal")!.focus(); });
     this.root.querySelector<HTMLButtonElement>("#defend-journal")!.onclick = () => {
-      this.journal!.innerHTML = journalHTML(this.save.discovered);
+      this.journal!.innerHTML = journalHTML(this.host.allJournal?.() ? allEnemyKinds() : this.save.discovered);
       paintPortraits(this.journal!);
       this.journal!.querySelector<HTMLButtonElement>("[data-journal-close]")!.onclick = () => this.journal!.close();
       this.journal!.showModal();
@@ -456,7 +468,9 @@ export class DefendPage {
     } else {
       const img = new Image();
       img.onload = () => {
-        for (let x = 0; x < 4; x++) c.drawImage(img, 38, 1 + x * 16, 16, 16, x * 16, 0, 16, 16);
+        // The run's top two rows (y 1–2) are nearly transparent, so start
+        // below them: the button's own background showed through as a block.
+        for (let x = 0; x < 4; x++) c.drawImage(img, 38, 3 + x * 15, 16, 16, x * 16, 0, 16, 16);
       };
       img.src = `${(import.meta as ImportMeta & { env?: { BASE_URL?: string } }).env?.BASE_URL ?? "./"}assets/defend/wall-cap.png`;
     }
@@ -625,7 +639,18 @@ export class DefendPage {
   }
 
   private updateSkillCooldowns() {
-    if (this.phase !== "sim" || !this.sim) return;
+    if (this.phase !== "sim" || !this.sim) {
+      this.spellBar?.cancel();
+      if (this.spellBar) this.spellBar.el.hidden = true;
+      return;
+    }
+    // Every strike spell is always at hand, as in the Skills palette.
+    if (!this.spellBar) {
+      this.spellBar = new SpellBar(STRIKE_SPELLS);
+      this.root.querySelector("#defend-board")!.append(this.spellBar.el);
+    }
+    this.spellBar.el.hidden = false;
+    this.spellBar.update(this.sim, true, this.host.reduceMotion());
     for (const button of Array.from(this.root.querySelectorAll<HTMLButtonElement>("#defend-palette [data-item]"))) {
       const item = button.dataset.item, banner = item === "banner", necro = item === "necromancy", meteor = item === "meteor", frost = item === "frostNova", called = item === "reinforcements", spell = necro || meteor || frost || called;
       const left = banner ? this.sim.bannerRemaining : necro ? this.sim.necroRemaining : meteor ? this.sim.meteorRemaining : frost ? this.sim.frostRemaining : called ? this.sim.reinforceRemaining : 0;
@@ -971,7 +996,8 @@ export class DefendPage {
 
   // ── Dragging ──────────────────────────────────────────────────────────
   private overlay(): Overlay | null {
-    const o = this.pointers.session?.overlay() ?? null;
+    if (this.spellBar) this.spellBar.el.hidden = this.phase !== "sim";
+    const o = this.pointers.session?.overlay() ?? (this.phase === "sim" && this.sim ? this.spellBar?.overlay(this.sim) : null) ?? null;
     // An aimed meteor or nova shows its researched reach; Necromancy marks the fallen it would raise.
     if (o?.spell?.look === "meteor" && this.sim) o.spell.r = meteorReach(this.sim);
     else if (o?.spell?.look === "frost" && this.sim) o.spell.r = frostReach(this.sim);
@@ -992,6 +1018,7 @@ export class DefendPage {
    * build phase picks things up; in battle a press lifts the war banner where
    * it stands (a tap takes it down), and anywhere else moves the view. */
   private pickUp(e: PointerEvent): boolean {
+    if (this.spellBar?.armed) return false;
     if (this.phase === "sim") return this.pickUpBanner(e);
     if (this.phase !== "build") return false;
     const { cx, cy, inside } = eventCell(this.renderer!, e);
@@ -1144,6 +1171,11 @@ export class DefendPage {
    * tap, or a tap on anything else, puts it down). */
   private tap(e: PointerEvent) {
     if (this.phase === "over") return;
+    if (this.phase === "sim" && this.sim && this.spellBar?.armed) {
+      const p = this.renderer!.toCell(e.clientX, e.clientY);
+      if (castStrike(this.sim, this.spellBar.armed, { x: p.fx, y: p.fy })) this.spellBar.cancel();
+      return;
+    }
     if (this.phase === "sim" && this.rallyTap(e)) return;
     this.closeSpecialty();
     const { cx, cy, inside } = eventCell(this.renderer!, e);

@@ -1,35 +1,11 @@
 import { defendRandom } from "./grid.ts";
+import { BRICKS, W, H, MORTAR, FACE, LIGHT, SHADE, CRACK, paintBrick, paintBrickBed, type Brick } from "../ui/brick-wall.ts";
 
 /** The keep's health in the battle's header: a short wall of bricks laid in
  * two courses, black mortar between them. As the keep is hurt the bricks
  * crack and break away from the right, tumbling out of the wall in pieces;
  * mended, they are laid again. Pixel art on a small canvas shown at twice
  * its size. Presentation only. */
-
-const W = 37;
-/** Room above the wall for chips to fly and below for them to fall. */
-const TOP = 3;
-const H = TOP + 9 + 6;
-const COURSE = 4;
-
-const MORTAR = "#0b0706";
-const HOLE = "#1d1310";
-const FACE = "#a8452e";
-const LIGHT = "#cf6a4c";
-const SHADE = "#6c2819";
-const CRACK = "#2a0f09";
-
-type Brick = { x: number; y: number; w: number };
-/** Each brick's place in the wall, ordered left to right by its middle, so
- * the wall comes down from the right a brick at a time. */
-const BRICKS: Brick[] = (() => {
-  const list: Brick[] = [];
-  for (let i = 0; i < 6; i++) list.push({ x: 1 + i * 6, y: TOP + 1, w: 5 });
-  list.push({ x: 1, y: TOP + 1 + COURSE, w: 2 });
-  for (let i = 0; i < 5; i++) list.push({ x: 4 + i * 6, y: TOP + 1 + COURSE, w: 5 });
-  list.push({ x: 34, y: TOP + 1 + COURSE, w: 2 });
-  return list.sort((a, b) => a.x + a.w / 2 - (b.x + b.w / 2));
-})();
 
 type Chip = { x: number; y: number; w: number; vx: number; vy: number; life: number };
 
@@ -105,22 +81,17 @@ export class KeepBricks {
     const c = this.c;
     c.clearRect(0, 0, W, H);
     // The wall's bed: black mortar round dark gaps where bricks have gone.
-    c.fillStyle = MORTAR;
-    c.fillRect(0, TOP, W, COURSE * 2 + 1);
-    c.fillStyle = HOLE;
-    for (const b of BRICKS) c.fillRect(b.x, b.y, b.w, 3);
+    paintBrickBed(c);
     // The part of the last brick's share already lost cracks it.
     const share = this.fraction * BRICKS.length - (this.standing - 1);
     BRICKS.slice(0, this.standing).forEach((b, i) => {
       const last = i === this.standing - 1;
-      c.fillStyle = last && this.flash > 0 ? "#fff3d6" : FACE;
-      c.fillRect(b.x, b.y, b.w, 3);
-      if (last && this.flash > 0) return;
-      c.fillStyle = LIGHT;
-      c.fillRect(b.x, b.y, b.w - 1, 1);
-      c.fillStyle = SHADE;
-      c.fillRect(b.x, b.y + 2, b.w, 1);
-      c.fillRect(b.x + b.w - 1, b.y, 1, 3);
+      if (last && this.flash > 0) {
+        c.fillStyle = "#fff3d6";
+        c.fillRect(b.x, b.y, b.w, 3);
+        return;
+      }
+      paintBrick(c, b);
       if (!last || b.w < 3) return;
       c.fillStyle = CRACK;
       if (share < 0.67) {

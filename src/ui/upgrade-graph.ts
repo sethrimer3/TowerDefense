@@ -17,7 +17,7 @@
  * Presentation only, with no game imports: the page hands it `GraphNode`s
  * (`set`) and hears back which node was picked (`onPick`). */
 import { stream } from "../random.ts";
-import { TreeMotes, type MoteNode } from "./tree-motes.ts";
+import { TreeMotes, type MoteArea, type MoteNode } from "./tree-motes.ts";
 import { BranchArt, rgb, type Pt, type Stroke, type Tone } from "./branch-art.ts";
 
 const rand = stream("effects");
@@ -105,6 +105,15 @@ export class UpgradeGraph {
   private pan = { x: 0, y: 0, s: 1 };
   private fit = { x: 0, y: 0, s: 1 };
   private steered = false;
+  /** The space the view can pan round, in the tree's own pixels: the tree
+   * (and its trailing lines) and `PAN_MARGIN` of its size more on every
+   * side. */
+  private area: MoteArea | null = null;
+  /** Where the motes swirl: the pan area, widened to cover the view at the
+   * furthest zoom out. */
+  private moteArea: MoteArea | null = null;
+  /** The furthest the view zooms out: `ZOOM_OUT` past fitting the tree. */
+  private minS = 0.2;
   private drag: { id: string; pointer: number; x0: number; y0: number; moved: boolean; pan?: { x: number; y: number } } | null = null;
   private pinch = new Map<number, { x: number; y: number }>();
 
@@ -205,13 +214,16 @@ export class UpgradeGraph {
       y0 = Math.min(y0, b.hy - r); y1 = Math.max(y1, b.hy + r);
     }
     if (x0 > x1) return;
+    this.area = panArea(x0, y0, x1, y1);
     const w = this.el.clientWidth || 300, h = this.el.clientHeight || 300, pad = 46;
     const s = Math.min(1.25, (w - pad * 2) / Math.max(1, x1 - x0), (h - pad * 2) / Math.max(1, y1 - y0));
     this.fit = { s, x: w / 2 - ((x0 + x1) / 2) * s, y: h / 2 - ((y0 + y1) / 2) * s };
+    this.minS = s / ZOOM_OUT;
+    this.moteArea = coverView(this.area, w, h, this.minS);
     if (now) {
       this.pan = { ...this.fit };
       this.steered = false;
-    }
+    } else if (this.steered) this.clamp();
   }
 
   private drop(id: string) {
@@ -309,19 +321,32 @@ export class UpgradeGraph {
   /** The motes over the branches: every live node a swirl, every branch a
    * current from parent to child, in the host's CSS pixels. */
   private paintMotes() {
-    const { x: px, y: py, s } = this.pan, nodes: MoteNode[] = [], edges: [string, string][] = [];
+    if (!this.area) return;
+    const nodes: MoteNode[] = [], edges: [string, string][] = [];
     for (const b of this.bodies.values()) {
       if (b.dying >= 0) continue;
-      nodes.push({ id: b.n.id, x: px + b.x * s, y: py + b.y * s });
+      nodes.push({ id: b.n.id, x: b.x, y: b.y });
       if (b.n.parent && this.bodies.has(b.n.parent)) edges.push([b.n.parent, b.n.id]);
     }
-    this.motes.draw(this.moteCanvas, this.now || performance.now(), { nodes, edges, picked: this.picked || null, pixel: ART * s, reduced: this.opts.reduceMotion() });
+    // A mote pixel is half a branch's art pixel.
+    this.motes.draw(this.moteCanvas, this.now || performance.now(), { nodes, edges, picked: this.picked || null, area: this.moteArea ?? this.area, view: this.pan, pixel: (ART * this.pan.s) / 2, reduced: this.opts.reduceMotion() });
+  }
+
+  /** Keeps the view inside the space it can pan round (`area`): along an
+   * axis the area is wider than the view, its edges stay beyond the view's;
+   * along one it fits in, it stays centred. */
+  private clamp() {
+    const a = this.area;
+    if (!a) return;
+    const { s } = this.pan;
+    this.pan.x = clampAxis(this.pan.x, a.x, a.w, this.el.clientWidth, s);
+    this.pan.y = clampAxis(this.pan.y, a.y, a.h, this.el.clientHeight, s);
   }
 
   /** A purchase at node `id`: the motes round it burst outward. */
   burst(id: string) {
     const b = this.bodies.get(id);
-    if (b) this.motes.burst(this.pan.x + b.x * this.pan.s, this.pan.y + b.y * this.pan.s, this.moteCanvas);
+    if (b) this.motes.burst(b.x, b.y);
   }
 
   /** The branches and trailing lines, as pixel art a whole number of device
@@ -475,6 +500,7 @@ export class UpgradeGraph {
       this.steered = true;
       this.pan.x = g.pan.x + e.clientX - g.x0;
       this.pan.y = g.pan.y + e.clientY - g.y0;
+      this.clamp();
       if (this.opts.reduceMotion()) this.draw();
       return;
     }
@@ -504,9 +530,10 @@ export class UpgradeGraph {
   };
 
   private zoom(f: number, cx: number, cy: number) {
-    const r = this.el.getBoundingClientRect(), s = Math.max(0.2, Math.min(2.5, this.pan.s * f));
+    const r = this.el.getBoundingClientRect(), s = Math.max(this.minS, Math.min(Math.max(2.5, this.minS), this.pan.s * f));
     const k = s / this.pan.s, x = cx - r.left, y = cy - r.top;
     this.pan = { s, x: x - (x - this.pan.x) * k, y: y - (y - this.pan.y) * k };
+    this.clamp();
     this.steered = true;
     if (this.opts.reduceMotion()) this.draw();
   }
@@ -624,4 +651,34 @@ export function webLayout(nodes: readonly { id: string; parent?: string }[]): Ma
     x += ring * 2 * 9;
   }
   return at;
+}
+
+/** How far past the tree the view can pan, a share of the tree's size each
+ * way (at least `PAN_MIN` pixels, so a small tree still has room round it). */
+export const PAN_MARGIN = 0.2, PAN_MIN = 60;
+/** How far past fitting the whole tree the view zooms out: a quarter more. */
+export const ZOOM_OUT = 1.25;
+
+/** `area` widened about its middle, along each axis it falls short, to cover
+ * a `w` by `h` view at zoom `s`. */
+export function coverView(area: MoteArea, w: number, h: number, s: number): MoteArea {
+  const cw = Math.max(area.w, w / s), ch = Math.max(area.h, h / s);
+  return { x: area.x + (area.w - cw) / 2, y: area.y + (area.h - ch) / 2, w: cw, h: ch };
+}
+
+/** The space a tree spanning (x0, y0) to (x1, y1) can be panned round:
+ * `PAN_MARGIN` of its width more on the left and right, of its height above
+ * and below. */
+export function panArea(x0: number, y0: number, x1: number, y1: number): MoteArea {
+  const mx = Math.max(PAN_MIN, (x1 - x0) * PAN_MARGIN), my = Math.max(PAN_MIN, (y1 - y0) * PAN_MARGIN);
+  return { x: x0 - mx, y: y0 - my, w: x1 - x0 + mx * 2, h: y1 - y0 + my * 2 };
+}
+
+/** A pan offset `p` along one axis held so the area from `a0`, `len` long,
+ * covers the view (`view` pixels at zoom `s`) when it is bigger, else sits
+ * centred in it. */
+export function clampAxis(p: number, a0: number, len: number, view: number, s: number) {
+  if (!view) return p;
+  if (len * s <= view) return view / 2 - (a0 + len / 2) * s;
+  return Math.min(-a0 * s, Math.max(view - (a0 + len) * s, p));
 }

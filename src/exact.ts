@@ -25,3 +25,27 @@ export const sq = (x: number) => x * x;
 
 /** The length of (dx, dy): `Math.hypot`'s answer from exact operations. */
 export const dist = (dx: number, dy: number) => Math.sqrt(dx * dx + dy * dy);
+
+/** Positive base to an integer ratio, using deterministic square roots for
+ * fractional binary digits. Used by saved ratings and scenario budgets. */
+export function ratioPow(base:number,numerator:number,denominator:number){
+ if(!Number.isFinite(base)||base<=0||!Number.isSafeInteger(numerator)||!Number.isSafeInteger(denominator)||denominator<=0)return NaN;
+ const negative=numerator<0,n=Math.abs(numerator),whole=Math.floor(n/denominator);
+ let result=1;
+ if(whole<=1024)result=intPow(base,whole);
+ else {let factor=base,power=whole;while(power){if(power%2)result*=factor;power=Math.floor(power/2);if(power)factor*=factor;}}
+ let remainder=n-whole*denominator,root=base;
+ for(let bit=0;bit<52&&remainder;bit++){root=Math.sqrt(root);remainder*=2;if(remainder>=denominator){result*=root;remainder-=denominator;}}
+ return negative?1/result:result;
+}
+/** Binary logarithm from normalization and repeated squaring, avoiding a
+ * platform-dependent transcendental in saved castle difficulty. */
+export function binaryLog(value:number){
+ if(!Number.isFinite(value)||value<=0)return value===Infinity?Infinity:NaN;
+ let whole=0;
+ while(value<1){value*=2;whole--;}
+ while(value>=2){value/=2;whole++;}
+ let fraction=0,weight=.5;
+ for(let bit=0;bit<52;bit++){value*=value;if(value>=2){value/=2;fraction+=weight;}weight/=2;}
+ return whole+fraction;
+}

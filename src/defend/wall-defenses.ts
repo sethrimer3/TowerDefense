@@ -243,7 +243,7 @@ export function stepBallistaBolts(sim: DefendSim, dt: number) {
       sim.hurtEnemy(e, bolt.damage, true, "ranged", { x: x0, y: y0, building: bolt.building }, true);
       if (e.hp <= 0) continue;
       if (bolt.stagger && !ENEMIES[e.kind].unyielding) e.stagger = Math.max(e.stagger ?? 0, bolt.stagger);
-      if (bolt.burn) ignite(e, bolt.burn, FIRE_BOLTS.burn);
+      if (bolt.burn) ignite(e, bolt.burn, FIRE_BOLTS.burn, sim.tallyOrigin({ x: x0, y: y0, building: bolt.building }));
     }
     if (bolt.hits.length >= bolt.pierce) bolt.left = 0;
     if(field&&bolt.hits.length<bolt.pierce&&captureShot(sim,{kind:"ballista",shot:bolt},{x:x0,y:y0},end)){bolt.left=0;continue;}

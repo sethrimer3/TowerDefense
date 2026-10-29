@@ -1,17 +1,27 @@
-/** Regenerate the rough deployment-price table without reading any player save. */
-import { STRUCTURES,UPGRADES,type StructureKind } from '../src/defend/catalog.ts';
-import { defaultDefendSave } from '../src/defend/progress.ts';
-import { deployable } from '../src/campaign/sim.ts';
-import { ambushPrice } from '../src/campaign/economy.ts';
-const levels=defaultDefendSave().levels,max={...levels};for(const u of UPGRADES)max[u.id]=u.maxLevel;
-console.log('# Ambush deployment economy\n');
-console.log('Ambush starts levels 1/2/3 with **500/600/700 gold**. This is a level-local wallet, separate from the Mine’s persistent Gold. A retry restarts its budget and rebuys the saved layout only while affordable; run gold is not persisted.\n');
-console.log('Owning a building type unlocks it for Ambush. Each placement costs gold, and repeat copies can be bought without consuming Defend inventory. Building and selling are allowed during waves. Before waves, selling refunds the exact paid cost; during battle it refunds 70%, rounded down to a multiple of ten, and withdraws that building’s troops. No sales or purchases after victory/defeat.\n');
-console.log('## Rough pricing rule\n');
-console.log('All purchase costs round to the nearest ten (minimum 10):\n\n`cost = round10(40 + 12 × potentialDPS × (1 + min(range, 20) / 20) × replacementMultiplier + durabilityAllowance)`\n');
-console.log('- Infantry potential DPS assumes its full Armory garrison, base unit damage/reload and Arms & Armour. Durability allowance is 15% of the full garrison’s HP. Faster training receives a small replacement-rate premium.\n- Direct towers use their implemented damage/cooldown. Cannon splash assumes 2.5 targets; wizard splash assumes 2. These are rough potential estimates, not guaranteed throughput.\n- A Watch Tower costs for support: an 8-DPS partner benefiting from its damage mark, plus its upgraded coverage. It has no direct damage.\n- `price-estimates.ts` estimates potential DPS using native catalog stats and Armory curves. It is used only for prices; all attacks run in DefendSim. Armory levels are snapshotted for the level; upgrades bought elsewhere take effect on retry or the next level.\n- Actual worn Defend paths and their specialty abilities apply in battle. A worn variant adds a rough 20% premium per rank plus 1% of its allocated upgrade value (capped at 500 gold), before rounding. This is an initial estimate rather than a claim that all paths have equal combat value. The table shows unranked copies; Max-Armory prices include every relevant current Armory rank.\n');
-console.log('## Initial price table\n\n| Building | Base potential DPS | Base cost | Max-Armory cost |\n|---|---:|---:|---:|');
-for(const kind of Object.keys(STRUCTURES) as StructureKind[])if(deployable(kind,'ambush')){const p=ambushPrice(kind,levels);console.log(`| ${STRUCTURES[kind].name} | ${p.dps.toFixed(1)}${p.support?' support equiv.':''} | ${p.cost} | ${ambushPrice(kind,max).cost} |`);}
-console.log('\n## Kill gold\n\n`difficulty = maxHP / 12 + (damage / cooldown) / 2 + speed / 1.2`\n\n`bounty = round10(4 × difficulty)` (minimum 10)\n');
-console.log('The bounty is calculated from each enemy’s actual spawn stats. Weak enemies usually pay 10 gold; tougher native species and later-wave HP scaling pay more. Higher HP, DPS or speed increases the underlying reward before rounding. Every enemy gets a bounty. Only the friendly killing hit pays it, once; hits, escaped enemies and defeated friendly troops never pay. Gold is awarded immediately so it can fund another building during that wave. Siege gives no Ambush gold.\n');
-console.log('The coefficient choices are initial balance estimates. Check actual level outcomes and adjust starting gold, prices or reward coefficients together rather than tying this budget to the player’s persistent metal wallet.\n\nRegenerate: `node --experimental-transform-types --import ./tests/pin-random.ts tools/ambush-prices.ts > docs/design/AMBUSH_ECONOMY.md`');
+/** Regenerate native base-building price estimates without reading a player save. */
+import { STRUCTURES } from "../src/defend/catalog.ts";
+import { AMBUSH_PALETTE } from "../src/campaign/plans.ts";
+import { ambushPrice } from "../src/campaign/economy.ts";
+import { AMBUSH_WAVES } from "../src/campaign/ambush-waves.ts";
+console.log("# Ambush deployment economy\n");
+console.log(
+  "Level 1 starts with **800 gold**, each later level 5% more (rounded to tens). This wallet is local to the level and separate from Mine metals. A retry or reload starts a fresh wallet and empty build grid. Old saved pad layouts are discarded; best stars remain saved.\n",
+);
+console.log(
+  "The palette offers **Melee Guild, Ranged Guild, Archer Tower, Cannon Tower and Wizard Tower** to every player. Each uses native Defend combat at base Armory levels. Defend ownership, Knowledge paths and Smithy upgrades do not enter the Ambush battle. Purchases and sales work during waves. Sales before wave 2 starts return the full investment, including local upgrades. From wave 2 onward the refund is 70%, rounded down to tens. Actual native nextSteps upgrades are bought with level gold, including merges that consume two maxed partners; their investments are retained by the resulting building.\n",
+);
+console.log("## Rough base pricing\n\n    cost = round10(40 + 12 × potentialDPS × (1 + min(range, 20) / 20) × replacementMultiplier + durabilityAllowance)\n");
+console.log(
+  "Infantry assumes a full native base garrison. Cannon splash assumes 2.5 targets; wizard splash assumes two. These are pricing estimates only; all damage, fire rates, special abilities and projectiles run through DefendSim. Prices round to the nearest ten, minimum 10.\n\n| Building | Base potential DPS | Gold |\n|---|---:|---:|",
+);
+for (const kind of AMBUSH_PALETTE) {
+  const p = ambushPrice(kind);
+  console.log("| " + STRUCTURES[kind].name + " | " + p.dps.toFixed(1) + " | " + p.cost + " |");
+}
+console.log(
+  "\n## Local upgrade fees\n\nAttunement: 55% of the current kind’s catalog price; branch attunement: 70%; path ranks I/II/III: 40/65/100%; merge: 150%; beyond-ultimate: 200%. Each fee rounds to tens, minimum 20 gold. These bounded tier estimates do not use native Knowledge costs, which span six orders of magnitude. The selected native building panel offers every valid next step and displays its total investment refund. No global research enters combat.\n",
+);
+console.log("\n## Kill gold\n\n    wave gold = " + AMBUSH_WAVES.goldPerHp + " × the wave's total enemy HP\n    bounty = wave gold / the wave's enemies\n");
+console.log(
+  "Native enemy deaths pay once, at their wave's bounty (the young of the fallen at the current wave's). Escapes and fortress body parts pay nothing. Gold arrives immediately and can fund an in-wave purchase. Siege never uses this wallet. The 30-level scripted balance checks use these opening budgets, base prices and tier fees. Measurements and reproducible opening/final-level probes are in AMBUSH_BALANCE.md; these remain rough, adjustable estimates.\n\nRegenerate:\n\n    node --experimental-transform-types --import ./tests/pin-random.ts tools/ambush-prices.ts > docs/design/AMBUSH_ECONOMY.md",
+);

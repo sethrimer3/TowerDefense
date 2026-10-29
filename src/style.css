@@ -1956,6 +1956,10 @@ nav button > .tab-idle[hidden] { display: none; }
 }
 .sconce.left { left: 0; }
 .sconce.right { right: 0; }
+/* The Study's torches hang off its piers' inner sides (`--pier` wide, set by
+   hall-art.ts), the backplate over the pier's outline. */
+.chamber-vault .sconce.left { left: calc(var(--pier, 36px) - 3px); }
+.chamber-vault .sconce.right { right: calc(var(--pier, 36px) - 3px); }
 /* The keep's sunbeams and dust, over the menu too, as light rather than paint. */
 .chamber-light {
   position: absolute;
@@ -1977,6 +1981,8 @@ nav button > .tab-idle[hidden] { display: none; }
 }
 @media (max-width: 480px) {
   .sconce { width: 22px; height: 48px; }
+  .chamber-vault .sconce.left { left: calc(var(--pier, 36px) - 2px); }
+  .chamber-vault .sconce.right { right: calc(var(--pier, 36px) - 2px); }
   .chamber-content { padding: 6px 22px; }
 }
 /* The ledger in its room: a head, two strips that scroll sideways (so the
@@ -2301,18 +2307,17 @@ nav button > .tab-idle[hidden] { display: none; }
 nav button > .combat-tab-icon { display: grid; overflow: hidden; width: 42px; height: 42px; flex: 0 0 auto; }
 .combat-icon-layer { grid-area: 1 / 1; display: grid; place-items: center; width: 100%; height: 100%; }
 nav button .combat-icon-layer > .ui-sprite { width: 100%; height: 100%; object-fit: contain; }
+nav button > span > .tab-icon { display: block; width: 42px; height: 42px; }
 nav button[data-mode] > .tab-label { min-height: 2.4em; }
-@media (max-width: 480px) { nav button > .combat-tab-icon { width: 32px; height: 32px; } }
-@media (max-width: 360px) { nav button > .combat-tab-icon { width: 26px; height: 26px; } }
+@media (max-width: 480px) { nav button > .combat-tab-icon, nav button > span > .tab-icon { width: 32px; height: 32px; } }
+@media (max-width: 360px) { nav button > .combat-tab-icon, nav button > span > .tab-icon { width: 26px; height: 26px; } }
 
-.campaign-head h1 { margin: 0 0 8px; }
 .campaign-head p { line-height: 1.5; }
-.campaign-actions, .campaign-roster, .campaign-spaces { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.campaign-actions, .campaign-roster { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .campaign-board { width: min(100%, 600px); margin: 12px auto; border: 3px solid var(--ink); }
 .campaign-board > canvas { display: block; width: 100%; height: auto; touch-action: manipulation; }
 .campaign-roster button { display: grid; justify-items: center; gap: 4px; width: 130px; }
 .campaign-roster button[aria-pressed="true"] { outline: 2px solid #d6ae68; }
-.campaign-spaces button { font-size: 12px; }
 .campaign-status { min-height: 1.5em; }
 .campaign-actions button[hidden] { display: none; }
 
@@ -2356,6 +2361,8 @@ nav button[data-mode] > .tab-label { min-height: 2.4em; }
 
 .ambush-wallet { font-weight: bold; font-size: 18px; }
 .ambush-wallet b { font-variant-numeric: tabular-nums; }
+/* A round coin, so the wallet's ingot never reads as a minus sign. */
+.ambush-wallet .metal-icon { width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 2px 0 #ffffff80, inset 0 -2px 0 #0000004d, 0 1px 0 #000; }
 
 #ambush .campaign-board, #siege .campaign-board { width: 100%; height: min(76dvh, 900px); min-height: 420px; position: relative; }
 #ambush .campaign-board > canvas, #siege .campaign-board > canvas { width: 100%; height: 100%; touch-action: none; }
@@ -2365,7 +2372,6 @@ nav button[data-mode] > .tab-label { min-height: 2.4em; }
 
 #ambush.native-campaign.active, #siege.native-campaign.active { display: flex; flex-direction: column; overflow: hidden; gap: 6px; }
 .native-campaign .campaign-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 0; }
-.native-campaign .campaign-head h1 { font-size: 20px; margin: 0; }
 .native-campaign .campaign-head p { margin: 0; }
 .native-campaign .campaign-actions { margin: 0; }
 .native-campaign .campaign-status { flex-basis: 100%; font-size: 12px; }
@@ -2380,9 +2386,144 @@ nav button[data-mode] > .tab-label { min-height: 2.4em; }
 .native-campaign .siege-profile > div { min-width: 0; font-size: 12px; }
 .native-campaign .siege-profile small { display: none; }
 .native-campaign .siege-opponent { margin: 0; padding: 0; border: 0; font-size: 12px; }
-.native-campaign .campaign-intro, .native-campaign .campaign-help { font-size: 11px; }
-.native-campaign .campaign-help { flex: 0 0 auto; max-height: 30%; overflow-y: auto; }
-.native-campaign .campaign-help p { margin: 6px; }
 .native-campaign .campaign-spells, .native-campaign .campaign-inspect-actions { margin: 0; }
-.native-campaign .campaign-spaces { margin: 0; }
-@media(max-width:480px) { .native-campaign .campaign-head button { font-size: 10px; padding: 6px; } .native-campaign .campaign-head h1 { font-size: 15px; } }
+@media(max-width:480px) { .native-campaign .campaign-head button { font-size: 10px; padding: 6px; } }
+/* Ambush level selection: parchment cards in three columns on the keep's wood. */
+.ambush-select-head { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:12px; color:var(--gold); }
+.ambush-level-columns, .ambush-level-cards { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+.ambush-level-columns { text-align:center; padding:0 12px; color:var(--gold); }
+.ambush-zone { margin:12px 0 20px; padding:12px; border:2px solid var(--area-dark); background:var(--wood); }
+.ambush-zone h2 { margin:0 0 10px; color:var(--area-color); font-size:16px; }
+.ambush-level-card { min-width:0; display:flex; flex-direction:column; align-items:stretch; gap:8px; padding:8px; color:var(--ink); background:var(--brass-nails), var(--parchment); border:2px solid var(--brass); font-family:var(--font); }
+.ambush-level-card:disabled { opacity:.45; }
+.ambush-level-preview { height:110px; background:linear-gradient(var(--area-dark),var(--area-color)); display:grid; place-items:center; color:var(--gold); border:2px solid var(--ink); overflow:hidden; }
+.ambush-level-card strong { font-size:13px; overflow-wrap:anywhere; }
+.ambush-card-stars { color:var(--area-dark); letter-spacing:3px; }
+@media(max-width:480px) { .ambush-level-columns,.ambush-level-cards { gap:6px; } .ambush-zone { padding:6px; } .ambush-level-card { padding:5px; gap:5px; } .ambush-level-preview { height:80px; } .ambush-level-card strong { font-size:11px; } }
+.ambush-level-preview canvas { width:100%; height:100%; object-fit:contain; image-rendering:pixelated; background:#0b0a09; }
+/* Ambush keeps health and gold above a separately scrolling native palette,
+   as narrow as Defend's: a small stone plaque over the shelf of buildings. */
+.native-campaign .ambush-side { flex-direction:column;align-items:stretch;overflow:hidden; }
+.native-campaign .side-open .ambush-side { width:80px; }
+.native-campaign .ambush-side,.ambush-side-content,.ambush-side-content .defend-palette { scrollbar-width:none; }
+.native-campaign .ambush-side::-webkit-scrollbar,.ambush-side-content::-webkit-scrollbar,.ambush-side-content .defend-palette::-webkit-scrollbar { display:none; }
+.ambush-side-head { position:relative;flex:none;display:flex;flex-direction:column;align-items:center;gap:2px;margin-bottom:4px;padding:4px 3px 3px;text-align:center;font-size:9px;line-height:1.1;border:2px solid #0c0907;border-radius:3px;background:linear-gradient(#00000060,#00000030),var(--stone),#161412;box-shadow:inset 0 3px 6px #000000c0,inset 0 -1px 0 #ffffff14,0 1px 0 #ffd9a01a; }
+.ambush-side-head>strong { display:block;padding:0 12px;white-space:nowrap;color:#e8dcc4;text-shadow:0 1px 0 #000; }
+#ambush-health-short { display:none; }
+.ambush-side-head canvas { width:37px;height:18px;display:block;margin:auto;image-rendering:pixelated; }
+.ambush-side-head .ambush-hide { position:absolute;top:1px;right:1px;width:14px;height:14px;min-height:0;padding:0;font-size:10px;line-height:1;border-width:1px; }
+.ambush-icon { display:inline-block;image-rendering:pixelated;vertical-align:middle;flex:none; }
+.ambush-wallet { display:flex;align-items:center;justify-content:center;gap:3px;margin:0;color:var(--gold);font-weight:bold;font-size:11px; }
+.ambush-wallet b,.ambush-mini b { font-variant-numeric:tabular-nums; }
+.ambush-side-content { overflow:auto;min-height:0; }
+.ambush-side-content .defend-palette { width:100%;max-height:none; }
+.ambush-side-content [hidden] { display:none; }
+.ambush-side-content .defend-item small { display:flex;align-items:center;justify-content:center;gap:2px; }
+.ambush-hud-stars { display:flex;justify-content:center;gap:2px; }
+.ambush-hud-stars span { display:block;line-height:0;transition:transform .4s; }
+.ambush-hud-stars .star-lost { transform:translateY(1px); }
+.ambush-mini { position:absolute;z-index:3;top:6px;left:6px;display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-height:0;padding:3px 5px;font-size:10px;line-height:1.1;color:#e8dcc4;background:#000000a0;border:1px solid var(--gold);border-radius:2px;box-shadow:none;text-shadow:0 1px 0 #000; }
+.ambush-mini[hidden] { display:none; }
+.ambush-mini-hp,.ambush-mini-gold { display:flex;align-items:center;gap:3px; }
+.ambush-mini-gold { color:var(--gold); }
+.ambush-mini canvas { width:37px;height:18px;image-rendering:pixelated; }
+.ambush-result { position:absolute;z-index:5;left:50%;top:50%;transform:translate(-50%,-50%);width:min(320px,88%);box-sizing:border-box;text-align:center;padding:16px;background:var(--wood);border:3px solid var(--brass-nails);box-shadow:0 5px 30px #000b; }
+.ambush-result button { margin:4px; }
+.ambush-result-stars { color:var(--gold);font-size:32px; }
+.native-campaign .ambush-side .campaign-inspect-actions { display:flex;flex-direction:column;padding:6px; }
+.native-campaign .campaign-actions label { display:flex;align-items:center;gap:3px; }
+.strike-bar { position:absolute;left:8px;bottom:max(8px,env(safe-area-inset-bottom));display:flex;gap:6px;z-index:4; }
+.strike-bar button { position:relative;width:48px;height:48px;padding:2px;border-radius:50%;border:2px solid var(--brass-nails);background:conic-gradient(#caa75c88 var(--fill,100%),#17120de0 0);opacity:.3; }
+.strike-bar button:disabled { opacity:.3; }
+.strike-bar button[aria-pressed="true"] { opacity:1;outline:2px solid var(--gold); }
+.strike-bar canvas { width:40px;height:40px;image-rendering:pixelated; }
+.strike-bar small { position:absolute;inset:12px 0 0;text-shadow:1px 1px #000;font-size:14px; }
+.strike-ready { animation:strike-ready .5s ease-out; }
+@keyframes strike-ready { from { opacity:1;filter:brightness(3); } to { opacity:.3;filter:brightness(1); } }
+@media (max-width:600px) {
+ .native-campaign .side-open .ambush-side { width:60px; }
+ .ambush-side-head { font-size:8px;padding:3px 2px 2px; }
+ #ambush-health-label { display:none; }
+ #ambush-health-short { display:inline; }
+ .strike-bar button { width:40px;height:40px; }
+ .strike-bar canvas { width:32px;height:32px; }
+}
+@media (prefers-reduced-motion:reduce) { .ambush-hud-stars span { transition:none; }.strike-ready { animation:none; } }
+
+.strike-bar[hidden] { display:none; }
+.ambush-building-details { padding:6px;display:flex;flex-direction:column;gap:6px;font-size:11px; }
+.ambush-building-details .ambush-portrait { width:80px;height:80px;margin:auto;image-rendering:pixelated; }
+.ambush-building-details dl { display:grid;grid-template-columns:1fr auto;gap:4px;margin:0; }
+.ambush-building-details dd { margin:0;color:var(--gold); }
+.ambush-upgrades { display:flex;flex-direction:column;gap:6px; }
+.ambush-upgrades button { font-size:10px;padding:5px; }
+.ambush-upgrades small { display:block; }
+.ambush-star-dialog { width:min(860px,94vw);max-height:92dvh;padding:12px;box-sizing:border-box; }
+.ambush-star-head { display:flex;align-items:center;flex-wrap:wrap;gap:8px; }
+.ambush-star-body { position:relative;height:min(56dvh,460px); }
+.ambush-star-graph { height:100%;position:relative;z-index:1; }
+.ambush-star-card { min-height:92px;position:relative; }
+.ambush-star-card p { margin:6px 0; }
+.ambush-star-dialog { padding-top:40px; }
+.ambush-star-head label { display:flex;gap:6px;align-items:center; }
+@media(max-width:600px) { .ambush-star-body { height:44dvh; }.ambush-star-head label { width:100%; } }
+
+.ambush-zone h2 small { font-size:11px;font-weight:normal;color:var(--ink);margin-left:8px; }
+.ambush-result-stars span { display:inline-block; }
+.star-award { animation:ambush-star .55s both;animation-delay:var(--star-delay,0s); }
+@keyframes ambush-star { 0% { opacity:0;transform:translateY(12px) scale(.3) rotate(-25deg); } 65% { opacity:1;transform:translateY(-3px) scale(1.15); } 100% { opacity:1;transform:none; } }
+@media(prefers-reduced-motion:reduce) { .star-award { animation:none; } }
+
+/* Siege's entry cards and board portraits use the shared wood/parchment theme. */
+.siege-entry { width:min(100%,650px);margin:12px auto;display:grid;gap:16px;justify-items:center;padding:14px;box-sizing:border-box; }
+.siege-entry > .siege-profile { width:100%; }
+.siege-ladder { display:grid;justify-items:center;gap:8px;width:min(100%,340px); }
+.siege-ladder h2 { margin:0; }
+.siege-rank-emblem { width:48px;height:48px;image-rendering:pixelated;flex-shrink:0; }
+.siege-ladder > .siege-rank-emblem { width:96px;height:96px; }
+.siege-ladder progress { width:100%;height:14px;accent-color:#d6ae68; }
+.siege-find { min-width:220px;min-height:60px;font-size:22px; }
+.siege-match-card,.siege-result { display:grid;gap:10px;justify-items:center;text-align:center;padding:18px;width:100%;box-sizing:border-box;background:var(--wood);border:3px solid var(--brass-nails); }
+.siege-match-card p,.siege-result p { margin:0;line-height:1.5; }
+.siege-match-identity,.siege-rank-change { display:flex;gap:10px;align-items:center;max-width:100%; }
+.siege-match-identity strong { overflow-wrap:anywhere; }
+.siege-entry-actions { display:flex;gap:12px; }
+.siege-castle-preview { width:176px;height:176px;border:2px solid var(--ink);image-rendering:pixelated; }
+.siege-name-plate { line-height:1.3;position:absolute;z-index:3;display:flex;align-items:flex-start;gap:2px;max-width:calc(100% - 14px);opacity:.92;pointer-events:none;transition:opacity .12s;color:var(--ink); }
+.siege-name-plate-top { top:6px;left:6px; }
+.siege-name-plate-bottom { bottom:max(6px,env(safe-area-inset-bottom,0px));right:6px;flex-direction:row-reverse; }
+.siege-name-plate .siege-banner { position:static;inset:auto;width:56px;height:92px;flex-shrink:0;image-rendering:pixelated;touch-action:auto; }
+.siege-plate-text { display:flex;align-items:center;gap:6px;margin-top:8px;padding:3px 8px;min-height:36px;box-sizing:border-box;min-width:0;background:var(--parchment);border:2px solid var(--ink);box-shadow:inset 0 0 0 1px var(--brass); }
+.siege-name-plate strong { font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.siege-name-plate .siege-rank-emblem { position:static;width:30px;height:30px;flex-shrink:0; }
+.siege-plate-text { flex-shrink:1; }
+.siege-units { position:absolute;left:8px;bottom:max(8px,env(safe-area-inset-bottom,0px));z-index:3;display:grid;gap:2px;max-height:45%;overflow:hidden;pointer-events:none;background:var(--nails),var(--wood);border:2px solid var(--ink);box-shadow:inset 0 0 0 1px var(--brass);padding:7px 10px;color:#f3e3c0;text-shadow:1px 1px #000;font-size:12px; }
+.siege-units[hidden] { display:none; }
+.siege-unit { display:grid;grid-template-columns:18px 2.2em auto;align-items:center;gap:5px; }
+.siege-unit canvas { position:static;width:18px;height:18px;image-rendering:pixelated; }
+.siege-unit span { text-align:right;font-variant-numeric:tabular-nums; }
+@media(max-width:600px) { .campaign-board:has(.strike-bar button) .siege-name-plate-bottom { bottom:calc(max(8px,env(safe-area-inset-bottom,0px)) + 50px); } }
+.campaign-board:has(.strike-bar button) .siege-units { bottom:calc(max(8px,env(safe-area-inset-bottom,0px)) + 58px); }
+@media(min-width:900px) { .siege-name-plate .siege-banner { width:84px;height:138px; }.siege-plate-text { margin-top:14px; }.siege-units { font-size:14px; }.siege-unit { grid-template-columns:27px 2.2em auto; }.siege-unit canvas { width:27px;height:27px; } }
+.siege-name-plate.aim-under { opacity:.4; }
+@keyframes siege-flag-reveal { from { transform:translateY(-22px);opacity:0; } to { transform:translateY(0);opacity:1; } }
+@keyframes siege-name-reveal { from { clip-path:inset(0 100% 0 0); } to { clip-path:inset(0); } }
+.siege-reveal .profile-flag { animation:siege-flag-reveal .6s ease-out; }
+.siege-reveal .siege-opponent-name { animation:siege-name-reveal .6s steps(16,end); }
+@media(max-width:480px) { .siege-entry { padding:8px;gap:12px; }.siege-match-card { padding:10px; }.siege-name-plate strong { max-width:110px;font-size:10px; } }
+@media(prefers-reduced-motion:reduce) { .siege-reveal .profile-flag,.siege-reveal .siege-opponent-name { animation:none; }.siege-name-plate { transition:none; } }
+
+#siege.native-campaign[data-siege-view="entry"],#siege.native-campaign[data-siege-view="match"] { overflow-y:auto; }
+.siege-entry { flex-shrink:0; }
+
+/* Siege's resource gate shares native spell icons and aiming. */
+.siege-spells { gap:4px;align-items:center;pointer-events:none; }
+.siege-spells button { pointer-events:auto; }
+.siege-spells button:not(:disabled) { opacity:1; }
+.siege-spells .strike-ready { animation-name:siege-mana-ready; }
+@keyframes siege-mana-ready { from { filter:brightness(3); } to { filter:brightness(1); } }
+.strike-bar .mana-pips { inset:auto 0 1px;display:flex;justify-content:center;gap:2px;pointer-events:none; }
+.mana-pips i { width:4px;height:4px;background:#78d6ee;border:1px solid #08121c;box-shadow:inset 1px 1px #d8f8ff; }
+.siege-mana { display:flex;align-items:center;gap:3px;height:48px;padding:3px 5px;box-sizing:border-box;white-space:nowrap;background:var(--nails),var(--wood);border:2px solid var(--ink);box-shadow:inset 0 0 0 1px var(--brass);color:#f3e3c0;text-shadow:1px 1px #000;font-size:12px;font-variant-numeric:tabular-nums;line-height:1; }
+.siege-mana canvas { position:static;inset:auto;width:18px;height:24px;image-rendering:pixelated; }
+@media(max-width:600px) { .siege-mana { height:40px;padding:2px 4px; } }

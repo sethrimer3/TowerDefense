@@ -40,12 +40,16 @@ export type GroundArt = {
   turf: Uint8Array;
 };
 
-const cache = new WeakMap<CityMap, GroundArt>();
+const cache = new WeakMap<CityMap, GroundArt>(), grassyCache = new WeakMap<CityMap, GroundArt>();
 
-/** `map`'s street art, baked on first use. */
-export function groundArt(map: CityMap): GroundArt {
-  let art = cache.get(map);
-  if (!art) cache.set(map, (art = bake(map)));
+/** `map`'s street art, baked on first use. `grassy` where the open ground
+ * outside the walls is grass (the forest's), so the grass there, and under
+ * an outpost's wooden fence, creeps out over the roads beside it as a
+ * park's does. */
+export function groundArt(map: CityMap, grassy = false): GroundArt {
+  const store = grassy ? grassyCache : cache;
+  let art = store.get(map);
+  if (!art) store.set(map, (art = bake(map, grassy)));
   return art;
 }
 
@@ -65,20 +69,36 @@ function noise(x: number, y: number, scale: number, salt: number) {
   return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
 }
 
-const isGrass = (t: number) => t === CellType.PARK || t === CellType.WATER;
-/** Street dirt: the streets, and the lots of the player's structures, so a
- * sprite smaller than its lot stands on the street around it rather than
- * on a square of its own. */
-const isDirt = (t: number) => t === CellType.ROAD || t === CellType.STRUCT;
+/** What a bake reads a cell as: grass, street dirt, or neither (a kerb). */
+type Ground = { grass: (i: number) => boolean; dirt: (i: number) => boolean };
+
+/** Grass: the parks and their ponds, and with `grassy` the open ground and
+ * the wooden fences standing on it. Street dirt: the streets, and the lots
+ * of the player's structures, the houses and the wooden gates, so a sprite
+ * smaller than its lot stands on the street around it rather than on a
+ * square of its own. */
+function ground(map: CityMap, grassy: boolean): Ground {
+  const fence = (i: number) => map.type[i] === CellType.WALL && !!map.buildings[map.owner[i]]?.fence;
+  return {
+    grass: (i) => {
+      const t = map.type[i];
+      return t === CellType.PARK || t === CellType.WATER || (grassy && (t === CellType.OUT || fence(i)));
+    },
+    dirt: (i) => {
+      const t = map.type[i];
+      return t === CellType.ROAD || t === CellType.STRUCT || t === CellType.HOUSE || (t === CellType.WALL && !!map.buildings[map.owner[i]]?.woodGate);
+    },
+  };
+}
 
 /** The nearest cell (of the eight round (cx, cy)) passing `want`, from art
  * pixel centre (x, y): its distance in art pixels, and which cell. */
-function nearest(map: CityMap, cx: number, cy: number, x: number, y: number, want: (t: number) => boolean) {
+function nearest(cx: number, cy: number, x: number, y: number, want: (i: number) => boolean) {
   let best = Infinity, bx = 0, by = 0;
   for (let dy = -1; dy <= 1; dy++)
     for (let dx = -1; dx <= 1; dx++) {
       const nx = cx + dx, ny = cy + dy;
-      if ((!dx && !dy) || !cellInBounds(nx, ny) || !want(map.type[cellIndex(nx, ny)])) continue;
+      if ((!dx && !dy) || !cellInBounds(nx, ny) || !want(cellIndex(nx, ny))) continue;
       const ex = Math.max(nx * ART - x, 0, x - (nx + 1) * ART), ey = Math.max(ny * ART - y, 0, y - (ny + 1) * ART);
       const d = Math.sqrt(ex * ex + ey * ey);
       if (d < best) (best = d), (bx = nx), (by = ny);
@@ -86,15 +106,16 @@ function nearest(map: CityMap, cx: number, cy: number, x: number, y: number, wan
   return { d: best, cx: bx, cy: by };
 }
 
-function bake(map: CityMap): GroundArt {
+function bake(map: CityMap, grassy: boolean): GroundArt {
   const px = new Uint32Array(W * H), bare = new Uint8Array(W * H), turf = new Uint8Array(W * H);
+  const g = ground(map, grassy);
   for (let cy = 0; cy < CELLS_H; cy++)
     for (let cx = 0; cx < CELLS_W; cx++) {
       const i = cellIndex(cx, cy), t = map.type[i];
       // Outside the city a structure stands on the open floor, not a lot of dirt.
       if (t === CellType.STRUCT && !map.city[i]) continue;
-      if (isDirt(t)) paintStreet(map, px, turf, cx, cy);
-      else if (t === CellType.PARK) paintBare(map, px, bare, cx, cy);
+      if (g.dirt(i)) paintStreet(g, px, turf, cx, cy);
+      else if (t === CellType.PARK) paintBare(g, px, bare, cx, cy);
     }
   // Where the edge turns steeply, a bare park pixel can still touch turf
   // across the cells' boundary: the park keeps its grass there.
@@ -130,21 +151,21 @@ const edge = (x: number, y: number) =>
 const WORN_BAND = 1.3;
 
 /** One street cell's dirt, with the grass of any park beside it creeping in. */
-function paintStreet(map: CityMap, px: Uint32Array, turf: Uint8Array, cx: number, cy: number) {
+function paintStreet(g: Ground, px: Uint32Array, turf: Uint8Array, cx: number, cy: number) {
   for (let j = 0; j < ART; j++)
     for (let i = 0; i < ART; i++) {
       const x = cx * ART + i, y = cy * ART + j, mx = x + 0.5, my = y + 0.5;
-      const park = nearest(map, cx, cy, mx, my, isGrass);
-      const g = park.d - edge(x, y);
+      const park = nearest(cx, cy, mx, my, g.grass);
+      const e = park.d - edge(x, y);
       const k = y * W + x;
-      if (g < 0) {
+      if (e < 0) {
         // Turf: the park's own patch green, flecked dark and light.
         const h = hash01(x, y, 410);
         px[k] = rgba(h < 0.12 ? TURF.dark : h > 0.92 ? TURF.light : grassPatch(park.cx, park.cy) === GRASS.patch[0] ? TURF.patch[0] : TURF.patch[1]);
         turf[k] = 1;
         continue;
       }
-      if (g < WORN_BAND && ((x + y) & 1) === 0) {
+      if (e < WORN_BAND && ((x + y) & 1) === 0) {
         px[k] = rgba(WORN[hash(x, y, 411) & 1]);
         continue;
       }
@@ -155,20 +176,19 @@ function paintStreet(map: CityMap, px: Uint32Array, turf: Uint8Array, cx: number
         continue;
       }
       if (px[k]) continue; // The foot of a tuft above.
-      px[k] = rgba(dirt(map, cx, cy, mx, my, x, y));
+      px[k] = rgba(dirt(g, cx, cy, mx, my, x, y));
     }
 }
 
 /** The dirt colour at art pixel (x, y) of street cell (cx, cy). */
-function dirt(map: CityMap, cx: number, cy: number, mx: number, my: number, x: number, y: number) {
+function dirt(g: Ground, cx: number, cy: number, mx: number, my: number, x: number, y: number) {
   const h = hash01(x, y, 420);
   if (h < 0.025) return DIRT[0];
   // Blotches of two browns, their edges dithered.
   const blot = noise(x, y, 6, 421) + (((x + y) & 1) - 0.5) * 0.08;
   let shade = blot > 0.55 ? 3 : 2;
-  // Darker against the kerbs (houses and walls), worn lighter down the
-  // middle of the way.
-  const kerb = nearest(map, cx, cy, mx, my, (t) => !isDirt(t) && !isGrass(t)).d;
+  // Darker against the kerbs (walls), worn lighter down the middle of the way.
+  const kerb = nearest(cx, cy, mx, my, (i) => !g.dirt(i) && !g.grass(i)).d;
   if (kerb < 1.2 || (kerb < 2.2 && h < 0.5)) shade = 1;
   else if (kerb > 9 && noise(x, y, 4, 422) > 0.62) shade = 4;
   if (h > 0.94) shade = Math.min(4, shade + 1);
@@ -178,17 +198,17 @@ function dirt(map: CityMap, cx: number, cy: number, mx: number, my: number, x: n
 
 /** Bare patches where the dirt of a street beside park cell (cx, cy) bites
  * into its edge: wherever `edge` falls inside the park. */
-function paintBare(map: CityMap, px: Uint32Array, bare: Uint8Array, cx: number, cy: number) {
+function paintBare(g: Ground, px: Uint32Array, bare: Uint8Array, cx: number, cy: number) {
   for (let j = 0; j < ART; j++)
     for (let i = 0; i < ART; i++) {
       const x = cx * ART + i, y = cy * ART + j;
-      const road = nearest(map, cx, cy, x + 0.5, y + 0.5, isDirt).d;
+      const road = nearest(cx, cy, x + 0.5, y + 0.5, g.dirt).d;
       if (road > ART) continue;
       // How far past the edge, on its dirt side (negative: still grass).
-      const g = -edge(x, y) - road;
-      if (g < 0) continue;
+      const e = -edge(x, y) - road;
+      if (e < 0) continue;
       const k = y * W + x;
       bare[k] = 1;
-      px[k] = rgba(g < WORN_BAND && ((x + y) & 1) === 0 ? WORN[hash(x, y, 432) & 1] : DIRT[hash01(x, y, 433) < 0.15 ? 1 : 2]);
+      px[k] = rgba(e < WORN_BAND && ((x + y) & 1) === 0 ? WORN[hash(x, y, 432) & 1] : DIRT[hash01(x, y, 433) < 0.15 ? 1 : 2]);
     }
 }

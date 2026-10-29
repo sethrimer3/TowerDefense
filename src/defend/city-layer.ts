@@ -9,17 +9,21 @@ import { CELL_COUNT, CELLS_H, CELLS_W, SPAWN_ROW, SUB, TILES_H, TILES_W, cellInB
 import { CellType, type Building, type CityMap } from "./citygen.ts";
 import type { Light, Stone } from "./lighting.ts";
 import type { DefendSim } from "./sim.ts";
+import { drawFenceSections } from "./fences.ts";
 import { ROAD, keepStage, paintKeepRubble, paintStructureArt, paintStructureRubble } from "./structure-art.ts";
 import { houseRubbleSprite, roofSeed, roofSprite } from "./roof-art.ts";
 import { ART, openAt, parkArt } from "./park-art.ts";
+import { paintBridges } from "./bridge-art.ts";
 import { damageStage, drawSprite, sprite, wallDamagePixels, wallRubblePixels } from "./damage-art.ts";
 import { mooringPixels } from "./sky-palace-art.ts";
 import { GRASS, grassPatch, groundArt } from "./ground-art.ts";
 import { heights, paintShadows, shadowMask, type Footprint } from "./shadow-art.ts";
 import { gatePixels, gateRubblePixels } from "./gate-art.ts";
+import { WOOD_GATE, gateArtRect, woodGatePixels, woodGateRubblePixels } from "./wood-gate-art.ts";
 import { gateRect, type Side } from "./layout.ts";
 import { SPIKE_REACH, bastionPixels, bastionRubblePixels, spikePixels } from "./wall-defense-art.ts";
 import { AREAS, areaArtId, type AreaId } from "./areas.ts";
+import { hasForest } from "./forest.ts";
 import { hasWallArt, wallCapSprite, wallFaceSprite, wallRubbleTones } from "./area-wall-art.ts";
 import { drawPixel, drawRoof, pixelKey, type PixelSprite } from "./pixel-sprites.ts";
 
@@ -70,7 +74,7 @@ const FLOOR_SIZE = 80;
 const CAP = { x: 38, w: 16, y0: 1, span: 62 };
 const FACE = { x0: 8, span: 64, y: 44, h: 14 };
 /** How far a wall stone's brick face hangs over the cell below, in cells. */
-const FACE_HANG = 0.45;
+export const FACE_HANG = 0.45;
 
 const RUBBLE = "#4a443d";
 const WALL = "#8e897c";
@@ -107,16 +111,18 @@ export function paintCityLayer(c: CanvasRenderingContext2D, px: number, scene: C
   c.imageSmoothingEnabled = false;
   paintFlagstones(p);
   paintCityGround(p);
-  paintPixelArt(p, groundArt(map).canvas);
+  paintPixelArt(p, groundArt(map, hasForest(p.area)).canvas);
   paintRoadStones(p, scene.stones);
   // Ponds over the park grass, as pixel art.
   paintPixelArt(p, parkArt(map).canvas);
   paintPondPlants(p);
+  paintBridges(c, px, map);
   // The spikes' beams lie under the stones, so only the stakes show past
   // the wall. Walls next: a wall's face hangs over the cell below it, and a
   // house or structure standing there is in front of the face, so it covers it.
   paintSpikes(p);
   for (const b of map.buildings) if (b.kind === "wall") paintBuilding(p, b);
+  paintFences(c, px, map, sim);
   for (const b of map.buildings) if (b.kind !== "wall") paintBuilding(p, b);
   paintShadows(c, cityShadows(map, sim, scene.looks), px);
   paintLanternBrackets(p, scene.lights);
@@ -138,7 +144,7 @@ function cityShadows(map: CityMap, sim: DefendSim | null, looks?: Readonly<Recor
  * once a kind, size and look, and again as the pixel art loads, with a cell
  * of room all round for sprites that overhang their lot. */
 const footprints = new Map<string, Omit<Footprint, "x0" | "y0"> | null>();
-function spriteFootprint(map: CityMap, b: Building, look: string | undefined): Footprint | null {
+export function spriteFootprint(map: CityMap, b: Building, look: string | undefined): Footprint | null {
   if (typeof document === "undefined") return null;
   const r = b.rect, key = `${b.kind}:${r.w}x${r.h}:${look ?? ""}:${pixelKey()}`;
   let f = footprints.get(key);
@@ -218,10 +224,12 @@ function paintCityGround(p: Paint) {
     for (let cx = 0; cx < CELLS_W; cx++) {
       const i = cellIndex(cx, cy);
       const t = map.type[i];
-      // A structure placed outside the city stands on the open floor.
-      if (t === CellType.OUT || (t === CellType.STRUCT && !map.city[i])) continue;
+      // A structure placed outside the city stands on the open floor, and
+      // so does a wooden fence, not on a stone wall's footing (in the
+      // forest, its grass grows under it: `paintFences`).
+      if (t === CellType.OUT || (t === CellType.STRUCT && !map.city[i]) || map.buildings[map.owner[i]]?.fence) continue;
       if (t === CellType.PARK || t === CellType.WATER) paintGrass(p, cx, cy);
-      else if (t !== CellType.WALL || !solid(i)) paintGravel(p, cx, cy);
+      else if (t !== CellType.WALL || !solid(i) || map.buildings[map.owner[i]]?.woodGate) paintGravel(p, cx, cy);
     }
 }
 
@@ -295,17 +303,21 @@ function paintBuilding(p: Paint, b: Building) {
     h = Math.round((r.y + r.h) * px) - y;
   const box = { x, y, w, h, px };
   if (b.kind === "wall") {
+    // Wooden fences are drawn together after the walls (`paintFences`).
+    if (b.fence) return;
     if (solid(b.cells[0])) paintWall(p, b);
     else if (hasWallArt(p.area) || !paintPixelRubble(p, b)) paintArt(p, wallRubbleSprite(lotSeed(b), p.area), box);
     return;
   }
   if (b.kind === "gate") {
-    const side = b.gate!.side;
+    const side = b.gate!.side, a = gateArtRect(b);
+    const ax = Math.round(a.x * px), ay = Math.round(a.y * px);
+    const art = { x: ax, y: ay, w: Math.round((a.x + a.w) * px) - ax, h: Math.round((a.y + a.h) * px) - ay, px };
     if (sim && !sim.intact(b)) {
-      paintArt(p, gateRubbleSprite(side, lotSeed(b)), box);
+      paintArt(p, b.woodGate ? woodGateRubbleSprite(side, lotSeed(b)) : gateRubbleSprite(side, lotSeed(b)), art);
       return paintRebuilding(p, b);
     }
-    return paintArt(p, gateSprite(side, 0, stageOf(sim, b), lotSeed(b)), box);
+    return paintArt(p, gateSpriteOf(b, b.woodGate && sim ? -1 : 0, stageOf(sim, b)), art);
   }
   if (b.kind === "wallBallista") {
     if (sim && !sim.intact(b)) {
@@ -387,7 +399,7 @@ const SPIKE_OUT: Record<Side, readonly [number, number]> = { n: [0, -1], e: [1, 
 /** The wall spikes on every standing stone they line, painted under the
  * stones, their tips reaching out past the wall's face (on the south, past
  * the brick face hanging below the stone). */
-function paintSpikes({ c, px, map, solid }: Paint) {
+function paintSpikes({ c, px, map, solid }: Paint, outside = false) {
   for (const row of map.spikes ?? []) {
     const [dx, dy] = SPIKE_OUT[row.side];
     for (const i of row.cells) {
@@ -397,15 +409,59 @@ function paintSpikes({ c, px, map, solid }: Paint) {
       const reach = SPIKE_REACH / ART + (hung ? FACE_HANG : 0);
       const x = Math.round((cx + dx * reach) * px), y = Math.round((cy + dy * reach) * px);
       const w = Math.round((cx + dx * reach + 1) * px) - x, h = Math.round((cy + dy * reach + 1) * px) - y;
+      if (outside) {
+        // Only past the stone (and its hanging face), on the ground outside.
+        const x0 = Math.round(cx * px), x1 = Math.round((cx + 1) * px), y0 = Math.round(cy * px);
+        const y1 = Math.round((cy + 1) * px) + (hung ? Math.round(px * FACE_HANG) : 0);
+        const r = row.side === "n" ? [x, y, w, y0 - y] : row.side === "s" ? [x, y1, w, y + h - y1] : row.side === "e" ? [x1, y, x + w - x1, h] : [x, y, x0 - x, h];
+        if (r[2] <= 0 || r[3] <= 0) continue;
+        c.save();
+        c.beginPath();
+        c.rect(r[0], r[1], r[2], r[3]);
+        c.clip();
+      }
       drawSprite(c, sprite(`spikes:${row.side}:${hash(cx, cy, 31) % 8}`, ART, ART, () => spikePixels(row.side, hash(cx, cy, 31) % 8)), x, y, w, h);
+      if (outside) c.restore();
     }
   }
+}
+
+/** The spikes' points reaching out past the wall over the open ground,
+ * painted again (at `px` a cell) over whatever covered that ground after
+ * the city layer: the forest's floor. */
+export function paintSpikePoints(c: CanvasRenderingContext2D, px: number, map: CityMap, sim: DefendSim | null) {
+  if (!map.spikes?.length) return;
+  const solid = (i: number) => (sim ? sim.solid[i] === 1 : map.owner[i] >= 0 && map.type[i] !== CellType.ROAD);
+  paintSpikes({ c, px, map, sim, solid, area: "moss" }, true);
+}
+
+/** The standing wooden fences, all at once: in the city layer, and again
+ * over the forest's floor and grass, which cover the open ground they
+ * stand on. */
+export function paintFences(c: CanvasRenderingContext2D, px: number, map: CityMap, sim: DefendSim | null, shadow = false) {
+  const sections = [];
+  for (const b of map.buildings)
+    if (b.kind === "wall" && b.fence && !b.hidden && b.cells.length && (sim ? sim.solid[b.cells[0]] === 1 : true))
+      for (const f of b.rails ?? [b.fence]) sections.push({ ...f, broken: false });
+  if (sections.length) drawFenceSections(c, px, sections, shadow);
 }
 
 /** A city gate's sprite with its doors at `frame`, and its rubble. */
 export const gateSprite = (side: Side, frame: number, stage: number, seed: number) => {
   const r = gateRect({ tx: 0, ty: 0, side });
   return sprite(`gate:${side}:${frame}:${stage}:${seed}`, r.w * ART, r.h * ART, () => gatePixels(side, frame, stage, seed));
+};
+/** Gate `b`'s sprite, stone or wooden, with its doors at `frame`, drawn over
+ * `gateArtRect(b)`. */
+export const gateSpriteOf = (b: Building, frame: number, stage: number) =>
+  b.woodGate ? woodGateSprite(b.gate!.side, frame, stage, lotSeed(b)) : gateSprite(b.gate!.side, frame, stage, lotSeed(b));
+const woodGateSprite = (side: Side, frame: number, stage: number, seed: number) => {
+  const across = side === "e" || side === "w", u = WOOD_GATE.long * ART, v = WOOD_GATE.deep * ART;
+  return sprite(`woodGate:${side}:${frame}:${stage}:${seed}`, across ? v : u, across ? u : v, () => woodGatePixels(side, frame, stage, seed));
+};
+const woodGateRubbleSprite = (side: Side, seed: number) => {
+  const across = side === "e" || side === "w", u = WOOD_GATE.long * ART, v = WOOD_GATE.deep * ART;
+  return sprite(`woodGate:${side}:rubble:${seed}`, across ? v : u, across ? u : v, () => woodGateRubblePixels(side, seed));
 };
 const gateRubbleSprite = (side: Side, seed: number) => {
   const r = gateRect({ tx: 0, ty: 0, side });
@@ -449,6 +505,28 @@ function paintWall(p: Paint, b: Building) {
   const face = !standing(0, 1) && cy + 1 < CELLS_H;
   if (face) paintWallFace(p, cx, { x, y });
   paintWallOutline(p, { x, y, w: Math.round((cx + 1) * px) - x, h: Math.round((cy + 1) * px) - y }, standing, face);
+}
+
+/** The open ground cells (outside the city) a standing wall stone's brick
+ * face hangs over, in runs along each row: `y` the row, `x0` to `x1`
+ * (exclusive) the cells. Whatever is drawn on that ground after the city
+ * layer (the forest's floor) must leave the face showing. */
+export function hangingFaces(map: CityMap, sim: DefendSim | null): { y: number; x0: number; x1: number }[] {
+  const standing = (i: number) => map.wall[i] === 1 && !map.buildings[map.owner[i]]?.fence && (sim ? sim.solid[i] === 1 : map.owner[i] >= 0);
+  const runs: { y: number; x0: number; x1: number }[] = [];
+  for (let cy = 1; cy < CELLS_H; cy++) {
+    let start = -1;
+    for (let cx = 0; cx <= CELLS_W; cx++) {
+      const i = cellIndex(cx, cy);
+      const hung = cx < CELLS_W && map.type[i] === CellType.OUT && standing(i - CELLS_W) && !standing(i);
+      if (hung && start < 0) start = cx;
+      else if (!hung && start >= 0) {
+        runs.push({ y: cy, x0: start, x1: cx });
+        start = -1;
+      }
+    }
+  }
+  return runs;
 }
 
 /** A thin black outline, one art pixel wide like the buildings', round the

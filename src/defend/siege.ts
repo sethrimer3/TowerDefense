@@ -128,7 +128,7 @@ export function blockerAhead(sim: DefendSim, e: Point, range: number): number {
       const id = sim.map.owner[i];
       return id >= 0 && sim.intact(sim.map.buildings[id]) && rectDist(sim.map.buildings[id].rect, e.x, e.y) <= range ? id : -1;
     }
-    const next = downhill(sim.marchField(), sim.solid, cx, cy);
+    const next = downhill(sim.marchField(e), sim.solid, cx, cy);
     if (next < 0) return -1;
     cx = cellX(next);
     cy = cellY(next);

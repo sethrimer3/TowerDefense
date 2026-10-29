@@ -15,11 +15,15 @@
  *   renderer draws after the units (`park-trees.ts`); their shadows are cast
  *   with the buildings' (`shadow-art.ts`).
  *
+ * An Ambush river is painted here too, but as the forest's lakes are
+ * (`river-art.ts`), and is no pond: no ducks, ripples or reflections.
+ *
  * Baked once per city (`parkArt`), with the open-water mask the ripples,
  * reflections and ducks keep to. Presentation only. */
 import { CELLS_H, CELLS_W, hash, hash01 } from "./grid.ts";
 import { CellType, type CityMap } from "./citygen.ts";
 import { POND_BLEND, hasTree, pondDisc, pondField, treeCanopy } from "./park-geometry.ts";
+import { paintRiver, riverBed, riverCanvas, riverCell, riverShape } from "./river-art.ts";
 
 /** Art pixels a cell. */
 export const ART = 8;
@@ -98,9 +102,14 @@ function toCanvas(px: Uint32Array, w = W, h = H) {
 }
 
 function paintPonds(map: CityMap, px: Uint32Array, open: Uint8Array) {
+  // An Ambush river, as the forest's lakes are painted, its water running
+  // on under the bridges; its live water is `RiverLife`'s, not the ponds'.
+  const bed = riverBed(map);
+  if (bed) paintRiver(px, riverShape(bed), riverCanvas(map, true), { x0: 0, y0: 0, x1: W, y1: H });
   const discs: { x: number; y: number; r: number }[] = [];
   for (let i = 0; i < map.type.length; i++) {
-    if (map.type[i] !== CellType.WATER) continue;
+    // A bridge's water runs on under it; a river is painted as the lakes are.
+    if ((map.type[i] !== CellType.WATER && map.bridges?.[i] !== 2) || riverCell(map, i)) continue;
     const cx = i % CELLS_W, cy = (i - cx) / CELLS_W;
     discs.push(pondDisc(cx, cy, 1));
   }
@@ -138,9 +147,16 @@ function paintPonds(map: CityMap, px: Uint32Array, open: Uint8Array) {
       px[y * W + x] = rgba(BANDS[band].color);
       open[y * W + x] = band >= 3 ? 1 : 0;
     }
+  // Nothing swims or ripples under a bridge.
+  if (map.bridges)
+    for (let i = 0; i < map.bridges.length; i++) {
+      if (!map.bridges[i]) continue;
+      const cx = i % CELLS_W, cy = (i - cx) / CELLS_W;
+      for (let y = cy * ART; y < (cy + 1) * ART; y++) open.fill(0, y * W + cx * ART, y * W + (cx + 1) * ART);
+    }
   // Glints and lily pads on the open water.
   for (let i = 0; i < map.type.length; i++) {
-    if (map.type[i] !== CellType.WATER) continue;
+    if (map.type[i] !== CellType.WATER || riverCell(map, i)) continue;
     const cx = i % CELLS_W, cy = (i - cx) / CELLS_W;
     // Glints on about half the cells, anywhere in them, so they don't line
     // up into the cells' grid.

@@ -14,14 +14,15 @@ import { enemySize } from "./catalog.ts";
  * planted war banner, the magic boats' water (flood-art.ts) over the ground, the wizards' fire, the building grid and drag overlay (edit-overlay.ts), then
  * rain in screen space. */
 import { onPixelArt, pixelArtOn, pixelKey } from "./pixel-sprites.ts";
-import { CELLS_H, CELLS_W, boardSize, hash01, type TilePos } from "./grid.ts";
+import { CELL_COUNT, CELLS_H, CELLS_W, boardSize, cellIndex, hash01, type TilePos } from "./grid.ts";
 import type { CityMap } from "./citygen.ts";
 import type { DefendSim } from "./sim.ts";
 import { DefendLighting, type LightFrame } from "./lighting.ts";
 import { Fences } from "./fences.ts";
 import { Rain, Snow, ambientFor, type Weather } from "./weather.ts";
 import { areaFade, type AreaId } from "./areas.ts";
-import { damageKey, gateSprite, lotSeed, onCityArtLoaded, paintCityLayer, paintStanding, stageOf } from "./city-layer.ts";
+import { gateArtRect } from "./wood-gate-art.ts";
+import { FACE_HANG, damageKey, gateSpriteOf, hangingFaces, onCityArtLoaded, paintCityLayer, paintFences, paintSpikePoints, paintStanding, stageOf } from "./city-layer.ts";
 import { GATE_FRAMES } from "./gate-art.ts";
 import { peopleAt } from "./gates.ts";
 import type { GateRanks } from "../gate-upgrades.ts";
@@ -38,6 +39,7 @@ import { RallyFlagArt } from "./rally-flag-art.ts";
 import { bannerReach } from "./war-banner.ts";
 import { ParkGrass, type Walker } from "./park-grass.ts";
 import { PondWater } from "./pond-water.ts";
+import { RiverLife } from "./river-art.ts";
 import { ENEMIES } from "./catalog.ts";
 import { GroundRelief, type ReliefLight } from "./ground-relief.ts";
 import { WizardArt, flameLights } from "./wizard-art.ts";
@@ -112,6 +114,8 @@ export class DefendRenderer {
   readonly fences = new Fences();
   readonly grass = new ParkGrass();
   readonly water = new PondWater();
+  /** An Ambush river's current, glints, rain rings and fish. */
+  private readonly river = new RiverLife();
   readonly relief = new GroundRelief();
   readonly wizard = new WizardArt();
   readonly trees = new ParkTrees();
@@ -140,6 +144,9 @@ export class DefendRenderer {
   /** How far each city gate stands open (0 shut to 1), by building id. */
   private gateOpen = new Map<number, number>();
   private layerScale = 1;
+  /** The open ground the wall's brick faces hang over, as of the layer. */
+  private faces: { y: number; x0: number; x1: number }[] = [];
+  private faced = new Uint8Array(CELL_COUNT);
   /** Camera: zoom `s` and translation (canvas pixels) applied to the whole
    * board. s = 1 fits the board to the stage it sits in; along an edge the
    * view is wider than the board it is centred, elsewhere clamped to it. */
@@ -337,7 +344,6 @@ export class DefendRenderer {
       ctx.restore();
     }
     ctx.imageSmoothingEnabled = false;
-    if (sim) this.drawGates(map, sim, opts, dt);
     drawBallistas(ctx, this.px, map, sim, sim ? sim.bonuses.gate : opts.gate);
     drawSpikeThrusts(ctx, this.px, map, sim);
     const feet = this.drawParkLife(map, sim, opts, dt);
@@ -346,6 +352,15 @@ export class DefendRenderer {
     this.forest.sync(map, sim);
     this.forest.drawFloor(ctx, this.px, this.forestShare());
     this.forest.drawWater(ctx, this.px, opts.now, this.forestShare(), opts.reduceMotion);
+    this.river.sync(map);
+    this.river.draw({
+      c: ctx, px: this.px, now: opts.now, dt, rain: !!(sim && opts.weather?.rain), cold: sim?.cold ?? !!opts.weather?.snow, thawed: sim?.thawedPonds,
+      walkers: feet, reduceMotion: opts.reduceMotion || !(opts.effects ?? true),
+    });
+    if (this.forestShare() > 0) {
+      this.drawFaces();
+      paintSpikePoints(ctx, this.px, map, sim);
+    }
     if ((opts.effects ?? true) && this.forestShare() > 0) {
       this.forestGrass.sync(this.forest.forestPlan!);
       this.forestGrass.draw({
@@ -353,8 +368,13 @@ export class DefendRenderer {
         c: ctx, px: this.px, now: opts.now, dt, reduceMotion: opts.reduceMotion, alpha: this.forestShare(),
         wind: sim && opts.weather?.rain ? "rain" : opts.weather ? "cloud" : "calm",
         walkers: feet,
+        faced: this.faced, hangRows: Math.ceil(ART * FACE_HANG),
       });
     }
+    // An outpost's wooden fences stand on the forest's grass, and the gates
+    // swing over it.
+    if (this.forestShare() > 0) paintFences(ctx, this.px, map, sim, true);
+    if (sim) this.drawGates(map, sim, opts, dt);
     // Park fences sit on the ground layer, under the lighting and units.
     this.fences.sync(map);
     if (sim) this.fences.update(sim);
@@ -363,8 +383,29 @@ export class DefendRenderer {
     if (sim) this.floods.draw({ c: ctx, px: this.px, sim, area: this.area, rain: !!opts.weather?.rain, reduceMotion: opts.reduceMotion, reflections: opts.effects ?? true, layer: this.layer, layerScale: this.layerScale });
   }
 
+  /** The wall's brick faces hang over the open ground south of it, which
+   * the forest's floor covers: copied back over it from the city layer
+   * (and the fading one), exactly as they were painted. */
+  private drawFaces() {
+    const ctx = this.ctx, k = this.layerScale, P = this.px * k, hang = Math.round(P * FACE_HANG);
+    const copy = (layer: HTMLCanvasElement) => {
+      for (const f of this.faces) {
+        const sx = Math.round(f.x0 * P), sy = Math.round(f.y * P), sw = Math.round(f.x1 * P) - sx;
+        ctx.drawImage(layer, sx, sy, sw, hang, sx / k, sy / k, sw / k, hang / k);
+      }
+    };
+    copy(this.layer);
+    if (this.previousArea && this.previousLayer) {
+      ctx.save();
+      ctx.globalAlpha = 1 - this.areaMix;
+      copy(this.previousLayer);
+      ctx.restore();
+    }
+  }
+
   /** The city gates swing open while any of the city's people are at
-   * them, and shut behind them; the layer shows them shut. */
+   * them, and shut behind them; the layer shows them shut (a wooden
+   * gate's leaves, shut or not, are drawn here over its posts). */
   private drawGates(map: CityMap, sim: DefendSim, opts: DrawOptions, dt: number) {
     for (const b of map.buildings) {
       if (b.kind !== "gate" || !b.gate) continue;
@@ -378,10 +419,10 @@ export class DefendRenderer {
       const open = opts.reduceMotion ? (near ? 1 : 0) : Math.max(0, Math.min(1, was + (near ? 2.5 : -1.5) * Math.min(dt, 0.1)));
       this.gateOpen.set(b.id, open);
       const frame = Math.round(open * (GATE_FRAMES - 1));
-      if (!frame) continue;
-      const r = b.rect, px = this.px;
+      if (!frame && !b.woodGate) continue;
+      const r = gateArtRect(b), px = this.px;
       const x = Math.round(r.x * px), y = Math.round(r.y * px);
-      const art = gateSprite(b.gate.side, frame, stageOf(sim, b), lotSeed(b));
+      const art = gateSpriteOf(b, frame, stageOf(sim, b));
       if (art) this.ctx.drawImage(art, x, y, Math.round((r.x + r.w) * px) - x, Math.round((r.y + r.h) * px) - y);
     }
   }
@@ -573,6 +614,9 @@ export class DefendRenderer {
     this.layer.width = W * k;
     this.layer.height = H * k;
     paintCityLayer(this.lctx, this.px * k, { map, sim, area: this.area, lights: this.lighting.lights, stones: this.lighting.roadStones, looks });
+    this.faces = hangingFaces(map, sim);
+    this.faced.fill(0);
+    for (const f of this.faces) for (let x = f.x0; x < f.x1; x++) this.faced[cellIndex(x, f.y)] = 1;
   }
 
   /** Folds fallen and rebuilt buildings into the lighting, then draws what

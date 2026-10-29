@@ -74,6 +74,28 @@ function flyAtKeep(t: Turn) {
   sim.moveToward(e, center(goal.rect), { speed: enemySpeed(sim, e) * chilled(e), dt, flying: true });
 }
 
+/** Scenario geography calls the ordinary native bites, collision and steering. */
+const turn = (sim: DefendSim, e: Enemy, dt: number): Turn => ({ sim, e, dt, def: ENEMIES[e.kind], reach: enemySize(e) / 2 + 0.4 });
+export function routeToBuilding(sim: DefendSim, e: Enemy, id: number, dt: number, field: Float64Array) {
+  const t = turn(sim, e, dt);
+  if (rectDist(sim.map.buildings[id].rect, e.x, e.y) <= t.reach) return hitBuilding(t, id);
+  routeOnField(t, field);
+}
+export function routeToPoint(sim: DefendSim, e: Enemy, dt: number, field: Float64Array) {
+  routeOnField(turn(sim, e, dt), field);
+}
+export function routeFlier(sim: DefendSim, e: Enemy, dt: number) {
+  flyAtKeep(turn(sim, e, dt));
+}
+function routeOnField(t: Turn, field: Float64Array) {
+  const { sim, e, dt } = t,
+    best = downhill(field, sim.foeSolid, clampCell(e.x, CELLS_W), clampCell(e.y, CELLS_H), sim.scenario?.toll);
+  if (best < 0) return;
+  const p = cellCenter(best);
+  if (sim.foeSolid[best] && sim.map.owner[best] >= 0) smashThrough(t, best, p);
+  else sim.moveToward(e, { x: p.x + e.jx, y: p.y + e.jy }, { speed: enemySpeed(sim, e) * chilled(e), dt });
+}
+
 /** Wreck the house that caught its eye. False once the house is gone or the
  * enemy lost interest, so it goes back to marching this same step. */
 function chaseDistraction(t: Turn) {

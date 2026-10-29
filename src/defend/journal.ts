@@ -63,6 +63,9 @@ export function paintJournal(canvas: HTMLCanvasElement, unread: boolean) {
   if (unread) paintRows(c, SEAL, 13, 0);
 }
 
+/** Every species in the catalog, for the journal with all its entries unlocked. */
+export const allEnemyKinds = () => Object.keys(ENEMIES) as EnemyKind[];
+
 export function journalHTML(discovered: EnemyKind[]): string {
   const entries = [...discovered].sort((a, b) => ENEMIES[a].cost - ENEMIES[b].cost || ENEMIES[a].name.localeCompare(ENEMIES[b].name));
   const groups = AREAS.map(area => {

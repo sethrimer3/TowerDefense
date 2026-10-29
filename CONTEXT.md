@@ -8,10 +8,34 @@ The domain glossary: the words the game, its code and its docs use. Terms only, 
 One of Defend, Ambush or Siege, selected through the shared combat tab.
 
 **Ambush**:
-A fixed-level tower-defense mode: enemies follow a road, while towers and infantry buildings occupy spaces alongside it.
+A fixed-level tower-defense mode: enemies follow a track, while towers and infantry buildings stand beside it.
+
+**Track**:
+The marked road that ground enemies follow through an Ambush level.
+
+**Lane**:
+One of an Ambush track's ways in, from its own entry at the board's edge to the keep. Later levels have two or three; lanes may join on the way.
+
+**Bridge**:
+A plank deck where a road crosses water; the only way over a river on foot.
+
+**Crowd wave**:
+An Ambush wave of fifty to five hundred native enemies, their strength scaled to the level and wave.
 
 **Siege**:
 An assault mode: infantry trained by the player's buildings raid enemy castles and their guards.
+
+**Entry arrow**:
+The marker at the board edge showing where an Ambush level’s enemies arrive.
+
+**Level select**:
+The Ambush screen of thirty levels, arranged in three columns and ten zone rows, showing their best stars and unlocks.
+
+**Star rating**:
+An Ambush level's best result, from zero to three stars. Improving a best result adds only the difference to the earned total.
+
+**Build grid**:
+The quarter-tile grid used to place Ambush buildings, with a clear quarter between their footprints.
 
 **Muster space**:
 A space in the lower muster ground where an owned infantry building trains troops for a Siege assault.
@@ -321,6 +345,9 @@ A stack of crates of bait, a structure for anywhere: while any stands, every ene
 **City gate**:
 A gatehouse set into the city wall on the edge of a city tile: it opens for the city's own people (troops and civilians) and stays shut to the enemy, who must batter it down; but while it stands open for your people, the enemy can slip through too, until a portcullis bars it.
 
+**Outpost gate**:
+In Ambush, the gate where the road meets an outpost's fence (a wooden gate) or, after Palisades III, its stone wall (a stone gatehouse), and where it meets the keep's wall. Units come and go only by the gates; the enemy batters them rather than the wall beside them.
+
 **Portcullis**:
 The city gates' first upgrade branch: an iron grate that keeps the enemy out while the gate is open for your people, then murder holes and boiling pitch over the way in.
 
@@ -598,3 +625,40 @@ The level's deployment budget, spent on buildings and earned by killing enemies.
 
 **Kill bounty**:
 The Ambush gold paid once for defeating an enemy, based on that enemy's combat difficulty.
+
+- **Outpost breach**: the first ground enemy body entering a fenced outpost. Its health then follows the fraction of its original houses still standing.
+- **Flier warning**: a red dotted route from the track entrance to the keep, with a ring and exclamation mark, warning that an upcoming wave includes flying enemies.
+
+- **Auto-send**: an optional Ambush control that sends the next wave after the field is clear and the break ends. Sending early awards no bonus.
+- **Strike quick bar**: round spell icons on the board; choose a spell, then tap its target. Choosing it again cancels.
+
+- **Ambush investment**: the gold paid for a building and its local upgrades, including buildings consumed by a merge. Selling returns all of it until wave 2 starts, then a fraction rounded down to tens.
+
+- **Ambush star pool**: the sum of best level ratings minus stars invested in the Ambush star tree. Upgrades, undo and respec affect Ambush alone.
+- **Head start**: an Ambush star-tree branch that places one or two free Archer Towers at level start; selling a free tower returns no purchase gold.
+
+- **Ambush boss wave**: wave 10 or 20, containing the strongest native enemy kind its zone budget can afford.
+
+**Rank**:
+A named Siege skill band, from Bronze through Grandmaster.
+
+**Division**:
+One of five tiers within a Siege rank, V through I.
+
+**Find Match**:
+The Siege action that reveals an opponent and castle preview before the player commits to an attack.
+
+- **Defensive DPS**: estimated sustained castle damage against a weighted single-target/crowd benchmark.
+- **Castle ceiling**: the strongest legal castle found by the bounded footprint search; the Grandmaster generation anchor.
+
+- **Castle blueprint**: the native city layout and upgrades saved with a Siege opponent.
+- **Muster rows**: the player’s infantry buildings arranged below the invaded castle.
+
+**Reference army**:
+A reproducible infantry roster representing an assumed stage of progression for offline Siege difficulty trials.
+
+**Matched raid**:
+A difficulty trial in which the reference army and target castle share an MMR.
+
+**Mana**:
+A temporary Siege battle resource earned by defeating enemy troops and spent on strike spells.

@@ -30,20 +30,13 @@ import { CELL, FW } from "./fire.ts";
 import { ELIXIRS } from "./lab.ts";
 import { HATCH_Y, LabRenderer } from "./lab-render.ts";
 import { LAB_TOP } from "./geometry.ts";
-import { ashlar, facing } from "./ashlar.ts";
+import { PILLAR_OUTLINE, ashlar, facing, pillarShade } from "./ashlar.ts";
 import { shaftAt, SoftSunlight, SUNLIGHT } from "../soft-sunlight.ts";
+import { DAY_MS, daylight } from "../daylight.ts";
+export { DAY_MS, daylight } from "../daylight.ts";
 
 /** Each role's robe. */
 const ROBES: Record<Role, RGB> = { shelver: [240, 236, 228], professor: [104, 124, 200], researcher: [160, 104, 210] };
-
-/** One day and night, in ms of wall-clock time. */
-export const DAY_MS = 8 * 60 * 1000;
-/** Daylight in [0, 1] at wall-clock time `now`: a long day, a long night, a
- * dawn and a dusk between. */
-export function daylight(now: number) {
-  const s = Math.sin(((now % DAY_MS) / DAY_MS) * Math.PI * 2);
-  return Math.min(1, Math.max(0, 0.5 + s * 1.4));
-}
 
 /** The torches on the nave's walls and piers, and the tables' candles. */
 const TORCHES = [
@@ -222,10 +215,17 @@ export class LibraryRenderer {
             rgb = lead ? [20, 18, 16] : clear ? [150, 170, 190] : GLASS[Math.floor(h01(col, row, 3) * GLASS.length)];
           }
         } else {
-          // Ashlar: courses of blocks, bigger on the piers at either side.
-          const stone = ashlar(x, y, x < BAYS_EDGE || x >= W - BAYS_EDGE);
+          // Ashlar: courses of blocks, bigger on the piers at either side,
+          // which are outlined and shaded round.
+          const pier = x < BAYS_EDGE || x >= W - BAYS_EDGE;
+          const stone = ashlar(x, y, pier);
           rgb = stone.rgb;
           hgt = stone.hgt;
+          if (pier) {
+            const k = pillarShade(x < BAYS_EDGE ? x : x - (W - BAYS_EDGE), BAYS_EDGE);
+            rgb = k === null ? PILLAR_OUTLINE : [rgb[0] * k, rgb[1] * k, rgb[2] * k];
+            if (k === null) hgt = 0;
+          }
         }
         // A carved rib along the vault's edge.
         if (kind === Kind.Wall && y - vaultY(x) < 3) {

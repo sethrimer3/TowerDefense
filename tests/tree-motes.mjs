@@ -34,6 +34,7 @@ try {
     const fixture = await page.evaluate(async () => {
       const { defaults } = await import('/src/save.ts');
       const s = defaults(); s.settings.soundOff = true; s.settings.ambienceOff = true; s.knowledge = 1e6;
+      s.profile = { name: 'Mote Warden', flag: { base: 3, layers: [] } };
       return s;
     });
     await context.addInitScript(f => { if (!sessionStorage.getItem('motes')) { localStorage.setItem('towerdefense.v1', JSON.stringify(f)); sessionStorage.setItem('motes', '1'); } }, fixture);
@@ -54,6 +55,54 @@ try {
     const b = await gold(page, '#defend-specialty .ug-motes');
     assert.notEqual(a.hash, b.hash, 'the motes move');
     await page.screenshot({ path: `test-results/tree-motes/${name}-keep.png` });
+    // Panning: the view stops a fifth of the tree's size past it, and the motes go with the tree.
+    const host = page.locator('#defend-specialty .ug-host');
+    const box = await host.boundingBox();
+    const view = () => page.evaluate(() => { const t = window.__dp.tree; return { pan: { ...t.pan }, area: t.area, w: t.el.clientWidth, h: t.el.clientHeight }; });
+    const start = await view();
+    assert.ok(start.area, 'the pan area is known');
+    const drag = async (dx, dy) => {
+      const x = box.x + 6, y = box.y + 6;
+      if (touch) {
+        const cdp = await context.newCDPSession(page);
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+        for (let k = 1; k <= 10; k++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + (dx * k) / 10, y: y + (dy * k) / 10 }] });
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      } else {
+        await page.mouse.move(x, y); await page.mouse.down();
+        await page.mouse.move(x + dx, y + dy, { steps: 10 }); await page.mouse.up();
+      }
+    };
+    await drag(3000, 3000);
+    assert.ok(await page.evaluate(() => window.__dp.tree.steered), 'the background drag panned the view');
+    const far = await view();
+    for (const [p, a0, len, size] of [[far.pan.x, far.area.x, far.area.w, far.w], [far.pan.y, far.area.y, far.area.h, far.h]]) {
+      if (len * far.pan.s <= size) assert.ok(Math.abs(p - (size / 2 - (a0 + len / 2) * far.pan.s)) < 1, `centred when it fits: ${JSON.stringify(far)}`);
+      else assert.ok(p + a0 * far.pan.s <= 0.5, `the area's near edge never comes inside the view: ${p + a0 * far.pan.s}`);
+    }
+    assert.ok(far.pan.x !== start.pan.x || far.pan.y !== start.pan.y || start.area.w * start.pan.s <= start.w, 'it panned');
+    await page.screenshot({ path: `test-results/tree-motes/${name}-panned.png` });
+    const moved = await gold(page, '#defend-specialty .ug-motes');
+    assert.ok(moved.count > 20, `motes still fill the panned view: ${moved.count}`);
+    // Zooming far out stops a quarter past fitting the tree, and the motes still fill the view, corners too.
+    if (!touch) {
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      for (let k = 0; k < 30; k++) await page.mouse.wheel(0, 400);
+      await page.waitForTimeout(1200);
+      const out = await page.evaluate(() => { const t = window.__dp.tree; return { s: t.pan.s, fit: t.fit.s }; });
+      assert.ok(Math.abs(out.s - out.fit / 1.25) < 1e-6, `zoom out stops a quarter past the fit: ${JSON.stringify(out)}`);
+      const corners = await page.evaluate(() => {
+        const c = document.querySelector('#defend-specialty .ug-motes'), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+        const q = [0, 0, 0, 0];
+        for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) {
+          const i = (y * c.width + x) * 4;
+          if (d[i + 3] > 0 && d[i] > 180) q[(y < c.height / 2 ? 0 : 2) + (x < c.width / 2 ? 0 : 1)]++;
+        }
+        return q;
+      });
+      assert.ok(corners.every(n => n > 10), `motes in every quarter of the zoomed-out view: ${corners}`);
+      await page.screenshot({ path: `test-results/tree-motes/${name}-zoomed-out.png` });
+    }
     // A purchase bursts them (the keep's first rank).
     const first = await page.locator('#defend-specialty .ug-node.next').first().getAttribute('data-node');
     await page.evaluate(id => window.__dp.tree.burst(id), first);

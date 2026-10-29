@@ -45,6 +45,13 @@ const FREE = 9;
 
 export type BuildingKind = "house" | "wall" | "gate" | "wallBallista" | StructureKind;
 export type Building = {
+  /** Optional solid wooden scenario fence; ordinary city walls remain stone. */
+  fence?: { x1: number; y1: number; x2: number; y2: number };
+  /** The rails a scenario fence draws through its cell, where given (two
+   * at a corner, so the ring joins), instead of `fence` alone. */
+  rails?: { x1: number; y1: number; x2: number; y2: number }[];
+  /** Set for a scenario gate in a wooden fence: drawn as a wooden gate. */
+  woodGate?: true;
   /** Empty scenario deployment lot; excluded from rendering and recruitment. */
   hidden?: boolean;
   id: number;
@@ -78,6 +85,8 @@ export type CityMap = {
   structures: FittedStructure[];
   /** The wall spikes (unset when there are none). */
   spikes?: SpikeRow[];
+  /** Road cells bridging water, 2 over the water itself and 1 on its banks (unset when there are none). */
+  bridges?: Uint8Array;
 };
 
 /** House footprints and how often each is tried first: mostly chunky
