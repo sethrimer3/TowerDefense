@@ -1086,3 +1086,5 @@ Defend is endless: these are its first ten 20-wave areas, not a finite level lis
 ### Endless cycles — wave 201 onward
 
 - [ ] Every subsequent Defend wave: **outdated**. The ten-area order repeats every 200 waves; its budget continues to grow. A future generator migration must explicitly update this entry and log any story exceptions.
+
+Rendering follow-up (2026-10-30): all Dark One enemies share the noise portal outline. Packed pixel cracks softly fill black and reopen as enemies separate; this does not change rosters, physical spacing or attack-transfer connections. [Contour rules](../art/UNIT_CONTOURS.md).
