@@ -1,4 +1,4 @@
-import { approachBuildingContact, structureContactRect, CONTACT_OUTLINE } from "./contact.ts";
+import { approachBuildingContact, approachDefenderContact, buildingContactPoint, defenderInContact, structureContactRect, CONTACT_OUTLINE } from "./contact.ts";
 import { enemySize } from "./catalog.ts";
 import { stepAbilities, enemyDamage, enemySpeed } from "./enemy-abilities.ts";
 import { hostileSpecial } from "./hostile-attacks.ts";
@@ -15,7 +15,11 @@ import { dist } from "../exact.ts";
 import { ENEMIES, type EnemyDef } from "./catalog.ts";
 import { CELLS_H, CELLS_W, cellIndex, sideCells } from "./grid.ts";
 import { cellCenter, center, clampCell, downhill, nearestPoint, rectDist } from "./pathing.ts";
-import type { DefendSim, Enemy } from "./sim.ts";
+import { cloaked } from "./assassins.ts";
+import { perched } from "./gun-sight.ts";
+import { groundBody } from "./enemy-crowd.ts";
+import type { CrowdTarget } from "./enemy-crowd.ts";
+import type { Civilian, Soldier, DefendSim, Enemy } from "./sim.ts";
 import { chilled } from "./wizard.ts";
 import { stepIceCube } from "./ice-enemies.ts";
 
@@ -25,8 +29,10 @@ type Turn = { sim: DefendSim; e: Enemy; def: EnemyDef; reach: number; dt: number
 
 export function stepEnemy(sim: DefendSim, e: Enemy, dt: number) {
   if (e.hp <= 0) return;
+  sim.crowd.add(e);
   const def = ENEMIES[e.kind];
   e.cd -= dt;
+  if (sim.crowd.holds(e)) return;
   if (e.impaled !== undefined) return;
   if (stepAbilities(sim, e, dt)) return;
   if (e.leader !== undefined) {
@@ -39,6 +45,7 @@ export function stepEnemy(sim: DefendSim, e: Enemy, dt: number) {
     // The segment immediately behind a cut becomes a new independent head.
     delete e.leader;
   }
+  if (sim.crowd.queued(e)) return;
   if (hostileSpecial(sim, e, dt)) return;
   if (def.siege && stepSiege(sim, e, dt)) return;
   if (def.boat) return stepBoat(sim, e, dt);
@@ -52,19 +59,22 @@ export function stepEnemy(sim: DefendSim, e: Enemy, dt: number) {
   march(t);
 }
 
-function fightDefender({ sim, e, def, reach }: Turn) {
+function fightDefender(t: Turn) {
+  const { sim, e, def, reach, dt } = t;
   const foe = sim.nearestDefender(e.x, e.y, reach + 0.2);
   if (!foe) return false;
-  if (e.cd <= 0) {
-    e.cd = def.cooldown;
-    // A valkyrie just after her charge can't be hurt.
-    if ("guard" in foe && foe.guard) return true;
-    const damage = enemyDamage(sim, e);
-    const drained = sim.hurtDefender(foe, damage);
-    if (e.kind === "leechSwarm") e.hp = Math.min(e.maxHp, e.hp + drained);
-    foe.flash = 0.12;
-  }
+  if (def.faction === "darkOne" && groundBody(e) && !approachDefenderContact(sim, e, foe, dt)) return true;
+  sim.crowd.target(e, { unit: foe });
+  hitDefender(t, foe);
   return true;
+}
+function hitDefender({ sim, e, def }: Turn, foe: Soldier | Civilian) {
+  if (e.cd > 0 || def.faction === "darkOne" && (e.freeze || e.stagger)) return;
+  e.cd = def.cooldown;
+  if ("guard" in foe && foe.guard) return;
+  const drained = sim.hurtDefender(foe, enemyDamage(sim, e));
+  if (e.kind === "leechSwarm") e.hp = Math.min(e.maxHp, e.hp + drained);
+  foe.flash = 0.12;
 }
 
 /** Fliers make straight for the keep, or the nearest monster bait. */
@@ -172,7 +182,9 @@ const isHouse = (sim: DefendSim, bid: number) => bid >= 0 && sim.map.buildings[b
 /** Native and scenario routes share exactly the same contact gate. */
 function contactBuilding(t: Turn, id: number) {
   const b = t.sim.map.buildings[id];
-  if (b && t.sim.intact(b) && approachBuildingContact(t.sim, t.e, b, t.dt)) hitBuilding(t, id);
+  if (b && t.sim.intact(b) && approachBuildingContact(t.sim, t.e, b, t.dt)) {
+    t.sim.crowd.target(t.e, { building: b }); hitBuilding(t, id);
+  }
 }
 function insideFence(t: Turn) {
   const cell = cellIndex(clampCell(t.e.x, CELLS_W), clampCell(t.e.y, CELLS_H));
@@ -181,12 +193,12 @@ function insideFence(t: Turn) {
   contactBuilding(t, b.id); return true;
 }
 
-function hitBuilding({ sim, e, def }: Turn, id: number) {
-  if (e.cd > 0) return;
+function hitBuilding({ sim, e, def }: Turn, id: number, front = e) {
+  if (e.cd > 0 || def.faction === "darkOne" && (e.freeze || e.stagger)) return;
   e.cd = def.cooldown;
   const bite = enemyDamage(sim, e);
   sim.damageBuilding(id, bite);
-  if (sim.map.buildings[id].kind === "monsterBait") baitBitten(sim, e, bite, sim.map.buildings[id]);
+  if (sim.map.buildings[id].kind === "monsterBait") baitBitten(sim, front, bite, sim.map.buildings[id]);
 }
 
 /** Deterministic cone breath; only chain heads attack. */
@@ -220,4 +232,29 @@ function breathe(sim: DefendSim, e: Enemy, _dt: number): boolean {
     if (sim.intact(b) && inside(near.x, near.y)) sim.damageBuilding(b.id, enemyDamage(sim, e));
   }
   return true;
+}
+
+/** Roots were acquired by native AI this phase; transfer only their basic
+ * contact attack, once per rear enemy's own cooldown/status. */
+function crowdTargetValid(sim: DefendSim, e: Enemy, target: CrowdTarget) {
+  if (!groundBody(e)) return false;
+  if ("building" in target) {
+    const b = target.building;
+    if (!sim.intact(b) || sim.aloft(b.id)) return false;
+    const p = buildingContactPoint(sim, e, b);
+    return Math.abs(p.x - e.x) + Math.abs(p.y - e.y) <= 1e-8;
+  }
+  const u = target.unit;
+  if (u.hp <= 0 || cloaked(u) || perched(u)) return false;
+  return defenderInContact(e, u);
+}
+export function prepareCrowdAttacks(sim: DefendSim) {
+  sim.crowd.prime((e, target) => crowdTargetValid(sim, e, target));
+}
+export function transferCrowdAttacks(sim: DefendSim) {
+  sim.crowd.transfer((e, target) => crowdTargetValid(sim, e, target), (e, front, target) => {
+    const t = turn(sim, e, 0);
+    if ("building" in target) hitBuilding(t, target.building.id, front);
+    else hitDefender(t, target.unit);
+  });
 }

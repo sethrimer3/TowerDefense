@@ -213,8 +213,7 @@ export function stepBoat(sim: DefendSim, e: Enemy, dt: number) {
     }
   }
   const step = Math.min(len, enemySpeed(sim, e) * chilled(e) * dt);
-  e.x += dx * step;
-  e.y += dy * step;
+  sim.crowd.move(e, dx * step, dy * step);
 }
 
 /** The buildings with a cell within `r` cells' box of the boat, each once,

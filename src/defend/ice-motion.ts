@@ -58,8 +58,14 @@ export class IceMotion {
     const solid = own ? sim.ownSolid : sim.foeSolid;
     const n = this.velocity.has(u) ? Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / .2)) : 1;
     for (let i = 0; i < n; i++) {
-      if (!blocked(solid, u.x + dx / n, u.y, radius)) u.x += dx / n;
-      if (!blocked(solid, u.x, u.y + dy / n, radius)) u.y += dy / n;
+      if (!blocked(solid, u.x + dx / n, u.y, radius)) {
+        if (!own && sim.crowd.has(u as Enemy)) sim.crowd.move(u as Enemy, dx / n, 0);
+        else u.x += dx / n;
+      }
+      if (!blocked(solid, u.x, u.y + dy / n, radius)) {
+        if (!own && sim.crowd.has(u as Enemy)) sim.crowd.move(u as Enemy, 0, dy / n);
+        else u.y += dy / n;
+      }
     }
   }
 }

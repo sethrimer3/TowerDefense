@@ -116,7 +116,6 @@ export function knockBack(sim: DefendSim, a: Arrow, e: Enemy) {
   for (let i = 0; i < n; i++) {
     const x = e.x + dx, y = e.y + dy;
     if (def.flying ? !cellInBounds(x, y) : blocked(sim.foeSolid, x, y)) break;
-    e.x = x;
-    e.y = y;
+    sim.crowd.move(e, x - e.x, y - e.y, (cx, cy) => def.flying ? cellInBounds(cx, cy) : !blocked(sim.foeSolid, cx, cy));
   }
 }

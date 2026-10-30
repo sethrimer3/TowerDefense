@@ -1,3 +1,4 @@
+import { EnemyCrowd } from "./enemy-crowd.ts";
 import { stepFlagBearer, friendlySafe } from "./flag-bearers.ts";
 import type { ChronoState, DivineArrow, ReleasedArrow } from "./chrono.ts";
 import { ageMageChill, type MageChill, type MageBolt } from "./mage-attunements.ts";
@@ -55,7 +56,7 @@ import {
 } from "./catalog.ts";
 import { CellType, type Building, type CityMap } from "./citygen.ts";
 import { atHome, escaped, Builders } from "./civilians.ts";
-import { stepEnemy } from "./enemies.ts";
+import { stepEnemy, prepareCrowdAttacks, transferCrowdAttacks } from "./enemies.ts";
 import { blocked, cellAt, cellCenter, center, fillFlowField, nearestOpen, type FieldTerrain, type Point } from "./pathing.ts";
 import { ignite, stepArrows, stepShells, Towers } from "./towers.ts";
 import type { WispArrow, WispTowerState } from "./wisp-arrow.ts";
@@ -679,6 +680,8 @@ export class DefendSim {
     }
   }
 
+  readonly crowd = new EnemyCrowd();
+
   step(dt: number) {
     this.time += dt;
     if (this.wave > 0) this.stats.current.seconds += dt;
@@ -689,9 +692,11 @@ export class DefendSim {
     if (this.skyPalaces.length) stepSkyPalaces(this, dt);
     if (!this.atmosphere && groundWeather(areaForWave(this.wave).id)) this.atmosphere = new Atmosphere();
     this.atmosphere?.step(this, dt);
+    if (!this.scenario?.passiveEnemies) this.crowd.begin(this);
     this.indexEnemies();
     this.markEnemies();
-    this.stepUnits(dt);
+    prepareCrowdAttacks(this);
+    try { this.stepUnits(dt); } finally { this.crowd.end(); }
     stepBlackHoles(this, dt);
     stepPoison(this, dt);
     this.sweepAway();
@@ -716,7 +721,8 @@ export class DefendSim {
       this.enemyLookup.clear();
       this.enemyLookupActive = this.enemies.some(e => e.fortressPart);
       if (this.enemyLookupActive) for (const e of this.enemies) this.enemyLookup.set(e.id, e);
-      if (!this.scenario?.passiveEnemies) for (const e of this.enemies) if (e.hp > 0) stepEnemy(this, e, dt);
+      if (!this.scenario?.passiveEnemies) for (const e of this.enemies) if (e.hp > 0) { stepEnemy(this, e, dt); this.crowd.sync(e); }
+      transferCrowdAttacks(this);
     } finally {
       this.defenderIndexActive = false;
       this.enemyLookupActive = false;
@@ -1049,6 +1055,7 @@ export class DefendSim {
 
   /** Friendly projectiles that move enemies invalidate the shared blast snapshot. */
   reindexAfterDisplacement() {
+    this.crowd.syncMoved();
     this.indexEnemies();
     this.blastIndexReady = this.stationaryAttacks;
   }
@@ -1295,7 +1302,7 @@ export class DefendSim {
     if (len === 0 || separate && len < 0.02) return true;
     dx /= len;
     dy /= len;
-    const [sx, sy] = !separate || "kind" in u && ENEMIES[(u as Enemy).kind]?.unyielding ? [0, 0] : this.separation(u);
+    const [sx, sy] = !separate || this.crowd.has(u as Enemy) || "kind" in u && ENEMIES[(u as Enemy).kind]?.unyielding ? [0, 0] : this.separation(u);
     if ("kind" in u && ((u as Enemy).kind === "siegeBeetle" || ENEMIES[(u as Enemy).kind]?.siege)) (u as Enemy).facing = { x: dx, y: dy };
     const step = Math.min(len, speed * dt);
     const mx = dx * step + sx * 0.5 * speed * dt * 4;

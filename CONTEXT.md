@@ -704,3 +704,13 @@ A PNG, one pixel an art pixel and without an outline, that replaces the game's o
 
 **Dark crimson glow**:
 The steady night halo around Dark One enemies, brighter and wider where they gather and fading with distance and daylight.
+
+
+**Blight**:
+The Dark One’s enemy forces, including Mini Darklings, Darklings and Large Darklings.
+
+**Front line**:
+Enemies directly contacting the structure or unit their crowd is attacking.
+
+**Attack transfer**:
+A rear Blight member’s own attack reaching the front line’s target through an uninterrupted chain of touching living Blight bodies.

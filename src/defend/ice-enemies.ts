@@ -62,7 +62,7 @@ export function stepIceCube(sim: DefendSim, e: Enemy, dt: number) {
   for (let n = 0; n < steps; n++) {
     const x = e.x + dx / distance * travel / steps, y = e.y + dy / distance * travel / steps;
     if (blocked(sim.solid, x, y)) { delete e.iceSlide; break; }
-    e.x = x; e.y = y; trail();
+    sim.crowd.move(e, x - e.x, y - e.y); trail();
   }
   if (travel === distance) delete e.iceSlide;
 }

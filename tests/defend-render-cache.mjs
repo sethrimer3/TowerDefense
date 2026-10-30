@@ -6,8 +6,8 @@ import { writeFileSync } from 'node:fs';
 const referenceRoot=makeReference();
 // Keep the optimization references, but compare combat to the art before Siege sides.
 const combatRoot=makeReference(process.env.PERF_REF || '0555c7d');
-// Main deliberately changed torch occlusion and rim lighting in #192.
-const lightingRoot=makeReference('9a9a057');
+// Main deliberately revised torchlit edge thickness/strength in #194.
+const lightingRoot=makeReference('c10cafb');
 const browser = await chromium.launch(process.env.PLAYWRIGHT_EXECUTABLE
   ? { headless: true, executablePath: process.env.PLAYWRIGHT_EXECUTABLE }
   : { headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || 'chrome' });
@@ -120,7 +120,7 @@ try {
       }
     }
     // Pin the intentional art-based occlusion/rim-lighting appearance from
-    // main #192, rather than the superseded whole-cell shadow model. Exact
+    // main #194/#195, rather than the superseded whole-cell shadow model. Exact
     // parity is required, including its actual building body/rim masks.
     const {DefendLighting,MASK}=await import('/src/defend/lighting.ts');
     const {DefendLighting:ReferenceLighting}=await import(`${lightingRoot}/lighting.ts`);

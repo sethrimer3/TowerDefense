@@ -42,6 +42,8 @@ Totals assume every parent and child is defeated. Large Darkling stats start at 
 
 - **2026-10-29 — Deep crimson and night heat.** Dark One outlines are now deep crimson (`#9c1235`). A shared dark crimson night halo strengthens and broadens as enemies gather, fading with daylight. The drain's old ~2% onset at ten neighbors was too faint; it now begins at 22% and eases to full strength near sixty. Unit/shot alpha protects combat art while surrounding terrain, buildings, trees, water, lighting, smoke, floating structures and rain receive the wash. No wave roster, combat state or replay fixture changed.
 
+- **2026-10-29 — Blight packing and attack transfer.** Ground bodies now block one another and build visible rear ranks. Touching living Dark One members transfer their own ready basic hits to a front-line target through native defenses; gaps/deaths break the chain. Darkling body fills and narrow-gap contours are batched as a crowd. This intentionally changes battle outcomes and replay hashes, while roster compositions and migration statuses remain unchanged. See [packing rules and validation](BLIGHT_PRESSURE.md).
+
 ## Color drain and performance rules
 
 Faction is explicit in the enemy catalog; never infer darkness from a sprite's color. Currently tagged: Mini Darkling, Darkling, Large Darkling, Mother, Broodling, Dark Knight, Void Sparrow, Necromancer, Skeleton, Blink Imp, Crypt Hound and Grave Wisp. Future Dark One enemies must carry the same faction tag. Other species' allegiance is still pending their migration/story review. Friendly dark wizards and shades do not contribute; neither do dead enemies, fortress parts or Siege proxy objects.
