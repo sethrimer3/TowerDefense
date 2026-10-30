@@ -12,8 +12,11 @@ import { ART } from "./park-art.ts";
 import { cellInBounds, cellIndex, hash, hash01 } from "./grid.ts";
 import type { Building, CityMap } from "./citygen.ts";
 import type { DefendSim } from "./sim.ts";
-import { OUTLINE, pixels, sprite } from "./damage-art.ts";
+import { OUTLINE, drawSprite, pixels, sprite } from "./damage-art.ts";
 import { cloudPuffs, structurePixels } from "./tower-art.ts";
+import { ART_NAMES } from "./art-overrides.ts";
+import { STRUCTURES } from "./catalog.ts";
+import { sourcePixels, type ArtPiece } from "./sprite-source.ts";
 
 /** Cells of cloud round the palace on each side of its sprite. */
 export const MARGIN = 2;
@@ -46,12 +49,14 @@ function bankPuffs(cw: number, ch: number, seed: number): [number, number, numbe
  * `(cw + 2·MARGIN)·ART` wide and high. */
 export function skyPalacePixels(cw: number, ch: number, seed: number): Uint32Array {
   const w = (cw + 2 * MARGIN) * ART, h = (ch + 2 * MARGIN) * ART;
+  return sourcePixels(ART_NAMES.scenery("sky-palace", `${cw}x${ch}`), w, h, () => {
   const out = new Uint32Array(w * h), p = pixels(out, w, h);
   cloudPuffs(p, bankPuffs(cw, ch, seed));
   const palace = structurePixels("valkyriePalace", cw, ch, 0, seed, "cloudborne"), pw = cw * ART;
   for (let i = 0; i < palace.length; i++)
     if (palace[i] >>> 24) out[(MARGIN * ART + Math.floor(i / pw)) * w + MARGIN * ART + (i % pw)] = palace[i];
   return out;
+  });
 }
 
 /** The bank's shadow: its shape in a checker of black. */
@@ -66,6 +71,7 @@ export function skyShadowPixels(cw: number, ch: number, seed: number): Uint32Arr
 /** The mooring a palace leaves on its lot of `cw × ch` cells: packed earth,
  * a ring of marble flags and a gold star where it comes down. */
 export function mooringPixels(cw: number, ch: number, seed: number): Uint32Array {
+  return sourcePixels(ART_NAMES.scenery("mooring", `${cw}x${ch}`), cw * ART, ch * ART, () => {
   const w = cw * ART, h = ch * ART, out = new Uint32Array(w * h), p = pixels(out, w, h);
   const EARTH = [0x4a3b2b, 0x5a4834, 0x66533c], MARBLE = [0x8a8c9a, 0xb9bac6, 0xdcdce4], GOLD = [0xb08a3e, 0xe9c46a, 0xfff4c8];
   for (let y = 1; y < h - 1; y++)
@@ -90,6 +96,15 @@ export function mooringPixels(cw: number, ch: number, seed: number): Uint32Array
   }
   p.set(Math.floor(cx), Math.floor(cy), GOLD[2]);
   return out;
+  });
+}
+
+export function skyPalacePieces(): ArtPiece[] {
+  const d = STRUCTURES.valkyriePalace;
+  return [[d.w, d.h], ...(d.compact ? [[d.compact.w, d.compact.h]] : [])].flatMap(([cw, ch]) => [
+    { name: ART_NAMES.scenery("sky-palace", `${cw}x${ch}`), w: (cw + 2 * MARGIN) * ART, h: (ch + 2 * MARGIN) * ART, about: "Cloudborne palace and cloud bank", pixels: () => skyPalacePixels(cw, ch, 0) },
+    { name: ART_NAMES.scenery("mooring", `${cw}x${ch}`), w: cw * ART, h: ch * ART, about: "Cloudborne palace mooring; ground overlay", joined: true, pixels: () => mooringPixels(cw, ch, 0) },
+  ]);
 }
 
 /** One palace to draw: its building, and the top left of its footprint in cells. */
@@ -136,7 +151,7 @@ function over(map: CityMap, sim: DefendSim, { b, x, y }: Aloft): boolean {
 function drawOne(c: CanvasRenderingContext2D, px: number, { b, x, y }: Aloft, alpha: number, o: { now: number; reduceMotion: boolean; night: number }) {
   const { w: cw, h: ch } = b.rect, seed = hash(b.rect.x, b.rect.y, 0xc10d);
   const art = sprite(`sky:${cw}x${ch}:${seed}`, (cw + 2 * MARGIN) * ART, (ch + 2 * MARGIN) * ART, () => skyPalacePixels(cw, ch, seed));
-  const shade = sprite(`sky:shadow:${cw}x${ch}:${seed}`, (cw + 2 * MARGIN) * ART, (ch + 2 * MARGIN) * ART, () => skyShadowPixels(cw, ch, seed));
+  const shade = sprite(`sky:shadow:${cw}x${ch}:${seed}`, (cw + 2 * MARGIN) * ART, (ch + 2 * MARGIN) * ART, () => skyShadowPixels(cw, ch, seed), false);
   if (!art || !shade) return;
   // A slow bob, a whole art pixel at a time.
   const bob = o.reduceMotion ? 0 : Math.round(Math.sin(o.now / 900 + b.id) * 1.5) / ART;
@@ -151,6 +166,6 @@ function drawOne(c: CanvasRenderingContext2D, px: number, { b, x, y }: Aloft, al
   c.globalAlpha = alpha;
   if (o.night > 0) c.filter = `brightness(${1 - 0.55 * o.night})`;
   const [ax, ay] = at(x, y - 0.6 + bob);
-  c.drawImage(art, ax, ay, Math.round(W), Math.round(H));
+  drawSprite(c, art, ax, ay, Math.round(W), Math.round(H));
   c.restore();
 }

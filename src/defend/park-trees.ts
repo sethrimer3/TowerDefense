@@ -1,9 +1,10 @@
+import { drawSprite } from "./damage-art.ts";
 /** The parks' trees, standing over everyone below them: drawn after the
  * units from the sprites `park-art.ts` bakes, each fading to half opacity
  * while anyone (an enemy, soldier or civilian) is under its canopy, so
  * nobody is lost from sight, and filling back in once they have passed.
  * Their shadows lie in the city layer (`shadow-art.ts`). Presentation only. */
-import { drawPixel } from "./pixel-sprites.ts";
+import { drawPixel, pixelKey } from "./pixel-sprites.ts";
 import { hash01 } from "./grid.ts";
 import type { CityMap } from "./citygen.ts";
 import { ART, parkArt, type TreeSprite } from "./park-art.ts";
@@ -24,13 +25,16 @@ export const under = (t: TreeSprite, u: Under) => {
 
 export class ParkTrees {
   private map: CityMap | null = null;
+  private artKey = "";
   private trees: TreeSprite[] = [];
   /** Each tree's opacity, easing toward 1 or `UNDER_ALPHA`. */
   readonly alpha: number[] = [];
   private off: HTMLCanvasElement | null = null;
 
   sync(map: CityMap) {
-    if (map === this.map) return;
+    const key = pixelKey();
+    if (map === this.map && key === this.artKey) return;
+    this.artKey = key;
     this.map = map;
     this.trees = parkArt(map).trees;
     this.alpha.length = 0;
@@ -83,7 +87,7 @@ export class ParkTrees {
       // Pixel Art's oak or pine over the canopy's disc (the pine where the canopy is dark).
       const pine = hash01(Math.floor(t.cx), Math.floor(t.cy), 22) < 0.5;
       if (drawPixel(target, pine ? "city-pine" : "city-oak", (t.cx - t.r) * px, (t.cy - t.r) * px, t.r * 2 * px)) return;
-      target.drawImage(t.canvas, t.x * k, t.y * k, t.w * k, t.h * k);
+      drawSprite(target,t.canvas, t.x * k, t.y * k, t.w * k, t.h * k);
     });
     target.restore();
     if (!shade || !box) return;
@@ -112,10 +116,10 @@ export class ParkTrees {
       y1 = -Infinity;
     for (const t of this.trees) {
       if (!t.canvas) continue;
-      x0 = Math.min(x0, t.x * k);
-      y0 = Math.min(y0, t.y * k);
-      x1 = Math.max(x1, (t.x + t.w) * k);
-      y1 = Math.max(y1, (t.y + t.h) * k);
+      x0 = Math.min(x0, (t.x - 1) * k);
+      y0 = Math.min(y0, (t.y - 1) * k);
+      x1 = Math.max(x1, (t.x + t.w + 1) * k);
+      y1 = Math.max(y1, (t.y + t.h + 1) * k);
     }
     // The camera only scales and moves.
     const left = Math.max(0, Math.floor(m.a * x0 + m.e) - 1),

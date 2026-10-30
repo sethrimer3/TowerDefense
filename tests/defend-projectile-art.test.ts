@@ -15,7 +15,7 @@ test("arrowDir picks the nearest of the sixteen headings, clockwise from right",
   assert.equal(arrowDir(1, -0.1), 0);
 });
 
-test("every arrow points its head the way it flies, fletching behind, all outlined", () => {
+test("every arrow points its head the way it flies, fletching behind, without baked rims", () => {
   const seen = new Set<string>();
   for (let dir = 0; dir < ARROW_DIRS; dir++) {
     const px = arrowPixels(dir), n = Math.sqrt(px.length);
@@ -37,12 +37,12 @@ test("every arrow points its head the way it flies, fletching behind, all outlin
   assert.equal(seen.size, ARROW_DIRS);
 });
 
-test("cannon balls are round, outlined and lit", () => {
+test("cannon balls are round, outline-free and lit", () => {
   for (const d of [4, 5]) {
     const { px, size } = ballPixels(d);
     assert.equal(size, d + 2);
     assert.equal(px[0], "", "corners are clear");
-    assert.ok(px.includes(OUTLINE));
+    assert.ok(!px.includes(OUTLINE));
     assert.ok(px.includes("#8c8c96"), "a glint");
   }
 });

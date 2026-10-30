@@ -2,6 +2,10 @@
 import { BODY_FRAMES, bodyKey, type BodyKind, type BodyOptions } from "./melee-body-data.ts";
 import type { Facing } from "./melee-facing.ts";
 
+import { meleeFramePixels } from "./unit-body-art.ts";
+import { spriteCanvas } from "./damage-art.ts";
+import { onPixelArt } from "./pixel-sprites.ts";
+
 const frames = new Map(BODY_FRAMES.map((frame, i) => [frame.key, { frame, i }]));
 const cache = new Map<string, HTMLCanvasElement>();
 
@@ -10,12 +14,10 @@ export function meleeBody(kind: BodyKind, direction: Facing, options: BodyOption
   const id = `${key}:${direction}`;
   let cv = cache.get(id);
   if (cv) return cv;
-  const { frame, i } = found, rows = frame.views[direction];
-  cv = document.createElement("canvas"); cv.width = rows[0].length; cv.height = rows.length;
-  const c = cv.getContext("2d")!;
-  rows.forEach((row, y) => [...row].forEach((ch, x) => {
-    if (ch !== ".") { c.fillStyle = frame.palette[ch]; c.fillRect(x, y, 1, 1); }
-  }));
+  const p = meleeFramePixels(key, direction);
+  cv = spriteCanvas(p.data, p.w, p.h, undefined, false);
   cache.set(id, cv);
   return cv;
 }
+
+onPixelArt(() => cache.clear());

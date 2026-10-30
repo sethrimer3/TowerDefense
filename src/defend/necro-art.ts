@@ -1,3 +1,6 @@
+import { summonedArcherPixels } from "./unit-body-art.ts";
+import { spriteCanvas } from "./damage-art.ts";
+import { onPixelArt } from "./pixel-sprites.ts";
 /** The Necromancy spell as it is drawn, in the city's pixel art:
  *
  * - **The risen:** bone warriors in a black outline with grave-green eyes,
@@ -28,16 +31,8 @@ function sprite(look: Look, struck: boolean, direction: Facing = "south") {
   const key = `${look}:${struck}`;
   let cv = sprites.get(key);
   if (cv) return cv;
-  const rows = SPRITES[look];
-  cv = document.createElement("canvas");
-  cv.width = rows[0].length;
-  cv.height = rows.length;
-  const c = cv.getContext("2d")!;
-  rows.forEach((row, j) => [...row].forEach((ch, i) => {
-    if (ch === ".") return;
-    c.fillStyle = struck && ch !== "o" ? "#fff" : COLORS[ch];
-    c.fillRect(i, j, 1, 1);
-  }));
+  const p = summonedArcherPixels(false, struck);
+  cv = spriteCanvas(p.data, p.w, p.h, undefined, false);
   sprites.set(key, cv);
   return cv;
 }
@@ -91,3 +86,5 @@ export function drawRaisings(c: Ctx, px: number, sim: DefendSim) {
 export function raisingLights(sim: DefendSim) {
   return sim.raisings.map((r) => ({ x: r.x, y: r.y, r: NECRO.radius * 1.2, k: 0.8 * (1 - r.t / RAISE_SHOW), color: GREEN[2] }));
 }
+
+onPixelArt(() => sprites.clear());

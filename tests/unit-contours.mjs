@@ -38,8 +38,8 @@ try {
     fadedOutline.end(fadedC);
     const translucent = { inside: pixel(fadedC, 14, 14), edge: pixel(fadedC, 9, 14) };
     const opponents = { blue: pixel(c, 9, 14), red: pixel(c, 26, 14), seam: pixel(c, 16, 14), friendBody: pixel(c, 12, 14) };
-    // Baked rims removed; body paths track cropping and the actual camera.
-    const sprite = make(5, 5), s = sprite.getContext('2d'); s.fillStyle = '#000'; s.fillRect(0, 0, 5, 5); s.fillStyle = '#43ba73'; s.fillRect(1, 1, 3, 3);
+    // Sources have no baked rims; body paths track cropping and the actual camera.
+    const sprite = make(5, 5), s = sprite.getContext('2d'); s.fillStyle = '#43ba73'; s.fillRect(1, 1, 3, 3);
     const neutral = [];
     for (const merged of [false, true]) {
       const cv = make(), c = cv.getContext('2d'), outline = new UnitOutline(), l = outline.begin(c, merged, .5);

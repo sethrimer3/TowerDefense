@@ -67,13 +67,13 @@ test("blasts blow up the trees they reach, once, leaving craters", () => {
   assert.deepEqual(fresh.blast(x, y, 2.5).map((f) => f.tree.id), want);
 });
 
-test("tree sprites are outlined pixel art in five lean frames, their trunks still", () => {
+test("tree sources are outline-free pixel art in five lean frames, their trunks still", () => {
   for (const size of [0, 1, 2, 3] as const)
   for (const kind of size ? (["oak", "pine"] as const) : (["oak", "pine", "bush"] as const))
     for (let v = 0; v < VARIANTS; v++) {
       const frames = [-2, -1, 0, 1, 2].map((l) => treeSprite(kind, v, l, size));
       for (const s of frames) {
-        assert.ok(s.px.some((p) => p === 0xff07090b), "a black outline");
+        assert.ok(!s.px.some((p) => p === 0xff07090b), "no baked outline");
         for (const p of s.px) assert.ok(p === 0 || p >>> 24 === 255, "opaque or clear");
       }
       assert.notDeepEqual(frames[0].px, frames[4].px, "leaning moves the canopy");
@@ -82,7 +82,7 @@ test("tree sprites are outlined pixel art in five lean frames, their trunks stil
       const last = (s: (typeof frames)[0]) => Array.from(s.px.slice((s.h - 1) * s.w));
       assert.deepEqual(last(frames[0]), last(frames[4]));
     }
-  assert.ok(rockSprite(0.4, 9).px.some((p) => p === 0xff07090b));
+  assert.ok(!rockSprite(0.4, 9).px.some((p) => p === 0xff07090b));
 });
 
 /** No bark-brown pixels: the trunk is hidden under the crown from above. */
@@ -268,11 +268,11 @@ test("any attack strikes the smaller trees apart into stumps; the biggest stand"
   const t = plan.trees.find((o) => o.size === 1 && damage.standing(o))!;
   damage.cut(t.x - 2, t.y, t.x + 2, t.y, 0.3);
   assert.ok(damage.stumps.at(-1)!.cut, "a blade saws it clean");
-  // Stump sprites: outlined, sawn ones with pale rings, bigger for bigger trees.
+  // Stump sources: outline-free, sawn ones with pale rings, bigger for bigger trees.
   for (const size of [0, 1, 2] as const)
     for (const cut of [true, false]) {
       const s = stumpSprite(size, 3, cut);
-      assert.ok(s.px.some((p) => p === 0xff07090b), "outlined");
+      assert.ok(!s.px.some((p) => p === 0xff07090b), "no baked outline");
       for (const p of s.px) assert.ok(p === 0 || p >>> 24 === 255);
     }
   assert.ok(stumpSprite(0, 3, true).w < stumpSprite(2, 3, true).w);

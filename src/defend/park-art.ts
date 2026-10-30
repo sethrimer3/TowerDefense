@@ -1,3 +1,7 @@
+import { ART_NAMES } from "./art-overrides.ts";
+import { sourcePixels, type ArtPiece } from "./sprite-source.ts";
+import { outlinePixels, spriteCanvas } from "./damage-art.ts";
+import { onPixelArt } from "./pixel-sprites.ts";
 import { ART } from "./art-scale.ts";
 /** The parks' ponds and trees as pixel art: painted pixel by pixel at `ART`
  * pixels a cell (as the park grass's blades are), then drawn into the city
@@ -48,7 +52,8 @@ export type ParkArt = {
   mask: HTMLCanvasElement | null;
 };
 
-const cache = new WeakMap<CityMap, ParkArt>();
+let cache = new WeakMap<CityMap, ParkArt>();
+onPixelArt(()=>{cache=new WeakMap();});
 
 /** Whether art pixel (x, y) is open water. */
 export const openAt = (art: ParkArt, x: number, y: number) =>
@@ -196,37 +201,41 @@ function put(px: Uint32Array, open: Uint8Array, x: number, y: number, c: number)
   px[y * W + x] = rgba(c);
 }
 
-/** Paints every tree into `px` and returns each as its own sprite. */
+/** One park canopy's unpadded source box. Seeded shapes share a named
+ * artist variant by palette and dimensions, as seeded roofs do. */
+export function parkTreeSource(cx: number, cy: number) {
+  const dark = hash01(cx,cy,22)<.5 ? 0 : 1, own: [number,number,number][]=[];
+  treePixels(cx,cy,(x,y,part,light)=>{
+    if(part === "edge") return;
+    const v=light+((x+y)&1)*.12-.06;
+    own.push([x,y,v>.55?TREE.top[dark]:v>.12?TREE.light[dark]:v>-.35?TREE.mid[dark]:TREE.dark[dark]]);
+  });
+  const x0=Math.min(...own.map(p=>p[0])),y0=Math.min(...own.map(p=>p[1]));
+  const w=Math.max(...own.map(p=>p[0]))-x0+1,h=Math.max(...own.map(p=>p[1]))-y0+1;
+  const data=new Uint32Array(w*h);
+  for(const [x,y,c] of own)data[(y-y0)*w+x-x0]=rgba(c);
+  const name=ART_NAMES.scenery(`park-tree-${dark}-${w}x${h}`);
+  return {x:x0,y:y0,w,h,name,data:sourcePixels(name,w,h,()=>data)};
+}
 function paintTrees(map: CityMap, px: Uint32Array, open: Uint8Array): TreeSprite[] {
-  const out: TreeSprite[] = [];
-  for (let cy = 0; cy < CELLS_H; cy++)
-    for (let cx = 0; cx < CELLS_W; cx++) {
-      if (!hasTree(map, cx, cy)) continue;
-      const dark = hash01(cx, cy, 22) < 0.5 ? 0 : 1;
-      const own: [number, number, number][] = [];
-      treePixels(cx, cy, (x, y, part, light) => {
-        // Water under a canopy is hidden: nothing swims or ripples there.
-        open[y * W + x] = 0;
-        if (part === "edge") return void own.push([x, y, TREE.outline]);
-        // Four shades from the upper left, the boundaries dithered.
-        const dither = ((x + y) & 1) * 0.12 - 0.06;
-        const v = light + dither;
-        own.push([x, y, v > 0.55 ? TREE.top[dark] : v > 0.12 ? TREE.light[dark] : v > -0.35 ? TREE.mid[dark] : TREE.dark[dark]]);
-      });
-      let x0 = W, y0 = H, x1 = 0, y1 = 0;
-      for (const [x, y, c] of own) {
-        px[y * W + x] = rgba(c);
-        x0 = Math.min(x0, x), y0 = Math.min(y0, y), x1 = Math.max(x1, x), y1 = Math.max(y1, y);
-      }
-      const w = x1 - x0 + 1, h = y1 - y0 + 1, t = treeCanopy(cx, cy);
-      let canvas: HTMLCanvasElement | null = null;
-      if (typeof document !== "undefined") {
-        const sprite = new Uint32Array(w * h);
-        for (const [x, y, c] of own) sprite[(y - y0) * w + x - x0] = rgba(c);
-        canvas = toCanvas(sprite, w, h);
-      }
-      out.push({ x: x0, y: y0, w, h, canvas, cx: t.x, cy: t.y, r: t.r });
+  const out: TreeSprite[]=[];
+  for(let cy=0;cy<CELLS_H;cy++)for(let cx=0;cx<CELLS_W;cx++){
+    if(!hasTree(map,cx,cy))continue;
+    const p=parkTreeSource(cx,cy), art=outlinePixels(p.data,p.w,p.h),t=treeCanopy(cx,cy);
+    for(let y=0;y<art.h;y++)for(let x=0;x<art.w;x++){
+      const X=p.x+x-1,Y=p.y+y-1,v=art.data[y*art.w+x];
+      if(v&&X>=0&&Y>=0&&X<W&&Y<H){px[Y*W+X]=v;open[Y*W+X]=0;}
     }
+    out.push({x:p.x,y:p.y,w:p.w,h:p.h,canvas:typeof document === "undefined" ? null : spriteCanvas(p.data,p.w,p.h),cx:t.x,cy:t.y,r:t.r});
+  }
+  return out;
+}
+export function parkTreePieces(): ArtPiece[] {
+  const out: ArtPiece[]=[],seen=new Set<string>();
+  for(let cy=1;cy<CELLS_H-1;cy++)for(let cx=1;cx<CELLS_W-1;cx++){
+    const p=parkTreeSource(cx,cy);if(seen.has(p.name))continue;seen.add(p.name);
+    out.push({name:p.name,w:p.w,h:p.h,about:`Park canopy ${p.w} × ${p.h}`,pixels:()=>parkTreeSource(cx,cy).data});
+  }
   return out;
 }
 

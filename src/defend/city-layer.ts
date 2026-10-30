@@ -25,7 +25,7 @@ import { gateRect, type Side } from "./layout.ts";
 import { SPIKE_REACH, bastionPixels, bastionRubblePixels, spikePixels } from "./wall-defense-art.ts";
 import { AREAS, areaArtId, type AreaId } from "./areas.ts";
 import { hasForest } from "./forest.ts";
-import { hasWallArt, wallCapSprite, wallFaceSprite, wallRubbleTones } from "./area-wall-art.ts";
+import { hasWallArt, wallCapSprite, wallFaceSprite, wallRubbleTones, wallRubbleSource } from "./area-wall-art.ts";
 import { drawPixel, drawRoof, pixelKey, type PixelSprite } from "./pixel-sprites.ts";
 
 export { POND, POND_WATER, hasTree, pondDisc, pondPath, treeCanopy } from "./park-geometry.ts";
@@ -359,7 +359,7 @@ function paintBuilding(p: Paint, b: Building) {
   }
   // A cloudborne palace floats over its lot (`sky-palace-art.ts`), leaving its mooring.
   if (aloft(p, b)) {
-    return paintArt(p, sprite(`mooring:${r.w}x${r.h}:${lotSeed(b)}`, r.w * ART, r.h * ART, () => mooringPixels(r.w, r.h, lotSeed(b))), box);
+    return paintArt(p, sprite(`mooring:${r.w}x${r.h}:${lotSeed(b)}`, r.w * ART, r.h * ART, () => mooringPixels(r.w, r.h, lotSeed(b)), false), box);
   }
   // Pixel Art's roofs on undamaged houses; a damaged one keeps its own, showing the damage.
   if (b.kind === "house" && !stageOf(sim, b) && drawRoof(c, b.variant, box, px)) return;
@@ -444,7 +444,7 @@ function paintSpikes({ c, px, map, solid }: Paint, outside = false) {
         c.rect(r[0], r[1], r[2], r[3]);
         c.clip();
       }
-      drawSprite(c, sprite(`spikes:${row.side}:${hash(cx, cy, 31) % 8}`, ART, ART, () => spikePixels(row.side, hash(cx, cy, 31) % 8)), x, y, w, h);
+      drawSprite(c, sprite(`spikes:${row.side}:${hash(cx, cy, 31) % 8}`, ART, ART, () => spikePixels(row.side, hash(cx, cy, 31) % 8), {joins:row.side==="n"||row.side==="s"?["w","e"]:["n","s"]}), x, y, w, h);
       if (outside) c.restore();
     }
   }
@@ -493,9 +493,9 @@ const gateRubbleSprite = (side: Side, seed: number) => {
 };
 const wallRubbleSprite = (seed: number, area: AreaId) => {
   const tones = wallRubbleTones(area);
-  return sprite(`wall:rubble:${tones ? area : "moss"}:${seed}`, ART, ART, () => wallRubblePixels(seed, ART, tones?.stone, tones?.accent));
+  return sprite(`wall:rubble:${tones ? area : "moss"}:${seed}`, ART, ART, () => wallRubbleSource(area, seed));
 };
-const wallDamageSprite = (stage: number, seed: number) => sprite(`wall:${stage}:${seed}`, ART, ART, () => wallDamagePixels(stage, seed, ART));
+const wallDamageSprite = (stage: number, seed: number) => sprite(`wall:${stage}:${seed}`, ART, ART, () => wallDamagePixels(stage, seed, ART), false);
 
 /** One wall stone. Edges and the hanging brick face follow the *standing*
  * wall, so a breach gets proper broken edges. */
@@ -562,7 +562,7 @@ export function hangingFaces(map: CityMap, sim: DefendSim | null): { y: number; 
   return runs;
 }
 
-/** A half-art-pixel black contour inside the painted box of the
+/** A one-art-pixel black contour inside the painted box of the
  * standing wall: on every side of the stone at `at` with no standing
  * neighbour, carried down the sides and along the foot of its hanging face. */
 function paintWallOutline(

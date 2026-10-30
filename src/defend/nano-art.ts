@@ -1,3 +1,4 @@
+import { drawSmall } from "./small-art.ts";
 /** C4 nanobots' battle art (`nanobots.ts`), as pixel art at `ART` pixels a
  * cell: each shell a grey canister banded in glowing green, arcing high
  * over its dithered shadow with a trail of loose motes; each cloud a swarm
@@ -61,16 +62,8 @@ export function drawNano(c: Ctx, px: number, sim: DefendSim) {
     }
     // The canister: 3 × 5 inside its outline, a green band round its middle.
     const x = Math.round(gx * ART) - 2, y = Math.round((gy - lift) * ART) - 3;
-    c.fillStyle = OUTLINE;
-    dot(x, y, 5, 7);
-    c.fillStyle = STEEL[1];
-    dot(x + 1, y + 1, 3, 5);
-    c.fillStyle = STEEL[2];
-    dot(x + 1, y + 1, 1, 5);
-    c.fillStyle = STEEL[0];
-    dot(x + 3, y + 1, 1, 5);
-    c.fillStyle = GREEN[2];
-    dot(x + 1, y + 3, 3, 1);
+    drawSmall(c,px,"nano-canister",0,(x+2.5)/ART,(y+3.5)/ART);
+
   }
   if (!infected) return;
   // Three motes crawling round each host, blinking in turn.

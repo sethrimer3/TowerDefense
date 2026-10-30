@@ -1,3 +1,7 @@
+import { ART_NAMES } from "./art-overrides.ts";
+import { colorPixels, sourcePixels, type ArtPiece } from "./sprite-source.ts";
+import { spriteCanvas } from "./damage-art.ts";
+import { onPixelArt } from "./pixel-sprites.ts";
 /** Blasts and the cracks they leave, as pixel art at `ART` pixels a cell
  * inside the city's black outline:
  *
@@ -47,7 +51,7 @@ export function drawExplosion(c: Ctx, px: number, fx: Effect) {
 }
 
 /** One frame of an explosion of radius `R` art pixels, `k` through its life. */
-function bakeBoom(R: number, look: number, k: number) {
+export function explosionPixels(R: number, look: number, k: number) {
   const E = Math.ceil(R * 2.2) + 2, N = 2 * E + 1;
   const grid: (string | null)[] = new Array(N * N).fill(null);
   const at = (x: number, y: number) => (x + E >= 0 && x + E < N && y + E >= 0 && y + E < N ? (y + E) * N + x + E : -1);
@@ -81,16 +85,6 @@ function bakeBoom(R: number, look: number, k: number) {
       }
       grid[at(x, y)] = col;
     }
-  // The black outline round everything filled.
-  const outline: number[] = [];
-  for (let y = -E; y <= E; y++)
-    for (let x = -E; x <= E; x++) {
-      if (grid[at(x, y)]) continue;
-      let near = false;
-      for (let dy = -1; dy <= 1 && !near; dy++) for (let dx = -1; dx <= 1; dx++) if ((dx || dy) && at(x + dx, y + dy) >= 0 && grid[at(x + dx, y + dy)] && grid[at(x + dx, y + dy)] !== OUTLINE) { near = true; break; }
-      if (near) outline.push(at(x, y));
-    }
-  for (const i of outline) grid[i] = OUTLINE;
   // The flash ring racing out, dithered.
   if (k < 0.3) {
     const ring = R * (0.7 + k * 3.2);
@@ -110,14 +104,22 @@ function bakeBoom(R: number, look: number, k: number) {
       if (i < 0 || (grid[i] && grid[i] !== OUTLINE && far < Rf)) continue;
       grid[i] = n % 4 === 0 ? SMOKE[0] : FLAME[Math.max(1, 4 - Math.floor(k * 5 + hash01(look, 7, n)))];
     }
-  const { cv, c } = bake(N, N);
-  for (let i = 0; i < grid.length; i++) {
-    if (!grid[i]) continue;
-    c.fillStyle = grid[i]!;
-    c.fillRect(i % N, Math.floor(i / N), 1, 1);
-  }
-  return { img: cv, ox: E, oy: E };
+  const name=ART_NAMES.effect("explosion",`${R}-${look}-${Math.floor(k*FRAMES)}`);
+  return {data:sourcePixels(name,N,N,()=>colorPixels(grid)),w:N,h:N,ox:E,oy:E};
 }
+function bakeBoom(R: number,look: number,k: number) {
+  const p=explosionPixels(R,look,k);
+  return {img:spriteCanvas(p.data,p.w,p.h),ox:p.ox,oy:p.oy};
+}
+export function explosionPieces(): ArtPiece[] {
+  const out: ArtPiece[]=[];
+  for(const R of [3,4,6,8,12,16,20,24,32])for(let look=0;look<LOOKS;look++)for(let frame=0;frame<FRAMES;frame++){
+    const k=(frame+.5)/FRAMES,p=explosionPixels(R,look,k);
+    out.push({name:ART_NAMES.effect("explosion",`${R}-${look}-${frame}`),w:p.w,h:p.h,allowEmpty:!p.data.some(v=>v>>>24>=128),about:`Explosion radius ${R}, look ${look}, frame ${frame}`,pixels:()=>explosionPixels(R,look,k).data});
+  }
+  return out;
+}
+onPixelArt(()=>{booms.clear();scorchArt.clear();});
 
 // ── Cracks ─────────────────────────────────────────────────────────────────
 
@@ -203,9 +205,6 @@ function bakeScorch(sc: Scorch, R: number): ScorchArt {
 function bakeCracks(art: ScorchArt, heat: number) {
   const N = 2 * art.E + 1;
   const { cv, c } = bake(N, N);
-  c.fillStyle = OUTLINE;
-  for (const i of art.pixels.keys())
-    for (const j of [i - 1, i + 1, i - N, i + N]) if (!art.pixels.has(j)) c.fillRect(j % N, Math.floor(j / N), 1, 1);
   for (const [i, t] of art.pixels) {
     const g = heat * (1.15 - 0.75 * t);
     c.fillStyle = g > 0.85 ? FLAME[4] : g > 0.66 ? FLAME[3] : g > 0.46 ? FLAME[2] : g > 0.28 ? FLAME[1] : g > 0.12 ? FLAME[0] : "#3a2418";

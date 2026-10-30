@@ -1,8 +1,8 @@
 import { UnitContours, bodyPath } from "./unit-contours.ts";
 /** Unit bodies share a screen layer, with independent ink channels. Legacy
- * mode keeps baked sprite rims beneath every body. Thin visibility mode uses
- * cached body paths and primitive geometry through UnitContours, removes old
- * colored rims and emits only the half-art-pixel outer union. Its buffers can
+ * mode retains its separate ink layer for compatibility probes. Thin visibility mode uses
+ * cached outline-free body paths and primitive geometry through UnitContours
+ * and emits only the half-art-pixel outer union. Its buffers can
  * be drawn after the world wash without repainting or reading the scene. */
 import { OUTLINE } from "./pixel-fx.ts";
 
@@ -46,7 +46,6 @@ function copiesOf(img: Sprite): Copies | null {
   c.drawImage(img, 0, 0);
   const image = c.getImageData(0, 0, w, h);
   const solid = silhouette(image.data, w, h);
-  stripOutline(image.data, w, h);
   made.data = image.data; made.paths?.clear();
   made.faded = false;
   for (let i = 3; i < image.data.length; i += 4) if (image.data[i] >= 128 && image.data[i] < 255) { made.faded = true; break; }

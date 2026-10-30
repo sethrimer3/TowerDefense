@@ -1,3 +1,4 @@
+import { sourcePixels } from "./sprite-source.ts";
 /** The city gate as pixel art at `ART` pixels a cell: a gatehouse set into
  * the wall, two crenellated stone towers either side of a passage with a
  * stone lintel on its outer arch, barred by two oak doors with iron bands
@@ -57,7 +58,7 @@ export function gatePixels(side: Side, frame = 0, stage = 0, seed = 0): Uint32Ar
 
 /** A fallen gate: its towers' stumps and a heap of stone and charred
  * timber from the doors. */
-export function gateRubblePixels(side: Side, seed = 0): Uint32Array {
+function drawnGateRubblePixels(side: Side, seed = 0): Uint32Array {
   const { w, h } = turn(side);
   return rubblePixels(w, h, hash(seed, 0x6a7f), { x0: 0, y0: 0, x1: w - 1, y1: h - 1, stone: STONE, top: TONE.wood, beams: true });
 }
@@ -132,7 +133,7 @@ function colour(m: Uint8Array, w: number, h: number, seed: number): Uint32Array 
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
       const k = m[y * w + x];
-      if (k === NONE) continue;
+      if (k === NONE || (k === LINE && (at(x - 1, y) <= LINE || at(x + 1, y) <= LINE || at(x, y - 1) <= LINE || at(x, y + 1) <= LINE))) continue;
       const lit = at(x - 1, y) === LINE || at(x, y - 1) === LINE ? 2 : at(x + 1, y) === LINE || at(x, y + 1) === LINE ? 0 : 1;
       const grain = hash(seed, x, y, 9) % 5;
       let c: number;
@@ -156,4 +157,8 @@ function colour(m: Uint8Array, w: number, h: number, seed: number): Uint32Array 
       out[y * w + x] = rgba(c);
     }
   return out;
+}
+
+export function gateRubblePixels(side: Side, seed = 0):Uint32Array {
+  return sourcePixels(ART_NAMES.rubble(ART_NAMES.gate(side,0)),turn(side).w,turn(side).h,()=>drawnGateRubblePixels(side,seed));
 }

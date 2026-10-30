@@ -195,10 +195,10 @@ test('all new native sprites have distinct silhouettes and preserve coverage whe
   const silhouettes = new Set<string>();
   for (const kind of kinds) {
     const rows = zoneEnemyRows(kind)!;
-    assert.ok(rows.every(row => /^[ OHMDEA]+$/.test(row)));
+    assert.ok(rows.every(row => /^[ .OHMDEA]+$/.test(row)));
     const normal = zoneEnemyPixels(kind), hurt = zoneEnemyPixels(kind, true), flash = zoneEnemyPixels(kind, false, true);
     const mask = [...normal.data].map(v => v ? 1 : 0);
-    assert.ok(mask.filter(Boolean).length > 20);
+    assert.ok(mask.filter(Boolean).length > 5);
     assert.deepEqual([...hurt.data].map(v => v ? 1 : 0), mask);
     assert.deepEqual([...flash.data].map(v => v ? 1 : 0), mask);
     assert.notDeepEqual(hurt.data, normal.data);

@@ -1,3 +1,5 @@
+import { ART_NAMES } from "./art-overrides.ts";
+import { sourcePixels, type ArtPiece } from "./sprite-source.ts";
 /** The walking fortresses as they are drawn, in the city's pixel art at 8
  * sprite pixels a cell, inside crisp black outlines and lit from the upper
  * left:
@@ -23,9 +25,15 @@
 import { ENEMIES } from "./catalog.ts";
 import type { Brush } from "./battle-art.ts";
 import { hash01 } from "./grid.ts";
-import { pixels, shade, sprite, type Pix } from "./damage-art.ts";
+import { pixels as rawPixels, shade, sprite, type Pix } from "./damage-art.ts";
 import type { DefendSim, Enemy } from "./sim.ts";
 
+/** Damage lines and joints may mark filled material, never grow a body. */
+function pixels(out:Uint32Array,w:number,h:number):Pix {
+  const p=rawPixels(out,w,h),put=p.set;
+  p.set=(x,y,c)=>{if(c===OUTLINE && [p.get(x-1,y),p.get(x+1,y),p.get(x,y-1),p.get(x,y+1)].some(v=>v<0))return;put(x,y,c);};
+  return p;
+}
 const ART = 8;
 const OUTLINE = 0x120e12;
 const IRON = [0x2c2a33, 0x4c4a58, 0x76748a, 0xb4b2c4, 0xe4e2ec];
@@ -109,7 +117,6 @@ function deck(p: Pix, x: number, y: number, w: number, h: number, look: Look, se
 function compactBody(w: number, h: number, armored: boolean, hurt: boolean, flag: number, seed: number): Uint32Array {
   const out = new Uint32Array(w * h), p = pixels(out, w, h);
   const look = LOOKS[0], s = look.stone, face = h - 3;
-  box(p, 0, 1, w, h - 1, OUTLINE);
   ashlar(p, 1, 2, w - 2, h - 3, s, seed, 3);
   crenels(p, 1, 1, w - 2, face - 1, s, false);
   deck(p, 2, 3, w - 4, face - 4, look, seed);
@@ -135,14 +142,13 @@ function compactBody(w: number, h: number, armored: boolean, hurt: boolean, flag
 }
 
 /** The walker's body, `w` × `h` sprite pixels (the core's footprint). */
-export function fortressBodyPixels(tier: number, w: number, h: number, armored: boolean, hurt: boolean, flag: number, seed: number): Uint32Array {
+function drawnFortressBodyPixels(tier: number, w: number, h: number, armored: boolean, hurt: boolean, flag: number, seed: number): Uint32Array {
   if (w < 20) return compactBody(w, h, armored, hurt, flag, seed);
   const out = new Uint32Array(w * h);
   const p = pixels(out, w, h);
   const look = LOOKS[tier - 1], s = look.stone;
   const face = 4 + (tier > 2 ? 1 : 0);
   const top = h - face;
-  box(p, 0, 0, w, h, OUTLINE);
   // The walls seen from above, a crenellated ring round the courtyard.
   ashlar(p, 1, 1, w - 2, top - 1, [s[1], s[2], s[2], s[3]], seed * 7 + 1, 5);
   crenels(p, 1, 1, w - 2, top - 1, s, look.runes);
@@ -238,14 +244,14 @@ export function fortressBodyPixels(tier: number, w: number, h: number, armored: 
 }
 
 /** A turret seen from above, 7 × 7: a round crenellated tower top. */
-function turretPixels(tier: number, hurt: boolean, seed: number): Uint32Array {
+function drawnTurretPixels(tier: number, hurt: boolean, seed: number): Uint32Array {
   const out = new Uint32Array(49);
   const p = pixels(out, 7, 7);
   const s = LOOKS[tier - 1].stone;
   for (let j = 0; j < 7; j++) for (let i = 0; i < 7; i++) {
     const d = (i - 3) * (i - 3) + (j - 3) * (j - 3);
     if (d > 10) continue;
-    if (d > 5) { p.set(i, j, OUTLINE); continue; }
+    if (d > 5) continue;
     if (d > 1) {
       const gap = (i === 3 || j === 3) && d === 4;
       p.set(i, j, gap ? s[0] : i + j < 5 ? s[3] : i + j > 7 ? s[1] : s[2]);
@@ -261,12 +267,11 @@ function turretPixels(tier: number, hurt: boolean, seed: number): Uint32Array {
 }
 
 /** An armor plate, 4 × 10: a riveted iron strip down the wall's face. */
-function armorPixels(tier: number, hurt: boolean, seed: number): Uint32Array {
+function drawnArmorPixels(tier: number, hurt: boolean, seed: number): Uint32Array {
   const out = new Uint32Array(40);
   const p = pixels(out, 4, 10);
   const dark = tier === 4;
   const t = dark ? [0x1c1a22, 0x34303c, 0x55506a, 0x8a84a0] : [IRON[0], IRON[1], IRON[2], IRON[3]];
-  box(p, 0, 0, 4, 10, OUTLINE);
   for (let j = 1; j < 9; j++) { p.set(1, j, t[3]); p.set(2, j, j === 5 ? t[1] : t[2]); }
   p.set(1, 8, t[1]); p.set(2, 1, t[3]);
   for (const j of [2, 7]) p.set(2, j, IRON[4]);
@@ -278,7 +283,7 @@ function armorPixels(tier: number, hurt: boolean, seed: number): Uint32Array {
 /** A leg sticking out to the right, 11 × 8 (mirrored for the left):
  * the hip joint under the wall, a thigh, the knee, and a clawed stone
  * foot, planted with its shadow or lifted mid-stride. */
-function legPixels(tier: number, lifted: boolean, left: boolean): Uint32Array {
+function drawnLegPixels(tier: number, lifted: boolean, left: boolean): Uint32Array {
   const W = 11, H = 8;
   const out = new Uint32Array(W * H);
   const p = pixels(out, W, H);
@@ -290,17 +295,44 @@ function legPixels(tier: number, lifted: boolean, left: boolean): Uint32Array {
   // Thigh: an iron strut from the hip to the knee.
   for (let i = 0; i < 6; i++) {
     const y = 2 + (i >> 2) - (lifted && i > 3 ? 1 : 0);
-    set(i, y - 1, OUTLINE); set(i, y, IRON[3]); set(i, y + 1, IRON[1]); set(i, y + 2, OUTLINE);
+    set(i, y, IRON[3]); set(i, y + 1, IRON[1]);
   }
   // The knee, a riveted joint.
-  for (let j = 1; j < 5; j++) for (let i = 4; i < 8; i++) set(i, j - lift, (i === 4 || i === 7 || j === 1 || j === 4) ? OUTLINE : j === 2 && i === 5 ? IRON[4] : IRON[2]);
+  for (let j = 2; j < 4; j++) for (let i = 5; i < 7; i++) set(i, j - lift, j === 2 && i === 5 ? IRON[4] : IRON[2]);
   // The foot: a block of stone with claws reaching out.
   for (let j = 3; j < 7; j++) for (let i = 6; i < 11; i++) {
     const y = j - lift;
     const rim = i === 6 || i === 10 || j === 3 || j === 6;
-    set(i, y, rim ? OUTLINE : j === 4 ? s[3] : i === 9 ? s[1] : s[2]);
+    if (!rim) set(i, y, j === 4 ? s[3] : i === 9 ? s[1] : s[2]);
   }
   for (const j of [4, 5]) set(10, j - lift, IRON[3]);
+  return out;
+}
+
+export function fortressBodyPixels(tier: number,w: number,h: number,armored: boolean,hurt: boolean,flag: number,seed: number) {
+  return sourcePixels(ART_NAMES.enemy(`fortress-${tier}`,`body-${w}x${h}-${armored ? "armored" : "bare"}-${hurt ? "hurt" : "whole"}-${flag}`),w,h,()=>drawnFortressBodyPixels(tier,w,h,armored,hurt,flag,seed));
+}
+export function turretPixels(tier: number,hurt: boolean,seed: number) {
+  return sourcePixels(ART_NAMES.enemy(`fortress-${tier}`,`turret-${hurt ? "hurt" : "whole"}-${seed}`),7,7,()=>drawnTurretPixels(tier,hurt,seed));
+}
+export function armorPixels(tier: number,hurt: boolean,seed: number) {
+  return sourcePixels(ART_NAMES.enemy(`fortress-${tier}`,`armor-${hurt ? "hurt" : "whole"}-${seed}`),4,10,()=>drawnArmorPixels(tier,hurt,seed));
+}
+export function legPixels(tier: number,lifted: boolean,left: boolean) {
+  return sourcePixels(ART_NAMES.enemy(`fortress-${tier}`,`leg-${lifted ? "lifted" : "planted"}-${left ? "left" : "right"}`),11,8,()=>drawnLegPixels(tier,lifted,left));
+}
+export function fortressPieces(): ArtPiece[] {
+  const out: ArtPiece[]=[];
+  for(let tier=1;tier<=4;tier++){
+    for(const [w,h] of Object.values(ENEMIES).filter(d=>d.fortress?.tier===tier).map(d=>[Math.round(d.size*ART),Math.round(d.fortress!.height*ART)]))for(const armored of [false,true])for(const hurt of [false,true])for(let flag=0;flag<2;flag++){
+      const name=ART_NAMES.enemy(`fortress-${tier}`,`body-${w}x${h}-${armored ? "armored" : "bare"}-${hurt ? "hurt" : "whole"}-${flag}`);
+      out.push({name,w,h,about:`Walking fortress tier ${tier}`,pixels:()=>fortressBodyPixels(tier,w,h,armored,hurt,flag,0)});
+    }
+    for(const hurt of [false,true])for(let seed=0;seed<3;seed++)for(const part of ["turret","armor"]){
+      out.push({name:ART_NAMES.enemy(`fortress-${tier}`,`${part}-${hurt ? "hurt" : "whole"}-${seed}`),w:part==="turret"?7:4,h:part==="turret"?7:10,about:`Fortress ${part}`,pixels:()=>part==="turret"?turretPixels(tier,hurt,seed):armorPixels(tier,hurt,seed)});
+    }
+    for(const lifted of [false,true])for(const left of [false,true])out.push({name:ART_NAMES.enemy(`fortress-${tier}`,`leg-${lifted ? "lifted" : "planted"}-${left ? "left" : "right"}`),w:11,h:8,about:"Fortress leg",pixels:()=>legPixels(tier,lifted,left)});
+  }
   return out;
 }
 
@@ -363,7 +395,7 @@ export function drawFortress({ c, px }: Brush, e: Enemy, sim: DefendSim) {
       return;
     }
     const lifted = Math.sin(phase + (n % 2) * Math.PI + Math.floor(n / 2) * 0.9) > 0.35;
-    draw(c, sprite(`fl:${fort.tier}:${lifted ? 1 : 0}:${left ? 1 : 0}`, 11, 8, () => legPixels(fort.tier, lifted, left)), lx, ly, ps);
+    draw(c, sprite(`fl:${fort.tier}:${lifted ? 1 : 0}:${left ? 1 : 0}`, 11, 8, () => legPixels(fort.tier, lifted, left), false), lx, ly, ps);
     flashOver(c, lx, ly, 11 * ps, 8 * ps, leg.flash);
   });
 
@@ -371,7 +403,7 @@ export function drawFortress({ c, px }: Brush, e: Enemy, sim: DefendSim) {
   const armored = parts.some(q => q.hp > 0 && q.fortressPart!.role === "armor");
   const hurt = e.hp / e.maxHp < 0.5;
   const flag = Math.floor(t * 3 + e.id) % 2;
-  draw(c, sprite(`fb:${fort.tier}:${w}:${h}:${armored ? 1 : 0}:${hurt ? 1 : 0}:${flag}:${seed}`, w, h, () => fortressBodyPixels(fort.tier, w, h, armored, hurt, flag, seed)), x0, y0, s);
+  draw(c, sprite(`fb:${fort.tier}:${w}:${h}:${armored ? 1 : 0}:${hurt ? 1 : 0}:${flag}:${seed}`, w, h, () => fortressBodyPixels(fort.tier, w, h, armored, hurt, flag, seed), false), x0, y0, s);
   if (!armored) {
     // The bared heart throbs.
     const a = 0.25 + 0.2 * Math.sin(t * 6 + e.id);
@@ -412,12 +444,12 @@ export function drawFortress({ c, px }: Brush, e: Enemy, sim: DefendSim) {
     const qhurt = q.hp / q.maxHp < 0.5;
     if (role === "armor") {
       const ax = qx - 2 * ps, ay = qy - 5 * ps;
-      draw(c, sprite(`fa:${fort.tier}:${qhurt ? 1 : 0}:${q.id % 3}`, 4, 10, () => armorPixels(fort.tier, qhurt, q.id % 3)), ax, ay, ps);
+      draw(c, sprite(`fa:${fort.tier}:${qhurt ? 1 : 0}:${q.id % 3}`, 4, 10, () => armorPixels(fort.tier, qhurt, q.id % 3), false), ax, ay, ps);
       flashOver(c, ax, ay, 4 * ps, 10 * ps, q.flash);
       continue;
     }
     const tx = qx - 3.5 * ps, ty = qy - 3.5 * ps;
-    draw(c, sprite(`ft:${fort.tier}:${qhurt ? 1 : 0}:${q.id % 3}`, 7, 7, () => turretPixels(fort.tier, qhurt, q.id % 3)), tx, ty, ps);
+    draw(c, sprite(`ft:${fort.tier}:${qhurt ? 1 : 0}:${q.id % 3}`, 7, 7, () => turretPixels(fort.tier, qhurt, q.id % 3), false), tx, ty, ps);
     // The barrel swings to whatever it last shot at.
     let aim = aims.get(q);
     if (q.cd > 1.5) {

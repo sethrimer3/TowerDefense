@@ -1,3 +1,8 @@
+import { ART } from "./art-scale.ts";
+import { ART_NAMES } from "./art-overrides.ts";
+import { colorPixels, sourcePixels, resamplePixels, type ArtPiece } from "./sprite-source.ts";
+import { spriteCanvas } from "./damage-art.ts";
+import { onPixelArt } from "./pixel-sprites.ts";
 /** The magic boats as they are drawn: pixel art at `SP` sprite pixels a
  * cell inside crisp black outlines, lit from the upper left, one cached
  * sprite per heading (`DIRS` of them) and rune-glow frame, so they turn
@@ -22,7 +27,7 @@ import type { Brush } from "./battle-art.ts";
 import type { DefendSim, Enemy } from "./sim.ts";
 
 /** Sprite pixels a cell. */
-const SP = 10;
+const DESIGN = 10, SP = ART;
 /** Headings a boat can be drawn at. */
 const DIRS = 16;
 
@@ -52,12 +57,9 @@ const LOOK: Partial<Record<EnemyKind, Look>> = {
 const sprites = new Map<string, HTMLCanvasElement>();
 
 /** Paints one boat at heading `dir` and rune `frame` into a fresh canvas. */
-function sprite(kind: EnemyKind, dir: number, frame: number, struck: boolean): HTMLCanvasElement {
-  const key = `${kind}:${dir}:${frame}:${struck ? 1 : 0}`;
-  let cv = sprites.get(key);
-  if (cv) return cv;
+export function boatPixels(kind: EnemyKind, dir: number, frame: number, struck = false) {
   const look = LOOK[kind]!, size = ENEMIES[kind].size;
-  const L = (size * SP) / 2, half = Math.max(2.6, L * 0.34);
+  const L = (size * DESIGN) / 2, half = Math.max(2.6, L * 0.34);
   const N = Math.ceil(L * 2 + 6) | 1, c = (N - 1) / 2;
   const a = (dir / DIRS) * Math.PI * 2, dx = Math.cos(a), dy = Math.sin(a);
   const px: (string | null)[] = new Array(N * N).fill(null);
@@ -113,27 +115,22 @@ function sprite(kind: EnemyKind, dir: number, frame: number, struck: boolean): H
       }
       px[j * N + i] = col;
     }
-  // One pixel of black outline round everything.
-  const out = px.slice();
-  for (let j = 0; j < N; j++)
-    for (let i = 0; i < N; i++) {
-      if (px[j * N + i]) continue;
-      if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([ox, oy]) => {
-        const x = i + ox, y = j + oy;
-        return x >= 0 && y >= 0 && x < N && y < N && px[y * N + x];
-      })) out[j * N + i] = OUTLINE;
-    }
-  cv = document.createElement("canvas");
-  cv.width = cv.height = N;
-  const g = cv.getContext("2d")!;
-  out.forEach((color, k) => {
-    if (!color) return;
-    g.fillStyle = struck && color !== OUTLINE ? "#fff" : color;
-    g.fillRect(k % N, Math.floor(k / N), 1, 1);
-  });
-  sprites.set(key, cv);
+  const p = resamplePixels(colorPixels(px),N,N,ART/DESIGN);
+  const data = sourcePixels(ART_NAMES.enemy(kind,`boat-${dir}-${frame}`),p.w,p.h,()=>p.data);
+  return {...p,data:struck ? data.map(v=>v ? 0xffffffff : 0) : data};
+}
+function sprite(kind: EnemyKind, dir: number, frame: number, struck: boolean) {
+  const key=`${kind}:${dir}:${frame}:${struck}`;
+  let cv=sprites.get(key);
+  if(!cv){const p=boatPixels(kind,dir,frame,struck);cv=spriteCanvas(p.data,p.w,p.h,undefined,false);sprites.set(key,cv);}
   return cv;
 }
+export function boatPieces(): ArtPiece[] {
+  return (Object.keys(LOOK) as EnemyKind[]).flatMap(kind=>Array.from({length:DIRS},(_,dir)=>Array.from({length:4},(_,frame)=>{
+    const p=boatPixels(kind,dir,frame);return {name:ART_NAMES.enemy(kind,`boat-${dir}-${frame}`),w:p.w,h:p.h,about:`${kind}, heading ${dir}, rune frame ${frame}`,pixels:()=>boatPixels(kind,dir,frame).data};
+  })).flat());
+}
+onPixelArt(()=>sprites.clear());
 
 /** The heading a boat is drawn at, from where it's going. */
 function headingOf(e: Enemy) {

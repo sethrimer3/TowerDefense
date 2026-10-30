@@ -1,3 +1,4 @@
+import { sourcePixels } from "./sprite-source.ts";
 /** The placeable structures (all but the keep) as pixel art at `ART`
  * pixels a cell, like the keep, roofs and parks: seen from above, lit from
  * the upper left, inside a crisp black outline, with damage stages and
@@ -243,18 +244,19 @@ export const artLook = (kind: string, path?: string): string =>
  * lot, as `(cw·ART) × (ch·ART)` RGBA pixels, in its path's `look` (see
  * `PATH_LOOKS`; "" for the base art). */
 export function structurePixels(kind: PlacedKind, cw: number, ch: number, stage = 0, seed = 0, look = ""): Uint32Array {
-  const w = cw * ART, h = ch * ART, out = new Uint32Array(w * h), p = pixels(out, w, h);
+  const w = cw * ART, h = ch * ART, out = new Uint32Array(w * h), p = buildingPen(out, w, h);
   // An artist's sprite stands in for the drawn one (`art-overrides.ts`).
   const own = artOverride(ART_NAMES.structure(kind, cw, ch, artLook(kind, look)), w, h);
   if (own) out.set(own);
   else PAINT[kind](p, artLook(kind, look));
-  damage(p, stage, hash(seed, KINDS.indexOf(kind)), MATERIAL[kind].m);
+  p.finish();
+  damage(pixels(out,w,h), stage, hash(seed, KINDS.indexOf(kind)), MATERIAL[kind].m);
   if (kind === "darkKeep") fissures(p, stage, hash(seed, 0xd4));
   return out;
 }
 
 /** What a fallen structure leaves, as `(cw·ART) × (ch·ART)` RGBA pixels. */
-export function structureRubblePixels(kind: PlacedKind, cw: number, ch: number, seed = 0): Uint32Array {
+function drawnStructureRubblePixels(kind: PlacedKind, cw: number, ch: number, seed = 0): Uint32Array {
   const w = cw * ART, h = ch * ART;
   return rubblePixels(w, h, hash(seed, KINDS.indexOf(kind), 3), { ...frame(w, h), ...MATERIAL[kind].ruin });
 }
@@ -313,6 +315,35 @@ const PAINT: Record<PlacedKind, (p: Pix, look: string) => void> = {
   monsterBait: paintMonsterBait,
 };
 
+/** Black strokes are interior drawing details. They may mark a filled
+ * surface, but never create a silhouette pixel of their own. This also
+ * lets small emblems over a roof keep their dark joins and beams. */
+function buildingPen(out: Uint32Array, w: number, h: number): Pix & { finish(): void } {
+  const p=pixels(out,w,h),put=p.set,get=p.get,details=new Map<number,number>();
+  p.set=(x,y,c)=>{
+    if(x<0||y<0||x>=w||y>=h)return;
+    const i=y*w+x;
+    if(c===OUTLINE)details.set(i,c);
+    else {details.delete(i);put(x,y,c);}
+  };
+  p.get=(x,y)=>x>=0&&y>=0&&x<w&&y<h&&details.has(y*w+x)?OUTLINE:get(x,y);
+  return {...p,finish(){
+    // Details may cross a filled surface, including other detail pixels,
+    // but cannot define its exposed silhouette. Resolve after the materials
+    // so drawing order does not erase roof ridges, beams or inner parapets.
+    let changed=true;
+    while(changed){
+      changed=false;
+      const solid=(x:number,y:number)=>x>=0&&y>=0&&x<w&&y<h&&(out[y*w+x]>>>24>=128||details.has(y*w+x));
+      for(const i of details.keys()){
+        const x=i%w,y=Math.floor(i/w);
+        if(!solid(x-1,y)||!solid(x+1,y)||!solid(x,y-1)||!solid(x,y+1)) {details.delete(i);changed=true;}
+      }
+    }
+    for(const [i,c] of details)put(i%w,Math.floor(i/w),c);
+  }};
+}
+
 function rect(p: Pix, x0: number, y0: number, x1: number, y1: number, c: number) {
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) p.set(x, y, c);
 }
@@ -343,7 +374,8 @@ function squareTower(p: Pix, crenels: boolean) {
   for (let y = y0; y <= y1; y++)
     for (let x = x0; x <= x1; x++) {
       const ring = Math.min(x - x0, y - y0, x1 - x, y1 - y);
-      if (ring === 0 || ring === 3) p.set(x, y, OUTLINE);
+      if (ring === 0) continue;
+      if (ring === 3) p.set(x, y, OUTLINE);
       else if (ring > 3) continue;
       else {
         const sunny = x - x0 < 3 || y - y0 < 3;
@@ -393,7 +425,6 @@ function gable(p: Pix, x0: number, y0: number, x1: number, y1: number, base: num
 /** Stone walls round the hall, two pixels thick and lit to the upper left,
  * then the roof inside; returns the roof's ridge. */
 function hall(p: Pix, x0: number, y0: number, x1: number, y1: number, roof: number) {
-  rect(p, x0, y0, x1, y1, OUTLINE);
   for (let y = y0 + 1; y < y1; y++)
     for (let x = x0 + 1; x < x1; x++) p.set(x, y, x === x0 + 1 || y === y0 + 1 ? C.stone[3] : x === x1 - 1 || y === y1 - 1 ? C.stone[1] : C.stone[2]);
   rect(p, x0 + 2, y0 + 2, x1 - 2, y1 - 2, OUTLINE);
@@ -744,7 +775,6 @@ function paintGatlingNest(p: Pix, look: string) {
  * rifle turned outward, and a mast with a red light on the fourth. */
 function paintRevolutionary(p: Pix) {
   const { x0, y0, x1, y1 } = frame(p.w, p.h);
-  rect(p, x0, y0, x1, y1, OUTLINE);
   for (let y = y0 + 1; y < y1; y++)
     for (let x = x0 + 1; x < x1; x++) {
       const edge = x === x0 + 1 || y === y0 + 1 ? TECH[3] : x === x1 - 1 || y === y1 - 1 ? TECH[0] : null;
@@ -1235,7 +1265,7 @@ function paintNanoTower(p: Pix) {
       const c = Math.min(x - x0, x1 - x) + Math.min(y - y0, y1 - y);
       if (c < cut) continue;
       const ring = Math.min(x - x0, y - y0, x1 - x, y1 - y, c - cut);
-      if (ring === 0) p.set(x, y, OUTLINE);
+      if (ring === 0) continue;
       else if (ring <= 2) p.set(x, y, Math.floor((x + y) / 3) % 2 ? HAZARD : OUTLINE);
       else if (ring === 3) p.set(x, y, OUTLINE);
       else {
@@ -1261,7 +1291,7 @@ function paintNanoTower(p: Pix) {
   }
   // The mortar: a heavy lit iron ring round a bore glowing with the swarm.
   disc(p, cx, cy, 8.5, (x, y, d, dx, dy) => {
-    if (d > 7.7) return OUTLINE;
+    if (d > 7.7) return null;
     if (d > 5.2) return C.iron[1 + Math.min(2, lit(x, y, dx, dy, d))];
     if (d > 4.4) return OUTLINE;
     if (d > 3) return NANO[0];
@@ -1285,7 +1315,7 @@ function paintCannonTower(p: Pix, look: string) {
   const { x0, y0, x1, y1 } = frame(p.w, p.h);
   const cx = (x0 + x1 + 1) / 2, cy = (y0 + y1 + 1) / 2, r = (x1 - x0 + 1) / 2;
   disc(p, cx, cy, r, (x, y, d, dx, dy) => {
-    if (d > r - 1) return OUTLINE;
+    if (d > r - 1) return null;
     if (d > r - 2.6) {
       const sector = Math.floor(((Math.atan2(dy, dx) + Math.PI) / (2 * Math.PI)) * 14);
       return sector % 2 ? C.stone[1] : C.stone[Math.min(3, 2 + (lit(x, y, dx, dy, d) >> 1))];
@@ -1401,7 +1431,7 @@ function paintWizardTower(p: Pix, look: string) {
     return m / Math.cos(Math.PI / sides);
   };
   disc(p, cx, cy, r, (x, y, d, dx, dy) => {
-    if (d > r - 1) return OUTLINE;
+    if (d > r - 1) return null;
     const e = reach(d, dx, dy);
     if (e > roof + 1) {
       // The rim of pale stone, a rune glowing every so often round it.
@@ -1585,7 +1615,8 @@ function paintValkyriePalace(p: Pix, look: string) {
       if (ring > wall) continue;
       // Lit on the faces toward the upper left, shaded on the others.
       const sunny = x - x0 === ring || y - y0 === ring;
-      if (ring === 0 || ring === wall) p.set(x, y, OUTLINE);
+      if (ring === 0) continue;
+      if (ring === wall) p.set(x, y, OUTLINE);
       else if (ring <= steps) p.set(x, y, marble(x, y, sunny ? 4 - (ring - 1) : 2 - (ring - 1)));
       else if (ring === edge) p.set(x, y, sunny ? C.marble[2] : C.marble[0]);
       else {
@@ -1620,7 +1651,7 @@ function paintValkyriePalace(p: Pix, look: string) {
   // The dome: white marble shaded as a sphere, gold ribs, and a gold
   // lantern at its crown.
   disc(p, dcx, dcy, r, (x, y, d, dx, dy) => {
-    if (d > r - 1) return OUTLINE;
+    if (d > r - 1) return null;
     const ang = Math.atan2(dy, dx) + Math.PI;
     if (r > 6 && Math.abs(((ang / (2 * Math.PI)) * 8) % 1 - 0.5) > 0.42 && d > 1.6) return d < r * 0.6 ? C.gold[1] : C.gold[0];
     return C.marble[Math.min(4, 1 + lit(x, y, dx, dy, d) + (d < r * 0.45 ? 1 : 0))];
@@ -1648,7 +1679,6 @@ export const CLOUD = [0x7d88a8, 0xaab6d0, 0xd6deee, 0xf6f8fc, 0xffffff];
 /** Puffs of cloud (x, y, radius in pixels) as one billow: their outline
  * round the whole, each shaded as a ball lit from the upper left. */
 export function cloudPuffs(p: Pix, puffs: readonly (readonly [number, number, number])[]) {
-  for (const [x, y, r] of puffs) disc(p, x, y, r, () => OUTLINE);
   for (const [x, y, r] of puffs) disc(p, x, y, r - 1, (px, py, d, dx, dy) => CLOUD[Math.min(4, lit(px, py, dx, dy, d) + (d < (r - 1) * 0.4 ? 1 : 0))]);
 }
 
@@ -1665,7 +1695,8 @@ function paintDarkKeep(p: Pix) {
     for (let x = x0; x <= x1; x++) {
       const ring = Math.min(x - x0, y - y0, x1 - x, y1 - y);
       const sunny = x - x0 === ring || y - y0 === ring;
-      if (ring === 0 || ring === wa || ring === wb) p.set(x, y, OUTLINE);
+      if (ring === 0) continue;
+      if (ring === wa || ring === wb) p.set(x, y, OUTLINE);
       else if (ring < wa) p.set(x, y, ob(x, y, sunny ? 4 - ring : 2 - ring + 1));
       else if (ring < wb) {
         // Glassy black blocks in crimson mortar, merlons along the outer edge.
@@ -1859,4 +1890,8 @@ function paintChronoTower(p:Pix,_look:string){
     if(Math.abs(x)<=1&&Math.abs(y)<r)p.set(cx+x,cy+y,C.brass[1]);
   }
   p.set(cx,cy,C.ice[3]);p.set(cx+1,cy,C.ice[2]);
+}
+
+export function structureRubblePixels(kind: PlacedKind, cw: number, ch: number, seed = 0):Uint32Array {
+  return sourcePixels(ART_NAMES.rubble(ART_NAMES.structure(kind,cw,ch)),cw*ART,ch*ART,()=>drawnStructureRubblePixels(kind,cw,ch,seed));
 }

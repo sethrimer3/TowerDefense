@@ -1,6 +1,6 @@
 import { ART } from "./art-scale.ts";
 /** The Simple enemies and Simple troops settings: every unit drawn as one
- * crisp square in its colour inside a black outline, lit along the top and
+ * crisp square body; UnitContours supplies its outside outline. Lit along the top and
  * left and shaded along the bottom and right, one art pixel each. Squares
  * are batched into one path per colour, so a crowd of thousands costs a
  * handful of fills. Presentation only. */
@@ -16,7 +16,6 @@ import { TROOPS } from "./unit-bodies.ts";
 /** Squares waiting to be filled, as flat x, y, side runs, by fill colour;
  * kept between frames so a frame allocates nothing once warm. */
 const fills = new Map<string, number[]>();
-const outlines = new Map<string, number[]>();
 
 function add(map: Map<string, number[]>, color: string, x: number, y: number, s: number) {
   let list = map.get(color);
@@ -24,18 +23,8 @@ function add(map: Map<string, number[]>, color: string, x: number, y: number, s:
   list.push(x, y, s);
 }
 
-/** Every queued square: outlines (on `rims`), bodies, then the light and
- * shade edges. */
+/** Every queued body, then its light and shade edges. */
 function flush(c: CanvasRenderingContext2D, k: number, rims = c, rimFor?: (color: string) => CanvasRenderingContext2D) {
-  for (const [color, q] of outlines) {
-    if (!q.length) continue;
-    const r = rimFor?.(color) ?? rims;
-    r.fillStyle = color;
-    r.beginPath();
-    for (let i = 0; i < q.length; i += 3) r.rect(q[i] - k, q[i + 1] - k, q[i + 2] + 2 * k, q[i + 2] + 2 * k);
-    r.fill();
-    q.length = 0;
-  }
   const edges: number[] = [];
   for (const [color, q] of fills) {
     if (!q.length) continue;
@@ -73,7 +62,6 @@ const artPixel = (px: number) => Math.max(1, Math.round(px / ART));
 function queue(px: number, k: number, x: number, y: number, size: number, color: string, outline: string) {
   const s = Math.max(2 * k, Math.round(size * px));
   const sx = Math.round(x * px - s / 2), sy = Math.round(y * px - s / 2);
-  add(outlines, outline, sx, sy, s);
   add(fills, color, sx, sy, s);
 }
 

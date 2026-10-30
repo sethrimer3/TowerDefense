@@ -1,3 +1,6 @@
+import { ART_NAMES } from "./art-overrides.ts";
+import { sourcePixels, hexColor, type ArtPiece } from "./sprite-source.ts";
+import { pixels, sprite, drawSprite } from "./damage-art.ts";
 /** The Frost nova as it is drawn, in the city's pixel art (`ART` pixels a
  * cell, snapped to whole screen pixels):
  *
@@ -110,19 +113,17 @@ export function drawRime(c: Ctx, px: number, sim: DefendSim) {
 
 /** A diamond of ice `r` art pixels from its middle, in a black outline,
  * lit from the upper left. */
-function diamond(c: Ctx, dot: ReturnType<typeof artPen>, x: number, y: number, r: number, i: number) {
-  for (let j = -r - 1; j <= r + 1; j++) {
-    const w = r + 1 - Math.abs(j);
-    c.fillStyle = OUTLINE;
-    dot(x - w, y + j, 2 * w + 1, 1);
-  }
-  for (let j = -r; j <= r; j++) {
-    const w = r - Math.abs(j);
-    for (let q = -w; q <= w; q++) {
-      c.fillStyle = q + j < 0 ? FROST[4] : q + j === 0 ? FROST[3 - (i & 1)] : FROST[2];
-      dot(x + q, y + j);
-    }
-  }
+export function frostDiamondPixels(r:number,variant:number){
+  const n=r*2+1,data=new Uint32Array(n*n),p=pixels(data,n,n);
+  for(let y=-r;y<=r;y++)for(let x=-r;x<=r;x++)if(Math.abs(x)+Math.abs(y)<=r)p.set(x+r,y+r,hexColor(x+y<0?FROST[4]:x+y===0?FROST[3-(variant&1)]:FROST[2]));
+  return sourcePixels(ART_NAMES.effect("frost-diamond",`${r}-${variant}`),n,n,()=>data);
+}
+function diamond(c:Ctx,px:number,x:number,y:number,r:number,i:number){
+  const n=r*2+1,cv=sprite(`frost-diamond:${r}:${i&1}`,n,n,()=>frostDiamondPixels(r,i&1));
+  drawSprite(c,cv,(x-r)*px/ART,(y-r)*px/ART,n*px/ART,n*px/ART);
+}
+export function frostDiamondPieces():ArtPiece[]{
+  return [1,2].flatMap(r=>[0,1].map(v=>({name:ART_NAMES.effect("frost-diamond",`${r}-${v}`),w:r*2+1,h:r*2+1,about:`Frost diamond, radius ${r}, variant ${v}`,pixels:()=>frostDiamondPixels(r,v)})));
 }
 /** The nova's ring of ice rushing out, and shatters' shards flying. */
 export function drawFrostBursts(c: Ctx, px: number, sim: DefendSim) {
@@ -149,7 +150,7 @@ export function drawFrostBursts(c: Ctx, px: number, sim: DefendSim) {
       const far = b.r * reach * (b.nova ? 0.85 + 0.15 * hash01(seed, i, 1) : 0.6 + 0.6 * hash01(seed, i, 1));
       const lift = b.nova ? 0 : Math.sin(Math.PI * k) * 0.5;
       const x = Math.round((b.x + Math.cos(a) * far) * ART), y = Math.round((b.y + Math.sin(a) * far - lift) * ART);
-      diamond(c, dot, x, y, b.nova && i % 2 ? 2 : 1, i);
+      diamond(c, px, x, y, b.nova && i % 2 ? 2 : 1, i);
     }
     c.globalAlpha = 1;
   }

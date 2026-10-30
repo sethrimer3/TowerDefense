@@ -1,3 +1,8 @@
+import { onPixelArt } from "./pixel-sprites.ts";
+import { ART_NAMES } from "./art-overrides.ts";
+import { sourcePixels, hexColor, type ArtPiece } from "./sprite-source.ts";
+import { spriteCanvas, withMask, rgba } from "./damage-art.ts";
+import { drawPuffBody, drawPuffOutline } from "./puff-art.ts";
 import { enemySize } from "./catalog.ts";
 /** The wizard tower's attacks as they are drawn, as pixel art at `ART`
  * pixels a cell inside the city's black outline. The sim says where each
@@ -123,20 +128,22 @@ export class WizardArt {
       const r = Math.max(1, Math.round((p.size + k * 0.5) * ART * 0.5)), ax = Math.round(p.x * ART), ay = Math.round(p.y * ART);
       c.globalAlpha = (1 - k) < 0.2 ? 0.35 : 0.6;
       c.fillStyle = SMOKE[1];
-      puff(dot, ax, ay, r);
+      drawPuffBody(c,px,ax,ay,r,SMOKE[1]);
       c.fillStyle = SMOKE[3];
       dot(ax - r + 1, ay - r + 1, Math.max(1, r - 1), 1);
     }
     c.globalAlpha = 1;
     const live = this.fire.filter((p) => !p.ember && p.age / p.life < 0.85);
     live.sort((p, q) => q.age / q.life - p.age / p.life);
-    c.fillStyle = OUTLINE;
-    for (const p of live) puff(dot, Math.round(p.x * ART), Math.round(p.y * ART), fireRadius(p) + 1);
+    for (const p of live) {
+      const k=p.age/p.life,tone=k<.08?4:k<.22?3:k<.4?2:k<.62?1:0;
+      drawPuffOutline(c,px,Math.round(p.x*ART),Math.round(p.y*ART),fireRadius(p),FLAME[tone]);
+    }
     for (const p of live) {
       const k = p.age / p.life, tone = k < 0.08 ? 4 : k < 0.22 ? 3 : k < 0.4 ? 2 : k < 0.62 ? 1 : 0;
       const x = Math.round(p.x * ART), y = Math.round(p.y * ART), r = fireRadius(p);
       c.fillStyle = FLAME[tone];
-      puff(dot, x, y, r);
+      drawPuffBody(c,px,x,y,r,FLAME[tone]);
       // A hotter lick at its upper left, so the jet flickers inside.
       if (r > 0 && tone < 4) {
         c.fillStyle = FLAME[tone + 1];
@@ -369,7 +376,8 @@ const RIME_W = 5, RIME_H = 4;
 const CLUSTER_R = 12;
 
 type ClusterArt = { rime: HTMLCanvasElement; shards: ({ outline: HTMLCanvasElement; fill: HTMLCanvasElement } | undefined)[] };
-const clusterArts = new WeakMap<Cluster, ClusterArt>();
+let clusterArts = new WeakMap<Cluster, ClusterArt>();
+onPixelArt(()=>{clusterArts=new WeakMap();});
 
 function clusterArt(cl: Cluster) {
   let art = clusterArts.get(cl);
@@ -391,7 +399,7 @@ function drawCluster(c: CanvasRenderingContext2D, px: number, dot: ReturnType<ty
   const art = clusterArt(cl);
   const img = (art.shards[step * 2 + warm] ??= bakeCluster(cl, step / SCALES, warm === 1));
   const ax = Math.round(cl.x * ART) - CLUSTER_R, ay = Math.round(cl.y * ART) - CLUSTER_R;
-  blit(c, px, outline ? img.outline : img.fill, ax, ay);
+  withMask(outline?"rim":"body",()=>blit(c,px,img.fill,ax,ay));
   // Glints twinkling at the shards' lit tips.
   if (outline || step < SCALES) return;
   c.fillStyle = ICE[5];
@@ -408,7 +416,7 @@ function drawCluster(c: CanvasRenderingContext2D, px: number, dot: ReturnType<ty
  * normal against the key light into the ice palette, darker where it sinks
  * into the frost, all inside one black outline. `warm` turns the lit
  * facets toward the fire's glow. */
-function bakeCluster(cl: Cluster, scale: number, warm: boolean) {
+export function iceClusterPixels(cl: Cluster, scale: number, warm: boolean) {
   const N = CLUSTER_R * 2 + 1;
   const grid = new Int8Array(N * N).fill(-1);
   for (const s of cl.shards) {
@@ -431,22 +439,23 @@ function bakeCluster(cl: Cluster, scale: number, warm: boolean) {
         grid[y * N + x] = tone;
       }
   }
-  const { cv: line, c } = bake(N, N);
-  c.fillStyle = OUTLINE_ICE;
-  for (let y = 0; y < N; y++)
-    for (let x = 0; x < N; x++) {
-      if (grid[y * N + x] >= 0) continue;
-      const near = (xx: number, yy: number) => xx >= 0 && yy >= 0 && xx < N && yy < N && grid[yy * N + xx] >= 0;
-      if (near(x - 1, y) || near(x + 1, y) || near(x, y - 1) || near(x, y + 1)) c.fillRect(x, y, 1, 1);
-    }
-  const palette = warm ? WARM_ICE : ICE;
-  const { cv: fill, c: f } = bake(N, N);
-  for (let i = 0; i < grid.length; i++) {
-    if (grid[i] < 0) continue;
-    f.fillStyle = palette[grid[i]];
-    f.fillRect(i % N, Math.floor(i / N), 1, 1);
+  const palette=warm ? WARM_ICE : ICE;
+  const data=Uint32Array.from(grid,tone=>tone<0?0:rgba(hexColor(palette[tone])));
+  const variant=Math.floor(cl.shards[0].phase*100)%16,step=Math.round(scale*SCALES);
+  return sourcePixels(ART_NAMES.effect("ice-cluster",`${variant}-${step}-${warm ? "warm" : "cold"}`),N,N,()=>data);
+}
+function bakeCluster(cl:Cluster,scale:number,warm:boolean){
+  const N=CLUSTER_R*2+1,fill=spriteCanvas(iceClusterPixels(cl,scale,warm),N,N,undefined,{ink:hexColor(OUTLINE_ICE)});
+  return {outline:fill,fill};
+}
+export function iceClusterPieces():ArtPiece[]{
+  const out:ArtPiece[]=[];
+  for(let variant=0;variant<16;variant++){
+    let k=0;const cl=cluster(()=>hash01(variant,k++,991),0,0,variant/16*Math.PI*2,1,0);
+    cl.shards[0].phase=variant/100;
+    for(let step=1;step<=SCALES;step++)for(const warm of [false,true])out.push({name:ART_NAMES.effect("ice-cluster",`${variant}-${step}-${warm ? "warm" : "cold"}`),w:CLUSTER_R*2+1,h:CLUSTER_R*2+1,about:`Ice cluster ${variant}, size step ${step}, ${warm ? "warm" : "cold"}`,pixels:()=>iceClusterPixels(cl,step/SCALES,warm)});
   }
-  return { outline: line, fill };
+  return out;
 }
 
 /** Rime on the ground: pale specks dithered over a patch, thicker at its

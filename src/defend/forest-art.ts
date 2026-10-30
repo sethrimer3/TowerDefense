@@ -1,3 +1,7 @@
+import { ART_NAMES } from "./art-overrides.ts";
+import { sourcePixels, type ArtPiece } from "./sprite-source.ts";
+import { outlinePixels, spriteCanvas, drawSprite } from "./damage-art.ts";
+import { onPixelArt, pixelKey } from "./pixel-sprites.ts";
 /** The forest outside the walls (`forest.ts`) as pixel art at `ART` pixels a
  * cell, inside crisp black outlines like the parks' trees:
  *
@@ -92,6 +96,13 @@ const CRAG = [0x24262a, 0x34373a, 0x4a4d4c, 0x63665f, 0x81847a, 0xa2a497];
 
 /** A sprite: its pixels, its size and where the canopy's middle sits in it. */
 export type Sprite = { px: Uint32Array; w: number; h: number; ox: number; oy: number; runs?: Int16Array };
+
+const outlinedSceneryCache = new WeakMap<Sprite, Sprite>();
+function outlinedScenery(s: Sprite): Sprite {
+  let drawn=outlinedSceneryCache.get(s);
+  if(!drawn){const art=outlinePixels(s.px,s.w,s.h);drawn={px:art.data,w:art.w,h:art.h,ox:s.ox+1,oy:s.oy+1};outlinedSceneryCache.set(s,drawn);}
+  return drawn;
+}
 
 /** A sprite's rows as runs of solid pixels: row, first and past-last
  * column, three numbers a run. */
@@ -231,15 +242,7 @@ export function treeSprite(kind: TreeKind, v: number, lean: number, size: TreeSi
       colour[i] = rgba(b >= 4 ? BERRY[b - 4] : pal[b]);
     }
   }
-  // A one-pixel outline round canopy and trunk alike.
-  const px = new Uint32Array(w * h);
-  for (let y = 0; y < h; y++)
-    for (let x = 0; x < w; x++) {
-      const i = y * w + x;
-      if (fill[i] >= 0) { px[i] = colour[i]; continue; }
-      const near = (x > 0 && fill[i - 1] >= 0) || (x < w - 1 && fill[i + 1] >= 0) || (y > 0 && fill[i - w] >= 0) || (y < h - 1 && fill[i + w] >= 0);
-      if (near) px[i] = rgba(OUTLINE);
-    }
+  const px = sourcePixels(ART_NAMES.scenery(`tree-${kind}-${size}-${v}-${lean}`),w,h,()=>colour);
   s = { px, w, h, ox, oy };
   sprites[key] = s;
   return s;
@@ -281,13 +284,8 @@ function rock(size: number, seed: number): Sprite {
       if (inside[i + 1]) px[i + 1] = rgba(STONE[3]);
     }
   }
-  for (let y = 0; y < h; y++)
-    for (let x = 0; x < w; x++) {
-      const i = y * w + x;
-      if (inside[i]) continue;
-      if ((x > 0 && inside[i - 1]) || (x < w - 1 && inside[i + 1]) || (y > 0 && inside[i - w]) || (y < h - 1 && inside[i + w])) px[i] = rgba(OUTLINE);
-    }
-  return { px, w, h, ox: half, oy: half };
+  const own = sourcePixels(ART_NAMES.scenery(`rock-${w}x${h}-${seed % 64}`),w,h,()=>px);
+  return { px: own, w, h, ox: half, oy: half };
 }
 
 /** Which floor pixels a tree's shadow has darkened already. */
@@ -370,7 +368,7 @@ export function paintFloor(out: Uint32Array, plan: ForestPlan, damage: ForestDam
   for (let Y = clip.y0; Y < clip.y1; Y++) shaded.fill(0, Y * W + clip.x0, Y * W + clip.x1);
   for (const t of plan.trees) {
     if ((damage && !damage.upright(t)) || !nearClip(t.x, t.y, t.r * 2 + 1)) continue;
-    const s = treeSprite(t.kind, t.variant, 0, t.size), R = t.r * ART, runs = runsOf(s);
+    const s = outlinedScenery(treeSprite(t.kind, t.variant, 0, t.size)), R = t.r * ART, runs = runsOf(s);
     const x0 = Math.round(t.x * ART) - s.ox + Math.round(R * 0.35) + 1, y0 = Math.round(t.y * ART) - s.oy + Math.round(R * 0.5) + 1;
     for (let k = 0; k < runs.length; k += 3) {
       const Y = y0 + runs[k];
@@ -414,7 +412,8 @@ function darken(p: number) {
 }
 
 /** Copies a sprite's pixels in, or (`shadow`) shades where they would go. */
-function stamp(out: Uint32Array, s: Sprite, x0: number, y0: number, shadow: boolean) {
+function stamp(out: Uint32Array, source: Sprite, x0: number, y0: number, shadow: boolean) {
+  const s=outlinedScenery(source); x0--;y0--;
   for (let y = 0; y < s.h; y++)
     for (let x = 0; x < s.w; x++) {
       const p = s.px[y * s.w + x], X = x0 + x, Y = y0 + y;
@@ -501,10 +500,9 @@ export function stumpSprite(size: TreeSize, seed: number, cut: boolean): Sprite 
   const px = new Uint32Array(w * w);
   for (let i = 0; i < w * w; i++) {
     if (grid[i] >= 0) { px[i] = rgba(colours[grid[i]]); continue; }
-    const x = i % w, y = (i - x) / w;
-    if ((x > 0 && grid[i - 1] >= 0) || (x < w - 1 && grid[i + 1] >= 0) || (y > 0 && grid[i - w] >= 0) || (y < w - 1 && grid[i + w] >= 0)) px[i] = rgba(OUTLINE);
+
   }
-  s = { px, w, h: w, ox: half, oy: half };
+  s = { px:sourcePixels(ART_NAMES.scenery(`stump-${size}-${seed%8}-${cut ? "cut" : "broken"}`),w,w,()=>px), w, h: w, ox: half, oy: half };
   stumps.set(key, s);
   return s;
 }
@@ -615,7 +613,7 @@ export function waterGlints(plan: ForestPlan) {
 /** A small mountain: a heap of cells raised into a rocky hill seen from
  * above, its ridges lit from the upper left, scree at its ragged foot, moss
  * on its gentler slopes, a long shadow to the lower right. */
-function mountain(out: Uint32Array, b: Boulder) {
+export function mountainSource(b: Boulder) {
   const rock = new Set(b.cells);
   let cx0 = Infinity, cy0 = Infinity, cx1 = -Infinity, cy1 = -Infinity;
   for (const c of b.cells) {
@@ -623,7 +621,6 @@ function mountain(out: Uint32Array, b: Boulder) {
     cx0 = Math.min(cx0, x), cy0 = Math.min(cy0, y), cx1 = Math.max(cx1, x), cy1 = Math.max(cy1, y);
   }
   const X0 = (cx0 - 1) * ART, Y0 = (cy0 - 1) * ART, w = (cx1 - cx0 + 3) * ART, h = (cy1 - cy0 + 3) * ART;
-  if (X0 + w + 4 < clip.x0 || X0 >= clip.x1 || Y0 + h + 4 < clip.y0 || Y0 >= clip.y1) return;
   const seed = b.seed % 1000;
   // Its outline: the heap's cells blended smoothly between their middles,
   // so its corners round off, ragged by noise.
@@ -645,28 +642,14 @@ function mountain(out: Uint32Array, b: Boulder) {
     const x = X0 + (i % w), y = Y0 + Math.floor(i / w);
     H[i] = d[i] * 1.3 + 2.4 * Math.sin(x * 0.31 + y * 0.17 + seed) + 1.6 * Math.sin(y * 0.43 - x * 0.12 + seed * 2);
   }
-  const put = (x: number, y: number, c: number) => {
-    const X = X0 + x, Y = Y0 + y;
-    if (inClip(X, Y)) out[Y * W + X] = c;
-  };
-  // Its shadow, cast to the lower right.
-  for (let y = 0; y < h; y++)
-    for (let x = 0; x < w; x++) {
-      if (!inside[y * w + x]) continue;
-      for (const k of [2, 4]) {
-        const sx = x + k, sy = y + k, X = X0 + sx, Y = Y0 + sy;
-        if ((sx < w && sy < h && inside[sy * w + sx]) || !inClip(X, Y)) continue;
-        if (k === 4 && (X + Y) & 1) continue;
-        out[Y * W + X] = darken(out[Y * W + X]);
-      }
-    }
+  const source = new Uint32Array(w*h);
+  const put = (x:number,y:number,c:number)=>{ source[y*w+x]=c; };
   const at = (x: number, y: number) => H[Math.max(0, Math.min(h - 1, y)) * w + Math.max(0, Math.min(w - 1, x))];
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
       const i = y * w + x;
       if (!inside[i]) {
-        // The black outline round it.
-        if ((x > 0 && inside[i - 1]) || (x < w - 1 && inside[i + 1]) || (y > 0 && inside[i - w]) || (y < h - 1 && inside[i + w])) put(x, y, rgba(OUTLINE));
+
         continue;
       }
       const gx = at(x + 1, y) - at(x - 1, y), gy = at(x, y + 1) - at(x, y - 1);
@@ -688,10 +671,25 @@ function mountain(out: Uint32Array, b: Boulder) {
     })
     .filter((g) => g.deep > 5 && hash01(g.seed, 514) < 0.55)
     .sort((a, c) => a.y - c.y);
-  for (const g of crags) {
-    const sp = rockSprite(Math.round((0.9 + Math.min(1.2, g.deep / 14) + hash01(g.seed, 515) * 0.3) * 4) / 4, g.seed % 64);
-    stamp(out, sp, Math.round(g.x * ART) - sp.ox + 2, Math.round(g.y * ART) - sp.oy + 2, true);
-    stamp(out, sp, Math.round(g.x * ART) - sp.ox, Math.round(g.y * ART) - sp.oy, false);
+  const name=ART_NAMES.scenery(`mountain-${w}x${h}-${b.seed%16}`);
+  return {px:sourcePixels(name,w,h,()=>source),w,h,ox:0,oy:0,x:X0,y:Y0,name,crags};
+}
+function mountain(out:Uint32Array,b:Boulder) {
+  const s=mountainSource(b);
+  if(s.x+s.w+4<clip.x0 || s.x>=clip.x1 || s.y+s.h+4<clip.y0 || s.y>=clip.y1)return;
+  for(let y=0;y<s.h;y++)for(let x=0;x<s.w;x++){
+    if(!s.px[y*s.w+x])continue;
+    for(const k of [2,4]){
+      const sx=x+k,sy=y+k,X=s.x+sx,Y=s.y+sy;
+      if((sx<s.w&&sy<s.h&&s.px[sy*s.w+sx])||!inClip(X,Y)||(k===4&&(X+Y)&1))continue;
+      out[Y*W+X]=darken(out[Y*W+X]);
+    }
+  }
+  stamp(out,s,s.x,s.y,false);
+  for(const g of s.crags){
+    const sp=rockSprite(Math.round((.9+Math.min(1.2,g.deep/14)+hash01(g.seed,515)*.3)*4)/4,g.seed%64);
+    stamp(out,sp,Math.round(g.x*ART)-sp.ox+2,Math.round(g.y*ART)-sp.oy+2,true);
+    stamp(out,sp,Math.round(g.x*ART)-sp.ox,Math.round(g.y*ART)-sp.oy,false);
   }
 }
 
@@ -785,6 +783,7 @@ const maskId = (m: Uint8Array) => maskIds.get(m) ?? (maskIds.set(m, ++masks), ma
 /** Draws the forest outside the walls, kept by the renderer. */
 export class ForestArt {
   private map: CityMap | null = null;
+  private artKey = "";
   private plan: ForestPlan | null = null;
   private river: ForestRiver | null = null;
   private sim: DefendSim | null | undefined = undefined;
@@ -825,6 +824,12 @@ export class ForestArt {
 
   /** Plans the forest for `map`, and gives each new run a forest whole again. */
   sync(map: CityMap, sim: DefendSim | null) {
+    const key = pixelKey();
+    if (key !== this.artKey) {
+      this.artKey = key;
+      this.floorStale = [WHOLE];
+      this.dirty = true;
+    }
     if (map !== this.map) {
       this.map = map;
       this.plan = forestPlan(map);
@@ -1276,7 +1281,7 @@ export class ForestArt {
       const t = b.tree, p = Math.max(0, Math.min(1, (time - b.since) / BURN));
       const sprite = charSprite(t.kind, t.variant, t.size, Math.min(4, 1 + Math.floor(p * 4)));
       const x = Math.round(t.x * ART), y = Math.round(t.y * ART), s = treeSprite(t.kind, t.variant, 0, t.size);
-      c.drawImage(sprite, ((x - s.ox) * px) / ART, ((y - s.oy) * px) / ART, (s.w * px) / ART, (s.h * px) / ART);
+      drawSprite(c,sprite, ((x - s.ox) * px) / ART, ((y - s.oy) * px) / ART, (s.w * px) / ART, (s.h * px) / ART);
       // Flames grow over the first second, roar, then die down at the end.
       const heat = Math.min(1, p * 4) * (p > 0.75 ? (1 - p) * 4 : 1);
       if (heat <= 0) continue;
@@ -1356,7 +1361,7 @@ export function charPixels(kind: TreeKind, v: number, size: TreeSize, level: num
     const tr = 0x1a + lum * 0.25, tg = 0x14 + lum * 0.18, tb = 0x10 + lum * 0.12;
     out[i] = ((255 << 24) | (Math.round(b + (tb - b) * k) << 16) | (Math.round(g + (tg - g) * k) << 8) | Math.round(r + (tr - r) * k)) >>> 0;
   }
-  return out;
+  return sourcePixels(ART_NAMES.scenery(`tree-${kind}-${size}-${v}-char-${level}`),s.w,s.h,()=>out);
 }
 
 function charSprite(kind: TreeKind, v: number, size: TreeSize, level: number) {
@@ -1364,12 +1369,7 @@ function charSprite(kind: TreeKind, v: number, size: TreeSize, level: number) {
   let cv = charred.get(key);
   if (cv) return cv;
   const s = treeSprite(kind, v, 0, size);
-  cv = document.createElement("canvas");
-  cv.width = s.w;
-  cv.height = s.h;
-  const g = cv.getContext("2d")!, img = g.createImageData(s.w, s.h);
-  new Uint32Array(img.data.buffer).set(charPixels(kind, v, size, level));
-  g.putImageData(img, 0, 0);
+  cv=spriteCanvas(charPixels(kind,v,size,level),s.w,s.h);
   charred.set(key, cv);
   return cv;
 }
@@ -1391,7 +1391,7 @@ export function composeCrowns(out: Uint32Array, plan: ForestPlan, damage: Forest
   for (const t of plan.trees) {
     const ty = Math.round(t.y * ART), reach = t.r * ART * 1.3 + 8;
     if (ty + reach < y0 || ty - reach >= y1 || (damage && !damage.standing(t))) continue;
-    const s = treeSprite(t.kind, t.variant, leanOf(t, time, wind), t.size), runs = runsOf(s), px = s.px;
+    const s = outlinedScenery(treeSprite(t.kind, t.variant, leanOf(t, time, wind), t.size)), runs = runsOf(s), px = s.px;
     const sx = Math.round(t.x * ART) - s.ox, sy = ty - s.oy, a = alpha[t.id] ?? 1;
     for (let k = 0; k < runs.length; k += 3) {
       const Y = sy + runs[k];
@@ -1420,3 +1420,35 @@ export function leanOf(t: ForestTree, time: number, wind: number) {
 }
 
 const hex = (c: number) => `#${c.toString(16).padStart(6, "0")}`;
+
+export function forestPieces(): ArtPiece[] {
+  const pieces: ArtPiece[]=[];
+  for(const kind of ["oak","pine","bush"] as TreeKind[])for(let size=0;size<4;size++)for(let v=0;v<VARIANTS;v++){
+    for(let lean=-LEAN;lean<=LEAN;lean++){
+      const s=treeSprite(kind,v,lean,size as TreeSize);
+      pieces.push({name:ART_NAMES.scenery(`tree-${kind}-${size}-${v}-${lean}`),w:s.w,h:s.h,about:`${kind}, size ${size}, variant ${v}, lean ${lean}`,pixels:()=>treeSprite(kind,v,lean,size as TreeSize).px});
+    }
+    for(let level=1;level<=4;level++){
+      const s=treeSprite(kind,v,0,size as TreeSize);
+      pieces.push({name:ART_NAMES.scenery(`tree-${kind}-${size}-${v}-char-${level}`),w:s.w,h:s.h,about:`Charred ${kind}, size ${size}, variant ${v}, stage ${level}`,pixels:()=>charPixels(kind,v,size as TreeSize,level)});
+    }
+  }
+  const seen=new Set<string>();
+  for(let size=.25;size<=3;size+=.125)for(let seed=0;seed<64;seed++){
+    const s=rockSprite(size,seed),name=ART_NAMES.scenery(`rock-${s.w}x${s.h}-${seed}`);
+    if(seen.has(name))continue;seen.add(name);
+    pieces.push({name,w:s.w,h:s.h,about:`Rock ${s.w} × ${s.h}, variant ${seed}`,pixels:()=>rockSprite(size,seed).px});
+  }
+  for(let size=0;size<4;size++)for(let seed=0;seed<8;seed++)for(const cut of [false,true]){
+    const s=stumpSprite(size as TreeSize,seed,cut);
+    pieces.push({name:ART_NAMES.scenery(`stump-${size}-${seed}-${cut ? "cut" : "broken"}`),w:s.w,h:s.h,about:`Stump, size ${size}, variant ${seed}`,pixels:()=>stumpSprite(size as TreeSize,seed,cut).px});
+  }
+  for(let width=3;width<=9;width++)for(let height=3;height<=9;height++)for(let seed=0;seed<16;seed++){
+    const cells:number[]=[];
+    for(let y=10;y<10+height;y++)for(let x=10;x<10+width;x++)cells.push(cellIndex(x,y));
+    const b={cells,seed},p=mountainSource(b);
+    pieces.push({name:p.name,w:p.w,h:p.h,about:`Mountain base ${width} × ${height}, variant ${seed}; crags separate`,pixels:()=>mountainSource(b).px});
+  }
+  return pieces;
+}
+onPixelArt(()=>{sprites.length=0;rocks.clear();stumps.clear();charred.clear();});

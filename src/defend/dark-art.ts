@@ -1,3 +1,7 @@
+import { ART_NAMES } from "./art-overrides.ts";
+import { rowPixels, sourcePixels, type ArtPiece } from "./sprite-source.ts";
+import { spriteCanvas } from "./damage-art.ts";
+import { onPixelArt } from "./pixel-sprites.ts";
 /** The dark wizard and his black lightning as they are drawn, in the pixel
  * art of the city (`ART` pixels a cell):
  *
@@ -35,19 +39,19 @@ const RUBY = ["#3d0410", "#7e0a1c", "#c0182e", "#f0425a", "#ffc4cc"];
 /** The dark wizard, 11 × 13 sprite pixels: hood (h lit, k deep), eyes (E),
  * robe (r lit, d shaded), crimson trim (c) and the ruby clasp (R). */
 const WIZ = [
-  "....000....",
-  "...0hhk0...",
-  "..0hhkkk0..",
-  ".0hhkkkkd0.",
-  ".0hkEkkEd0.",
-  ".0hkkkkkd0.",
-  "0chhcRcddc0",
-  "0rhhdcdddd0",
-  "0rrhdcdddd0",
-  "0rrhdcdddd0",
-  "0rrrdcdddd0",
-  "0ccccccccc0",
-  ".000000000.",
+  "...........",
+  "....hhk....",
+  "...hhkkk...",
+  "..hhkkkkd..",
+  "..hkEkkEd..",
+  "..hkkkkkd..",
+  ".chhcRcddc.",
+  ".rhhdcdddd.",
+  ".rrhdcdddd.",
+  ".rrhdcdddd.",
+  ".rrrdcdddd.",
+  ".ccccccccc.",
+  "...........",
 ];
 const WIZ_W = WIZ[0].length;
 const WIZ_COLORS: Record<string, string> = {
@@ -63,20 +67,16 @@ function wizSprite(look: WizLook) {
 
 /** The figure, flashed white when struck, or as a crimson silhouette for
  * the aura round him. */
-function paintWiz(look: WizLook) {
-  const cv = document.createElement("canvas");
-  cv.width = WIZ_W;
-  cv.height = WIZ.length;
-  const c = cv.getContext("2d")!;
-  WIZ.forEach((row, j) =>
-    [...row].forEach((ch, i) => {
-      if (ch === ".") return;
-      c.fillStyle = look === "aura" ? RUBY[2] : look === "struck" && ch !== "0" ? "#fff" : WIZ_COLORS[ch];
-      c.fillRect(i, j, 1, 1);
-    }),
-  );
-  return cv;
+export function wizardPixels(look: WizLook) {
+  const palette = Object.fromEntries(Object.entries(WIZ_COLORS).map(([ch,color]) => [ch,look === "aura" ? RUBY[2] : look === "struck" && ch !== "0" ? "#fff" : color]));
+  const p = rowPixels(WIZ,palette);
+  return sourcePixels(ART_NAMES.unit(`dark-wizard-${look}`),p.w,p.h,()=>p.data);
 }
+function paintWiz(look: WizLook) { return spriteCanvas(wizardPixels(look),WIZ_W,WIZ.length,undefined,false); }
+export function wizardPieces(): ArtPiece[] {
+  return (["plain","struck","aura"] as WizLook[]).map(look => ({name:ART_NAMES.unit(`dark-wizard-${look}`),w:WIZ_W,h:WIZ.length,about:`Dark wizard, ${look}`,pixels:()=>wizardPixels(look)}));
+}
+onPixelArt(()=>{wizSprites=null;});
 
 /** Sprite pixels a cell. */
 const scale = (px: number) => (px * DARK_WIZARD.size * 2.6) / WIZ.length;

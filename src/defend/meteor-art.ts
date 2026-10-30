@@ -1,3 +1,8 @@
+import { ART_NAMES } from "./art-overrides.ts";
+import { sourcePixels, hexColor, type ArtPiece } from "./sprite-source.ts";
+import { pixels, spriteCanvas, sprite, drawSprite } from "./damage-art.ts";
+import { drawPuffBody, drawPuffOutline } from "./puff-art.ts";
+import { onPixelArt } from "./pixel-sprites.ts";
 /** The Meteor strike as it is drawn, in the city's pixel art (`ART` pixels a
  * cell, snapped to whole screen pixels):
  *
@@ -39,11 +44,8 @@ export function meteorAt(m: Meteor) {
 const bodies = new Map<string, HTMLCanvasElement>();
 /** A meteor's body, `d` art pixels across: lit from its leading (lower
  * left) edge, with seams of fire (or a glint) in one of three patterns. */
-function body(look: MeteorLook, d: number, variant: number) {
-  const key = `${look}:${d}:${variant}`;
-  let cv = bodies.get(key);
-  if (cv) return cv;
-  const { cv: canvas, c } = bake(d, d);
+export function meteorPixels(look: MeteorLook,d:number,variant:number){
+  const data=new Uint32Array(d*d),p=pixels(data,d,d);
   const mid = (d - 1) / 2, r = d / 2;
   const inside = (x: number, y: number) => x >= 0 && y >= 0 && x < d && y < d && (x - mid) * (x - mid) + (y - mid) * (y - mid) <= r * r - 0.3;
   for (let y = 0; y < d; y++) for (let x = 0; x < d; x++) {
@@ -52,22 +54,29 @@ function body(look: MeteorLook, d: number, variant: number) {
     // Leading edge: down and to the left, the way it falls.
     const lead = ((mid - x) + (y - mid)) / (2 * r);
     let colour: string;
-    if (edge) colour = OUTLINE;
-    else if (look === "ice") colour = lead > 0.3 ? ICE[4] : lead > 0.05 ? ICE[3] : lead > -0.25 ? ICE[2] : ICE[1];
+    if (edge) continue;
+    if (look === "ice") colour = lead > 0.3 ? ICE[4] : lead > 0.05 ? ICE[3] : lead > -0.25 ? ICE[2] : ICE[1];
     else {
       const seam = hash01(variant, x, y) < 0.16 && lead > -0.35;
       colour = lead > 0.32 ? FLAME[3] : lead > 0.18 ? FLAME[2] : seam ? FLAME[1] : lead > -0.1 ? ROCK[3] : lead > -0.3 ? ROCK[2] : ROCK[1];
     }
-    c.fillStyle = colour;
-    c.fillRect(x, y, 1, 1);
+    p.set(x,y,hexColor(colour));
   }
-  // A glint at the upper left of the ice; a white-hot heart in the rock's lead.
-  c.fillStyle = look === "ice" ? ICE[4] : FLAME[4];
-  if (look === "ice") c.fillRect(Math.round(mid - r / 2), Math.round(mid - r / 2), 1, 1);
-  else c.fillRect(Math.round(mid - r / 3), Math.round(mid + r / 3), 1, 1);
-  bodies.set(key, canvas);
-  return canvas;
+  const color=hexColor(look==="ice"?ICE[4]:FLAME[4]);
+  if(look==="ice")p.set(Math.round(mid-r/2),Math.round(mid-r/2),color);
+  else p.set(Math.round(mid-r/3),Math.round(mid+r/3),color);
+  return sourcePixels(ART_NAMES.effect("meteor",`${look}-${d}-${variant}`),d,d,()=>data);
 }
+function body(look:MeteorLook,d:number,variant:number){
+  const key=`${look}:${d}:${variant}`;let cv=bodies.get(key);
+  if(!cv){cv=spriteCanvas(meteorPixels(look,d,variant),d,d);bodies.set(key,cv);}return cv;
+}
+export function meteorPieces():ArtPiece[]{
+  const out:ArtPiece[]=[];
+  for(const look of ["rock","ice"] as MeteorLook[])for(let d=4;d<=24;d++)for(let variant=0;variant<3;variant++)out.push({name:ART_NAMES.effect("meteor",`${look}-${d}-${variant}`),w:d,h:d,about:`${look} meteor, ${d} pixels, look ${variant}`,pixels:()=>meteorPixels(look,d,variant)});
+  return out;
+}
+onPixelArt(()=>bodies.clear());
 
 /** Every meteor still falling: the shadow and ring where it will land, its
  * trail and its body. */
@@ -108,11 +117,10 @@ export function drawMeteors(c: Ctx, px: number, sim: DefendSim) {
       const colour = k > 0.7 ? cool[Math.min(cool.length - 1, Math.floor((1 - k) * 10))] : hot[k < 0.15 ? 3 : k < 0.35 ? 2 : k < 0.55 ? 1 : 0];
       puffs.push({ ax, ay, r, colour });
     }
-    c.fillStyle = OUTLINE;
-    for (const p of puffs) if (p.colour !== cool[0]) puff(dot, p.ax, p.ay, p.r + 1);
+    for(const p of puffs)if(p.colour!==cool[0])drawPuffOutline(c,px,p.ax,p.ay,p.r,p.colour);
     for (const p of puffs) {
       c.fillStyle = p.colour;
-      puff(dot, p.ax, p.ay, p.r);
+      drawPuffBody(c,px,p.ax,p.ay,p.r,p.colour);
     }
     blit(c, px, body(m.look, d, m.seed % 3), Math.round(at.x * ART - d / 2), Math.round(at.y * ART - d / 2));
   }
@@ -139,10 +147,8 @@ export function drawImpacts(c: Ctx, px: number, sim: DefendSim) {
       const lift = Math.sin(Math.PI * Math.min(1, k * 1.2)) * (0.6 + hash01(seed, i, 2) * 0.6);
       const ax = Math.round((m.x + Math.cos(a) * far) * ART), ay = Math.round((m.y + Math.sin(a) * far * 0.7 - lift) * ART);
       if (k > 0.85) c.globalAlpha = (1 - k) / 0.15;
-      c.fillStyle = OUTLINE;
-      dot(ax - 1, ay - 1, 4, 4);
-      c.fillStyle = ice ? ICE[i % 2 ? 3 : 2] : i % 3 ? ROCK[2] : FLAME[2];
-      dot(ax, ay, 2, 2);
+      const color = ice ? ICE[i % 2 ? 3 : 2] : i % 3 ? ROCK[2] : FLAME[2];
+      drawSprite(c, sprite(`impact-chip:${color}`, 2, 2, () => impactChipPixels(color)), ax*px/ART, ay*px/ART, 2*px/ART, 2*px/ART);
       c.globalAlpha = 1;
     }
   }
@@ -163,3 +169,16 @@ export function meteorLights(sim: DefendSim): { carried: CarriedLight[]; relief:
   }
   return { carried, relief };
 }
+
+const CHIP_COLORS = [ICE[2], ICE[3], ROCK[2], FLAME[2]];
+export function impactChipPixels(color: string) {
+  return sourcePixels(ART_NAMES.effect("impact-chip", color.slice(1)), 2, 2, () => {
+    const data = new Uint32Array(4), p = pixels(data, 2, 2);
+    for (let y = 0; y < 2; y++) for (let x = 0; x < 2; x++) p.set(x, y, hexColor(color));
+    return data;
+  });
+}
+export const impactChipPieces = (): ArtPiece[] => CHIP_COLORS.map(color => ({
+  name: ART_NAMES.effect("impact-chip", color.slice(1)), w: 2, h: 2,
+  about: `Meteor impact chip ${color}`, pixels: () => impactChipPixels(color),
+}));
