@@ -38,11 +38,11 @@ export function castStorm(sim: DefendSim, s: Soldier, first: Enemy, rank: number
 
 /** Four independently expiring strengths, never one status per attacking mage. */
 export function chillByMage(e: Enemy, speed: number, seconds: number, freeze: number) {
-  if (e.hp <= 0 || ENEMIES[e.kind].unyielding) return;
+  if (e.hp <= 0 || ENEMIES[e.kind].unyielding && e.kind !== "blightWorm") return;
   const chills = e.mageChills ??= [], old = chills.find(c => c.speed === speed);
   if (old) old.left = Math.max(old.left, seconds);
   else chills.push({ speed, left: seconds });
-  e.freeze = Math.max(e.freeze ?? 0, freeze);
+  if (e.kind !== "blightWorm") e.freeze = Math.max(e.freeze ?? 0, freeze);
 }
 
 export function mageChillSpeed(e: Enemy): number {

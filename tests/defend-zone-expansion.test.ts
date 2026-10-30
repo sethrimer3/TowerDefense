@@ -32,19 +32,21 @@ function fixture() {
   return sim;
 }
 
-test('every themed zone has at least fifteen species and all native additions appear on their first visit', () => {
+test('every themed zone has at least fifteen species and all native additions appear on their first procedural visit', () => {
   for (const area of AREAS) {
     const expected = additions[area.id];
     assert.equal(new Set(AREA_ENEMIES[area.id]).size, AREA_ENEMIES[area.id].length);
     assert.ok(AREA_ENEMIES[area.id].length >= 15, `${area.name} roster remains sparse`);
     if (!expected) continue;
     // Costs must be affordable immediately; selection also depends on the
-    // wave's exact spendable remainder, so probe the whole first zone visit.
+    // wave's exact spendable remainder, so probe the whole first procedural zone visit.
     for (const kind of expected) {
       assert.ok(AREA_ENEMIES[area.id].includes(kind));
       assert.ok(AREA_ENEMIES.nadir.includes(kind));
       assert.ok(AREAS.filter(a => a.id !== area.id && a.id !== 'nadir').every(a => !AREA_ENEMIES[a.id].includes(kind)));
-      const wave = AREAS.indexOf(area) * 20 + 1;
+      // Mossbound's first visit is authored Darklings; its legacy native
+      // species return on the first procedural revisit, waves 201–220.
+      const wave = area.id === 'moss' ? 201 : AREAS.indexOf(area) * 20 + 1;
       assert.equal(areaForWave(wave).id, area.id);
       assert.ok(ENEMIES[kind].cost <= waveDifficulty(wave));
       let selected = false;
@@ -52,7 +54,7 @@ test('every themed zone has at least fifteen species and all native additions ap
       for (let n = wave; n < wave + 20 && !selected; n++) {
         for (let r = 0; r < rolls && !selected; r++) selected = buildWave(n, () => (r + .5) / rolls).includes(kind);
       }
-      assert.ok(selected, `${kind} appears on its first zone visit`);
+      assert.ok(selected, `${kind} appears on its first procedural zone visit`);
     }
   }
 });

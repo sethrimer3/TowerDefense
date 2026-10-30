@@ -17,6 +17,7 @@ export const enemySpeed = (sim: DefendSim, e: Enemy) => {
 };
 
 export function damageModifier(sim: DefendSim, e: Enemy, origin: (Point & { attacker?: number; building?: number }) | undefined, source: string, projectile: boolean) {
+  if (e.kind === "blightWorm" && (e.burrow || e.untargetable)) return 0;
   if (e.fortressParts?.some(p => p.hp > 0 && p.fortressPart?.role === "armor")) return 0;
   if (e.kind === "burrowingMole" && (e.burrow ?? 1) > 0) return 0;
   if (e.kind !== "siegeBeetle" || !origin) return 1;

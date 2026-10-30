@@ -1,3 +1,6 @@
+import { UnitOutline } from "./unit-outline.ts";
+import { ART, UNIT_CONTOUR_ART_PIXELS, PORTAL_UNIT_INK } from "./art-scale.ts";
+import { drawDarklingBodies } from "./simple-units.ts";
 import { ENEMIES, type EnemyKind } from "./catalog.ts";
 import { drawEnemyArt } from "./battle-art.ts";
 import { assembleFortress } from "./fortress.ts";
@@ -15,6 +18,7 @@ export const PORTRAIT = 80;
 const BORDER = 10, FIT = 54;
 /** The scratch canvas each enemy is first drawn on, at its art's own scale. */
 const SCRATCH = 256;
+let portalPortrait: UnitOutline | undefined;
 
 const FRAME_COLOURS = {
   outline: "#0b0706", dark: "#3b2212", wood: "#61391c", grain: "#4e2d16", light: "#86542a", edge: "#a8743e",
@@ -67,14 +71,20 @@ function drawOnScratch(scratch: HTMLCanvasElement, kind: EnemyKind, px: number) 
   } as unknown as DefendSim;
   // A chain shows its head and a few segments trailing up behind it.
   const segments = Math.min(def.chainLength ?? 1, 4);
-  const step = 0.3;
+  const step = kind === "blightWorm" ? def.size : 0.3;
   const top = mid + ((segments - 1) * step) / 2;
   for (let n = segments - 1; n >= 0; n--) enemies.push(standIn(kind, mid, top - n * step, ++id));
   const head = enemies[enemies.length - 1];
   if (def.fortress) assembleFortress(sim, head);
   const b = { c, px };
   // Fortress parts are drawn by their core.
-  for (const e of enemies) if (!e.fortressPart) drawEnemyArt(b, e, sim);
+  if (def.portalOutline && def.darkPixels) {
+    portalPortrait ??= new UnitOutline();
+    const layers = portalPortrait.begin(c, true, px / ART * UNIT_CONTOUR_ART_PIXELS);
+    portalPortrait.ink(PORTAL_UNIT_INK); portalPortrait.mergePixelGaps();
+    drawDarklingBodies({ c: layers.units, px }, enemies);
+    portalPortrait.end(c);
+  } else for (const e of enemies) if (!e.fortressPart) drawEnemyArt(b, e, sim);
 
   const data = c.getImageData(0, 0, SCRATCH, SCRATCH).data;
   let x0 = SCRATCH, y0 = SCRATCH, x1 = -1, y1 = -1;
