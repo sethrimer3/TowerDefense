@@ -17,17 +17,17 @@ const mix = (roster: readonly (readonly [EnemyKind, number])[]): EnemyKind[] =>
   roster.flatMap(([kind, count], order) => Array.from({ length: count }, (_, i) => ({ kind, at: (i + .5) / count, order })))
     .sort((a, b) => a.at - b.at || a.order - b.order).map(e => e.kind);
 
-/** Initial rosters are tuning data; split trees determine combat HP/slots. */
+/** Darkling hordes and their flying escorts are tuning data; split trees determine HP/slots. */
 export const DARKLING_WAVES: Readonly<Record<number, readonly (readonly [EnemyKind, number])[]>> = {
   11: [["significantDarkling", 10], ["majorDarkling", 40]],
   12: [["significantDarkling", 20], ["majorDarkling", 40], ["darkling", 100]],
   13: [["significantDarkling", 30], ["majorDarkling", 40], ["largeDarkling", 60]],
   14: [["significantDarkling", 40], ["majorDarkling", 40], ["darkling", 200]],
-  15: [["significantDarkling", 50], ["majorDarkling", 50]],
-  16: [["significantDarkling", 60], ["majorDarkling", 50], ["largeDarkling", 100]],
-  17: [["significantDarkling", 80], ["majorDarkling", 30], ["miniDarkling", 150]],
-  18: [["significantDarkling", 90], ["majorDarkling", 20], ["darkling", 100]],
-  19: [["significantDarkling", 100], ["majorDarkling", 20]],
+  15: [["significantDarkling", 50], ["majorDarkling", 50], ["blightDart", 3]],
+  16: [["significantDarkling", 60], ["majorDarkling", 50], ["largeDarkling", 100], ["blightDart", 4]],
+  17: [["significantDarkling", 80], ["majorDarkling", 30], ["miniDarkling", 150], ["blightDart", 5]],
+  18: [["significantDarkling", 90], ["majorDarkling", 20], ["darkling", 100], ["blightDart", 6]],
+  19: [["significantDarkling", 100], ["majorDarkling", 20], ["blightDart", 7], ["blightPrism", 1]],
 };
 
 /** Absolute waves only; later area cycles and Ambush keep their legacy rosters. */

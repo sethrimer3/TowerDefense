@@ -22,13 +22,25 @@ Started 2026-10-29. This is the working checklist for replacing the old enemy li
 | Defend 11 | Significant Darkling | 5 × 5 black art pixels, portal outline | 162 | 16 / 1 second | 0.65 | Two Major Darklings (44 descendants; 45 bodies including parent) |
 | Defend 20 | Blight Worm | Fifty touching 5 × 5 black art-pixel segments, portal perimeter | 300 each | 4 contact / 0.6 seconds per target; 1.25 underground per building pass | 3 surface / 4 underground | Each segment releases three Significant Darklings; cuts create independent heads |
 
-| Awaiting wave placement | Blight Dart | Black triangle/chevron, 6-art-pixel span, portal perimeter, flying | 10 | 2 / 1 second | 2.4 | No split; released darts scatter for 0.65 seconds |
-| Awaiting wave placement | Blight Prism | Black equilateral triangle, 12-art-pixel span, three spinning inlaid triangles, flying | 90 | 8 / 1.5 seconds | 0.35 | Three Blight Darts, 120° apart; 4 total bodies |
+| Defend 15 | Blight Dart | Black triangle/chevron, 6-art-pixel span, portal perimeter, flying | 10 | 2 / 1 second | 2.4 | No split; released darts scatter for 0.65 seconds |
+| Defend 19 | Blight Prism | Black equilateral triangle, 12-art-pixel span, three spinning inlaid triangles, flying | 90 | 8 / 1.5 seconds | 0.35 | Three Blight Darts, 120° apart; 4 total bodies |
 | Awaiting wave placement | Greater Blight Prism | Black equilateral triangle, 20-art-pixel span, four spinning inlaid triangles, flying | 270 | 16 / 1.5 seconds | 0.22 | Three Blight Darts, 120° apart; 4 total bodies |
 
 An art pixel is 1/8 of a board cell and scales with the camera. All five Darkling kinds use solid black square drawing under normal, Pixel Art, Simple enemies and merged-outline settings, without decorative sprites. The stats are initial tuning values.
 
 ## Change log
+
+- **2026-10-30 — Flying escorts placed in Defend waves 15–19.** Add 3/4/5/6/7 Blight Darts respectively, plus exactly one Blight Prism in wave 19. All previous ground counts are retained; the authored `mix` evenly spreads the sparse fliers through the five-second release without RNG. The prism adds three further darts on death. All kinds stay scripted-only; Greater Blight Prism is still unplaced, and other authored/procedural/Ambush lineups stay fixed. This supersedes the earlier decision to defer all flying placements.
+
+| Wave | Exact current initial roster | Total bodies including splits | Total HP including splits |
+|---|---|---:|---:|
+| 15 | 50 Significant + 50 Major + 3 Blight Darts | 3353 | 33330 |
+| 16 | 60 Significant + 50 Major + 100 Large + 4 Blight Darts | 4504 | 42120 |
+| 17 | 80 Significant + 30 Major + 150 minis + 5 Blight Darts | 4415 | 45230 |
+| 18 | 90 Significant + 20 Major + 100 Darklings + 6 Blight Darts | 4796 | 49240 |
+| 19 | 100 Significant + 20 Major + 7 Blight Darts + 1 Blight Prism | 4951 | 53350 |
+
+Wave 19 encounters ten darts in all when its prism is killed. Total HP still increases each wave; every full split tree fits the unchanged 5000-body cap. Initial authored costs are 1212/1776/1690/1824/1808. Replay/city/fence/save goldens stay unchanged: the replay fixtures do not reach these newly changed waves.
 
 - **2026-10-30 — Flying Blight catalog and artwork.** Added Blight Dart, Blight Prism and Greater Blight Prism, all Dark One fliers. Prisms drift very slowly and release exactly three darts along sqrt-derived unit rays separated by 120°, relative to their last heading; the darts fly outward for 0.65 seconds before ordinary flying combat resumes. All kinds have the shared burning noise perimeter, journal portraits and outline-free named body exports. Three/four internal triangles rotate at 1, 1/2, 1/4 and 1/8 speed (base period six seconds), fully realigning after 24/48 seconds; Reduce Motion freezes the pattern. Initial costs are 4/20/50, reserved split slots 1/4/4 and total split-tree HP 10/120/300. **Seth chose to add the enemies now and tune waves later:** all three remain scripted-only, with no additions to Defend or Ambush rosters and no migration checkboxes advanced. Existing goldens stay unchanged.
 
