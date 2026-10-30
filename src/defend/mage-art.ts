@@ -1,3 +1,8 @@
+import { drawSmall } from "./small-art.ts";
+import { ART_NAMES } from "./art-overrides.ts";
+import { sourcePixels, hexColor, type ArtPiece } from "./sprite-source.ts";
+import { pixels, spriteCanvas } from "./damage-art.ts";
+import { onPixelArt } from "./pixel-sprites.ts";
 import { mageAttunement, type MageFamily } from "./mage-attunements.ts";
 import { artPen } from "./pixel-fx.ts";
 /** The fire mages and their attack as they are drawn, in the pixel art of
@@ -38,12 +43,21 @@ const SMOKE = "rgba(48,40,36,0.55)";
 /** The mage, 7 × 8 sprite pixels: outline, hat (lit, dark), face, robe
  * (lit, mid, shaded), a gold belt, and in the outstretched hand (the last
  * column) a flame: `f` its foot, `F` its body and `T` the hot tip. */
-const MAGE = ["..00...", ".0Hh0..", "0HHhh0T", ".0ss0.F", "0RRrd0f", "0Rggd0.", "0RRrd0.", ".0000.."];
+const MAGE = [
+  ".......",
+  "..Hh...",
+  ".HHhh.T",
+  "..ss..F",
+  ".RRrd.f",
+  ".Rggd..",
+  ".RRrd..",
+  ".......",
+];
 const MAGE_COLORS: Record<string, string> = {
   "0": OUTLINE, H: "#a8282a", h: "#6e1818", s: "#e8c49a", R: "#e8573f", r: "#c8372d", d: "#8e2620", g: "#e9c46a",
 };
 /** Sprites: plain, struck (white), and holding a flame low and high. */
-type MageLook = "plain" | "struck" | "flame" | "blaze";
+export type MageLook = "plain" | "struck" | "flame" | "blaze";
 const mageSprites = new Map<string, HTMLCanvasElement>();
 const ELEMENT_COLORS: Record<MageFamily, Record<string,string>> = {
   plain: MAGE_COLORS,
@@ -60,12 +74,9 @@ function mageSprite(look: MageLook, family: MageFamily) {
   return cv;
 }
 
-function paintMage(look: MageLook, family: MageFamily) {
+export function magePixels(look: MageLook, family: MageFamily) {
   const colors = ELEMENT_COLORS[family], flame = family === "frost" ? FROST_FLAME : family === "storm" ? ["#486e9b","#7eacd0","#badceb","#f1df9f","#fffbed"] : FLAME;
-  const cv = document.createElement("canvas");
-  cv.width = 7;
-  cv.height = MAGE.length;
-  const c = cv.getContext("2d")!;
+  const data = new Uint32Array(7 * MAGE.length), p = pixels(data, 7, MAGE.length);
   MAGE.forEach((row, j) =>
     [...row].forEach((ch, i) => {
       if (ch === ".") return;
@@ -74,16 +85,22 @@ function paintMage(look: MageLook, family: MageFamily) {
         if (look === "plain" || look === "struck" || (ch === "T" && look === "flame")) return;
         color = ch === "f" ? flame[1] : ch === "F" ? flame[look === "blaze" ? 3 : 2] : flame[4];
       } else if (look === "struck" && ch !== "0") color = "#fff";
-      c.fillStyle = color;
-      c.fillRect(i, j, 1, 1);
+      p.set(i, j, hexColor(color));
     }),
   );
   if (family !== "plain") {
-    c.fillStyle = "#171c25";c.fillRect(6,4,1,3);
-    c.fillStyle = family === "frost" ? "#d7f2fa" : family === "storm" ? "#e8d58d" : "#f4b359";c.fillRect(6,4,1,1);
+    for (let y=4;y<7;y++) p.set(6,y,0x414651);
+    p.set(6,4,family === "frost" ? 0xd7f2fa : family === "storm" ? 0xe8d58d : 0xf4b359);
   }
-  return cv;
+  return sourcePixels(ART_NAMES.unit(`mage-${family}-${look}`),7,MAGE.length,()=>data);
 }
+function paintMage(look: MageLook, family: MageFamily) {
+  return spriteCanvas(magePixels(look,family),7,MAGE.length,undefined,false);
+}
+export function magePieces(): ArtPiece[] {
+  return (["plain","fire","frost","storm"] as MageFamily[]).flatMap(family => (["plain","struck","flame","blaze"] as MageLook[]).map(look => ({ name:ART_NAMES.unit(`mage-${family}-${look}`),w:7,h:MAGE.length,about:`${family} mage, ${look}`,pixels:()=>magePixels(look,family) })));
+}
+onPixelArt(()=>mageSprites.clear());
 
 /** A fire mage at its spot, `now` seconds into the battle: the sprite drawn
  * up crisp (the board draws with smoothing off). */
@@ -134,17 +151,8 @@ export function drawFireballs(c: Ctx, px: number, sim: DefendSim, reduced = fals
     // The ball: a dark rim (corners cut), orange body, a hot heart and a
     // glint at its upper left.
     const bx = snap(gx) - 2 * g, by = snap(gy - lift) - 2 * g;
-    c.fillStyle = f.frost ? "#10283c" : OUTLINE;
-    c.fillRect(bx + g, by, 3 * g, 5 * g);
-    c.fillRect(bx, by + g, 5 * g, 3 * g);
-    c.fillStyle = flame[2];
-    c.fillRect(bx + g, by + g, 3 * g, 3 * g);
-    c.fillStyle = flame[3];
-    c.fillRect(bx + g, by + g, 2 * g, 2 * g);
-    c.fillStyle = flame[4];
-    c.fillRect(bx + g, by + g, g, g);
-    c.fillStyle = flame[1];
-    c.fillRect(bx + 3 * g, by + 3 * g, g, g);
+    drawSmall(c,px,f.frost?"frostball":"fireball",0,(bx+2.5*g)/px,(by+2.5*g)/px,g*ART/px);
+
   }
 }
 

@@ -1,3 +1,5 @@
+import { basicUnitSprite } from "./basic-unit-art.ts";
+import { drawSprite } from "./damage-art.ts";
 import { ART, UNIT_CONTOUR_ART_PIXELS, DARK_UNIT_INK, PLAYER_UNIT_INK, NEUTRAL_UNIT_INK, MARKED_UNIT_INK, BROOD_UNIT_INK, PORTAL_UNIT_INK } from "./art-scale.ts";
 import {drawChrono} from "./chrono-art.ts";
 import { drawFortress } from "./fortress-art.ts";
@@ -230,7 +232,7 @@ function drawCivilians(b: Brush, sim: DefendSim, torches: Burning | null, unit?:
     const s = Math.max(2, CIVILIAN.size * px);
     if (!(u.flash <= 0 && drawPixel(c, "civilian", u.x * px - s / 2, u.y * px - s / 2, s))) {
       c.fillStyle = u.flash > 0 ? "#fff" : CIVILIAN.color;
-      c.fillRect(u.x * px - s / 2, u.y * px - s / 2, s, s);
+      drawSprite(c,basicUnitSprite("civilian",false,u.flash>0),u.x * px - s / 2,u.y * px - s / 2,s,s);
     }
     if (u.state === "flee") {
       const dot = Math.max(1, px * .07);
@@ -268,8 +270,7 @@ function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null, reduced
     if (garrisoned(u)) continue;
     unit?.(u.id);
     if (u.kind === "flagBearer") {
-      const a=Math.max(1,px/8),r=rimOf(c);r.fillStyle=sides?.ink(u.id)??"#b3202a";
-      r.fillRect(u.x*px-2*a,u.y*px-4*a,4*a,5*a);
+      const a=px/8;
       c.fillStyle="#c5a46d";c.fillRect(u.x*px-a,u.y*px-3*a,2*a,3*a);
       c.fillStyle="#eed7ac";c.fillRect(u.x*px-a,u.y*px-4*a,2*a,a);
       continue;
@@ -322,11 +323,9 @@ function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null, reduced
       if (torches) drawHandTorch(b, { x: x + SOLDIER.size * 0.65, y: y - SOLDIER.size * 0.45, id: u.id }, sim.time, torches(u.x, u.y, u.id));
       continue;
     }
-    const r = rimOf(c);
-    r.fillStyle = archer ? "#1b3324" : "#1c2a40";
-    r.fillRect(x * px - s / 2 - 1, y * px - s / 2 - 1, s + 2, s + 2);
+
     c.fillStyle = u.flash > 0 ? "#fff" : archer ? ARCHER_UNIT.color : SOLDIER.color;
-    c.fillRect(x * px - s / 2, y * px - s / 2, s, s);
+    drawSprite(c, basicUnitSprite(archer ? "archer" : "sword", false, u.flash > 0), x * px - s / 2, y * px - s / 2, s, s);
     if (heading) faceMark(c,x*px,y*px,s,Math.cos(heading.angle),Math.sin(heading.angle),"#c2ccd0");
     if (archer) {
       c.fillStyle = "#b58a4f";
@@ -378,11 +377,9 @@ function drawGuildTroop(b: Brush, sim: DefendSim, u: Soldier, reduced = false) {
   const x = (u.x + fx * punch * 0.12) * px, y = (u.y + fy * punch * 0.12) * px;
   if (k === "lancer") horse(c, x, y, fx, fy, s, unit, u.flash > 0);
   drawMeleeCape(c, px, u, sim, reduced, x / px, y / px);
-  const r = rimOf(c);
-  r.fillStyle = RIM;
-  r.fillRect(Math.round(x - s / 2 - 1), Math.round(y - s / 2 - 1), Math.round(s + 2), Math.round(s + 2));
+
   c.fillStyle = u.flash > 0 ? "#fff" : def.color;
-  c.fillRect(Math.round(x - s / 2), Math.round(y - s / 2), Math.round(s), Math.round(s));
+  drawSprite(c, basicUnitSprite(k, false, u.flash > 0), Math.round(x - s / 2), Math.round(y - s / 2), Math.round(s), Math.round(s));
   // A lit upper left, like the city's art.
   c.fillStyle = "rgba(255,255,255,0.22)";
   c.fillRect(Math.round(x - s / 2), Math.round(y - s / 2), Math.round(s), unit);
@@ -401,7 +398,7 @@ function drawGuildTroop(b: Brush, sim: DefendSim, u: Soldier, reduced = false) {
     const w = Math.max(1, Math.round(unit * 0.8)), len = s * (slen + punch * 0.35);
     const ox = x + fy * s * 0.35 - fx * s * 0.3, oy = y - fx * s * 0.35 - fy * s * 0.3;
     line(c, ox, oy, ox + fx * len, oy + fy * len, w, k === "lancer" ? "#d8d0bc" : "#8e6238");
-    rimDot(c, ox + fx * len, oy + fy * len, w + 2);
+
     c.fillStyle = tip;
     dot(c, ox + fx * len, oy + fy * len, w);
     if (k === "lancer") {
@@ -412,7 +409,6 @@ function drawGuildTroop(b: Brush, sim: DefendSim, u: Soldier, reduced = false) {
     if (k === "hoplite") {
       // The round bronze shield on its off side, a boss at its heart.
       const sx = x - fy * s * 0.5 + fx * s * 0.25, sy = y + fx * s * 0.5 + fy * s * 0.25, d = Math.max(3, Math.round(s * 0.62));
-      round(rimOf(c), sx, sy, d + 2, RIM);
       round(c, sx, sy, d, "#b08a3e");
       c.fillStyle = "#e9c46a";
       c.fillRect(Math.round(sx - d / 2) + 1, Math.round(sy - d / 2) + 1, Math.max(1, Math.round(d / 3)), Math.max(1, Math.round(d / 3)));
@@ -435,16 +431,16 @@ function drawGuildTroop(b: Brush, sim: DefendSim, u: Soldier, reduced = false) {
   if (k === "brawler") {
     // Fists: one held up, one thrown at the target.
     const reach = s * (0.55 + punch * 0.45);
-    rimDot(c, x + fx * reach, y + fy * reach, unit + 2);
+
     c.fillStyle = "#e8b88a";
     dot(c, x + fx * reach, y + fy * reach, unit);
-    rimDot(c, x + fy*s*0.55-fx*s*0.1, y - fx*s*0.55-fy*s*0.1, unit + 2);
+
     c.fillStyle = "#e8b88a";
     dot(c, x + fy*s*0.55-fx*s*0.1, y - fx*s*0.55-fy*s*0.1, unit);
     return;
   }
   if (k === "slinger") {
-    rimDot(c, x + s * 0.6, y - s * 0.3, unit + 2);
+
     c.fillStyle = "#b8b2a6";
     dot(c, x + s * 0.6, y - s * 0.3, unit);
     return;
@@ -498,13 +494,6 @@ function round(c: CanvasRenderingContext2D, x: number, y: number, d: number, col
 
 /** A stroke from (x0, y0) to (x1, y1), `w` pixels wide, in the black outline. */
 function line(c: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number, w: number, color: string) {
-  const r = rimOf(c);
-  r.strokeStyle = RIM;
-  r.lineWidth = w + 2;
-  r.beginPath();
-  r.moveTo(x0, y0);
-  r.lineTo(x1, y1);
-  r.stroke();
   c.beginPath();
   c.moveTo(x0, y0);
   c.lineTo(x1, y1);
@@ -607,14 +596,6 @@ function swingOf(sim: DefendSim, u: Soldier): Swing {
   return { dx: Math.cos(m.face) * lunge, dy: Math.sin(m.face) * lunge, blade: end + (home - end) * back * back, from, end, k };
 }
 
-/** A black pixel square of side `d` centred on (x, y): a rim under one of
- * side `d - 2`. */
-function rimDot(c: CanvasRenderingContext2D, x: number, y: number, d: number) {
-  const r = rimOf(c);
-  r.fillStyle = RIM;
-  dot(r, x, y, d);
-}
-
 /** A pixel square of side `d` centred on (x, y) in canvas pixels. */
 function dot(c: CanvasRenderingContext2D, x: number, y: number, d: number) {
   c.fillRect(Math.round(x - d / 2), Math.round(y - d / 2), d, d);
@@ -627,10 +608,6 @@ function drawSword({ c, px }: Brush, x: number, y: number, angle: number, reach:
     uy = Math.sin(angle);
   const r0 = SOLDIER.size * 0.5,
     r1 = r0 + BLADE * reach;
-  // The black outline first, a pixel round the blade.
-  const rim = rimOf(c);
-  rim.fillStyle = ink ?? "#0d0d10";
-  for (let r = r0; r <= r1; r += d / px) dot(rim, (x + ux * r) * px, (y + uy * r) * px, d + 2);
   c.fillStyle = "#dfe6ee";
   for (let r = r0 + 0.08; r <= r1; r += d / px) dot(c, (x + ux * r) * px, (y + uy * r) * px, d);
   // The crossguard and grip in brass.
@@ -691,8 +668,7 @@ export function drawEnemyArt(b: Brush, e: Enemy, sim: DefendSim, under = b) {
   if (def.darkPixels) {
     // No sprite lookup, rims, shading, torch, or animated decoration.
     const d = b.px / ART * def.darkPixels;
-    b.c.fillStyle = "#000000";
-    b.c.fillRect(e.x * b.px - d / 2, e.y * b.px - d / 2, d, d);
+    drawSprite(b.c, basicUnitSprite(e.kind,true),e.x * b.px - d / 2,e.y * b.px - d / 2,d,d);
   }
   else if (def.siege) drawSiegeEngine(b, e, sim.time);
   else if (def.boat) drawBoat(b, e, sim.time);
@@ -721,32 +697,14 @@ function drawEnemy(b: Brush, e: Enemy, sim: DefendSim, under: Brush) {
   const s = Math.max(zoneEnemyRows(e.kind) ? 3 : 2, Math.round(enemySize(e) * px));
   const x = Math.round(e.x * px - s / 2),
     y = Math.round(e.y * px - s / 2 - (e.kind === "bombBird" ? (e.dive === undefined ? 1 : Math.max(0, e.dive / 0.6)) * px * 1.5 : 0));
-  if (e.marked) {
-    const rim = rimOf(c); rim.fillStyle = "#f2c94c";
-    rim.fillRect(x - 1, y - 1, s + 2, s + 2);
-  } else if (def.flying) {
+  if (def.flying) {
     under.c.fillStyle = "rgba(0,0,0,0.35)";
     under.c.fillRect(x + px * 0.2, y + px * 0.35, s, s);
   }
-  if (def.boss) {
-    const r = rimOf(c);
-    r.fillStyle = "#1a0606";
-    r.fillRect(x - 1, y - 1, s + 2, s + 2);
-  } else if (e.kind === "mother" || e.kind === "broodling") {
-    if (!e.marked) {
-      const rim = rimOf(c); rim.fillStyle = "#6b3d8f";
-      rim.fillRect(x - 1, y - 1, s + 2, s + 2);
-    }
-  }
   const pixel = e.flash <= 0 ? enemySprite(e.kind) : undefined;
   if (!(pixel && drawPixel(c, pixel, x, y, s)) && !drawZoneEnemyBody(b, e, x, y, s)) {
-    if (!def.boss && !e.marked) {
-      const r = rimOf(c);
-      r.fillStyle = RIM;
-      r.fillRect(x - 1, y - 1, s + 2, s + 2);
-    }
     c.fillStyle = e.flash > 0 ? "#fff" : def.color;
-    c.fillRect(x, y, s, s);
+    drawSprite(c, basicUnitSprite(e.kind, true, e.flash > 0), x, y, s, s);
   }
   drawHostileMarks(b, e, { x, y, s });
   if (e.venom) drawVenom(b, e, { x, y, s }, sim.time);

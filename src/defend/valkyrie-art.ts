@@ -59,11 +59,6 @@ function drawSpear(c: Ctx, k: number, x: number, y: number, face: number) {
   const step = Math.max(1, k);
   for (let t = -3; t <= 7; t++) {
     const sx = Math.round(x + ux * t * k), sy = Math.round(y + 0.5 * k + uy * t * k);
-    c.fillStyle = OUTLINE;
-    c.fillRect(sx - step, sy - step, step * 2, step * 2);
-  }
-  for (let t = -3; t <= 7; t++) {
-    const sx = Math.round(x + ux * t * k), sy = Math.round(y + 0.5 * k + uy * t * k);
     c.fillStyle = t >= 5 ? (t === 7 ? GOLD[2] : GOLD[1]) : "#b08a5a";
     c.fillRect(sx - step / 2, sy - step / 2, step, step);
   }

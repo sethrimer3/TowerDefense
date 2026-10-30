@@ -1,3 +1,6 @@
+import { summonedArcherPixels } from "./unit-body-art.ts";
+import { spriteCanvas } from "./damage-art.ts";
+import { onPixelArt } from "./pixel-sprites.ts";
 /** The Reinforcements spell as it is drawn, in the city's pixel art:
  *
  * - **The soldiers:** knights in steel helms and blue tabards with a gold
@@ -37,16 +40,8 @@ function sprite(look: CalledLook, struck: boolean, stood: boolean, direction: Fa
   const key = `${look}:${struck}:${stood}`;
   let cv = sprites.get(key);
   if (cv) return cv;
-  const rows = SPRITES[look];
-  cv = document.createElement("canvas");
-  cv.width = rows[0].length;
-  cv.height = rows.length;
-  const c = cv.getContext("2d")!;
-  rows.forEach((row, j) => [...row].forEach((ch, i) => {
-    if (ch === ".") return;
-    c.fillStyle = ch === "o" ? (stood ? GOLD[2] : OUTLINE) : struck ? "#fff" : COLORS[ch];
-    c.fillRect(i, j, 1, 1);
-  }));
+  const p = summonedArcherPixels(true, struck);
+  cv = spriteCanvas(p.data, p.w, p.h, undefined, false);
   sprites.set(key, cv);
   return cv;
 }
@@ -195,3 +190,5 @@ export function reinforceLights(sim: DefendSim): ReliefLight[] {
   for (const l of sim.landings) if (l.kind !== "land") out.push({ x: l.x, y: l.y, r: Math.max(1.2, l.r * 1.2), k: 0.8 * (1 - l.t / LAND_SHOW), color: GOLD[2] });
   return out;
 }
+
+onPixelArt(() => sprites.clear());

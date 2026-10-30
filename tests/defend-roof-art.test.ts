@@ -5,14 +5,13 @@ import { ART } from "../src/defend/park-art.ts";
 
 const OUTLINE = 0xff07090b; // 0x0b0907 as little-endian RGBA
 
-test("a roof fills its cells inside a black outline, with a black ridge", () => {
-  for (const [cw, ch] of [[1, 1], [2, 1], [1, 3], [3, 2]]) {
-    const W = cw * ART, H = ch * ART, px = roofPixels(cw, ch, 2, 7);
-    assert.equal(px.length, W * H);
-    for (let x = 1; x <= W - 3; x++) assert.equal(px[W + x], OUTLINE, `top edge ${cw}x${ch} at ${x}`), assert.equal(px[(H - 3) * W + x], OUTLINE);
-    for (let y = 1; y <= H - 3; y++) assert.equal(px[y * W + 1], OUTLINE), assert.equal(px[y * W + W - 3], OUTLINE);
-    // The one-pixel gap round the lot stays clear.
-    for (let x = 0; x < W; x++) assert.equal(px[x], 0);
+test("a roof has a bare silhouette and retains its inner ridge", () => {
+  for (const [cw,ch] of [[1,1],[2,1],[1,3],[3,2]]) {
+    const W=cw*ART,H=ch*ART,px=roofPixels(cw,ch,2,7);
+    assert.equal(px.length,W*H);
+    for(let x=1;x<=W-3;x++)assert.equal(px[W+x],0),assert.equal(px[(H-3)*W+x],0);
+    for(let y=1;y<=H-3;y++)assert.equal(px[y*W+1],0),assert.equal(px[y*W+W-3],0);
+    assert.ok(px.includes(OUTLINE),"inner ridge stays part of the drawing");
   }
 });
 

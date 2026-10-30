@@ -1,3 +1,4 @@
+import { sourcePixels } from "./sprite-source.ts";
 import { flagPixels as profilePixels, type Flag } from "../profile/model.ts";
 /** DEFEND's structure art, seen from above: the keep, and the barracks and
  * towers from `tower-art.ts` at their damage stages and as rubble (drawn
@@ -9,7 +10,7 @@ import { BALLISTA_ART, BALLISTA_DIRS, ballistaPixels, bastionPixels, spikePixels
 import { TILE_ICON_CELLS, cityTilePixels } from "./tile-art.ts";
 import { hash, hash01 } from "./grid.ts";
 import { ART } from "./park-art.ts";
-import { bare, drawSprite, sprite, spriteCanvas } from "./damage-art.ts";
+import { drawSprite, sprite, spriteCanvas } from "./damage-art.ts";
 import { ART_NAMES, artOverride } from "./art-overrides.ts";
 import { onPixelArt } from "./pixel-sprites.ts";
 
@@ -111,7 +112,7 @@ function paintSpikesIcon(c: CanvasRenderingContext2D, n: number) {
   c.fillRect(x, y, k, s);
   c.fillRect(x + 2 * s - k, y, k, s);
   c.fillRect(x + s - k, y + 2 * k, k, s - 2 * k);
-  for (let i = 0; i < 2; i++) drawSprite(c, sprite(`icon:spikes:${i}`, ART, ART, () => spikePixels("n", i)), x + i * s, y - Math.round((5 / ART) * s), s, s);
+  for (let i = 0; i < 2; i++) drawSprite(c, sprite(`icon:spikes:${i}`, ART, ART, () => spikePixels("n", i),{joins:["w","e"]}), x + i * s, y - Math.round((5 / ART) * s), s, s);
 }
 
 /** A wall section: a block of four cap stones, lit from the upper left,
@@ -322,7 +323,8 @@ export function keepStage(hp: number, max: number) {
  * `stage` 1 to 4 it is cracked, holed, breached and ruined in turn; damage
  * only repaints pixels, never clears one, so it always covers the ground. */
 export function keepPixels(stage = 0): Uint32Array {
-  const out = wholeKeep(), p = pixels(out);
+  const out = wholeKeep(), p = pixels(out), put=p.set;
+  p.set=(x,y,c)=>{if(p.get(x,y)>=0)put(x,y,c);};
   for (let s = 1; s <= stage; s++) DAMAGE[s - 1](p);
   return out;
 }
@@ -338,7 +340,8 @@ function drawnKeep(): Uint32Array {
   for (let y = 1; y < n - 1; y++)
     for (let x = 1; x < n - 1; x++) {
       const ring = Math.min(x - 1, y - 1, n - 2 - x, n - 2 - y);
-      if (ring === 0 || ring === 3) set(x, y, K.outline);
+      if (ring === 0) continue;
+      if (ring === 3) set(x, y, K.outline);
       else if (ring === 1) set(x, y, (x + y) % 3 === 0 ? K.crenel : K.merlon);
       else if (ring === 2) set(x, y, x === 3 || y === 3 ? K.walkLit : x === n - 4 || y === n - 4 ? K.walkShade : K.walk);
       else courtyard(x, y, set);
@@ -346,7 +349,7 @@ function drawnKeep(): Uint32Array {
   greatTower(set);
   for (const [cx, cy] of [[4, 4], [n - 4, 4], [4, n - 4], [n - 4, n - 4]]) turret(cx, cy, set);
   // The gate: oak doors across the south wall.
-  for (let y = n - 4; y < n - 1; y++)
+  for (let y = n - 4; y < n - 2; y++)
     for (let x = n / 2 - 2; x < n / 2 + 2; x++) set(x, y, y === n - 2 ? K.outline : x === n / 2 - 1 ? K.doorDark : K.door);
   return out;
 }
@@ -395,7 +398,9 @@ function turret(cx: number, cy: number, set: Put) {
     for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++) {
       const dx = x + 0.5 - cx, dy = y + 0.5 - cy, d = Math.sqrt(dx * dx + dy * dy);
       if (d > r) continue;
-      if (d > r - 1) set(x, y, K.outline);
+      if (d > r - 1) {
+        if (x >= 3 && y >= 3 && x < KEEP - 3 && y < KEEP - 3) set(x, y, K.outline);
+      }
       else if (d > r - 1.9) set(x, y, dx + dy < 0 ? K.turretLit : K.turret);
       else if (d < 0.8 && dx < 0 && dy < 0) set(x, y, K.finial);
       else {
@@ -470,12 +475,7 @@ function pile(p: Pix, chunks: readonly Chunk[]) {
   for (let y = 0; y < n; y++)
     for (let x = 0; x < n; x++) {
       const k = id[y * n + x];
-      if (k < 0) {
-        let edge = false;
-        for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) edge ||= at(x + ox, y + oy) >= 0;
-        if (edge) p.set(x, y, K.outline);
-        continue;
-      }
+      if (k < 0) continue;
       const [cx, cy, r, tones] = chunks[k];
       const crease = [at(x + 1, y), at(x, y + 1)].some((o) => o >= 0 && o !== k);
       const lean = x + 0.5 - cx + (y + 0.5 - cy);
@@ -490,8 +490,6 @@ const chunk = (p: Pix, cx: number, cy: number, r: number, tones: readonly number
 function beam(p: Pix, x: number, y: number, len: number, [dx, dy]: Pt) {
   const along: Pt[] = [];
   for (let i = 0; i < len; i++) along.push([x + dx * i, y + dy * i]);
-  for (const [bx, by] of along)
-    for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) p.set(bx + ox, by + oy, K.outline);
   along.forEach(([bx, by], i) => p.set(bx, by, i % 3 === 1 ? K.rafter : K.rafterDark));
 }
 
@@ -571,7 +569,7 @@ const DAMAGE: ((p: Pix) => void)[] = [
 /** The fallen keep as `KEEP × KEEP` RGBA pixels: scorched flagstones,
  * stumps of the curtain wall and turrets, and a heap of stone, slate and
  * charred beams where the great tower stood, a few embers still in it. */
-export function keepRubblePixels(): Uint32Array {
+function drawnKeepRubblePixels(): Uint32Array {
   const n = KEEP, whole = pixels(wholeKeep()), out = new Uint32Array(n * n), p = pixels(out);
   const ring = (x: number, y: number) => Math.min(x - 1, y - 1, n - 2 - x, n - 2 - y);
   for (let y = 1; y < n - 1; y++)
@@ -601,7 +599,7 @@ export function keepRubblePixels(): Uint32Array {
     for (let x = 0; x < n; x++) {
       if (!part(x, y) || !stands(x, y)) continue;
       const end = ORTHO4.some(([dx, dy]) => part(x + dx, y + dy) && !stands(x + dx, y + dy));
-      p.set(x, y, end ? K.outline : whole.get(x, y));
+      p.set(x, y, end || whole.get(x,y)===K.outline ? K.stone[0] : whole.get(x, y));
     }
   // Fallen stone along the walls, then the heap over the great tower.
   const fallen: Chunk[] = [];
@@ -637,7 +635,7 @@ onPixelArt(() => {
 
 /** Pale damage overlay with exactly the keep sprite's silhouette. */
 export function paintKeepFlash(c: CanvasRenderingContext2D, { x, y, w, h }: ArtBox, alpha: number) {
-  keepFlashSprite ??= spriteCanvas(bare(keepPixels(), KEEP, KEEP).map(v => v ? rgba(0xfff4dc) : 0), KEEP, KEEP);
+  keepFlashSprite ??= spriteCanvas(keepPixels().map(v => v ? rgba(0xfff4dc) : 0), KEEP, KEEP, undefined, false);
   c.save();
   c.imageSmoothingEnabled = false;
   c.globalAlpha = alpha;
@@ -715,16 +713,16 @@ export function flagPixels(t: number, reduceMotion: boolean, blue = false, face?
     for (let x = 0; x < FLAG_W; x++) {
       const v = cloth[y * FLAG_W + x];
       if (v) out[y * FLAG_W + x] = rgba(colors ? custom[y*FLAG_W+x] : v > 3 ? band[v - 4] : field[v - 1]);
-      else if (edge(x, y)) out[y * FLAG_W + x] = rgba(K.outline);
+
     }
   // The pole's cap: two by two gold pixels in an outline, over the cloth's
   // hoist.
   for (let y = POLE - 2; y < POLE + 2; y++)
     for (let x = POLE - 2; x < POLE + 2; x++) {
       const rim = x === POLE - 2 || y === POLE - 2 || x === POLE + 1 || y === POLE + 1;
-      out[y * FLAG_W + x] = rgba(rim ? K.outline : x === POLE - 1 && y === POLE - 1 ? 0xf6e2a8 : K.finial);
+      if (!rim) out[y * FLAG_W + x] = rgba(x === POLE - 1 && y === POLE - 1 ? 0xf6e2a8 : K.finial);
     }
-  return out;
+  return !face && !burn && unfurl===1 ? sourcePixels(ART_NAMES.banner(blue,Math.floor(t*12)%12),FLAG_W,FLAG_H,()=>out) : out;
 }
 
 let flagCanvas: HTMLCanvasElement | null = null;
@@ -736,7 +734,7 @@ export function drawFlag(c: CanvasRenderingContext2D, px: number, pose: FlagPose
   const s = px / ART;
   c.save();
   c.imageSmoothingEnabled = false;
-  c.drawImage(flagCanvas, pose.x - POLE * s, pose.y - POLE * s + (pose.rise ?? 0)*px, FLAG_W * s, FLAG_H * s);
+  drawSprite(c, flagCanvas, pose.x - POLE * s, pose.y - POLE * s + (pose.rise ?? 0)*px, FLAG_W * s, FLAG_H * s);
   c.restore();
 }
 
@@ -746,7 +744,7 @@ function paintBannerIcon(c: CanvasRenderingContext2D, n: number) {
   const x0 = POLE - 3, y0 = POLE - 6, w = 18, h = 14;
   const sprite = spriteCanvas(flagPixels(0.3, false), FLAG_W, FLAG_H);
   const s = Math.floor((n * 0.95) / w);
-  c.drawImage(sprite, x0, y0, w, h, (n - w * s) / 2, (n - h * s) / 2, w * s, h * s);
+  c.drawImage(sprite, x0 + 1, y0 + 1, w, h, (n - w * s) / 2, (n - h * s) / 2, w * s, h * s);
 }
 
 /** The war banner where the player planted it: the keep's banner on a
@@ -781,6 +779,8 @@ export function drawRallyFlag(
   c.save();
   c.imageSmoothingEnabled = false;
   c.globalAlpha = pose.alpha ?? 1;
-  c.drawImage(rallyCanvas, x - POLE * s, y - POLE * s, FLAG_W * s, FLAG_H * s);
+  drawSprite(c, rallyCanvas, x - POLE * s, y - POLE * s, FLAG_W * s, FLAG_H * s);
   c.restore();
 }
+
+export const keepRubblePixels=()=>sourcePixels(ART_NAMES.rubble(ART_NAMES.keep),KEEP,KEEP,drawnKeepRubblePixels);

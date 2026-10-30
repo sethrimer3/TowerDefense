@@ -8,7 +8,7 @@ const later = AREAS.slice(1).map(a => a.id);
 const hashOf = (px: Uint32Array) => px.reduce((h, v) => (Math.imul(h, 31) + v) | 0, 7);
 
 test('every area after the first draws its own wall, Mossbound Ruins keeps its sprites', () => {
-  assert.equal(hasWallArt('moss'), false);
+  assert.equal(hasWallArt('moss'), true, 'Mossbound uses replaceable native-grid wall sources too');
   assert.equal(wallRubbleTones('moss'), null);
   for (const id of later) assert.ok(hasWallArt(id), id);
 });

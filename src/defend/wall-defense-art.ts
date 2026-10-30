@@ -1,3 +1,6 @@
+import { drawPike } from "./weapon-art.ts";
+import { sourcePixels } from "./sprite-source.ts";
+import { drawSmall } from "./small-art.ts";
 /** The wall's own defenses as pixel art at `ART` pixels a cell, in black
  * outlines like the rest of the city. Wall spikes are a row of iron-shod
  * oak stakes on a beam along the wall's outer face, pointing out of the
@@ -64,7 +67,7 @@ export function spikePixels(side: Side, seed = 0): Uint32Array {
   for (let v = 0; v < ART; v++)
     for (let u = 0; u < ART; u++) {
       const k = STAKES[v][u];
-      if (k === ".") continue;
+      if (k === "." || k === "K") continue;
       const g = hash(seed, u, v, 41) % 7;
       const c =
         k === "K" ? OUTLINE
@@ -76,7 +79,7 @@ export function spikePixels(side: Side, seed = 0): Uint32Array {
       const [x, y] = turn(side, u, v);
       out[y * ART + x] = rgba(c);
     }
-  return out;
+  return artOverride(ART_NAMES.spike(side,seed),ART,ART) ?? out;
 }
 
 /** Where (u along the stone, v from the tips in) lands for `side`. */
@@ -110,12 +113,9 @@ export function drawSpikeThrusts(c: CanvasRenderingContext2D, px: number, map: C
       for (const u of [-2, 2]) {
         // Along the wall `u` art pixels from the stone's middle; out from its face.
         const at = (a: number): [number, number] => [x0 + (dy ? u : 0) / ART + (dx * (ART / 2 + a)) / ART, y0 + (dx ? u : 0) / ART + (dy * (ART / 2 + a)) / ART];
-        c.fillStyle = "#0b0907";
-        for (let a = 0; a <= len + 1; a++) dot(...at(a), 1);
-        for (let a = 0; a <= len + 1; a++) {
-          c.fillStyle = a >= len - 1 ? "#cfcfd6" : a % 3 === 0 ? "#4a4a52" : "#7a7a84";
-          dot(...at(a));
-        }
+        const [x,y]=at(0);
+        drawPike(c,px,row.side,len,x,y);
+
       }
     }
   }
@@ -140,7 +140,7 @@ export function bastionPixels(stage = 0, seed = 0): Uint32Array {
       const ring = x === 1 || y === 1 || x === N - 2 || y === N - 2;
       const r = Math.sqrt((x - c) * (x - c) + (y - c) * (y - c));
       let k: number;
-      if (edge) k = LINE;
+      if (edge) continue;
       else if (ring) k = (x + y) % 3 === 0 ? CRENEL : hash(seed, x, y, 5) % 7 === 0 ? MOSS : MERLON;
       else if (x === 2 || y === 2 || x === N - 3 || y === N - 3) k = STONE_M;
       else if (r < 3.2) k = r > 2.3 ? LINE : PLATE;
@@ -154,6 +154,7 @@ export function bastionPixels(stage = 0, seed = 0): Uint32Array {
   for (let y = 0; y < N; y++)
     for (let x = 0; x < N; x++) {
       const k = m[y * N + x];
+      if (k === NONE) continue;
       const lit = at(x - 1, y) === LINE || at(x, y - 1) === LINE ? 2 : at(x + 1, y) === LINE || at(x, y + 1) === LINE ? 0 : 1;
       const grain = hash(seed, x, y, 9) % 5;
       let col: number;
@@ -179,7 +180,7 @@ export function bastionPixels(stage = 0, seed = 0): Uint32Array {
 }
 
 /** A fallen bastion: a heap of stone and splintered timber. */
-export function bastionRubblePixels(seed = 0): Uint32Array {
+function drawnBastionRubblePixels(seed = 0): Uint32Array {
   return rubblePixels(N, N, hash(seed, 0xba2), { x0: 0, y0: 0, x1: N - 1, y1: N - 1, stone: STONE, top: TONE.oak, beams: true });
 }
 
@@ -225,7 +226,7 @@ function drawnBallista(dir: number, loaded: boolean): Uint32Array {
       }
       if (loaded && Math.abs(ac) <= 0.55 && al >= -3 && al <= 9) k = al >= 7 ? HEAD : SHAFT;
       if (loaded && al >= 7 && al <= 8.5 && Math.abs(ac) <= 1.3 - (al - 7) * 0.6) k = HEAD;
-      if (Math.sqrt(px * px + py * py) <= 1.1) k = INK;
+      if (Math.sqrt(px * px + py * py) <= 1.1) k = IRON;
       m[y * S + x] = k;
     }
   const out = new Uint32Array(S * S);
@@ -233,13 +234,7 @@ function drawnBallista(dir: number, loaded: boolean): Uint32Array {
   for (let y = 0; y < S; y++)
     for (let x = 0; x < S; x++) {
       const k = m[y * S + x];
-      if (!k) {
-        // The outline: every empty pixel beside the ballista (the string
-        // excepted, which stays a fine line).
-        const near = [at(x - 1, y), at(x + 1, y), at(x, y - 1), at(x, y + 1)].some((n) => n && n !== STRING);
-        if (near) out[y * S + x] = rgba(OUTLINE);
-        continue;
-      }
+      if (!k) continue;
       // Lit from the upper left: a pixel with empty space up or left of it
       // catches the light, one with space down or right falls into shade.
       const lit = !at(x - 1, y) || !at(x, y - 1) ? 2 : !at(x + 1, y) || !at(x, y + 1) ? 0 : 1;
@@ -300,15 +295,9 @@ const OUTWARD = { n: [0, -1], e: [1, 0], s: [0, 1], w: [-1, 0] } as const;
  * (a burning one's head aflame), `scale` times the usual length, in art
  * pixels snapped to whole screen pixels. */
 function drawBolt(c: CanvasRenderingContext2D, px: number, x: number, y: number, dx: number, dy: number, scale: number, burning: boolean) {
-  const p = Math.max(1, Math.round(px / ART));
-  const dot = (along: number, grow = 0) => {
-    const ax = (x + (dx * along * scale) / ART) * px, ay = (y + (dy * along * scale) / ART) * px;
-    c.fillRect(Math.round(ax / p) * p - grow * p, Math.round(ay / p) * p - grow * p, p * (1 + 2 * grow), p * (1 + 2 * grow));
-  };
-  c.fillStyle = "#0b0907";
-  for (let a = -9; a <= 4; a++) dot(a, 1);
-  for (let a = -9; a <= 4; a++) {
-    c.fillStyle = a >= 2 ? (burning ? (a >= 4 ? "#ffd36b" : "#f07a28") : "#9a9aa2") : a <= -7 ? "#d8cfb4" : "#a07a48";
-    dot(a);
-  }
+  drawSmall(c,px,"wall-bolt",Math.round(ballistaDir(dx,dy)/2)%16+(burning?16:0),x,y,scale);
+}
+
+export function bastionRubblePixels(seed = 0):Uint32Array {
+  return sourcePixels(ART_NAMES.rubble(ART_NAMES.bastion),N,N,()=>drawnBastionRubblePixels(seed));
 }

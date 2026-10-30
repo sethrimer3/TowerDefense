@@ -1,3 +1,4 @@
+import { drawSprite, spriteSize } from "./damage-art.ts";
 /** Shared tools for the battle's effects drawn as pixel art at `ART` pixels
  * a cell, like the parks, the keep and the blazes: a pen that fills art
  * pixels snapped to whole screen pixels at any zoom, a blitter for baked
@@ -37,7 +38,8 @@ export function puff(dot: ReturnType<typeof artPen>, x: number, y: number, r: nu
  * art pixel (ax, ay), without smoothing. */
 export function blit(c: Ctx, px: number, img: HTMLCanvasElement, ax: number, ay: number) {
   const u = px / ART;
-  c.drawImage(img, ax * u, ay * u, img.width * u, img.height * u);
+  const {w,h}=spriteSize(img);
+  drawSprite(c,img,ax*u,ay*u,w*u,h*u);
 }
 
 /** A canvas `w` × `h` art pixels for baking a sprite into. */

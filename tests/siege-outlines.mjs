@@ -20,11 +20,11 @@ try {
       };
       const rows = [...document.querySelectorAll('#gallery canvas')].map(canvas => ({ red: count(canvas, ENEMY_INK), blue: count(canvas, FRIEND_INK) }));
       const sprite = document.createElement('canvas'); sprite.width = sprite.height = 3;
-      const p = sprite.getContext('2d'); p.fillStyle = '#000'; p.fillRect(0, 0, 3, 3); p.fillStyle = '#00ff00'; p.fillRect(1, 1, 1, 1);
+      const p = sprite.getContext('2d'); p.fillStyle = '#00ff00'; p.fillRect(1, 1, 1, 1);
       const checks = [];
       for (const merged of [true, false]) {
         const canvas = document.createElement('canvas'); canvas.width = 16; canvas.height = 8;
-        const c = canvas.getContext('2d'), outlines = new UnitOutline(), layer = outlines.begin(c, merged);
+        const c = canvas.getContext('2d'), outlines = new UnitOutline(), layer = outlines.begin(c, merged, 1);
         for (const [x, ink] of [[1, FRIEND_INK], [6, ENEMY_INK]]) { outlines.ink(ink); layer.units.drawImage(sprite, x, 1); }
         outlines.end(c);
         checks.push({ blue: [...c.getImageData(1, 1, 1, 1).data].slice(0, 3), red: [...c.getImageData(6, 1, 1, 1).data].slice(0, 3), body: [...c.getImageData(2, 2, 1, 1).data].slice(0, 3) });

@@ -1,3 +1,4 @@
+import { sourcePixels } from "./sprite-source.ts";
 /** A wooden fence gate as pixel art at `ART` pixels a cell: two stout posts
  * on the fence line with a plank door leaf hung on each, braced and banded,
  * swinging inward (`frame` 0 shut to `GATE_FRAMES - 1` wide open). Drawn
@@ -65,7 +66,7 @@ export function woodGatePixels(side: Side, frame = 0, stage = 0, seed = 0): Uint
 }
 
 /** A fallen wooden gate: a heap of broken planks along the fence line. */
-export function woodGateRubblePixels(side: Side, seed = 0): Uint32Array {
+function drawnWoodGateRubblePixels(side: Side, seed = 0): Uint32Array {
   const { w, h } = turn(side);
   const across = side === "e" || side === "w";
   const x0 = across ? MID - 4 : 0, y0 = across ? 0 : MID - 4, x1 = across ? MID + 3 : w - 1, y1 = across ? h - 1 : MID + 3;
@@ -113,7 +114,7 @@ function colour(m: Uint8Array, w: number, h: number, seed: number): Uint32Array 
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
       const k = m[y * w + x];
-      if (k === NONE) continue;
+      if (k === NONE || (k === LINE && (at(x - 1, y) <= LINE || at(x + 1, y) <= LINE || at(x, y - 1) <= LINE || at(x, y + 1) <= LINE))) continue;
       const lit = at(x - 1, y) === LINE || at(x, y - 1) === LINE ? 2 : at(x + 1, y) === LINE || at(x, y + 1) === LINE ? 0 : 1;
       const grain = hash(seed, x, y, 13) % 5;
       let c: number;
@@ -144,4 +145,8 @@ export function gateArtRect(b: Building): Rect {
   const off = (deep - depth) / 2, along = length < long ? (long - length) / 2 : 0, l = Math.max(length, long);
   if (!off && !along) return r;
   return across ? { x: r.x - off, y: r.y - along, w: deep, h: l } : { x: r.x - along, y: r.y - off, w: l, h: deep };
+}
+
+export function woodGateRubblePixels(side: Side, seed = 0):Uint32Array {
+  return sourcePixels(ART_NAMES.rubble(ART_NAMES.woodGate(side,0)),turn(side).w,turn(side).h,()=>drawnWoodGateRubblePixels(side,seed));
 }

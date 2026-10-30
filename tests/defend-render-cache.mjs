@@ -4,9 +4,7 @@ import assert from 'node:assert/strict';
 import { makeReference } from './defend-render-reference.mjs';
 import { writeFileSync } from 'node:fs';
 const referenceRoot=makeReference();
-// Keep the optimization references, but compare combat to the art before Siege sides.
-const combatRoot=makeReference(process.env.PERF_REF || '0555c7d');
-// Main deliberately revised torchlit edge thickness/strength in #194.
+// Freeze main's current inner-rim lighting math; feed it today's source masks.
 const lightingRoot=makeReference('c10cafb');
 const browser = await chromium.launch(process.env.PLAYWRIGHT_EXECUTABLE
   ? { headless: true, executablePath: process.env.PLAYWRIGHT_EXECUTABLE }
@@ -17,17 +15,13 @@ try {
   await page.addInitScript(()=>{ globalThis.__pinnedSeeds={defend:3182828918,game:3887091088}; });
   await page.goto((process.env.TEST_URL || 'http://127.0.0.1:5173/')+'tests/performance.html');
   page.on('console',msg=>{if(msg.text().startsWith('Sparse lightning'))console.log(msg.text());});
-  const results = await page.evaluate(async ({referenceRoot,combatRoot,lightingRoot}) => {
+  const results = await page.evaluate(async ({referenceRoot,lightingRoot}) => {
     const {GroundRelief}=await import('/src/defend/ground-relief.ts');
     const {GroundRelief:ReferenceRelief}=await import(`${referenceRoot}/ground-relief.ts`);
     const {DefendRenderer}=await import('/src/defend/render.ts');
     const {stressScene}=await import('/tests/defend-stress-scene.ts');
     const {drawBlazes}=await import('/src/defend/mage-art.ts');
     const {drawBlazes:referenceBlazes}=await import(`${referenceRoot}/mage-art.ts`);
-    const referenceBattle=await import(`${combatRoot}/battle-art.ts`);
-    const currentBattle=await import('/src/defend/battle-art.ts');
-    const {WizardArt:ReferenceWizard}=await import(`${combatRoot}/wizard-art.ts`);
-    const {drawBlazes:combatBlazes}=await import(`${combatRoot}/mage-art.ts`);
     const {map,sim}=stressScene(100);
     const make=(w=504,h=728)=>{const c=document.createElement('canvas');c.width=w;c.height=h;return c;};
     const compare=(a,b)=>{
@@ -119,8 +113,7 @@ try {
         reports.push({check:'scorch',px,time,...compare(a,b)});
       }
     }
-    // Pin the intentional art-based occlusion/rim-lighting appearance from
-    // main #194/#195, rather than the superseded whole-cell shadow model. Exact
+    // Pin main's art-based occlusion and inner-rim lighting. Exact
     // parity is required, including its actual building body/rim masks.
     const {DefendLighting,MASK}=await import('/src/defend/lighting.ts');
     const {DefendLighting:ReferenceLighting}=await import(`${lightingRoot}/lighting.ts`);
@@ -168,28 +161,8 @@ try {
     for(const [zoom,x,y] of [[1,0,0],[2.5,-300,-500]]){
       Object.assign(r.cam,{s:zoom,x,y});
       r.draw(map,sim,null,opts);const a=capture();
-      const original=make(canvas.width,canvas.height),fresh=make(canvas.width,canvas.height);
-      for(const cv of [original,fresh]){
-        const g=cv.getContext('2d');g.setTransform(zoom,0,0,zoom,x,y);g.imageSmoothingEnabled=false;
-      }
-      const g=original.getContext('2d'),brush={c:g,px:r.px};
-      referenceBattle.drawScorches(brush,sim);
-      combatBlazes(g,r.px,sim);
-      const {flameLights}=await import('/src/defend/wizard-art.ts');
-      const oldWizard=new ReferenceWizard();
-      Object.assign(oldWizard,{clusters:r.wizard.clusters,fire:r.wizard.fire,glints:r.wizard.glints});
-      oldWizard.drawIce(g,r.px,sim.frosts,sim.time*1000,flameLights(sim).relief);
-      referenceBattle.drawUnits(brush,sim,()=>1,true,undefined,{reduceMotion:opts.reduceMotion});
-      r.dark.draw(g,r.px,sim);
-      // The public legacy painter remains compatible. Production intentionally
-      // has the new half-art-pixel visibility contours, so compare that cache
-      // against a fresh current paint rather than the old artwork.
-      const f=fresh.getContext('2d'),currentBrush={c:f,px:r.px};
-      currentBattle.drawScorches(currentBrush,sim); combatBlazes(f,r.px,sim);
-      r.wizard.drawIce(f,r.px,sim.frosts,sim.time*1000,flameLights(sim).relief);
-      currentBattle.drawUnits(currentBrush,sim,()=>1,true,undefined,{reduceMotion:opts.reduceMotion});
-      r.dark.draw(f,r.px,sim);
-      reports.push({check:'legacy combat pixels',zoom,...compare(original,fresh)});
+      // Source outlines intentionally changed. Compare a fresh current paint
+      // against production's cached combat, including current unit contours.
       const cached=make(canvas.width,canvas.height),directCombat=make(canvas.width,canvas.height);
       cached.getContext('2d').drawImage(r.combatLayer,0,0);
       const dc=directCombat.getContext('2d');dc.setTransform(zoom,0,0,zoom,x,y);dc.imageSmoothingEnabled=false;
@@ -224,7 +197,7 @@ try {
     r.combatKey='';r.draw(map,sim,null,opts);
     reports.push({check:'resize and healthbars',...compare(resized,capture())});
     return reports;
-  },{referenceRoot,combatRoot,lightingRoot});
+  },{referenceRoot,lightingRoot});
   writeFileSync('test-results/render-cache.json',JSON.stringify(results,null,2));
   console.table(results);
   for(const result of results){

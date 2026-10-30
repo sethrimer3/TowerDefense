@@ -10,6 +10,12 @@ export function makeReference(ref = process.env.PERF_REF || '3b9f8a9', variant =
     const later = file === 'lighting.ts' || file === 'park-trees.ts';
     const current = variant && (variant === 'light' || (!later && (file === 'ground-relief.ts' || (variant === 'scorch' && file === 'mage-art.ts') || (variant === 'combat' && file !== 'pixel-fx.ts'))));
     let source = current ? readFileSync(`src/defend/${file}`, 'utf8') : execFileSync('git', ['show', `${ref}:src/defend/${file}`], { encoding: 'utf8' });
+    // Frozen tree shading uses today's source art and its explicit outside
+    // padding. Keep the full-canvas reference algorithm, only adapt its blit.
+    if (file === 'park-trees.ts') {
+      source = 'import { drawSprite } from "./damage-art.ts";\n' + source;
+      source = source.replace('target.drawImage(t.canvas,', 'drawSprite(target, t.canvas,');
+    }
     source = source.replace(/from "\.\.\/(.*?)"/g, 'from "../../src/$1"');
     source = source.replace(/from "\.\/(.*?)"/g, (_, path) => `from "${files.includes(path) ? './' : '../../src/defend/'}${path}"`);
     sources.set(file, source);

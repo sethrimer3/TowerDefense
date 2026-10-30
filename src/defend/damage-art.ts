@@ -120,9 +120,9 @@ function chip(p: Pix, seed: number) {
   for (let k = 0; k < 60; k++) {
     const x = Math.floor(hash01(seed, k, 6) * p.w), y = Math.floor(hash01(seed, k, 7) * p.h);
     if (!body(p, x, y)) continue;
-    const toward = ORTHO.find(([ox, oy]) => p.get(x + ox, y + oy) === OUTLINE && p.get(x + ox * 2, y + oy * 2) < 0);
+    const toward = ORTHO.find(([ox, oy]) => p.get(x + ox, y + oy) < 0);
     if (!toward) continue;
-    p.set(x, y, OUTLINE);
+    p.set(x, y, SOOT);
     if (body(p, x - toward[0], y - toward[1])) p.set(x - toward[0], y - toward[1], shade(p.get(x - toward[0], y - toward[1]), 0.6));
     return;
   }
@@ -148,7 +148,7 @@ export type Chunk = readonly [number, number, number, readonly number[]];
 
 /** Fallen chunks heaped together, later ones over earlier: each lit from
  * the upper left with a dark crease where it meets the next, and one black
- * outline round the whole pile. */
+ * silhouette later ringed by the shared sprite renderer. */
 export function pile(p: Pix, chunks: readonly Chunk[]) {
   const { w, h } = p, id = new Int16Array(w * h).fill(-1);
   const at = (x: number, y: number) => (x >= 0 && y >= 0 && x < w && y < h ? id[y * w + x] : -1);
@@ -160,12 +160,7 @@ export function pile(p: Pix, chunks: readonly Chunk[]) {
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
       const k = id[y * w + x];
-      if (k < 0) {
-        let edge = false;
-        for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) edge ||= at(x + ox, y + oy) >= 0;
-        if (edge) p.set(x, y, OUTLINE);
-        continue;
-      }
+      if (k < 0) continue;
       const [cx, cy, r, tones] = chunks[k];
       const crease = [at(x + 1, y), at(x, y + 1)].some((o) => o >= 0 && o !== k);
       const lean = x + 0.5 - cx + (y + 0.5 - cy);
@@ -175,8 +170,6 @@ export function pile(p: Pix, chunks: readonly Chunk[]) {
 
 /** A charred beam from (x, y), `len` pixels along (dx, dy), outlined. */
 export function beam(p: Pix, x: number, y: number, len: number, dx: number, dy: number) {
-  for (let i = 0; i < len; i++)
-    for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) p.set(x + dx * i + ox, y + dy * i + oy, OUTLINE);
   for (let i = 0; i < len; i++) p.set(x + dx * i, y + dy * i, RAFTER[i % 3 === 1 ? 1 : 0]);
 }
 
@@ -286,7 +279,7 @@ export function rubblePixels(w: number, h: number, seed: number, r: Ruin): Uint3
       if (!stands(x, y)) continue;
       const end = ORTHO.some(([dx, dy]) => wall(x + dx, y + dy) && !stands(x + dx, y + dy));
       const outer = rimDepth(x, y) === 0;
-      p.set(x, y, end || outer ? OUTLINE : x + y < cx + cy ? r.stone[2] : r.stone[1]);
+      p.set(x, y, end ? r.stone[0] : x + y < cx + cy ? r.stone[2] : r.stone[1]);
     }
   // The heap: stone and roofing, biggest first, over a beam or two.
   const span = rad - 1.5;
@@ -369,8 +362,8 @@ const DARK = 48;
 
 /** `px` (`w` × `h` art pixels) without its outline: every near-black opaque
  * pixel with a clear pixel or the sprite's edge beside it, cleared. Inner
- * lines stay. Pure: what the export hands an artist, and what `inked` draws
- * a fresh outline round. */
+ * lines stay. Legacy compatibility only: never used by rendering or export,
+ * because dark materials must be preserved. */
 export function bare(px: Uint32Array, w: number, h: number): Uint32Array {
   const out = px.slice();
   const solid = (x: number, y: number) => x >= 0 && y >= 0 && x < w && y < h && px[y * w + x] >>> 24 >= 128;
@@ -383,68 +376,109 @@ export function bare(px: Uint32Array, w: number, h: number): Uint32Array {
   return out;
 }
 
-/** `px` (`w` × `h` art pixels) with a one-art-pixel outline: every opaque
- * pixel with a clear pixel or the sprite's edge beside it turned `ink`.
- * Pure: what an artist's outline-free sprite gets when it is loaded, so it
- * matches the drawn art's own rims. */
-export function rimmed(px: Uint32Array, w: number, h: number, ink = OUTLINE): Uint32Array {
-  const out = px.slice(), line = rgba(ink);
-  const solid = (x: number, y: number) => x >= 0 && y >= 0 && x < w && y < h && px[y * w + x] >>> 24 >= 128;
-  for (let y = 0; y < h; y++)
-    for (let x = 0; x < w; x++)
-      if (solid(x, y) && (!solid(x - 1, y) || !solid(x + 1, y) || !solid(x, y - 1) || !solid(x, y + 1))) out[y * w + x] = line;
-  return out;
+/** An outside silhouette ring. The body retains its pixels and origin; padding
+ * belongs to the renderer, never the logical footprint. Fractional widths use
+ * a finer lattice (units normally use UnitContours instead). */
+export type Outline = { ink?: number; width?: number; joins?: readonly ("n"|"e"|"s"|"w")[] };
+export function outlinePixels(px: Uint32Array, w: number, h: number, ink = OUTLINE, width = 1, joins: Outline["joins"] = []) {
+  if (px.length !== w * h || width < 0 || !Number.isFinite(width)) throw new Error("Invalid sprite dimensions or outline width");
+  const scale = Number.isInteger(width) ? 1 : 2;
+  if (!Number.isInteger(width * scale)) throw new Error("Outline widths must be whole or half art pixels");
+  const pad = width * scale, W = w * scale + pad * 2, H = h * scale + pad * 2;
+  const data = new Uint32Array(W * H), line = rgba(ink);
+  // Stamp the ring from opaque body pixels, then copy the original body on
+  // top. Faint shadows/auras are retained but never grow a black silhouette.
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (px[y * w + x] >>> 24 < 128) continue;
+    for (let dy = -pad; dy < scale + pad; dy++) for (let dx = -pad; dx < scale + pad; dx++)
+      data[(y * scale + pad + dy) * W + x * scale + pad + dx] = line;
+  }
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++)if((joins.includes("w")&&x<pad)||(joins.includes("e")&&x>=pad+w*scale)||(joins.includes("n")&&y<pad)||(joins.includes("s")&&y>=pad+h*scale))data[y*W+x]=0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const v = px[y * w + x];
+    if (!v) continue;
+    for (let dy = 0; dy < scale; dy++) for (let dx = 0; dx < scale; dx++) {
+      const i = (y * scale + pad + dy) * W + x * scale + pad + dx;
+      if (v >>> 24 >= 128 || !data[i]) data[i] = v;
+    }
+  }
+  return { data, w: W, h: H, pad, scale };
 }
 
 /** What `drawSprite` draws while a mask of the city is painted: sprites'
- * bodies (their own rims included), or the outlines drawn apart from any
- * sprite (the standing wall's) alone (`withMask`), or everything (null). */
+ * outline-free bodies, or their shared outside rings and the standing wall's
+ * joined outline alone (`withMask`), or everything (null). */
 export type MaskMode = "body" | "rim";
 let mask: MaskMode | null = null;
 
 /** Runs `paint` with `drawSprite` drawing sprites (for the body mask) or
- * leaving them out (for the outline mask): what the lighting keeps dark
+ * their rings alone (for the outline mask): what the lighting keeps dark
  * under roofs and lights up along their edges. */
 export function withMask(mode: MaskMode, paint: () => void) {
+  const previous=mask;
   mask = mode;
   try {
     paint();
   } finally {
-    mask = null;
+    mask = previous;
   }
 }
 export const maskMode = () => mask;
 
-/** A canvas of `px` (`w` × `h` art pixels). */
-export function spriteCanvas(px: Uint32Array, w: number, h: number, cv = document.createElement("canvas")) {
-  cv.width = w;
-  cv.height = h;
-  const c = cv.getContext("2d")!;
-  const img = c.createImageData(w, h);
-  new Uint32Array(img.data.buffer).set(px);
-  c.putImageData(img, 0, 0);
+type SpriteInfo = { body: HTMLCanvasElement; rim: HTMLCanvasElement; w: number; h: number; width: number };
+const spriteInfo = new WeakMap<HTMLCanvasElement, SpriteInfo>();
+
+function upload(px: Uint32Array, w: number, h: number, cv = document.createElement("canvas")) {
+  cv.width = w; cv.height = h;
+  const c = cv.getContext("2d")!, img = c.createImageData(w, h);
+  new Uint32Array(img.data.buffer).set(px); c.putImageData(img, 0, 0);
   return cv;
 }
 
-/** A cached canvas of `w × h` art pixels made by `make` (null outside a
- * browser), keyed by `key`. */
-export function sprite(key: string, w: number, h: number, make: () => Uint32Array): HTMLCanvasElement | null {
+/** A source canvas and its shared outside ring. Use false for joined tiles,
+ * overlays, shadows and units (whose union gets UnitContours). */
+export function spriteCanvas(px: Uint32Array, w: number, h: number, cv = document.createElement("canvas"), outline: Outline | false = {}) {
+  if (outline === false || outline.width === 0) { spriteInfo.delete(cv); return upload(px, w, h, cv); }
+  const width = outline.width ?? 1, art = outlinePixels(px, w, h, outline.ink ?? OUTLINE, width, outline.joins);
+  const previous=spriteInfo.get(cv);
+  const body = upload(px, w, h,previous?.body);
+  const ring = art.data.slice();
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (px[y * w + x] >>> 24 >= 128)
+    for (let dy = 0; dy < art.scale; dy++) for (let dx = 0; dx < art.scale; dx++)
+      ring[(y * art.scale + art.pad + dy) * art.w + x * art.scale + art.pad + dx] = 0;
+  for(let i=0;i<ring.length;i++)if(ring[i]>>>24<128)ring[i]=0;
+  const rim = upload(ring, art.w, art.h,previous?.rim);
+  upload(art.data, art.w, art.h, cv);
+  spriteInfo.set(cv, { body, rim, w, h, width });
+  return cv;
+}
+
+/** Cache includes outline style; make always returns outline-free art. */
+export function sprite(key: string, w: number, h: number, make: () => Uint32Array, outline: Outline | false = {}): HTMLCanvasElement | null {
   if (typeof document === "undefined") return null;
+  key += outline === false ? ":body" : `:outline:${outline.ink ?? OUTLINE}:${outline.width ?? 1}:${outline.joins?.join("") ?? ""}`;
   let cv = cache.get(key);
   if (!cv) {
     if (cache.size > 4000) cache.clear();
-    cv = spriteCanvas(make(), w, h);
-    cache.set(key, cv);
+    cv = spriteCanvas(make(), w, h, undefined, outline); cache.set(key, cv);
   }
   return cv;
 }
 
-/** Draws a sprite up over a box of canvas pixels, smoothing off. */
+/** Draw the body in its original box, with the ring outside. The same
+ * metadata supplies separate body/rim masks for lighting and silhouette
+ * consumers, so padding never rescales or translates the art. */
 export function drawSprite(c: CanvasRenderingContext2D, cv: HTMLCanvasElement | null, x: number, y: number, w: number, h: number) {
-  // A mask of the outlines leaves sprites out: their rims are their own.
-  if (!cv || mask === "rim") return;
-  c.save();
-  c.imageSmoothingEnabled = false;
-  c.drawImage(cv, x, y, w, h);
+  if (!cv) return;
+  const info = spriteInfo.get(cv);
+  if (mask === "rim" && !info) return;
+  c.save(); c.imageSmoothingEnabled = false;
+  if (info && mask !== "body") {
+    const dx = w / info.w * info.width, dy = h / info.h * info.width;
+    c.drawImage(mask === "rim" ? info.rim : cv, x - dx, y - dy, w + 2 * dx, h + 2 * dy);
+  } else c.drawImage(info?.body ?? cv, x, y, w, h);
   c.restore();
 }
+
+/** Source dimensions, excluding a procedural outline's padding. */
+export function spriteSize(cv: HTMLCanvasElement) { const info=spriteInfo.get(cv); return info ? {w:info.w,h:info.h} : {w:cv.width,h:cv.height}; }

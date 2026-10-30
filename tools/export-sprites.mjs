@@ -15,6 +15,7 @@ const browser = await chromium.launch({
 });
 try {
   const page = await browser.newPage();
+  page.setDefaultNavigationTimeout(120_000);
   await page.goto(new URL("tools/sprite-export.html", base).href);
   await page.waitForFunction(() => window.artExport, null, { timeout: 60_000 });
   const pieces = await page.evaluate(() => window.artExport);

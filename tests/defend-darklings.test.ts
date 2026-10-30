@@ -6,7 +6,7 @@ import { generateCity } from '../src/defend/citygen.ts';
 import { defaultLayout, fitLayout } from '../src/defend/layout.ts';
 import { buildWave, buildDifficultyWave, waveDifficulty, MAX_WAVE_ENEMIES } from '../src/defend/waves.ts';
 import { DarkDensity, drainFalloff, DRAIN_W, DRAIN_H } from '../src/defend/dark-drain.ts';
-import { drawEnemyArt } from '../src/defend/battle-art.ts';
+import { basicUnitPixels } from '../src/defend/basic-unit-art.ts';
 import { drawSimpleEnemies } from '../src/defend/simple-units.ts';
 import { defaultDefendSave, decodeDefendSave } from '../src/defend/progress.ts';
 import { journalHTML } from '../src/defend/journal.ts';
@@ -67,9 +67,11 @@ test('one to four art-pixel bodies stay plain black in normal and Simple setting
       const boxes: number[][] = [];
       const c = { fillStyle: '', fillRect(...args: number[]) { assert.equal(this.fillStyle, '#000000'); boxes.push(args); }, rect(...args: number[]) { assert.equal(this.fillStyle, '#000000'); boxes.push(args); }, beginPath() {}, fill() {} } as unknown as CanvasRenderingContext2D;
       const e = { ...crowd(1, kind, 10, 10)[0], flash: 1, marked: true };
-      drawEnemyArt({ c, px }, e, { time: 0 } as DefendSim);
+      const source = basicUnitPixels(kind, true);
+      assert.equal(source.w, side); assert.equal(source.h, side);
+      assert.ok(source.data.every(v => v === 0xff000000), 'solid black material survives without stripping');
       drawSimpleEnemies({ c, px }, [e]);
-      assert.equal(boxes.length, 2);
+      assert.equal(boxes.length, 1);
       assert.ok(boxes.every(b => b[2] === side * px / 8 && b[3] === side * px / 8));
     }
   }

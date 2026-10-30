@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { damageStage, wallDamagePixels, wallRubblePixels } from "../src/defend/damage-art.ts";
+import { outlinePixels, damageStage, wallDamagePixels, wallRubblePixels } from "../src/defend/damage-art.ts";
 import { STRUCTURES } from "../src/defend/catalog.ts";
 import { PATHS, isSpell } from "../src/knowledge-paths.ts";
 import { PATH_LOOKS, artLook, structurePixels, structureRubblePixels, type PlacedKind } from "../src/defend/tower-art.ts";
@@ -25,7 +25,7 @@ for (const [name, w, h, at, rubble] of SPRITES)
   test(`${name}: each damage stage changes it without uncovering anything, and it falls to outlined rubble`, () => {
     const whole = at(0);
     assert.equal(whole.length, w * ART * h * ART);
-    assert.ok(whole.some((v) => v === OUTLINE), "outlined");
+    assert.ok(outlinePixels(whole,w*ART,h*ART).data.some(v=>v===OUTLINE),"the renderer adds its outline");
     let last = whole;
     for (let s = 1; s <= 3; s++) {
       const px = at(s);
@@ -36,7 +36,7 @@ for (const [name, w, h, at, rubble] of SPRITES)
     assert.deepEqual(at(2), at(2));
     const r = rubble();
     assert.equal(r.length, whole.length);
-    assert.ok(r.some((v) => v === OUTLINE));
+    assert.ok(outlinePixels(r,w*ART,h*ART).data.some(v=>v===OUTLINE),"rubble receives the same outside outline");
     assert.ok(r.filter((v) => v).length > whole.length * 0.25);
     assert.notDeepEqual(r, at(3));
   });

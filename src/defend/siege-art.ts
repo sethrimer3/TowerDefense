@@ -1,3 +1,9 @@
+import { drawAmmo } from "./weapon-art.ts";
+import { ART } from "./art-scale.ts";
+import { ART_NAMES } from "./art-overrides.ts";
+import { colorPixels, sourcePixels, resamplePixels, type ArtPiece } from "./sprite-source.ts";
+import { spriteCanvas } from "./damage-art.ts";
+import { onPixelArt } from "./pixel-sprites.ts";
 /** The siege engines and their shots as they are drawn: pixel art at
  * `SP` sprite pixels a cell inside crisp black outlines, lit from the upper
  * left like the roofs, drawn up with smoothing off.
@@ -35,7 +41,8 @@ import type { DefendSim, Effect, Enemy } from "./sim.ts";
 type Ctx = CanvasRenderingContext2D;
 
 /** Sprite pixels a cell. */
-export const SP = 10;
+export const SP = ART;
+const DESIGN = 10;
 /** Directions an engine can aim in. */
 export const DIRS = 16;
 
@@ -86,32 +93,7 @@ class Pix {
       for (let j = -r; j <= r + 0.01; j += 1) for (let i = -r; i <= r + 0.01; i += 1) this.dot(x + i, y + j, color);
     }
   }
-  /** Rings every shape in one pixel of outline. */
-  outline() {
-    const out = this.px.slice();
-    for (let y = 0; y < this.h; y++)
-      for (let x = 0; x < this.w; x++) {
-        if (this.px[y * this.w + x]) continue;
-        const near = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => {
-          const nx = x + dx, ny = y + dy;
-          return nx >= 0 && ny >= 0 && nx < this.w && ny < this.h && this.px[ny * this.w + nx] && this.px[ny * this.w + nx] !== C.outline;
-        });
-        if (near) out[y * this.w + x] = C.outline;
-      }
-    for (let i = 0; i < out.length; i++) this.px[i] = out[i];
-  }
-  canvas(struck: boolean) {
-    const cv = document.createElement("canvas");
-    cv.width = this.w;
-    cv.height = this.h;
-    const c = cv.getContext("2d")!;
-    this.px.forEach((color, i) => {
-      if (!color) return;
-      c.fillStyle = struck && color !== C.outline ? "#fff" : color;
-      c.fillRect(i % this.w, Math.floor(i / this.w), 1, 1);
-    });
-    return cv;
-  }
+
 }
 
 /** A pose: which way it aims (0 to `DIRS` - 1), and a frame of its own
@@ -125,19 +107,29 @@ const SIDE: Partial<Record<EnemyKind, number>> = {
 
 const sprites = new Map<string, HTMLCanvasElement>();
 
+export function siegePixels(kind: EnemyKind, pose: Pose, struck = false) {
+  const n=SIDE[kind]!, raw=new Pix(n,n);
+  PAINT[kind]!(raw,pose,unit(pose.dir));
+  const p=resamplePixels(colorPixels(raw.px),n,n,ART/DESIGN);
+  const name=ART_NAMES.enemy(kind,`siege-${pose.dir}-${pose.frame}-${pose.rolling ? "rolling" : "braced"}`);
+  const data=sourcePixels(name,p.w,p.h,()=>p.data);
+  return {...p,data:struck ? data.map(v=>v ? 0xffffffff : 0) : data};
+}
 function sprite(kind: EnemyKind, pose: Pose, struck: boolean) {
-  const key = `${kind}:${pose.dir}:${pose.frame}:${pose.rolling ? 1 : 0}:${struck ? 1 : 0}`;
-  let cv = sprites.get(key);
-  if (!cv) {
-    const n = SIDE[kind]!;
-    const p = new Pix(n, n);
-    PAINT[kind]!(p, pose, unit(pose.dir));
-    p.outline();
-    cv = p.canvas(struck);
-    sprites.set(key, cv);
-  }
+  const key=`${kind}:${pose.dir}:${pose.frame}:${pose.rolling}:${struck}`;
+  let cv=sprites.get(key);
+  if(!cv){const p=siegePixels(kind,pose,struck);cv=spriteCanvas(p.data,p.w,p.h,undefined,false);sprites.set(key,cv);}
   return cv;
 }
+export function siegePieces(): ArtPiece[] {
+  const out: ArtPiece[]=[];
+  for(const kind of Object.keys(SIDE) as EnemyKind[])for(let dir=0;dir<DIRS;dir++)for(const rolling of [false,true])for(let frame=0;frame<(rolling?2:kind==="trebuchet"?8:kind==="fireworkLauncher"?7:kind==="rocketBattery"?5:4);frame++) {
+    const pose={dir,frame,rolling},p=siegePixels(kind,pose);
+    out.push({name:ART_NAMES.enemy(kind,`siege-${dir}-${frame}-${rolling ? "rolling" : "braced"}`),w:p.w,h:p.h,about:`${kind}, heading ${dir}, ${rolling ? "rolling" : "braced"}, frame ${frame}`,pixels:()=>siegePixels(kind,pose).data});
+  }
+  return out;
+}
+onPixelArt(()=>sprites.clear());
 
 const unit = (dir: number) => {
   const a = (dir / DIRS) * Math.PI * 2;
@@ -389,7 +381,8 @@ export function drawSiegeShots({ c, px }: Brush, sim: DefendSim) {
     if (s.kind === "bolt") {
       const d = Math.hypot(s.x1 - s.x0, s.y1 - s.y0) || 1;
       const ux = (s.x1 - s.x0) / d, uy = (s.y1 - s.y0) / d;
-      for (let n = 0; n < 5; n++) dot(ax - ux * n * (1 / SP), ay - uy * n * (1 / SP), n === 0 ? C.ironHi : n > 3 ? C.rope : C.woodHi);
+      const dir=((Math.round(Math.atan2(uy,ux)/Math.PI/2*16)%16)+16)%16;
+      drawAmmo(c,px,"bolt",dir,ax,ay);
       continue;
     }
     // Shadows on the ground below.
@@ -404,15 +397,11 @@ export function drawSiegeShots({ c, px }: Brush, sim: DefendSim) {
         const t = at(s, kk);
         dot(t.ax + (hash01(s.seed, n, Math.floor(sim.time * 20)) - 0.5) * 0.08, t.ay, n < 2 ? C.emberHi : n < 4 ? C.ember : "rgba(120,100,90,0.5)");
       }
-      dot(ax, ay, hi, 2);
-      dot(ax, ay, lo);
+      drawAmmo(c,px,"rocket",Math.floor(hash01(s.seed,2)*SPARKS.length),ax,ay);
       continue;
     }
     if (s.kind === "stone") {
-      dot(ax, ay, C.outline, 4);
-      dot(ax, ay, C.stone, 3);
-      dot(ax - 1 / SP, ay - 1 / SP, C.stoneHi);
-      dot(ax + 1 / SP, ay + 1 / SP, C.stoneLo);
+      drawAmmo(c,px,"stone",0,ax,ay);
       continue;
     }
     // An iron ball, trailing a little smoke.
@@ -421,9 +410,7 @@ export function drawSiegeShots({ c, px }: Brush, sim: DefendSim) {
       const t = at(s, Math.max(0, k - n * 0.05));
       dot(t.ax, t.ay, `rgba(70,64,60,${0.4 - n * 0.1})`, big);
     }
-    dot(ax, ay, C.outline, big + 1);
-    dot(ax, ay, C.ironLo, big);
-    dot(ax - 0.5 / SP, ay - 0.5 / SP, C.ironHi);
+    drawAmmo(c,px,"ball",big===3?1:0,ax,ay);
   }
 }
 

@@ -1,3 +1,4 @@
+import { sourcePixels } from "./sprite-source.ts";
 /** The houses' roofs as pixel art at `ART` pixels a cell, like the parks
  * and the keep: a crisp black outline round two slopes that meet at a dark
  * ridge along the long axis, the sunny (north or west) slope lighter, laid
@@ -51,7 +52,7 @@ export function roofPixels(cw: number, ch: number, variant: number, seed: number
   const set = (x: number, y: number, c: number) => (out[y * W + x] = rgba(c));
   // The house sits one pixel in from its cells (two on the lower right).
   const x0 = 1, y0 = 1, x1 = W - 3, y1 = H - 3;
-  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) set(x, y, OUTLINE);
+
 
   // Work in roof coordinates: u along the ridge, v across it, over the
   // inside of the outline.
@@ -100,7 +101,7 @@ export function roofPixels(cw: number, ch: number, variant: number, seed: number
   for (let v = 0; v < V; v++)
     for (let u = 0; u < U; u++) {
       if (v === ridge) {
-        put(u, v, OUTLINE);
+        put(u, v, u === 0 || u === U - 1 ? shade(base, .7) : OUTLINE);
         continue;
       }
       const s = shingle(u, v);
@@ -187,7 +188,7 @@ export function houseDamagePixels(cw: number, ch: number, variant: number, seed:
 
 /** A fallen house: stumps of its walls round a heap of stone, roof tiles
  * and charred beams. */
-export function houseRubblePixels(cw: number, ch: number, variant: number, seed: number): Uint32Array {
+function drawnHouseRubblePixels(cw: number, ch: number, variant: number, seed: number): Uint32Array {
   const W = cw * ART, H = ch * ART, base = hex(ROOFS[variant % ROOFS.length]);
   return rubblePixels(W, H, hash(seed, 5), {
     x0: 1, y0: 1, x1: W - 3, y1: H - 3,
@@ -210,3 +211,7 @@ export function houseRubbleSprite(cw: number, ch: number, variant: number, seed:
 
 /** The seed a house's roof is drawn from: its lot, so it never changes. */
 export const roofSeed = (x: number, y: number, w: number, h: number) => hash(x, y, w, h, 31);
+
+export function houseRubblePixels(cw: number, ch: number, variant: number, seed: number):Uint32Array {
+  return sourcePixels(ART_NAMES.rubble(ART_NAMES.roof(variant,cw,ch)),cw*ART,ch*ART,()=>drawnHouseRubblePixels(cw,ch,variant,seed));
+}

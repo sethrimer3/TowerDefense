@@ -1,3 +1,6 @@
+import { capeSource, capeName, CAPE_BOX, CAPE_ORIGIN, CAPE_FRAMES } from "./cape-source.ts";
+import { spriteCanvas } from "./damage-art.ts";
+import type { ArtPiece } from "./sprite-source.ts";
 /** The Hero and its sword combos as they are drawn, in the pixel art of the
  * city (sprites drawn up crisp, effects snapped to the art's pixel):
  *
@@ -97,24 +100,11 @@ function drawCape(c: Ctx, k: number, u: Soldier, sim: DefendSim, look: string, s
   const { x0, y0, w, h, tone } = capePixels(cape, u.x - W / 2 / per, u.y - (H / 2 - 0.5) / per, per, sim.time);
   const [base, shade, plume] = CAPES[look] ?? CAPES[""];
   const colors = [base, base, mix(base, "#ffffff", 0.3), shade, mix(shade, "#000000", 0.35), look ? plume : GOLD[1], OUTLINE].map((col, i) => rgb(struck && i !== CAPE_EDGE ? pale(col) : col));
-  const cv = f.canvas;
-  if (cv.width !== w || cv.height !== h) {
-    cv.width = w;
-    cv.height = h;
-  }
-  const cc = cv.getContext("2d")!, img = cc.createImageData(w, h);
-  for (let p = 0; p < tone.length; p++) {
-    if (!tone[p]) continue;
-    const [r, g, b] = colors[tone[p]];
-    img.data[p * 4] = r;
-    img.data[p * 4 + 1] = g;
-    img.data[p * 4 + 2] = b;
-    img.data[p * 4 + 3] = 255;
-  }
-  cc.putImageData(img, 0, 0);
+  const cv=f.canvas,frame=Math.floor(sim.time*15)%CAPE_FRAMES;
+  spriteCanvas(capeSource(`hero-${look || "base"}`,frame,struck,{tone,w,h},colors,x0-W/2,y0-H/2,per),CAPE_BOX,CAPE_BOX,cv,false);
   c.save();
   c.imageSmoothingEnabled = false;
-  c.drawImage(cv, u.x * k * per - (W / 2) * k + x0 * k, u.y * k * per - (H / 2) * k + y0 * k, w * k, h * k);
+  c.drawImage(cv,u.x*k*per-CAPE_ORIGIN*k*per/ART,u.y*k*per-CAPE_ORIGIN*k*per/ART,CAPE_BOX*k*per/ART,CAPE_BOX*k*per/ART);
   c.restore();
 }
 
@@ -148,16 +138,9 @@ function drawSword(c: Ctx, k: number, x: number, y: number, face: number) {
   const ux = Math.cos(face), uy = Math.sin(face);
   const step = Math.max(1, Math.round(k));
   const at = (t: number) => [Math.round(x + ux * t * k), Math.round(y + 0.6 * k + uy * t * k)];
-  for (let t = 1; t <= 10; t++) {
-    const [sx, sy] = at(t);
-    c.fillStyle = OUTLINE;
-    c.fillRect(sx - step, sy - step, step * 2, step * 2);
-  }
   // The guard, across the blade.
   for (const side of [-1, 1]) {
     const [gx, gy] = at(3);
-    c.fillStyle = OUTLINE;
-    c.fillRect(Math.round(gx - uy * side * 1.6 * k) - step, Math.round(gy + ux * side * 1.6 * k) - step, step * 2, step * 2);
     c.fillStyle = GOLD[1];
     c.fillRect(Math.round(gx - uy * side * 1.6 * k) - step / 2, Math.round(gy + ux * side * 1.6 * k) - step / 2, step, step);
   }
@@ -304,4 +287,14 @@ export function heroLights(sim: DefendSim): { carried: CarriedLight[]; relief: R
     relief.push({ x: w.x, y: w.y, r: w.r + 1.2, k: 0.6 * k, color: w.kind === "rise" ? "#ffe08a" : "#cfe8ff" });
   }
   return { carried, relief };
+}
+
+export function heroCapePieces():ArtPiece[]{
+  const out:ArtPiece[]=[];
+  for(const look of Object.keys(CAPES))for(let frame=0;frame<CAPE_FRAMES;frame++)for(const struck of [false,true])out.push({name:capeName(`hero-${look || "base"}`,frame,struck),w:CAPE_BOX,h:CAPE_BOX,about:`Hero ${look || "base"} cape, frame ${frame}`,pixels:()=>{
+    const time=frame/15,cape=newCape(0,0,time,0),p=capePixels(cape,0,0,ART,time),[base,shade,plume]=CAPES[look];
+    const colors=[base,base,mix(base,"#ffffff",.3),shade,mix(shade,"#000000",.35),look?plume:GOLD[1],OUTLINE].map((col,i)=>rgb(struck&&i!==CAPE_EDGE?pale(col):col));
+    return capeSource(`hero-${look || "base"}`,frame,struck,p,colors,p.x0,p.y0,ART);
+  }});
+  return out;
 }

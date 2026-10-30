@@ -1,3 +1,7 @@
+import { MOSS_CAP,MOSS_FACE } from "./moss-wall-data.ts";
+import { ART_NAMES } from "./art-overrides.ts";
+import { sourcePixels,type ArtPiece } from "./sprite-source.ts";
+import { AREAS } from "./areas.ts";
 /** The city wall's masonry in every area after Mossbound Ruins, as pixel art
  * at `WALL_ART` pixels a cell: each wall cell a cap stone (whole, or split
  * into two or three blocks) lit from the upper left, with the area's own
@@ -7,7 +11,7 @@
  * stone. Mossbound Ruins keeps its hand-drawn sprites (`city-layer.ts`).
  * Everything is hashed from the cell, so a wall looks the same each repaint. */
 import { hash, hash01 } from "./grid.ts";
-import { pixels, sprite, type Pix } from "./damage-art.ts";
+import { pixels, sprite, wallRubblePixels, type Pix } from "./damage-art.ts";
 import type { AreaId } from "./areas.ts";
 
 /** Art pixels a wall cell, each way. */
@@ -383,7 +387,7 @@ const LOOKS: Partial<Record<AreaId, Look>> = {
 };
 
 /** Whether the area's wall is drawn here (every area but the first). */
-export const hasWallArt = (area: AreaId) => !!LOOKS[area];
+export const hasWallArt = (area: AreaId) => area === "moss" || !!LOOKS[area];
 
 /** How a cell's cap stone is cut: whole, halved either way, or a row of two
  * over one long block. The joints run along the cell's right and bottom. */
@@ -460,6 +464,42 @@ export const wallRubbleTones = (area: AreaId) => {
 /** Cached sprites of a cell's cap and a column's face (the cap repeats
  * every eight cells each way so the cache stays small). */
 export const wallCapSprite = (area: AreaId, cx: number, cy: number) =>
-  sprite(`areaWall:${area}:${cx & 7}:${cy & 7}`, WALL_ART, WALL_ART, () => wallCapPixels(area, cx & 7, cy & 7));
+  sprite(`areaWall:${area}:${cx & 7}:${cy & 7}`, WALL_SOURCE_ART, WALL_SOURCE_ART, () => wallSourcePixels(area,cx&7,cy&7), false);
 export const wallFaceSprite = (area: AreaId, cx: number) =>
-  sprite(`areaFace:${area}:${cx & 7}`, WALL_ART, FACE_ROWS, () => wallFacePixels(area, cx & 7));
+  sprite(`areaFace:${area}:${cx & 7}`, WALL_SOURCE_ART, WALL_SOURCE_FACE, () => wallSourcePixels(area,cx&7,0,true), false);
+
+/** Native joined sprites: no outline is added to either tile. The complete
+ * standing wall is ringed by paintWallOutline after its stones are joined. */
+export const WALL_SOURCE_ART=8,WALL_SOURCE_FACE=4;
+export function wallRubbleSource(area: AreaId, seed: number) {
+  const tones = wallRubbleTones(area);
+  return sourcePixels(ART_NAMES.scenery("wall-rubble", `${area}-${seed & 15}`), 8, 8, () => wallRubblePixels(seed, 8, tones?.stone, tones?.accent));
+}
+function mossWindow(face:boolean,cx:number,cy:number){
+  const source=face?MOSS_FACE:MOSS_CAP,raw=new Uint32Array(16*(face?14:16));
+  const sx=face?8+((cx*16)%64):38,sy=face?44:1+((cy*16+cx*37)%62);
+  for(let y=0;y<(face?14:16);y++)for(let x=0;x<16;x++){
+    const i=((sy+y-source.y)*source.w+sx+x-source.x)*4;
+    raw[y*16+x]=((source.data[i+3]<<24)|(source.data[i+2]<<16)|(source.data[i+1]<<8)|source.data[i])>>>0;
+  }
+  return raw;
+}
+export function wallSourcePixels(area:AreaId,cx:number,cy:number,face=false){
+  const w=WALL_SOURCE_ART,h=face?WALL_SOURCE_FACE:w;
+  const name=ART_NAMES.wall(area,cx&7,cy&7,face);
+  return sourcePixels(name,w,h,()=>{
+    const raw=area==='moss'?mossWindow(face,cx&7,cy&7):face?wallFacePixels(area,cx&7):wallCapPixels(area,cx&7,cy&7);
+    const H=area==='moss'?(face?14:16):(face?FACE_ROWS:WALL_ART),W=area==='moss'?16:WALL_ART,out=new Uint32Array(w*h);
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++)out[y*w+x]=raw[Math.min(H-1,Math.floor((y+.5)*H/h))*W+Math.min(W-1,Math.floor((x+.5)*W/w))];
+    return out;
+  });
+}
+export function wallPieces():ArtPiece[]{
+  const out:ArtPiece[]=[];
+  for (const area of AREAS) for (let seed = 0; seed < 16; seed++) out.push({ name: ART_NAMES.scenery("wall-rubble", `${area.id}-${seed}`), w: 8, h: 8, about: `${area.name} fallen wall stone`, pixels: () => wallRubbleSource(area.id, seed) });
+  for(const area of AREAS)for(let cx=0;cx<8;cx++){
+    for(let cy=0;cy<8;cy++)out.push({name:ART_NAMES.wall(area.id,cx,cy,false),w:WALL_SOURCE_ART,h:WALL_SOURCE_ART,about:`${area.name} wall cap (${cx},${cy}), joined`,joined:true,pixels:()=>wallSourcePixels(area.id,cx,cy)});
+    out.push({name:ART_NAMES.wall(area.id,cx,0,true),w:WALL_SOURCE_ART,h:WALL_SOURCE_FACE,about:`${area.name} wall face ${cx}, joined`,joined:true,pixels:()=>wallSourcePixels(area.id,cx,0,true)});
+  }
+  return out;
+}

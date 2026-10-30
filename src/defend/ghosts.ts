@@ -9,7 +9,11 @@
  * move on the wall clock and at most `GHOST.max` are in the air at once,
  * so a massacre stays cheap. */
 import { ART } from "./park-art.ts";
-import { OUTLINE, bake, blit } from "./pixel-fx.ts";
+import { ART_NAMES } from "./art-overrides.ts";
+import { rowPixels, sourcePixels, type ArtPiece } from "./sprite-source.ts";
+import { spriteCanvas } from "./damage-art.ts";
+import { pixelKey } from "./pixel-sprites.ts";
+import { OUTLINE, blit } from "./pixel-fx.ts";
 import { hash01 } from "./grid.ts";
 import type { Soldier } from "./sim.ts";
 
@@ -17,7 +21,10 @@ import type { Soldier } from "./sim.ts";
 export type GhostKind = Soldier["kind"] | "civilian";
 
 type Body = { x: number; y: number; hp: number; id: number };
-type Units = { soldiers: readonly (Body & { kind: Exclude<GhostKind, "civilian">; called?: { left?: true } })[]; civilians: readonly Body[] };
+type Units = {
+  soldiers: readonly (Body & { kind: Exclude<GhostKind, "civilian">; called?: { left?: true } })[];
+  civilians: readonly Body[];
+};
 
 export type Ghost = { kind: GhostKind; x: number; y: number; born: number; seed: number };
 
@@ -31,28 +38,28 @@ export const GHOST_PIXELS = [
   [
     "..yyy..",
     ".......",
-    "..ooo..",
-    ".ohwwo.",
-    "ohwwwwo",
-    "owewewo",
-    "owwwwwo",
-    "oowwwoo",
-    ".owwwo.",
-    ".owwo..",
-    "..oo...",
+    ".......",
+    "..hww..",
+    ".hwwww.",
+    ".wewew.",
+    ".wwwww.",
+    "..www..",
+    "..www..",
+    "..ww...",
+    ".......",
   ],
   [
     "..yyy..",
     ".......",
-    "..ooo..",
-    ".ohwwo.",
-    "ohwwwwo",
-    "owewewo",
-    "owwwwwo",
-    "oowwwoo",
-    ".owwwo.",
-    "..owwo.",
-    "...oo..",
+    ".......",
+    "..hww..",
+    ".hwwww.",
+    ".wewew.",
+    ".wwwww.",
+    "..www..",
+    "..www..",
+    "...ww..",
+    ".......",
   ],
 ];
 
@@ -88,6 +95,28 @@ const TINTS: Record<GhostKind, [string, string]> = {
   civilian: ["#f1ece0", "#ffffff"],
 };
 
+export function ghostPixels(kind: GhostKind, frame: number) {
+  const rows = GHOST_PIXELS[frame],
+    [body, sheen] = TINTS[kind];
+  return sourcePixels(
+    ART_NAMES.effect(`ghost-${kind}`, frame),
+    7,
+    rows.length,
+    () => rowPixels(rows, { w: body, h: sheen, e: OUTLINE, y: HALO }).data,
+  );
+}
+export function ghostPieces(): ArtPiece[] {
+  return (Object.keys(TINTS) as GhostKind[]).flatMap((kind) =>
+    [0, 1].map((frame) => ({
+      name: ART_NAMES.effect(`ghost-${kind}`, frame),
+      w: 7,
+      h: GHOST_PIXELS[frame].length,
+      about: `${kind} spirit, tail frame ${frame}`,
+      pixels: () => ghostPixels(kind, frame),
+    })),
+  );
+}
+
 export class Ghosts {
   readonly ghosts: Ghost[] = [];
   private sim: object | null = null;
@@ -95,6 +124,7 @@ export class Ghosts {
   private civilians: Units["civilians"] = [];
   private seen = new WeakSet<object>();
   private sprites = new Map<string, HTMLCanvasElement>();
+  private artKey = "";
 
   /** Looks for whoever died since last frame in battle `sim` and raises
    * their ghosts at wall time `now` (seconds); drops spent ghosts. */
@@ -126,7 +156,8 @@ export class Ghosts {
   /** Where ghost `g` is at wall time `now`: its offset in art pixels from
    * where it fell, its opacity and tail frame. Holds still under reduced motion. */
   static pose(g: Ghost, now: number, reduceMotion: boolean) {
-    const t = Math.max(0, now - g.born), p = Math.min(1, t / GHOST.life);
+    const t = Math.max(0, now - g.born),
+      p = Math.min(1, t / GHOST.life);
     const phase = hash01(Math.floor(g.seed * 100), 61) * 6.28;
     const rise = reduceMotion ? 0 : GHOST.rise * ART * (1 - (1 - p) * (1 - p));
     const sway = reduceMotion ? 0 : GHOST.sway * Math.sin(t * 3.4 + phase) * Math.min(1, t * 3);
@@ -151,18 +182,14 @@ export class Ghosts {
   }
 
   private sprite(kind: GhostKind, frame: number) {
+    const revision = pixelKey();
+    if (revision !== this.artKey) {
+      this.artKey = revision;
+      this.sprites.clear();
+    }
     const key = `${kind}${frame}`;
     let img = this.sprites.get(key);
-    if (img) return img;
-    const rows = GHOST_PIXELS[frame];
-    const { cv, c } = bake(rows[0].length, rows.length);
-    const [body, sheen] = TINTS[kind];
-    rows.forEach((row, y) => [...row].forEach((ch, x) => {
-      if (ch === ".") return;
-      c.fillStyle = ch === "o" || ch === "e" ? OUTLINE : ch === "y" ? HALO : ch === "h" ? sheen : body;
-      c.fillRect(x, y, 1, 1);
-    }));
-    this.sprites.set(key, img = cv);
+    if (!img) this.sprites.set(key, (img = spriteCanvas(ghostPixels(kind, frame), 7, GHOST_PIXELS[frame].length)));
     return img;
   }
 }

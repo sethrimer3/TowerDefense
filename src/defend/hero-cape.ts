@@ -145,12 +145,5 @@ export function capePixels(c: Cape, ox: number, oy: number, per: number, time: n
       const edging = cut.bands && (a > half - 0.65 || (cut.bands >= 2 && a > half - 1.25 && a < half - 0.95));
       tone[j * w + i] = along > hem - 0.9 || edging ? CAPE_TRIM : a > half - 1 ? (toLight ? CAPE_LIT : CAPE_DEEP) : fold > 0.55 ? CAPE_LIT : fold < -0.6 ? CAPE_SHADE : 1;
     }
-  // The outline round it.
-  for (let j = 0; j < h; j++)
-    for (let i = 0; i < w; i++) {
-      if (tone[j * w + i]) continue;
-      const on = (a: number, b: number) => a >= 0 && b >= 0 && a < w && b < h && tone[b * w + a] && tone[b * w + a] !== CAPE_EDGE;
-      if (on(i - 1, j) || on(i + 1, j) || on(i, j - 1) || on(i, j + 1)) tone[j * w + i] = CAPE_EDGE;
-    }
   return { x0, y0, w, h, tone };
 }

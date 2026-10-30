@@ -1,3 +1,8 @@
+import { drawPuffBody, drawPuffOutline } from "./puff-art.ts";
+import { ART_NAMES } from "./art-overrides.ts";
+import { colorPixels, sourcePixels, type ArtPiece } from "./sprite-source.ts";
+import { spriteCanvas } from "./damage-art.ts";
+import { onPixelArt } from "./pixel-sprites.ts";
 import { skyArrowView } from "./archer-attunements.ts";
 /** The battle's plain projectiles as pixel art at `ART` pixels a cell inside
  * the city's black outline, like the wizard's fire and the blasts:
@@ -94,7 +99,7 @@ export function arrowPixels(dir: number, javelin = false): string[] {
       const [tx, ty] = turn(x, y);
       px[(ty + 1) * n + tx + 1] = key[ch];
     }
-  return outlined(px, n, n);
+  return px;
 }
 
 /** Headings 0 to 8 from the three drawn ones: past an eighth of a turn the
@@ -107,35 +112,15 @@ function arrowTurn(dir: number): { base: number; turn: (x: number, y: number) =>
   return { base: r.base, turn: (x, y) => { const [tx, ty] = r.turn(x, y); return [6 - tx, ty]; } };
 }
 
-/** Rings every coloured pixel's four neighbours that are clear in the
- * outline colour. */
-function outlined(px: string[], w: number, h: number) {
-  const out = px.slice();
-  for (let y = 0; y < h; y++)
-    for (let x = 0; x < w; x++) {
-      if (px[y * w + x]) continue;
-      const near = (x > 0 && px[y * w + x - 1]) || (x < w - 1 && px[y * w + x + 1]) || (y > 0 && px[(y - 1) * w + x]) || (y < h - 1 && px[(y + 1) * w + x]);
-      if (near) out[y * w + x] = OUTLINE;
-    }
-  return out;
-}
-
-function paint(px: string[], w: number, h: number) {
-  const { cv, c } = bake(w, h);
-  for (let y = 0; y < h; y++)
-    for (let x = 0; x < w; x++) {
-      const color = px[y * w + x];
-      if (!color) continue;
-      c.fillStyle = color;
-      c.fillRect(x, y, 1, 1);
-    }
-  return cv;
+function paint(px: string[], w: number, h: number, name?: string, outline = true) {
+  const data = colorPixels(px);
+  return spriteCanvas(name ? sourcePixels(name,w,h,()=>data) : data,w,h,undefined,outline ? {} : false);
 }
 
 const arrowSprites: HTMLCanvasElement[] = [], javelinSprites: HTMLCanvasElement[] = [];
 function arrowSprite(dir: number, javelin = false) {
-  if (javelin) return (javelinSprites[dir] ??= paint(arrowPixels(dir, true), ARROW_BOX, ARROW_BOX));
-  return (arrowSprites[dir] ??= paint(arrowPixels(dir), ARROW_BOX, ARROW_BOX));
+  if (javelin) return (javelinSprites[dir] ??= paint(arrowPixels(dir, true), ARROW_BOX, ARROW_BOX, ART_NAMES.projectile("javelin",dir)));
+  return (arrowSprites[dir] ??= paint(arrowPixels(dir), ARROW_BOX, ARROW_BOX, ART_NAMES.projectile("arrow",dir)));
 }
 
 /** Arrows in flight, pointing where they fly (from where they were loosed
@@ -177,7 +162,7 @@ export function shotPixels(shot: Shot): { px: string[]; size: number } {
       if (ox * ox + oy * oy > r * r + 0.01) continue;
       px[y * size + x] = ox + oy < -r * 0.5 ? hi : ox + oy > r * 0.4 ? lo : base;
     }
-  const out = outlined(px, size, size);
+  const out = px;
   if (shot === "ball") out[size - 1] = "#ffd060";
   // A rocket's exhaust flaring out behind it, lower left.
   if (shot === "rocket") (out[(size - 1) * size] = "#ffd060"), (out[(size - 2) * size] = "#ff7a2e"), (out[(size - 1) * size + 1] = "#ff7a2e");
@@ -195,7 +180,7 @@ function shotSprite(shot: Shot) {
   let s = shotSprites.get(shot);
   if (!s) {
     const p = shotPixels(shot);
-    shotSprites.set(shot, (s = { cv: paint(p.px, p.size, p.size), size: p.size }));
+    shotSprites.set(shot, (s = { cv: paint(p.px, p.size, p.size,ART_NAMES.projectile(shot)), size: p.size }));
   }
   return s;
 }
@@ -212,7 +197,7 @@ export function ballPixels(d: number): { px: string[]; size: number } {
       const glint = Math.round(ox + r * 0.45) === 0 && Math.round(oy + r * 0.45) === 0;
       px[y * size + x] = glint ? C.ironHi : ox + oy > r * 0.6 ? C.ironLo : C.iron;
     }
-  return { px: outlined(px, size, size), size };
+  return { px, size };
 }
 
 /** Its dithered shadow: an ellipse, every other pixel at the rim. */
@@ -233,7 +218,7 @@ function ballSprite(d: number) {
   let s = balls.get(d);
   if (!s) {
     const b = ballPixels(d), sh = shadowPixels(d);
-    s = { cv: paint(b.px, b.size, b.size), size: b.size, shadow: paint(sh.px, sh.w, sh.h), sw: sh.w, sh: sh.h };
+    s = { cv: paint(b.px, b.size, b.size,ART_NAMES.projectile("cannon-ball",d)), size: b.size, shadow: paint(sh.px, sh.w, sh.h,undefined,false), sw: sh.w, sh: sh.h };
     balls.set(d, s);
   }
   return s;
@@ -293,13 +278,12 @@ export function drawBreath(c: Ctx, px: number, e: Enemy, time: number) {
   }
   c.save();
   c.globalAlpha = Math.min(1, t / 0.2);
-  c.fillStyle = OUTLINE;
-  for (const p of puffs) puff(dot, p.x, p.y, p.r + 1);
+  for (const p of puffs) drawPuffOutline(c,px,p.x,p.y,p.r,FLAME[p.tone]);
   // Coolest first, so the white-hot core shows through.
   for (let i = puffs.length - 1; i >= 0; i--) {
     const p = puffs[i];
     c.fillStyle = FLAME[p.tone];
-    puff(dot, p.x, p.y, p.r);
+    drawPuffBody(c,px,p.x,p.y,p.r,FLAME[p.tone]);
     if (p.tone < 4 && p.r > 0) {
       c.fillStyle = FLAME[p.tone + 1];
       dot(p.x - p.r + 1, p.y - p.r + 1, p.r, 1);
@@ -327,3 +311,15 @@ export function drawSparks(c: Ctx, px: number, fx: Effect) {
   }
   c.restore();
 }
+
+export function projectilePieces(): ArtPiece[] {
+  const out: ArtPiece[]=[];
+  for (let dir=0;dir<ARROW_DIRS;dir++) for (const javelin of [false,true]) out.push({name:ART_NAMES.projectile(javelin ? "javelin" : "arrow",dir),w:ARROW_BOX,h:ARROW_BOX,about:`${javelin ? "Javelin" : "Arrow"}, heading ${dir}`,pixels:()=>sourcePixels(ART_NAMES.projectile(javelin ? "javelin" : "arrow",dir),ARROW_BOX,ARROW_BOX,()=>colorPixels(arrowPixels(dir,javelin)))});
+  for (const shot of Object.keys(SHOTS) as Shot[]) {
+    const p=shotPixels(shot),name=ART_NAMES.projectile(shot);
+    out.push({name,w:p.size,h:p.size,about:`${shot} projectile`,pixels:()=>sourcePixels(name,p.size,p.size,()=>colorPixels(shotPixels(shot).px))});
+  }
+  for(const d of [4,5]) {const p=ballPixels(d),name=ART_NAMES.projectile("cannon-ball",d);out.push({name,w:p.size,h:p.size,about:`Cannon shell, ${d} art pixels`,pixels:()=>sourcePixels(name,p.size,p.size,()=>colorPixels(ballPixels(d).px))});}
+  return out;
+}
+onPixelArt(()=>{arrowSprites.length=javelinSprites.length=0;shotSprites.clear();balls.clear();});

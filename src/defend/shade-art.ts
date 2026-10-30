@@ -1,3 +1,9 @@
+import { drawKnife } from "./weapon-art.ts";
+import { pixelKey } from "./pixel-sprites.ts";
+import { ART_NAMES } from "./art-overrides.ts";
+import { sourcePixels, hexColor, type ArtPiece } from "./sprite-source.ts";
+import { pixels, spriteCanvas } from "./damage-art.ts";
+import { liveSprite } from "./unit-outline.ts";
 /** The Shadow's shade and its knives as they are drawn, in the city's pixel
  * art (every pixel snapped to the art's grid, whatever the zoom):
  *
@@ -28,11 +34,11 @@ const TRAIL = "#5a3e8a";
 /** The figure above its cloak, 7 pixels across: cowl (0), its shadowed
  * inside (1), its lit rim (2) and the eyes (e). */
 const HOOD = [
-  "..000..",
-  ".02220.",
-  "0211120",
-  "01e1e10",
-  "0111110",
+  ".......",
+  "..222..",
+  ".21112.",
+  ".1e1e1.",
+  ".11111.",
 ];
 /** The cloak's rows below the hood, and how wide it flares by its hem. */
 const CLOAK_ROWS = 9;
@@ -47,44 +53,15 @@ export function drawShade(c: Ctx, px: number, u: Soldier, sim: DefendSim, ink?: 
   const pix = Math.max(1, Math.round(px / ART)), a = 1 / ART;
   const struck = u.flash > 0, now = sim.time;
   const x0 = u.x - 3.5 * a, y0 = u.y - SHADE.size * 1.2;
-  const edge = (x: number, y: number) => {
-    const r = rim ?? c;
-    r.globalAlpha = c.globalAlpha;
-    r.fillStyle = ink ?? OUTLINE;
-    dot(r, px, pix, x, y);
-  };
   c.save();
   c.globalAlpha = struck ? 0.85 : 0.62;
-  // The cloak, from the shoulders down: a bell flaring wider row by row,
-  // its folds rippling, streaming off to one side, its hem cut into
-  // tatters that lift and fall. Lit from the upper left.
-  const stream = Math.sin(now * 1.7 + u.id) * 1.4;
-  for (let j = 0; j < CLOAK_ROWS; j++) {
-    const f = j / (CLOAK_ROWS - 1), half = 2 + f * 3.4 + Math.sin(now * 4.2 + j * 0.8 + u.id) * 0.7 * f;
-    const mid = stream * f * f, left = Math.round(mid - half), right = Math.round(mid + half);
-    for (let i = left; i <= right; i++) {
-      const hem = j === CLOAK_ROWS - 1, side = i === left || i === right;
-      if (hem && (i + Math.round(now * 6 + u.id)) % 3 === 0) continue;
-      c.fillStyle = side || hem ? OUTLINE : struck ? CLOAK[2] : i - mid < -half * 0.35 && j < 6 ? CLOAK[2] : i - mid > half * 0.4 ? CLOAK[0] : CLOAK[1];
-      if (ink && (side || hem)) edge(u.x + (i - 0.5) * a, y0 + (4 + j) * a);
-      else dot(c, px, pix, u.x + (i - 0.5) * a, y0 + (4 + j) * a);
-    }
+  const tick=Math.floor(now*12),key=`${tick}:${struck}:${pixelKey()}`;
+  let body=shadeBodies.get(u);
+  if(!body || body.key!==key){
+    const data=shadeBodyPixels(now,u.id,struck),canvas=spriteCanvas(data,SHADE_W,SHADE_H,body?.canvas, false);
+    liveSprite(canvas);body={key,canvas};shadeBodies.set(u,body);
   }
-  // Tatters trailing off the hem.
-  c.fillStyle = OUTLINE;
-  for (let k = -2; k <= 2; k++) {
-    const x = Math.round(stream + k * 1.6), drop = 1 + ((Math.round(now * 5) + k + u.id) & 1);
-    for (let d = 0; d < drop; d++) {
-      const dx = u.x + (x - 0.5) * a + stream * d * 0.4 * a, dy = y0 + (4 + CLOAK_ROWS + d) * a;
-      if (ink) edge(dx, dy); else dot(c, px, pix, dx, dy);
-    }
-  }
-  HOOD.forEach((row, j) => [...row].forEach((ch, i) => {
-    if (ch === ".") return;
-    c.fillStyle = ch === "e" ? EYES : ch === "0" ? OUTLINE : ch === "2" ? CLOAK[2] : struck ? CLOAK[2] : CLOAK[0];
-    if (ink && ch === "0") edge(x0 + i * a, y0 + j * a);
-    else dot(c, px, pix, x0 + i * a, y0 + j * a);
-  }));
+  c.drawImage(body.canvas,Math.round(u.x*ART-9.5)*px/ART,Math.round((u.y-SHADE.size*1.2)*ART)*px/ART,SHADE_W*px/ART,SHADE_H*px/ART);
   c.restore();
   // The knives circling it: those not out on a loop.
   const flying = sim.blades.filter((b) => b.shade === u.id).length;
@@ -96,21 +73,34 @@ export function drawShade(c: Ctx, px: number, u: Soldier, sim: DefendSim, ink?: 
   }
 }
 
-/** An acute triangle of steel at (x, y), its point leading along (dx, dy). */
-function knife(c: Ctx, px: number, pix: number, x: number, y: number, dx: number, dy: number) {
-  const d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d, a = 1 / ART;
-  // Its dark back edge, the blade's body, then the bright point.
-  c.fillStyle = OUTLINE;
-  dot(c, px, pix, x - ux * a - uy * a, y - uy * a + ux * a);
-  dot(c, px, pix, x - ux * a + uy * a, y - uy * a - ux * a);
-  c.fillStyle = STEEL[0];
-  dot(c, px, pix, x - ux * a, y - uy * a);
-  c.fillStyle = STEEL[1];
-  dot(c, px, pix, x, y);
-  c.fillStyle = STEEL[2];
-  dot(c, px, pix, x + ux * a, y + uy * a);
-  dot(c, px, pix, x + ux * a * 2, y + uy * a * 2);
+const SHADE_W=19,SHADE_H=18;
+const shadeBodies=new WeakMap<Soldier,{key:string;canvas:HTMLCanvasElement}>();
+export function shadeBodyPixels(now:number,id:number,struck=false){
+  const data=new Uint32Array(SHADE_W*SHADE_H),p=pixels(data,SHADE_W,SHADE_H);
+  const stream=Math.sin(now*1.7+id)*1.4;
+  for(let j=0;j<CLOAK_ROWS;j++){
+    const f=j/(CLOAK_ROWS-1),half=2+f*3.4+Math.sin(now*4.2+j*.8+id)*.7*f,mid=stream*f*f,left=Math.round(mid-half),right=Math.round(mid+half);
+    for(let i=left+1;i<right;i++){
+      if(j===CLOAK_ROWS-1)continue;
+      const color=struck?CLOAK[2]:i-mid<-half*.35&&j<6?CLOAK[2]:i-mid>half*.4?CLOAK[0]:CLOAK[1];
+      p.set(9+i,4+j,hexColor(color));
+    }
+  }
+  for(let k=-2;k<=2;k++){
+    const x=Math.round(stream+k*1.6),drop=1+((Math.round(now*5)+k+id)&1);
+    for(let d=0;d<drop;d++)p.set(Math.round(9+x+stream*d*.4),4+CLOAK_ROWS+d,hexColor(CLOAK[1]));
+  }
+  HOOD.forEach((row,y)=>[...row].forEach((ch,x)=>{
+    if(ch!=='.')p.set(6+x,y,hexColor(ch==='e'?EYES:ch==='0'?OUTLINE:ch==='2'?CLOAK[2]:struck?CLOAK[2]:CLOAK[0]));
+  }));
+  return sourcePixels(ART_NAMES.unit(`shade-${Math.floor(now*12)%12}-${struck ? "struck" : "plain"}`),SHADE_W,SHADE_H,()=>data);
 }
+export function shadePieces():ArtPiece[]{
+  return Array.from({length:12},(_,frame)=>[false,true].map(struck=>({name:ART_NAMES.unit(`shade-${frame}-${struck ? "struck" : "plain"}`),w:SHADE_W,h:SHADE_H,about:`Shade, cloak frame ${frame}`,pixels:()=>shadeBodyPixels(frame/12,0,struck)}))).flat();
+}
+
+/** An acute triangle of steel at (x, y), its point leading along (dx, dy). */
+function knife(c:Ctx,px:number,pix:number,x:number,y:number,dx:number,dy:number,outlined=false){drawKnife(c,px,x,y,dx,dy,outlined);}
 
 /** Every knife out on its loop, with its trail of dark. */
 export function drawBlades(c: Ctx, px: number, sim: DefendSim) {
@@ -134,5 +124,5 @@ function drawBlade(c: Ctx, px: number, pix: number, b: Blade) {
   }
   c.globalAlpha = 1;
   const head = loopAt(b, u), ahead = loopAt(b, Math.min(1, u + 0.02));
-  knife(c, px, pix, head.x, head.y, ahead.x - head.x || b.ax, ahead.y - head.y || b.ay);
+  knife(c, px, pix, head.x, head.y, ahead.x - head.x || b.ax, ahead.y - head.y || b.ay, true);
 }
