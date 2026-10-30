@@ -36,3 +36,5 @@ Add Defend items here in the form: **What** (one line), **Why**, **Files**, **Te
 
 - [x] Give every Blight/Dark One enemy the shared noise portal outline; softly fill packed pixel cracks black and reopen them as enemies separate, with reusable masks and no scene readbacks.
 - [ ] Migrate later waves toward roughly 90% plain pixel filler; identify medium enemies by equipment and retain complex sprites for rare high-strength threats. Track each composition and story exception in the migration log.
+
+- [x] Add flying Blight Dart, Blight Prism and Greater Blight Prism to the catalog, journal and art exports: paper-airplane darts, slow equilateral prisms with fractional nested rotations, and three darts released at 120° on death. Share the portal contour; test simulation and desktop/phone art. Per Seth, tune their wave placement later; no existing roster changes.

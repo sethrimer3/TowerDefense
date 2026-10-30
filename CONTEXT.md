@@ -740,3 +740,12 @@ The uninterrupted second a burrowing worm head must spend fully outside placed b
 
 **Blight infill**:
 The black visual joining narrow spaces inside packed Darkling groups. It blends back into the portal outline as bodies separate; it does not change their physical bodies or attack connections.
+
+**Blight Dart**:
+A small flying Blight shaped like a black paper airplane between an equilateral triangle and a chevron, with a burning perimeter. Darts released by a fallen prism scatter in three directions before attacking.
+
+**Blight Prism**:
+A very slow flying Blight shaped like a black equilateral triangle with nested spinning triangles inside it. Their fractional rotation speeds periodically align. Its death releases three Blight Darts one hundred and twenty degrees apart.
+
+**Greater Blight Prism**:
+A larger, tougher and slower Blight Prism with four nested spinning triangles. Releases the same three Blight Darts when destroyed.

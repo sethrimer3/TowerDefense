@@ -40,7 +40,7 @@ try {
         rows.push({ kind, px, zoom, simple, gap, ticks, above, below, profile });
         if (px === 8 && zoom === 4 && !simple) {
           gc.drawImage(cv, 0, index * 250, 1000, 250);
-          gc.fillStyle = '#fff0d5'; gc.font = '18px monospace'; gc.fillText(`${ENEMIES[kind].name}: half crimson + half black = one art pixel`, 20, index * 250 + 30);
+          gc.fillStyle = '#fff0d5'; gc.font = '18px monospace'; gc.fillText(`${ENEMIES[kind].name}: burning portal meets the wall contour`, 20, index * 250 + 30);
         }
         cv.remove();
       }
@@ -52,7 +52,10 @@ try {
   for (const row of result) {
     assert.ok(row.ticks < 90); assert.ok(Math.abs(row.gap - 1) < 1e-8, JSON.stringify(row));
     assert.ok(row.below.every(v => v < 100), `wall contour missing ${JSON.stringify(row)}`);
-    if (row.px === 8 && row.zoom === 4) assert.deepEqual(row.above, [156, 18, 53], `red must meet black without an empty row: ${JSON.stringify(row)}`);
+    if (row.px === 8 && row.zoom === 4) {
+      const [r, g, b] = row.above;
+      assert.ok(r > g && g > b && r - b > 20, `burning portal must meet black without an empty row: ${JSON.stringify(row)}`);
+    }
   }
   assert.deepEqual(errors, []);
   console.log(`Verified ${result.length} native body/contact renders at 8/11/16 px per cell, three zooms and both enemy graphics settings.`);

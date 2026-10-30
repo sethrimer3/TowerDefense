@@ -1,3 +1,4 @@
+import { isBlightFlier, stepDartBurst } from "./blight-fliers.ts";
 import { stepBlightWorm } from "./blight-worm.ts";
 import { approachBuildingContact, approachDefenderContact, buildingContactPoint, defenderInContact, structureContactRect, CONTACT_OUTLINE } from "./contact.ts";
 import { enemySize } from "./catalog.ts";
@@ -37,6 +38,7 @@ export function stepEnemy(sim: DefendSim, e: Enemy, dt: number) {
   if (sim.crowd.holds(e)) return;
   if (e.impaled !== undefined) return;
   if (stepAbilities(sim, e, dt)) return;
+  if (stepDartBurst(sim, e, dt)) return;
   if (e.leader !== undefined) {
     const leader = sim.enemies.find(other => other.id === e.leader && other.hp > 0);
     if (leader) {
@@ -84,6 +86,10 @@ function flyAtKeep(t: Turn) {
   const { sim, e, def, reach, dt } = t;
   const goal = sim.baits.length ? lureOf(sim, e.x, e.y) : sim.keep;
   if (rectDist(goal.rect, e.x, e.y) <= reach) return contactBuilding(t, goal.id);
+  if (isBlightFlier(e.kind)) {
+    const target = center(goal.rect), dx = target.x - e.x, dy = target.y - e.y, length = dist(dx, dy);
+    if (length > 0) e.facing = { x: dx / length, y: dy / length };
+  }
   sim.moveToward(e, center(goal.rect), { speed: enemySpeed(sim, e) * chilled(e), dt, flying: true });
 }
 
