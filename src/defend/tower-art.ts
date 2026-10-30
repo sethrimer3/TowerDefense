@@ -251,7 +251,7 @@ export function structurePixels(kind: PlacedKind, cw: number, ch: number, stage 
   else PAINT[kind](p, artLook(kind, look));
   p.finish();
   damage(pixels(out,w,h), stage, hash(seed, KINDS.indexOf(kind)), MATERIAL[kind].m);
-  if (kind === "darkKeep") fissures(p, stage, hash(seed, 0xd4));
+  if (kind === "darkKeep") fissures(pixels(out, w, h), stage, hash(seed, 0xd4));
   return out;
 }
 
