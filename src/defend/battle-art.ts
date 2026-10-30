@@ -1,3 +1,5 @@
+import { isBlightFlier } from "./blight-fliers.ts";
+import { drawBlightFlier } from "./blight-flier-art.ts";
 import { drawWormShadow, wormBodyVisible } from "./blight-worm-art.ts";
 import { basicUnitSprite } from "./basic-unit-art.ts";
 import { drawSprite } from "./damage-art.ts";
@@ -177,11 +179,11 @@ export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, hea
         if (simple.enemies) drawSimpleEnemies(u, others, rim, sides);
       }
       // Preserve native sprite ordering across factions, after the pixel mass.
-      if (!simple.enemies) for (const e of sim.enemies) if (!e.raidProxy && wormBodyVisible(e) && !ENEMIES[e.kind].darkPixels) { unit?.(e.id); drawEnemyArt(u, e, sim, layers ? b : undefined); }
+      if (!simple.enemies) for (const e of sim.enemies) if (!e.raidProxy && wormBodyVisible(e) && !ENEMIES[e.kind].darkPixels) { unit?.(e.id); drawEnemyArt(u, e, sim, layers ? b : undefined, simple.reduceMotion); }
     }
     else if (simple.enemies) drawSimpleEnemies(u, sim.enemies.filter(e=>!e.raidProxy && wormBodyVisible(e)), layers?.rims, sides, rimFor);
     else {
-      for (const e of sim.enemies) if (!e.raidProxy && wormBodyVisible(e)) { unit?.(e.id); drawEnemyArt(u, e, sim, layers ? b : undefined); }
+      for (const e of sim.enemies) if (!e.raidProxy && wormBodyVisible(e)) { unit?.(e.id); drawEnemyArt(u, e, sim, layers ? b : undefined, simple.reduceMotion); }
     }
     if (contours) drawSwords(u, swords, unit);
   } finally {
@@ -665,9 +667,10 @@ function drawHandTorch({ c, px }: Brush, at: { x: number; y: number; id: number 
 /** One enemy as the battle draws it: a siege engine, a boat or a body.
  * The journal's portraits draw through it too, with a stand-in sim that
  * has only `time` and `effects`. */
-export function drawEnemyArt(b: Brush, e: Enemy, sim: DefendSim, under = b) {
+export function drawEnemyArt(b: Brush, e: Enemy, sim: DefendSim, under = b, reduceMotion = false) {
   const def = ENEMIES[e.kind];
   if (!wormBodyVisible(e)) { drawWormShadow(under, e, sim.time); return; }
+  if (isBlightFlier(e.kind)) return drawBlightFlier(b, e, sim.time, reduceMotion, under);
   if (def.darkPixels) {
     // No sprite lookup, rims, shading, torch, or animated decoration.
     const d = b.px / ART * def.darkPixels;

@@ -33,7 +33,7 @@ export const extraArtPieces = () => [
   ...skyPalacePieces(),
   ...wallPieces(),
   ...weaponPieces(),
-  ...basicUnitPieces(), // Catalog-driven: includes both five-pixel Dark One bodies.
+  ...basicUnitPieces(), // Catalog-driven: Darkling/Worm squares and the three flying Blight silhouettes.
   ...shadePieces(),
   ...meleeCapePieces(),
   ...heroCapePieces(),
