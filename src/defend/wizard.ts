@@ -201,7 +201,7 @@ export function stepFrosts(sim: DefendSim, dt: number) {
     for (const e of sim.enemiesNear(w.x, w.y, w.r)) {
       if (w.hit.includes(e.id) || !inFan(e, w.x, w.y, w.dx, w.dy, w.spread, w.r)) continue;
       w.hit.push(e.id);
-      if (sim.hurtEnemy(e, damage, true, "ranged", w) && !ENEMIES[e.kind].unyielding) {
+      if (sim.hurtEnemy(e, damage, true, "ranged", w) && (!ENEMIES[e.kind].unyielding || e.kind === "blightWorm")) {
         e.chill = Math.max(e.chill ?? 0, chill);
         if (rime >= 3) e.freeze = Math.max(e.freeze ?? 0, RIME.freeze);
       }

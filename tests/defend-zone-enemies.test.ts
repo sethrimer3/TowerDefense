@@ -37,7 +37,7 @@ test('actual waves respect zone membership, affordability and offspring rules', 
   let seed = 19;
   const rand = () => ((seed = seed * 16807 % 2147483647) / 2147483647);
   for (let wave = 1; wave <= 200; wave++) {
-    if (wave <= 10) continue; // Authored Darkling waves have their own roster/count checks.
+    if (wave <= 20) continue; // Authored Darkling waves have their own roster/count checks.
     const mix = buildWave(wave, rand), allowed = AREA_ENEMIES[areaForWave(wave).id];
     assert.ok(mix.length > 0, `wave ${wave} is not empty`);
     assert.ok(mix.every(k => allowed.includes(k) && !ENEMIES[k].hatched));

@@ -33,7 +33,7 @@ export const extraArtPieces = () => [
   ...skyPalacePieces(),
   ...wallPieces(),
   ...weaponPieces(),
-  ...basicUnitPieces(),
+  ...basicUnitPieces(), // Catalog-driven: includes both five-pixel Dark One bodies.
   ...shadePieces(),
   ...meleeCapePieces(),
   ...heroCapePieces(),

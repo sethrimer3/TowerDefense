@@ -13,7 +13,7 @@ type Body = { e: Enemy; hx: number; hy: number; x0: number; x1: number; y0: numb
   ix: number; iy: number; epoch: number; stable: boolean; anchorX: number; anchorY: number; targetX: number; targetY: number; indexed: boolean; seen: number; target: CrowdTarget | null; previous: CrowdTarget | null; resolved: CrowdTarget | null; queued: boolean; planX: number; planY: number; previousSource: Body | null; source: Body | null; visited: boolean;
   waiting?: { x: number; y: number } };
 type Spiral = { x: number; y: number; dx: number; dy: number; leg: number; step: number; turns: number };
-export const groundBody = (e: Enemy) => e.hp > 0 && !e.raidProxy && !e.fortressPart && !ENEMIES[e.kind].flying && e.impaled === undefined && !(e.kind === "burrowingMole" && (e.burrow ?? 1) > 0);
+export const groundBody = (e: Enemy) => e.hp > 0 && e.kind !== "blightWorm" && !e.raidProxy && !e.fortressPart && !ENEMIES[e.kind].flying && e.impaled === undefined && !(e.kind === "burrowingMole" && (e.burrow ?? 1) > 0);
 const blight = (b: Body) => groundBody(b.e) && ENEMIES[b.e.kind].faction === "darkOne" && !b.waiting;
 
 export class EnemyCrowd {

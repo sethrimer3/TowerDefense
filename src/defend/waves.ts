@@ -3,12 +3,32 @@ import { areaForWave } from "./areas.ts";
 import { AREA_ENEMIES } from "./area-enemies.ts";
 
 export const MAX_WAVE_ENEMIES = 5000;
+export const waveCap = (wave: number) => wave === 20 ? 7000 : MAX_WAVE_ENEMIES;
 export const STARTING_DIFFICULTY = 20;
 export const DIFFICULTY_GROWTH = 1.05;
 
 /** Queues pop from the end: each group releases filler before its larger body. */
 const groups = (count: number, larger: EnemyKind, filler: EnemyKind, perGroup: number): EnemyKind[] =>
   Array.from({ length: count }, (): EnemyKind[] => [larger, ...Array<EnemyKind>(perGroup).fill(filler)]).flat();
+
+/** Evenly distribute each kind through the release, without random draws.
+ * Sorting fractional release positions also works when the queue is reversed. */
+const mix = (roster: readonly (readonly [EnemyKind, number])[]): EnemyKind[] =>
+  roster.flatMap(([kind, count], order) => Array.from({ length: count }, (_, i) => ({ kind, at: (i + .5) / count, order })))
+    .sort((a, b) => a.at - b.at || a.order - b.order).map(e => e.kind);
+
+/** Initial rosters are tuning data; split trees determine combat HP/slots. */
+export const DARKLING_WAVES: Readonly<Record<number, readonly (readonly [EnemyKind, number])[]>> = {
+  11: [["significantDarkling", 10], ["majorDarkling", 40]],
+  12: [["significantDarkling", 20], ["majorDarkling", 40], ["darkling", 100]],
+  13: [["significantDarkling", 30], ["majorDarkling", 40], ["largeDarkling", 60]],
+  14: [["significantDarkling", 40], ["majorDarkling", 40], ["darkling", 200]],
+  15: [["significantDarkling", 50], ["majorDarkling", 50]],
+  16: [["significantDarkling", 60], ["majorDarkling", 50], ["largeDarkling", 100]],
+  17: [["significantDarkling", 80], ["majorDarkling", 30], ["miniDarkling", 150]],
+  18: [["significantDarkling", 90], ["majorDarkling", 20], ["darkling", 100]],
+  19: [["significantDarkling", 100], ["majorDarkling", 20]],
+};
 
 /** Absolute waves only; later area cycles and Ambush keep their legacy rosters. */
 const AUTHORED_WAVES: Readonly<Partial<Record<number, readonly EnemyKind[]>>> = {
@@ -22,6 +42,8 @@ const AUTHORED_WAVES: Readonly<Partial<Record<number, readonly EnemyKind[]>>> = 
   8: Array<EnemyKind>(20).fill("majorDarkling"),
   9: Array<EnemyKind>(30).fill("majorDarkling"),
   10: Array<EnemyKind>(50).fill("majorDarkling"),
+  ...Object.fromEntries(Object.entries(DARKLING_WAVES).map(([wave, roster]) => [wave, mix(roster)])),
+  20: ["blightWorm"],
 };
 
 /** Bounded arithmetic keeps corrupt or extremely late wave numbers finite.
@@ -40,16 +62,17 @@ export function waveDifficulty(wave: number): number {
 
 /** Reserve offspring as well as their parent against the wave's hard cap.
  * Cyclic or invalid future split definitions are excluded safely. */
-function slots(def: EnemyDef, seen = new Set<EnemyKind>()): number {
+export function slots(def: EnemyDef, seen = new Set<EnemyKind>()): number {
   if (seen.has(def.kind)) return Infinity;
-  if (def.chainLength !== undefined) return Number.isSafeInteger(def.chainLength) && def.chainLength > 0 ? def.chainLength : Infinity;
+  const length = def.chainLength ?? 1;
+  if (!Number.isSafeInteger(length) || length < 1) return Infinity;
   if (def.fortress) return 1 + def.fortress.turrets + def.fortress.legs + def.fortress.armor;
   if (def.summonSlots) return def.summonSlots;
-  if (!def.splits) return 1;
+  if (!def.splits) return length;
   if (!Number.isSafeInteger(def.splits.count) || def.splits.count < 0) return Infinity;
   const child = ENEMIES[def.splits.into];
   if (!child) return Infinity;
-  return 1 + def.splits.count * slots(child, new Set([...seen, def.kind]));
+  return length * (1 + def.splits.count * slots(child, new Set([...seen, def.kind])));
 }
 
 export function buildWave(wave: number, rand: () => number): EnemyKind[] {

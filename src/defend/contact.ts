@@ -16,6 +16,16 @@ export const CONTACT_OUTLINE = UNIT_CONTOUR_ART_PIXELS / ART;
 /** Native movement otherwise reserves 0.18 cells, wider than a one-pixel body. */
 export const contactRadius = (e: Enemy) => Math.min(.18, enemySize(e) / 2 + CONTACT_OUTLINE) - EPS;
 
+/** Kinematic bodies can enter the empty margin of a fence collision cell,
+ * but must stop at the same painted rails as native contact attackers. */
+export function fenceContactRects(b: Building): Rect[] {
+  return (b.rails ?? (b.fence ? [b.fence] : [])).map(rail => {
+    const dx = rail.x2 - rail.x1, dy = rail.y2 - rail.y1;
+    return { x: (rail.x1 < rail.x2 ? rail.x1 : rail.x2) - .25, y: (rail.y1 < rail.y2 ? rail.y1 : rail.y2) - .25,
+      w: (dx < 0 ? -dx : dx) + .5, h: (dy < 0 ? -dy : dy) + .5 };
+  });
+}
+
 /** Stone-wall outlines occupy the outer half art pixel of their painted
  * box. Their south face also hangs beyond the logical collision cell. */
 export function structureContactRect(sim: DefendSim, b: Building): Rect {

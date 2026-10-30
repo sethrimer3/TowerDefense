@@ -1,3 +1,4 @@
+import { BLIGHT_WORM, initWorm, promoteWorm, wormOpenPoint, type WormState } from "./blight-worm.ts";
 import { EnemyCrowd } from "./enemy-crowd.ts";
 import { stepFlagBearer, friendlySafe } from "./flag-bearers.ts";
 import type { ChronoState, DivineArrow, ReleasedArrow } from "./chrono.ts";
@@ -30,7 +31,7 @@ import { stepSiegeShots, type SiegeAim, type SiegeShot } from "./siege.ts";
  * kind of unit decides to do lives beside it: `enemies.ts`, `troops.ts`,
  * `mages.ts`, `valkyries.ts`, `dark-wizards.ts`, `civilians.ts` and
  * `towers.ts`, with grid pathing in `pathing.ts`. */
-import { MAX_WAVE_ENEMIES, buildWave, waveDifficulty } from "./waves.ts";
+import { MAX_WAVE_ENEMIES, waveCap, buildWave, waveDifficulty } from "./waves.ts";
 import { BattleStats } from "./battle-stats.ts";
 export { buildWave } from "./waves.ts";
 import { dist, sq } from "../exact.ts";
@@ -148,6 +149,8 @@ export type Enemy = {
   slash?: { dx: number; dy: number; t: number };
   dive?: number;
   leader?: number;
+  /** Transient, allocated only for Blight Worm segments. */
+  worm?: WormState;
   shieldHp?: number;
   poisonT?: number;
   /** An assassin's venom: seconds left, the share more damage it takes,
@@ -384,7 +387,7 @@ export class DefendSim {
   /** The run's tally for the summary when the keep falls; not part of the
    * replayed state. */
   readonly stats = new BattleStats();
-  readonly slain: Record<EnemyKind, number> = { miniDarkling: 0, darkling: 0, largeDarkling: 0, majorDarkling: 0, roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0, darkKnight: 0, bombOrc: 0, bombBird: 0, voidSparrow: 0, shieldLesser: 0, shieldGreater: 0, poisonLesser: 0, poisonBearer: 0, poisonGreater: 0, poisonSovereign: 0, siegeBeetle: 0, burrowingMole: 0, necromancer: 0, skeleton: 0, bannerCaptain: 0, mirrorKnight: 0, leechSwarm: 0, ashPhoenix: 0, phoenixEgg: 0, blinkImp: 0, fortressHut: 0, fortressOutpost: 0, fortressTower: 0, fortressKeep: 0, fortressLesser: 0, fortress: 0, fortressGreater: 0, fortressSovereign: 0, rollingCannon: 0, ballista: 0, fireworkLauncher: 0, trebuchet: 0, bombard: 0, rocketBattery: 0, boatDinghy: 0, boatSailboat: 0, boatCutter: 0, boatCog: 0, boatLesser: 0, boat: 0, boatGreater: 0, boatSovereign: 0, iceGolem: 0, iceCube: 0, briarling: 0, mossBoar: 0, rootTreant: 0, duneScorpion: 0, sunScarab: 0, sandVulture: 0, sporeling: 0, fungalBrute: 0, sporeMoth: 0, shardling: 0, crystalSentinel: 0, prismRay: 0, starWisp: 0, cometHound: 0, astralWarden: 0, brineCrab: 0, lanternJelly: 0, coralGuardian: 0, fernMantis: 0, mossTroll: 0, lanternHornet: 0, glassJackal: 0, duneTortoise: 0, dustDjinn: 0, cinderImp: 0, slagGolem: 0, emberMoth: 0, kelpStalker: 0, capCrawler: 0, myceliumHulk: 0, rotMite: 0, geodeCrab: 0, prismMoth: 0, shardBrood: 0, cryptHound: 0, graveWisp: 0, novaMoth: 0 };
+  readonly slain: Record<EnemyKind, number> = { miniDarkling: 0, darkling: 0, largeDarkling: 0, majorDarkling: 0, significantDarkling: 0, blightWorm: 0, roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0, darkKnight: 0, bombOrc: 0, bombBird: 0, voidSparrow: 0, shieldLesser: 0, shieldGreater: 0, poisonLesser: 0, poisonBearer: 0, poisonGreater: 0, poisonSovereign: 0, siegeBeetle: 0, burrowingMole: 0, necromancer: 0, skeleton: 0, bannerCaptain: 0, mirrorKnight: 0, leechSwarm: 0, ashPhoenix: 0, phoenixEgg: 0, blinkImp: 0, fortressHut: 0, fortressOutpost: 0, fortressTower: 0, fortressKeep: 0, fortressLesser: 0, fortress: 0, fortressGreater: 0, fortressSovereign: 0, rollingCannon: 0, ballista: 0, fireworkLauncher: 0, trebuchet: 0, bombard: 0, rocketBattery: 0, boatDinghy: 0, boatSailboat: 0, boatCutter: 0, boatCog: 0, boatLesser: 0, boat: 0, boatGreater: 0, boatSovereign: 0, iceGolem: 0, iceCube: 0, briarling: 0, mossBoar: 0, rootTreant: 0, duneScorpion: 0, sunScarab: 0, sandVulture: 0, sporeling: 0, fungalBrute: 0, sporeMoth: 0, shardling: 0, crystalSentinel: 0, prismRay: 0, starWisp: 0, cometHound: 0, astralWarden: 0, brineCrab: 0, lanternJelly: 0, coralGuardian: 0, fernMantis: 0, mossTroll: 0, lanternHornet: 0, glassJackal: 0, duneTortoise: 0, dustDjinn: 0, cinderImp: 0, slagGolem: 0, emberMoth: 0, kelpStalker: 0, capCrawler: 0, myceliumHulk: 0, rotMite: 0, geodeCrab: 0, prismMoth: 0, shardBrood: 0, cryptHound: 0, graveWisp: 0, novaMoth: 0 };
   /** 1 while a cell is part of a standing (built) building. */
   readonly solid: Uint8Array;
   /** What blocks the city's own people: `solid`, but for the standing city
@@ -800,11 +803,15 @@ export class DefendSim {
         if (egg) egg.abilityT = 5;
       }
       const splits = ENEMIES[e.kind].splits;
-      if (splits) for (let n = 0; n < splits.count && this.waveSpawned < MAX_WAVE_ENEMIES; n++, this.waveSpawned++) hatched.push(this.hatch(splits.into, e, n, splits.count));
+      if (splits) for (let n = 0; n < splits.count && this.waveSpawned < waveCap(this.wave); n++, this.waveSpawned++) hatched.push(this.hatch(splits.into, e, n, splits.count));
     }
     this.enemies = this.enemies.filter((e) => e.hp > 0);
     this.shieldGenerators = this.shieldGenerators.filter(e => e.hp > 0);
     this.enemies.push(...hatched);
+    if (this.enemies.some(e => e.kind === "blightWorm")) {
+      const alive = new Set(this.enemies.map(e => e.id));
+      for (const e of this.enemies) if (e.kind === "blightWorm" && e.worm && e.leader !== undefined && !alive.has(e.leader)) promoteWorm(this, e);
+    }
     for (const s of this.soldiers) if (s.hp <= 0 && s.called) calledFell(this, s);
     for (const s of this.soldiers) if (s.hp <= 0 && s.kind !== "flagBearer" && !s.risen && !s.called) this.stats.current.troopsLost++;
     for (const c of this.civilians) if (c.hp <= 0) this.stats.current.civiliansLost++;
@@ -873,7 +880,7 @@ export class DefendSim {
     this.waveSpawned = this.enemies.length;
     const def = ENEMIES[kind], fort = def.fortress;
     const slots = fort ? 1 + fort.turrets + fort.legs + fort.armor : def.chainLength ?? 1;
-    if (this.waveSpawned + slots > MAX_WAVE_ENEMIES) return false;
+    if (this.waveSpawned + slots > waveCap(this.wave)) return false;
     const before = this.enemies.length;
     this.spawnEnemy(kind);
     if (this.enemies.length === before) return false;
@@ -887,6 +894,7 @@ export class DefendSim {
     if (this.spawnQueue.length) {
       this.spawnT -= dt;
       while (this.spawnT <= 0 && this.spawnQueue.length) {
+        if (this.waveSpawned >= waveCap(this.wave)) { this.spawnQueue = []; break; }
         // Release every wave over five seconds, including at the fixed 30 Hz step.
         if (!this.spawnInterval) this.spawnInterval = 5 / this.spawnQueue.length;
         this.spawnT += this.spawnInterval;
@@ -920,24 +928,27 @@ export class DefendSim {
 
   private spawnEnemy(kind: EnemyKind, at?: Point) {
     const fort = ENEMIES[kind].fortress;
-    if (this.waveSpawned + (fort ? 1 + fort.turrets + fort.legs + fort.armor : 1) > MAX_WAVE_ENEMIES) return;
+    if (this.waveSpawned + (fort ? 1 + fort.turrets + fort.legs + fort.armor : 1) > waveCap(this.wave)) return;
     for (let tries = 0; tries < 20; tries++) {
       const margin = fort ? ENEMIES[kind].size / 2 + 1 : 1;
       const x = at?.x ?? margin + this.rand() * (CELLS_W - 2 * margin);
-      const y = at?.y ?? (fort ? fort.height / 2 + .5 : .5) + this.rand() * 2;
+      const y = at?.y ?? (kind === "blightWorm" ? .5 : (fort ? fort.height / 2 + .5 : .5) + this.rand() * 2);
       if (blocked(this.solid, x, y)) continue;
       this.enemies.push(this.newEnemy(kind, x, y));
       this.waveSpawned++;
       let leader = this.enemies[this.enemies.length - 1];
+      const worm = kind === "blightWorm" ? [leader] : undefined;
       if (fort) assembleFortress(this, leader);
       const length = ENEMIES[kind].chainLength ?? 1;
-      for (let n = 1; n < length && this.waveSpawned < MAX_WAVE_ENEMIES; n++) {
-        const segment = this.newEnemy(kind, x, Math.max(0.25, y - n * 0.3));
+      for (let n = 1; n < length && this.waveSpawned < waveCap(this.wave); n++) {
+        const segment = this.newEnemy(kind, x, worm ? y - n * BLIGHT_WORM.spacing : Math.max(0.25, y - n * 0.3));
         segment.leader = leader.id;
         this.enemies.push(segment);
         this.waveSpawned++;
         leader = segment;
+        worm?.push(segment);
       }
+      if (worm) initWorm(this, worm);
       return;
     }
   }
@@ -950,14 +961,15 @@ export class DefendSim {
     const x = mother.x + k.x * r,
       y = mother.y + k.y * r;
     const free = x > 0 && y > 0 && x < CELLS_W && y < CELLS_H && !blocked(this.solid, x, y);
-    const young = free ? this.newEnemy(kind, x, y) : this.newEnemy(kind, mother.x, mother.y);
+    const point = mother.kind === "blightWorm" && mother.burrow ? wormOpenPoint(this, { x, y }) : free ? { x, y } : mother;
+    const young = this.newEnemy(kind, point.x, point.y);
     // They burst out at a run, then scatter before they think to fight.
     young.cd = 0.4 + (n / count) * 0.2;
     return young;
   }
 
   spawnAuxiliary(kind: EnemyKind, x: number, y: number): Enemy | null {
-    if (this.waveSpawned >= MAX_WAVE_ENEMIES) return null;
+    if (this.waveSpawned >= waveCap(this.wave)) return null;
     const enemy = this.newEnemy(kind, x, y);
     this.enemies.push(enemy);
     this.waveSpawned++;
@@ -1111,6 +1123,7 @@ export class DefendSim {
    * the physical origin used for shields, reflection or directional armor. */
   hurtEnemy(e: Enemy, amount: number, flash = true, source: "ranged" | "melee" = "ranged", origin?: DamageOrigin, projectile = false, element: "physical" | "fire" | "explosion" = "physical", pierce = 0, credit?: DamageOrigin) {
     if (e.hp <= 0 || !Number.isFinite(amount) || amount <= 0) return false;
+    if (e.kind === "blightWorm" && (e.burrow || e.untargetable)) return false;
     if (source === "ranged") {
       let shield: Enemy | undefined;
       for (const g of this.shieldGenerators) {
@@ -1135,7 +1148,8 @@ export class DefendSim {
     // back (never a burrowed mole's ground).
     const through = (m: number) => (pierce && m < 1 ? m + (1 - m) * pierce : m);
     const guard = damageModifier(this, e, origin, source, projectile);
-    amount *= e.kind === "burrowingMole" ? guard : through(guard);
+    amount *= e.kind === "burrowingMole" || e.kind === "blightWorm" ? guard : through(guard);
+    if (e.kind === "blightWorm" && e.leader === undefined) amount *= BLIGHT_WORM.headMultiplier;
     if (e.kind === "iceGolem" && element !== "physical") amount *= 2;
     amount *= through(ENEMIES[e.kind].damageScale?.[element] ?? 1);
     if (e.brittle && e.freeze) amount *= SHATTER.brittle[1];

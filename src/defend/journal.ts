@@ -71,7 +71,7 @@ export function journalHTML(discovered: EnemyKind[]): string {
   const groups = AREAS.map(area => {
     const roster = new Set(AREA_ENEMIES[area.id]);
     // Authored opening enemies do not enter the legacy procedural roster.
-    if (area.id === "moss") { roster.add("darkling"); roster.add("miniDarkling"); roster.add("largeDarkling"); roster.add("majorDarkling"); }
+    if (area.id === "moss") { roster.add("darkling"); roster.add("miniDarkling"); roster.add("largeDarkling"); roster.add("majorDarkling"); roster.add("significantDarkling"); roster.add("blightWorm"); }
     // Raised and hatched enemies belong beside their parent species.
     if (roster.has("necromancer")) roster.add("skeleton");
     if (roster.has("ashPhoenix")) roster.add("phoenixEgg");

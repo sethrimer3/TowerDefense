@@ -1,6 +1,6 @@
 # Enemy migration tracker
 
-Started 2026-10-29. This is the working checklist for replacing the old enemy lineups. **Absolute Defend waves 1–10 are updated.** All 30 Ambush levels (600 waves) and Defend waves 11–200 remain **outdated**. Later endless Defend waves remain outdated as well.
+Started 2026-10-29. This is the working checklist for replacing the old enemy lineups. **Absolute Defend waves 1–20 are updated.** All 30 Ambush levels (600 waves) and Defend waves 21–200 remain **outdated**. Later endless Defend waves remain outdated as well.
 
 ## Direction
 
@@ -19,7 +19,10 @@ Started 2026-10-29. This is the working checklist for replacing the old enemy li
 | Defend 4 | Large Darkling | 3 × 3 black art pixels | 18 | 4 / 1 second | 1 | Two Darklings; each then splits into two minis |
 | Defend 6 | Major Darkling | 4 × 4 black art pixels, portal outline | 54 | 8 / 1 second | 0.8 | Three Large Darklings (21 bodies in all) |
 
-An art pixel is 1/8 of a board cell and scales with the camera. All four kinds use solid black square drawing under normal, Pixel Art, Simple enemies and merged-outline settings, without decorative sprites. The stats are initial tuning values.
+| Defend 11 | Significant Darkling | 5 × 5 black art pixels, portal outline | 162 | 16 / 1 second | 0.65 | Two Major Darklings (44 descendants; 45 bodies including parent) |
+| Defend 20 | Blight Worm | Fifty touching 5 × 5 black art-pixel segments, portal perimeter | 300 each | 4 contact / 0.6 seconds per target; 5 underground per building pass | 3 surface / 4 underground | Each segment releases three Significant Darklings; cuts create independent heads |
+
+An art pixel is 1/8 of a board cell and scales with the camera. All five Darkling kinds use solid black square drawing under normal, Pixel Art, Simple enemies and merged-outline settings, without decorative sprites. The stats are initial tuning values.
 
 ## Change log
 
@@ -57,9 +60,30 @@ Accounting budgets are 40/80/160/240/400 for waves 6–10.
 
 - **2026-10-29 — Blight packing and attack transfer.** Ground bodies now block one another and build visible rear ranks. Touching living Dark One members transfer their own ready basic hits to a front-line target through native defenses; gaps/deaths break the chain. Darkling body fills and narrow-gap contours are batched as a crowd. This intentionally changes battle outcomes and replay hashes, while roster compositions and migration statuses remain unchanged. See [packing rules and validation](BLIGHT_PRESSURE.md).
 
+- **2026-10-30 — [x] Updated Defend waves 11–20 (Mossbound Ruins).** Significant Darklings add the fifth size; Major and Significant bodies share the burning portal contour. Initial rosters below are tuning data, evenly interleaved across the native five-second release, with no random draws. Total HP and body counts include every descendant.
+
+| Wave | Exact initial roster | Total bodies | Total HP |
+|---|---|---:|---:|
+| 11 | 10 Significant + 40 Major | 1330 | 11700 |
+| 12 | 20 Significant + 40 Major + 100 Darklings | 2080 | 17680 |
+| 13 | 30 Significant + 40 Major + 60 Large | 2650 | 23940 |
+| 14 | 40 Significant + 40 Major + 200 Darklings | 3280 | 28640 |
+| 15 | 50 Significant + 50 Major | 3350 | 33300 |
+| 16 | 60 Significant + 50 Major + 100 Large | 4500 | 42080 |
+| 17 | 80 Significant + 30 Major + 150 minis | 4410 | 45180 |
+| 18 | 90 Significant + 20 Major + 100 Darklings | 4790 | 49180 |
+| 19 | 100 Significant + 20 Major | 4940 | 53160 |
+| 20 | One Blight Worm (50 segments) | 6800 | 89700 |
+
+Wave 20's tree is 50 worm segments + 150 Significant + 300 Major + 900 Large + 1800 Darklings + 3600 minis. Only wave 20 raises its per-wave cap to 7000; the global/other-wave cap stays 5000. Every surfaced segment is 5/8 cell wide, so the worm is about 31 cells long. Heads wander independently of the keep, bounce at native contact using fixed rotations of at least 45°, and leave an exact arc-length trail for the body. Every segment damages structures and people it runs over, without stopping to fight. A cut inherits the trail behind its new head, with independent steering and burrow timers; each head takes 4× damage. Freeze/stagger do not stop the worm; chill slows its head. Worms are outside packing and attack transfer but still contribute color drain.
+
+A dive commits a straight ray at the keep center. Segments dive/surface in trail order, visible only as translucent shadows while underground, fully immune and untargetable. Each underground segment damages each structure on or beside its path once, through walls, water, boulders and keep. Heads continue on the ray to the first dry open point four cells past the keep's far edge, or the last open point before the board edge, with a timeout guard. Underground deaths release surfaced offspring at nearest open ground. These behaviors, contact with people, the sizes, per-wave cap and tuning are the implementation assumptions to review. A shared boss bar sums living segments. Normal and Simple art, journal portraits and outline-free exports use the same replaceable five-pixel bodies. All state is transient, and worm randomness uses `sim.rand` only.
+
+Replay fixture `mixed` advances into wave 11 at 80 seconds, so its later hashes are intentionally re-recorded for the new authored roster. Other replay scenarios and city/fence/save goldens are expected unchanged. Waves 21 onward and all Ambush levels retain their legacy rosters.
+
 ## Color drain and performance rules
 
-Faction is explicit in the enemy catalog; never infer darkness from a sprite's color. Currently tagged: Mini Darkling, Darkling, Large Darkling, Major Darkling, Mother, Broodling, Dark Knight, Void Sparrow, Necromancer, Skeleton, Blink Imp, Crypt Hound and Grave Wisp. Future Dark One enemies must carry the same faction tag. Other species' allegiance is still pending their migration/story review. Friendly dark wizards and shades do not contribute; neither do dead enemies, fortress parts or Siege proxy objects.
+Faction is explicit in the enemy catalog; never infer darkness from a sprite's color. Currently tagged: Mini Darkling, Darkling, Large Darkling, Major Darkling, Significant Darkling, Blight Worm, Mother, Broodling, Dark Knight, Void Sparrow, Necromancer, Skeleton, Blink Imp, Crypt Hound and Grave Wisp. Future Dark One enemies must carry the same faction tag. Other species' allegiance is still pending their migration/story review. Friendly dark wizards and shades do not contribute; neither do dead enemies, fortress parts or Siege proxy objects.
 
 The estimate uses fixed 4-cell buckets, neighboring buckets for density, and two reusable 144 × 208 alpha fields (drain and night heat), sampled at most ten times per second while simulation time advances. Each occupied bucket emits one smooth radial patch at its centroid; strongest-patch blending keeps overlapping groups from artificially multiplying their strength. There are no pairwise crowd queries. Two canvas blend passes desaturate and wash out the existing detailed world, followed at night by the dark crimson halo without scene copies, full-scene CPU pixel reads, blur or per-enemy filters. The field lookup avoids square roots in its inner loop. Mask memory and patch work are bounded by board size. The world-space mask follows pan and zoom. A reusable combat-art layer and screen mask exclude unit/shot alpha, while visibility contours, HUD and inspection overlays remain readable. Counts and neighborhood boundaries are intentionally approximate.
 
@@ -827,7 +851,7 @@ Each level currently has 20 waves from the existing procedural placeholder lineu
 
 ## Defend — first 200-wave zone cycle
 
-Defend is endless: these are its first ten 20-wave areas, not a finite level list. Only absolute waves 1–10 use the new authored lineups. In later cycles, area-local wave 1 (201, 401, …) still uses the legacy generator.
+Defend is endless: these are its first ten 20-wave areas, not a finite level list. Only absolute waves 1–20 use the new authored lineups. In later cycles, area-local wave 1 (201, 401, …) still uses the legacy generator.
 
 ### Mossbound Ruins — waves 1–20
 
@@ -841,16 +865,16 @@ Defend is endless: these are its first ten 20-wave areas, not a finite level lis
 - [x] Wave 8: **updated** — 20 Major Darklings; each splits into 3 Large Darklings.
 - [x] Wave 9: **updated** — 30 Major Darklings; each splits into 3 Large Darklings.
 - [x] Wave 10: **updated** — 50 Major Darklings; each splits into 3 Large Darklings.
-- [ ] Wave 11: **outdated**
-- [ ] Wave 12: **outdated**
-- [ ] Wave 13: **outdated**
-- [ ] Wave 14: **outdated**
-- [ ] Wave 15: **outdated**
-- [ ] Wave 16: **outdated**
-- [ ] Wave 17: **outdated**
-- [ ] Wave 18: **outdated**
-- [ ] Wave 19: **outdated**
-- [ ] Wave 20: **outdated**
+- [x] Wave 11: **updated** — 10 Significant + 40 Major.
+- [x] Wave 12: **updated** — 20 Significant + 40 Major + 100 Darklings.
+- [x] Wave 13: **updated** — 30 Significant + 40 Major + 60 Large.
+- [x] Wave 14: **updated** — 40 Significant + 40 Major + 200 Darklings.
+- [x] Wave 15: **updated** — 50 Significant + 50 Major.
+- [x] Wave 16: **updated** — 60 Significant + 50 Major + 100 Large.
+- [x] Wave 17: **updated** — 80 Significant + 30 Major + 150 minis.
+- [x] Wave 18: **updated** — 90 Significant + 20 Major + 100 Darklings.
+- [x] Wave 19: **updated** — 100 Significant + 20 Major.
+- [x] Wave 20: **updated** — one Blight Worm, 50 segments; 6800 bodies including all offspring.
 
 ### Amber Desert — waves 21–40
 

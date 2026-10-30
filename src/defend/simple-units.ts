@@ -1,3 +1,4 @@
+import { wormBodyVisible } from "./blight-worm-art.ts";
 import { ART } from "./art-scale.ts";
 import { basicName, basicUnitSprite } from "./basic-unit-art.ts";
 import { hasArtOverride } from "./art-overrides.ts";
@@ -100,7 +101,7 @@ export function drawDarklingBodies({ c, px }: Brush, enemies: readonly Enemy[], 
   let any = false;
   for (const e of enemies) {
     const side = ENEMIES[e.kind].darkPixels;
-    if (!side || e.raidProxy) continue;
+    if (!side || e.raidProxy || !wormBodyVisible(e)) continue;
     const d = px / ART * side;
     if (replacements && hasArtOverride(basicName(e.kind, true))) {
       drawSprite(c, basicUnitSprite(e.kind, true), e.x * px - d / 2, e.y * px - d / 2, d, d);
