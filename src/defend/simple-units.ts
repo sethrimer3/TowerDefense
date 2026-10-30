@@ -1,4 +1,7 @@
 import { ART } from "./art-scale.ts";
+import { basicName, basicUnitSprite } from "./basic-unit-art.ts";
+import { hasArtOverride } from "./art-overrides.ts";
+import { drawSprite } from "./damage-art.ts";
 /** The Simple enemies and Simple troops settings: every unit drawn as one
  * crisp square body; UnitContours supplies its outside outline. Lit along the top and
  * left and shaded along the bottom and right, one art pixel each. Squares
@@ -9,6 +12,7 @@ import type { Enemy, Soldier } from "./sim.ts";
 import type { UnitInks } from "./unit-outline.ts";
 
 type Brush = { c: CanvasRenderingContext2D; px: number };
+const DARKLING_SOURCES = ["miniDarkling", "darkling", "largeDarkling"].map(kind => basicName(kind, true));
 
 export { TROOPS } from "./unit-bodies.ts";
 import { TROOPS } from "./unit-bodies.ts";
@@ -69,7 +73,7 @@ function queue(px: number, k: number, x: number, y: number, size: number, color:
  * With `rims`, the outlines go there (merged outlines, `unit-outline.ts`). */
 export function drawSimpleEnemies({ c, px }: Brush, enemies: readonly Enemy[], rims = c, inks?: UnitInks, rimFor?: (color: string) => CanvasRenderingContext2D) {
   const k = artPixel(px);
-  drawDarklingBodies({ c, px }, enemies);
+  drawDarklingBodies({ c, px }, enemies, false);
   for (const e of enemies) {
     const def = ENEMIES[e.kind];
     if (def.darkPixels) continue;
@@ -90,13 +94,18 @@ export function drawSimpleTroops({ c, px }: Brush, soldiers: readonly Soldier[],
 
 /** Fill pixel bodies as one union. Separate antialiased fillRect calls can
  * leave faint seams where two flush bodies meet under a fractional camera. */
-export function drawDarklingBodies({ c, px }: Brush, enemies: readonly Enemy[]) {
+export function drawDarklingBodies({ c, px }: Brush, enemies: readonly Enemy[], sourceArt = true) {
   c.fillStyle = "#000000"; c.beginPath();
+  const replacements = sourceArt && DARKLING_SOURCES.some(hasArtOverride);
   let any = false;
   for (const e of enemies) {
     const side = ENEMIES[e.kind].darkPixels;
     if (!side || e.raidProxy) continue;
     const d = px / ART * side;
+    if (replacements && hasArtOverride(basicName(e.kind, true))) {
+      drawSprite(c, basicUnitSprite(e.kind, true), e.x * px - d / 2, e.y * px - d / 2, d, d);
+      continue;
+    }
     c.rect(e.x * px - d / 2, e.y * px - d / 2, d, d); any = true;
   }
   if (any) c.fill();

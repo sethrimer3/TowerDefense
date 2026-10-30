@@ -105,6 +105,29 @@ try {
         });
       } catch {}
       if (maskMode() !== null) throw new Error("Mask state leaked after an exception");
+      // The crowd union fast path must still honor named artist sources.
+      const { drawDarklingBodies } = await import("/src/defend/simple-units.ts");
+      const { basicName } = await import("/src/defend/basic-unit-art.ts");
+      const { setArtOverride } = await import("/src/defend/art-overrides.ts");
+      const { bumpPixelArt, setPixelArt } = await import("/src/defend/pixel-sprites.ts");
+      const name = basicName("miniDarkling", true),
+        crowd = make();
+      setArtOverride(name, { data: new Uint32Array([red]), w: 1, h: 1 });
+      bumpPixelArt();
+      try {
+        const enemy = { kind: "miniDarkling", x: 2.0625, y: 2.0625, id: 1, hp: 1 };
+        drawDarklingBodies({ c: crowd.getContext("2d"), px: 8 }, [enemy]);
+        if (read(crowd)[16 * 40 + 16] !== red || read(crowd)[16 * 40 + 15])
+          throw new Error("Crowd source override or anchor was lost");
+        setPixelArt(false);
+        crowd.getContext("2d").clearRect(0, 0, 40, 40);
+        drawDarklingBodies({ c: crowd.getContext("2d"), px: 8 }, [enemy]);
+        if (read(crowd)[16 * 40 + 16] !== rgba(0)) throw new Error("Darkling material or Pixel Art fallback changed");
+      } finally {
+        setArtOverride(name, null);
+        setPixelArt(true);
+        bumpPixelArt();
+      }
     });
     console.log("Outside rings, body/rim masks, anchors and joined edges passed at 1×, 2× and 3×.");
     await page.close();

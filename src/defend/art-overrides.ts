@@ -36,6 +36,10 @@ type Art = { data: Uint32Array; w: number; h: number };
 const art = new Map<string, Art>();
 const warned = new Set<string>();
 
+/** Cheap presence probe for batched uniform bodies. Pixel reads stay in the
+ * source/cache creation path, even in crowds with thousands of Darklings. */
+export const hasArtOverride = (name: string) => pixelArtOn() && art.has(name);
+
 /** The artist's pixels for `name` (`w × h` art pixels), or null. */
 export function artOverride(name: string, w: number, h: number): Uint32Array | null {
   const a = art.get(name);
