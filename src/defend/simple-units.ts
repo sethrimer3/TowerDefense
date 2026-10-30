@@ -12,7 +12,7 @@ import type { Enemy, Soldier } from "./sim.ts";
 import type { UnitInks } from "./unit-outline.ts";
 
 type Brush = { c: CanvasRenderingContext2D; px: number };
-const DARKLING_SOURCES = ["miniDarkling", "darkling", "largeDarkling"].map(kind => basicName(kind, true));
+const DARKLING_SOURCES = Object.values(ENEMIES).filter(def => def.darkPixels).map(def => basicName(def.kind, true));
 
 export { TROOPS } from "./unit-bodies.ts";
 import { TROOPS } from "./unit-bodies.ts";

@@ -9,6 +9,10 @@ export const PLAYER_UNIT_INK = '#121d42';
 export const NEUTRAL_UNIT_INK = '#140c0a';
 export const MARKED_UNIT_INK = '#f2c94c';
 export const BROOD_UNIT_INK = '#6b3d8f';
+/** A portal contour's key and fallback colour: where the fiery dimension
+ * (`portal-noise.ts`) shows through, drawn `PORTAL_CONTOUR_WIDTH` times wider. */
+export const PORTAL_UNIT_INK = '#e85c12';
+export const PORTAL_CONTOUR_WIDTH = 2;
 
 /** South-facing wall masonry projects this far beyond its solid cell. */
 export const WALL_FACE_HANG = .45;

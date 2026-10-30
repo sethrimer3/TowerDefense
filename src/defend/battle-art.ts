@@ -1,6 +1,6 @@
 import { basicUnitSprite } from "./basic-unit-art.ts";
 import { drawSprite } from "./damage-art.ts";
-import { ART, UNIT_CONTOUR_ART_PIXELS, DARK_UNIT_INK, PLAYER_UNIT_INK, NEUTRAL_UNIT_INK, MARKED_UNIT_INK, BROOD_UNIT_INK } from "./art-scale.ts";
+import { ART, UNIT_CONTOUR_ART_PIXELS, DARK_UNIT_INK, PLAYER_UNIT_INK, NEUTRAL_UNIT_INK, MARKED_UNIT_INK, BROOD_UNIT_INK, PORTAL_UNIT_INK } from "./art-scale.ts";
 import {drawChrono} from "./chrono-art.ts";
 import { drawFortress } from "./fortress-art.ts";
 import { drawIceEnemy } from "./ice-enemy-art.ts";
@@ -109,6 +109,7 @@ export type Simple = { enemies?: boolean; troops?: boolean; reduceMotion?: boole
 /** An enemy's contour: crimson for the Dark One's, gold while a watch tower
  * marks it, violet for the brood, black for the rest. */
 function enemyInk(e: Enemy) {
+  if (ENEMIES[e.kind].portalOutline) return PORTAL_UNIT_INK;
   if (ENEMIES[e.kind].faction === "darkOne") return DARK_UNIT_INK;
   if (e.marked) return MARKED_UNIT_INK;
   if (e.kind === "mother" || e.kind === "broodling") return BROOD_UNIT_INK;
@@ -171,8 +172,13 @@ export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, hea
     }
     else if (simple.enemies) drawSimpleEnemies(u, sim.enemies.filter(e=>!e.raidProxy), layers?.rims, sides, rimFor);
     else {
-      const pixel = contours && sim.enemies.find(e => !e.raidProxy && ENEMIES[e.kind].darkPixels);
-      if (pixel) { unit?.(pixel.id); outline!.mergePixelGaps(); drawDarklingBodies(u, sim.enemies); }
+      // Pixel bodies are filled as one union per contour ink (a portal's apart).
+      const pixel = contours && sim.enemies.some(e => !e.raidProxy && ENEMIES[e.kind].darkPixels);
+      if (pixel) {
+        const groups = new Map<string | undefined, Enemy[]>();
+        for (const e of sim.enemies) if (!e.raidProxy && ENEMIES[e.kind].darkPixels) { const ink = sides!.ink(e.id); const group = groups.get(ink); if (group) group.push(e); else groups.set(ink, [e]); }
+        for (const group of groups.values()) { unit?.(group[0].id); outline!.mergePixelGaps(); drawDarklingBodies(u, group); }
+      }
       for (const e of sim.enemies) if (!e.raidProxy && !(pixel && ENEMIES[e.kind].darkPixels)) { unit?.(e.id); drawEnemyArt(u, e, sim, layers ? b : undefined); }
     }
     if (contours) drawSwords(u, swords, unit);
