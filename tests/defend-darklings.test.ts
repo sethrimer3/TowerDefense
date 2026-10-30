@@ -19,14 +19,14 @@ const fixture = () => {
 const crowd = (n: number, kind: EnemyKind = 'miniDarkling', x = 20, y = 20) => Array.from({ length: n }, (_, id) => ({ kind, x, y, hp: 1, id } as Enemy));
 const at = (d: DarkDensity, x: number, y: number) => d.field[Math.floor(y * 2) * DRAIN_W + Math.floor(x * 2)];
 
-test('authored opening is 30 minis and 5 Darklings, independent of RNG; waves 6 onward retain legacy roster', () => {
+test('authored opening is 30 minis and 5 Darklings, independent of RNG; waves 11 onward retain legacy roster', () => {
   const wave = buildWave(1, () => { throw Error('opening must not roll'); });
   assert.equal(wave.length, 35);
   assert.equal(wave.filter(k => k === 'miniDarkling').length, 30);
   assert.equal(wave.filter(k => k === 'darkling').length, 5);
   assert.equal(wave.reduce((sum, k) => sum + ENEMIES[k].cost, 0), waveDifficulty(1));
   for (let i = 0; i < 5; i++) assert.deepEqual(wave.splice(-7).reverse(), [...Array(6).fill('miniDarkling'), 'darkling']);
-  for (const n of [6, 20, 181, 200, 201, 202, 203, 204, 205, 1000]) assert.ok(buildWave(n, () => .5).every(k => !ENEMIES[k].scriptedOnly));
+  for (const n of [11, 20, 181, 200, 201, 202, 203, 204, 205, 1000]) assert.ok(buildWave(n, () => .5).every(k => !ENEMIES[k].scriptedOnly));
   assert.ok(buildDifficultyWave(100, () => .5).every(k => !ENEMIES[k].scriptedOnly));
 });
 
@@ -61,8 +61,8 @@ test('splitting respects the native hard cap', () => {
   assert.equal((sim as any).waveSpawned, MAX_WAVE_ENEMIES);
 });
 
-test('one, two and three art-pixel bodies stay plain black in normal and Simple settings, even when struck or marked', () => {
-  for (const [kind, side] of [['miniDarkling', 1], ['darkling', 2], ['largeDarkling', 3]] as const) {
+test('one to four art-pixel bodies stay plain black in normal and Simple settings, even when struck or marked', () => {
+  for (const [kind, side] of [['miniDarkling', 1], ['darkling', 2], ['largeDarkling', 3], ['majorDarkling', 4]] as const) {
     for (const px of [8, 24]) {
       const boxes: number[][] = [];
       const c = { fillStyle: '', fillRect(...args: number[]) { assert.equal(this.fillStyle, '#000000'); boxes.push(args); }, rect(...args: number[]) { assert.equal(this.fillStyle, '#000000'); boxes.push(args); }, beginPath() {}, fill() {} } as unknown as CanvasRenderingContext2D;
@@ -108,18 +108,23 @@ test('explicit Dark One types contribute, other enemies, dead bodies, multipart 
 });
 
 
-test('authored waves 2–5 have exact requested counts and fresh independent queues', () => {
+test('authored waves 2–10 have exact requested counts and fresh independent queues', () => {
   const expected = [
-    { wave: 2, miniDarkling: 45, darkling: 15, largeDarkling: 0, budget: 75 },
-    { wave: 3, miniDarkling: 0, darkling: 50, largeDarkling: 0, budget: 100 },
-    { wave: 4, miniDarkling: 0, darkling: 80, largeDarkling: 5, budget: 180 },
-    { wave: 5, miniDarkling: 0, darkling: 0, largeDarkling: 30, budget: 120 },
+    { wave: 2, miniDarkling: 45, darkling: 15, largeDarkling: 0, majorDarkling: 0, budget: 75 },
+    { wave: 3, miniDarkling: 0, darkling: 50, largeDarkling: 0, majorDarkling: 0, budget: 100 },
+    { wave: 4, miniDarkling: 0, darkling: 80, largeDarkling: 5, majorDarkling: 0, budget: 180 },
+    { wave: 5, miniDarkling: 0, darkling: 0, largeDarkling: 30, majorDarkling: 0, budget: 120 },
+    { wave: 6, miniDarkling: 0, darkling: 0, largeDarkling: 0, majorDarkling: 5, budget: 40 },
+    { wave: 7, miniDarkling: 0, darkling: 0, largeDarkling: 0, majorDarkling: 10, budget: 80 },
+    { wave: 8, miniDarkling: 0, darkling: 0, largeDarkling: 0, majorDarkling: 20, budget: 160 },
+    { wave: 9, miniDarkling: 0, darkling: 0, largeDarkling: 0, majorDarkling: 30, budget: 240 },
+    { wave: 10, miniDarkling: 0, darkling: 0, largeDarkling: 0, majorDarkling: 50, budget: 400 },
   ];
   for (const row of expected) {
     const queue = buildWave(row.wave, () => { throw Error('authored waves must not roll'); });
-    for (const kind of ['miniDarkling', 'darkling', 'largeDarkling'] as const)
+    for (const kind of ['miniDarkling', 'darkling', 'largeDarkling', 'majorDarkling'] as const)
       assert.equal(queue.filter(k => k === kind).length, row[kind], `wave ${row.wave}: ${kind}`);
-    assert.equal(queue.length, row.miniDarkling + row.darkling + row.largeDarkling);
+    assert.equal(queue.length, row.miniDarkling + row.darkling + row.largeDarkling + row.majorDarkling);
     assert.equal(waveDifficulty(row.wave), row.budget);
     queue.pop();
     assert.equal(buildWave(row.wave, () => 0).length, queue.length + 1, 'caller cannot mutate authored roster');
@@ -130,11 +135,11 @@ test('authored waves 2–5 have exact requested counts and fresh independent que
   for (let i = 0; i < 5; i++) assert.deepEqual(four.splice(-17).reverse(), [...Array(16).fill('darkling'), 'largeDarkling']);
 });
 
-test('complete waves include both generations of offspring without ending early or splitting twice', () => {
+test('complete waves include every generation of offspring without ending early or splitting twice', () => {
   const expected = [
-    [2, 0, 15, 75], [3, 0, 50, 100], [4, 5, 90, 180], [5, 30, 60, 120],
+    [2, 0, 0, 15, 75], [3, 0, 0, 50, 100], [4, 0, 5, 90, 180], [5, 0, 30, 60, 120], [6, 5, 15, 30, 60],
   ];
-  for (const [wave, large, dark, mini] of expected) {
+  for (const [wave, major, large, dark, mini] of expected) {
     const sim = fixture(), queue = buildWave(wave, () => 0);
     sim.beginManualWave(wave, waveDifficulty(wave), queue.length);
     for (const kind of queue) assert.ok(sim.spawnAuxiliary(kind, 20, 10));
@@ -143,12 +148,13 @@ test('complete waves include both generations of offspring without ending early 
       for (const enemy of sim.enemies) sim.hurtEnemy(enemy, 1000);
       sim.step(1 / 30);
       assert.equal(sim.wave, wave, 'children retain the wave until cleared');
-      assert.ok(++rounds <= 3, 'only the authored split generations exist');
+      assert.ok(++rounds <= 4, 'only the authored split generations exist');
     }
+    assert.equal(sim.slain.majorDarkling, major);
     assert.equal(sim.slain.largeDarkling, large);
     assert.equal(sim.slain.darkling, dark);
     assert.equal(sim.slain.miniDarkling, mini);
-    assert.equal((sim as any).waveSpawned, large + dark + mini);
+    assert.equal((sim as any).waveSpawned, major + large + dark + mini);
     sim.step(1 / 30);
     assert.equal(sim.enemies.length, 0, 'no repeated split after cleanup');
   }
@@ -185,4 +191,15 @@ test('a local aura clips blending to its bounded world region and clears both bo
     for (let y = 0; y < DRAIN_H; y++) for (let x = 0; x < DRAIN_W; x++)
       if (field[y * DRAIN_W + x] > 0) assert.ok((x + .5) / 2 >= b.x && (x + .5) / 2 <= b.x + b.w && (y + .5) / 2 >= b.y && (y + .5) / 2 <= b.y + b.h);
   d.update([]); assert.equal(d.bounds, null); assert.equal(d.glowBounds, null);
+});
+
+test('Major Darklings split into three Large Darklings, fit the hard cap and wear a portal contour', () => {
+  const def = ENEMIES.majorDarkling;
+  assert.deepEqual(def.splits, { into: 'largeDarkling', count: 3 });
+  assert.equal(def.darkPixels, 4);
+  assert.equal(def.size, 4 / 8);
+  assert.ok(def.portalOutline && def.scriptedOnly && def.faction === 'darkOne');
+  // 50 × (1 + 3 × (1 + 2 × (1 + 2))) = 1100 bodies at most.
+  assert.ok(50 * 22 <= MAX_WAVE_ENEMIES);
+  for (const kind of ['miniDarkling', 'darkling', 'largeDarkling'] as const) assert.ok(!ENEMIES[kind].portalOutline);
 });

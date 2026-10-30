@@ -17,6 +17,11 @@ const AUTHORED_WAVES: Readonly<Partial<Record<number, readonly EnemyKind[]>>> = 
   3: Array<EnemyKind>(50).fill("darkling"),
   4: groups(5, "largeDarkling", "darkling", 16),
   5: Array<EnemyKind>(30).fill("largeDarkling"),
+  6: Array<EnemyKind>(5).fill("majorDarkling"),
+  7: Array<EnemyKind>(10).fill("majorDarkling"),
+  8: Array<EnemyKind>(20).fill("majorDarkling"),
+  9: Array<EnemyKind>(30).fill("majorDarkling"),
+  10: Array<EnemyKind>(50).fill("majorDarkling"),
 };
 
 /** Bounded arithmetic keeps corrupt or extremely late wave numbers finite.

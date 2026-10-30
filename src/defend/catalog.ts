@@ -1060,7 +1060,7 @@ export const HOUSE_HP_PER_CELL = 22;
 
 export type ZoneReinforcementKind = "fernMantis" | "mossTroll" | "lanternHornet" | "glassJackal" | "duneTortoise" | "dustDjinn" | "cinderImp" | "slagGolem" | "emberMoth" | "kelpStalker" | "capCrawler" | "myceliumHulk" | "rotMite" | "geodeCrab" | "prismMoth" | "shardBrood" | "cryptHound" | "graveWisp" | "novaMoth";
 export type ZoneEnemyKind = ZoneReinforcementKind | "briarling" | "mossBoar" | "rootTreant" | "duneScorpion" | "sunScarab" | "sandVulture" | "brineCrab" | "lanternJelly" | "coralGuardian" | "sporeling" | "fungalBrute" | "sporeMoth" | "shardling" | "crystalSentinel" | "prismRay" | "starWisp" | "cometHound" | "astralWarden";
-export type EnemyKind = "miniDarkling" | "darkling" | "largeDarkling" | ZoneEnemyKind | "iceGolem" | "iceCube" | "roach" | "orc" | "ogre" | "bat" | "warlord" | "mother" | "broodling" | "snake" | "dragon" | "shieldBearer" | "aegis" | "darkKnight" | "bombOrc" | "bombBird" | "voidSparrow" | "shieldLesser" | "shieldGreater" | "poisonLesser" | "poisonBearer" | "poisonGreater" | "poisonSovereign" | "siegeBeetle" | "burrowingMole" | "necromancer" | "skeleton" | "bannerCaptain" | "mirrorKnight" | "leechSwarm" | "ashPhoenix" | "phoenixEgg" | "blinkImp" | "fortressHut" | "fortressOutpost" | "fortressTower" | "fortressKeep" | "fortressLesser" | "fortress" | "fortressGreater" | "fortressSovereign" | "rollingCannon" | "ballista" | "fireworkLauncher" | "trebuchet" | "bombard" | "rocketBattery" | "boatDinghy" | "boatSailboat" | "boatCutter" | "boatCog" | "boatLesser" | "boat" | "boatGreater" | "boatSovereign";
+export type EnemyKind = "miniDarkling" | "darkling" | "largeDarkling" | "majorDarkling" | ZoneEnemyKind | "iceGolem" | "iceCube" | "roach" | "orc" | "ogre" | "bat" | "warlord" | "mother" | "broodling" | "snake" | "dragon" | "shieldBearer" | "aegis" | "darkKnight" | "bombOrc" | "bombBird" | "voidSparrow" | "shieldLesser" | "shieldGreater" | "poisonLesser" | "poisonBearer" | "poisonGreater" | "poisonSovereign" | "siegeBeetle" | "burrowingMole" | "necromancer" | "skeleton" | "bannerCaptain" | "mirrorKnight" | "leechSwarm" | "ashPhoenix" | "phoenixEgg" | "blinkImp" | "fortressHut" | "fortressOutpost" | "fortressTower" | "fortressKeep" | "fortressLesser" | "fortress" | "fortressGreater" | "fortressSovereign" | "rollingCannon" | "ballista" | "fireworkLauncher" | "trebuchet" | "bombard" | "rocketBattery" | "boatDinghy" | "boatSailboat" | "boatCutter" | "boatCog" | "boatLesser" | "boat" | "boatGreater" | "boatSovereign";
 export type EnemyDef = {
   kind: EnemyKind;
   /** Allegiance controls the crowd color drain, never inferred from sprite color. */
@@ -1068,7 +1068,9 @@ export type EnemyDef = {
   /** Introduced by an authored wave; keep out of legacy procedural rosters. */
   scriptedOnly?: boolean;
   /** A solid black body on the eight-art-pixels-per-cell lattice. */
-  darkPixels?: 1 | 2 | 3;
+  darkPixels?: 1 | 2 | 3 | 4;
+  /** Its contour is a portal: a screen-anchored fiery noise shows through it (`portal-noise.ts`). */
+  portalOutline?: boolean;
   name: string;
   hp: number;
   /** Species-specific behavior and counterplay shown in the journal. */
@@ -1226,6 +1228,7 @@ export const ENEMIES: Record<EnemyKind, EnemyDef> = {
   miniDarkling: { kind: "miniDarkling", name: "Mini Darkling", faction: "darkOne", scriptedOnly: true, darkPixels: 1, hp: 2, speed: 1.7, damage: 1, cooldown: 1, size: 1 / 8, color: "#000000", distraction: 0, flying: false, cost: 1, description: "One dark pixel of the Dark One's horde. Weak alone. Touching Blight packs transfer rear attacks to the front; nearby dark enemies drain the world's color." },
   darkling: { kind: "darkling", name: "Darkling", faction: "darkOne", scriptedOnly: true, darkPixels: 2, hp: 6, speed: 1.3, damage: 2, cooldown: 1, size: 2 / 8, color: "#000000", distraction: 0, flying: false, cost: 2, splits: { into: "miniDarkling", count: 2 }, description: "A black two-by-two pixel square. Defeating it releases two Mini Darklings. Its attack can pass through a touching Blight front line." },
   largeDarkling: { kind: "largeDarkling", name: "Large Darkling", faction: "darkOne", scriptedOnly: true, darkPixels: 3, hp: 18, speed: 1, damage: 4, cooldown: 1, size: 3 / 8, color: "#000000", distraction: 0, flying: false, cost: 4, splits: { into: "darkling", count: 2 }, description: "A black three-by-three pixel square of the Dark One. Defeating it releases two Darklings, each of which splits into two Mini Darklings. Touching Blight packs channel every member’s attack through the front line." },
+  majorDarkling: { kind: "majorDarkling", name: "Major Darkling", faction: "darkOne", scriptedOnly: true, darkPixels: 4, portalOutline: true, hp: 54, speed: 0.8, damage: 8, cooldown: 1, size: 4 / 8, color: "#000000", distraction: 0, flying: false, cost: 8, splits: { into: "largeDarkling", count: 3 }, description: "A black four-by-four pixel square whose outline is a tear into a burning dimension. Defeating it releases three Large Darklings, twenty-one bodies in all down to the last Mini Darkling." },
 };
 
 /** Multipliers the player's Smithy and skill trees lay over a run, on top

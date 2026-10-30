@@ -688,6 +688,12 @@ The gradual loss of color and contrast around a dense group of Dark One enemies,
 **Large Darkling**:
 A Dark One enemy consisting of a three-by-three black pixel square, splitting into two Darklings when defeated.
 
+**Major Darkling**:
+A Dark One enemy consisting of a four-by-four black pixel square, splitting into three Large Darklings when defeated. Its outline is a portal contour.
+
+**Portal contour**:
+A unit outline that shows a burning dimension through it, as if that dimension filled the whole screen unseen and the outline were a cut into it.
+
 **Art pixel**:
 The world-art unit: one eighth of a board cell, scaled to screen pixels by camera zoom and display density.
 
