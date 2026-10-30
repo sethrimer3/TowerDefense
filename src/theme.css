@@ -895,6 +895,16 @@ dialog::before {
   background: url("../assets/theme/seal.svg") center / contain no-repeat;
   filter: drop-shadow(0 2px 2px #3a1a0a80);
 }
+/* The pixel-art seal (seal-art.ts), upright and two screen pixels an art
+   pixel; Show legacy graphics brings back the smooth one above. */
+:root:not(.legacy-graphics) dialog::before {
+  top: 8px;
+  width: 52px;
+  height: 52px;
+  transform: translateX(-50%);
+  background-image: var(--seal-art, url("../assets/theme/seal.svg"));
+  image-rendering: pixelated;
+}
 dialog > small {
   color: var(--ink-soft);
 }
@@ -1431,12 +1441,24 @@ dialog .away-row .away-note {
 .defend-wave small { font-size: inherit; }
 .defend-wave .ui-sprite { margin-right: 4px; }
 .defend-wave b { color: #ffe1a0; }
+/* The Wave button and each wave's row show their zone's wall stones
+   (`--area-wall`, wall-tiles.ts), two screen pixels an art pixel, darkened
+   under the text; rows shift the tile so the stones don't repeat row to row. */
 .defend-left .defend-wave, .wave-list .wave-row {
-  background: linear-gradient(#ffffff14, #00000038), var(--area-dark);
+  background:
+    linear-gradient(#000000a0, #000000b8),
+    var(--area-wall, none) 0 var(--wall-at, 0) / 128px 128px repeat,
+    var(--area-dark);
+  image-rendering: pixelated;
   border-color: var(--area-color);
   color: var(--area-color);
 }
 .defend-wave b, .wave-row .wave-difficulty { color: var(--area-color); }
+/* One black pixel out from every letter, straight up, down and to the sides,
+   so the zones' bright colours read on parchment and on stone alike. */
+.wave-area, .wave-name, .defend-left .defend-wave small, .defend-left .defend-wave b {
+  text-shadow: 1px 0 #000, -1px 0 #000, 0 1px #000, 0 -1px #000;
+}
 .wave-area { margin: 10px 0 2px; color: var(--area-color); font-size: 14px; }
 .wave-area small { display: block; font-size: 9px; margin-top: 3px; }
 .wave-list .wave-row .wave-bar i, .wave-list .wave-row.boss .wave-bar i { background: linear-gradient(var(--area-color), var(--area-dark)); }
@@ -1469,7 +1491,7 @@ dialog .away-row .away-note {
   letter-spacing: 1px;
   text-transform: uppercase;
   color: #ffb8a0;
-  text-shadow: 0 1px 0 #000, 0 0 6px #ff4a2a90;
+  text-shadow: 1px 0 #000, -1px 0 #000, 0 1px #000, 0 -1px #000, 0 0 6px #ff4a2a90;
 }
 .wave-bar {
   height: 8px;
@@ -1810,8 +1832,6 @@ dialog .away-row .away-note {
 .defend-keep-meter { position: relative; display: block; width: 74px; height: 18px; }
 .defend-keep .defend-keep-meter canvas { position: absolute; left: 0; top: -6px; display: block; width: 74px; height: 36px; margin: 0; }
 .defend-hud > :first-child { margin-left: 0; }
-.defend-wave { position: relative; isolation: isolate; overflow: hidden; }
-.defend-wave .defend-wave-wall { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; image-rendering: pixelated; filter: brightness(.35); }
 #defend-upgrades { display: inline-flex; align-items: center; gap: 4px; }
 #defend-upgrades .ui-sprite { width: 22px; height: 22px; image-rendering: pixelated; }
 .defend-journal-zone-title { padding: 8px; background: var(--area-dark); color: #f4e3b8; text-align: left; }

@@ -16,7 +16,7 @@ import { allEnemyKinds, journalHTML, paintJournal } from "./journal.ts";
 import { paintPortraits } from "./journal-portrait.ts";
 import { wavePickerHTML } from "./wave-picker.ts";
 import { areaForWave, areaStyle, type AreaId } from "./areas.ts";
-import { hasWallArt, wallCapSprite } from "./area-wall-art.ts";
+import { installWallTiles } from "../ui/wall-tiles.ts";
 import { uiSprite } from "../ui/dom.ts";
 import { KeepBricks } from "./keep-bricks.ts";
 /** The DEFEND page: the palette and the board (everything the palette
@@ -204,6 +204,7 @@ export class DefendPage {
   constructor(root: HTMLElement, host: DefendHost) {
     this.root = root;
     this.host = host;
+    installWallTiles();
     Object.assign(window, { defendFrameTimes: (enabled?: boolean) => this.frameTimes.toggle(enabled) });
     window.addEventListener("resize", () => this.layoutBoard());
     document.addEventListener('visibilitychange', () => { this.lastTime = 0; this.stopSummoning(); });
@@ -430,7 +431,7 @@ export class DefendPage {
     if (this.phase === "build") {
       el.innerHTML = `${this.sideToggle(t("control.build"))}<button id="defend-upgrades" title="Your tiles: buy more buildings and bombs"><canvas class="ui-sprite" width="48" height="48" aria-hidden="true"></canvas>${t("nav.tiles")}</button>
         <button class="defend-go" id="defend-start">${this.testerSelected ? t("control.startTester") : t("control.start")}</button>
-        <button class="defend-wave" id="defend-wave" style="${areaStyle(areaForWave(startingWave(this.save)))}" title="Choose the starting wave · ${this.testerSelected ? "Unit tester" : areaForWave(startingWave(this.save)).name}" aria-haspopup="dialog"><canvas class="defend-wave-wall" aria-hidden="true" width="64" height="16"></canvas>${uiSprite("stage-select")}<small>${t("control.wave")} </small><b>${this.testerSelected ? t("control.tester") : startingWave(this.save)}</b></button>`;
+        <button class="defend-wave" id="defend-wave" style="${areaStyle(areaForWave(startingWave(this.save)))}" title="Choose the starting wave · ${this.testerSelected ? "Unit tester" : areaForWave(startingWave(this.save)).name}" aria-haspopup="dialog">${uiSprite("stage-select")}<small>${t("control.wave")} </small><b>${this.testerSelected ? t("control.tester") : startingWave(this.save)}</b></button>`;
       el.querySelector<HTMLButtonElement>("#defend-upgrades")!.onclick = () => this.host.openTiles?.();
       paintIcon(el.querySelector<HTMLCanvasElement>("#defend-upgrades canvas")!, "cityTile");
       this.bindSideToggle(el);
@@ -441,7 +442,6 @@ export class DefendPage {
       };
       center.prepend(el.querySelector("#defend-start")!);
       extra.append(el.querySelector("#defend-wave")!);
-      this.paintWaveWall();
     } else if (this.phase === "sim") {
       const armed = performance.now() < this.abandonArmed;
       el.innerHTML = `${this.sideToggle(this.sim?.unitTester ? t("control.enemies") : t("control.skills"))}<button id="defend-abandon" class="defend-danger ${armed ? "armed" : ""}">${armed ? t("control.confirm") : t("control.abandon")}</button>
@@ -468,25 +468,6 @@ export class DefendPage {
       };
       extra.append(el.querySelector("#defend-speed")!);
     } else el.innerHTML = "";
-  }
-
-  /** Reuse the selected area's native city-wall cap art. */
-  private paintWaveWall() {
-    const canvas = this.root.querySelector<HTMLCanvasElement>(".defend-wave-wall")!;
-    const c = canvas.getContext("2d")!;
-    const area = areaForWave(startingWave(this.save)).id;
-    c.imageSmoothingEnabled = false;
-    if (hasWallArt(area)) {
-      for (let x = 0; x < 4; x++) c.drawImage(wallCapSprite(area, x, 0)!, x * 16, 0);
-    } else {
-      const img = new Image();
-      img.onload = () => {
-        // The run's top two rows (y 1–2) are nearly transparent, so start
-        // below them: the button's own background showed through as a block.
-        for (let x = 0; x < 4; x++) c.drawImage(img, 38, 3 + x * 15, 16, 16, x * 16, 0, 16, 16);
-      };
-      img.src = `${(import.meta as ImportMeta & { env?: { BASE_URL?: string } }).env?.BASE_URL ?? "./"}assets/defend/wall-cap.png`;
-    }
   }
 
   /** Leaves the fallen city for the build phase: the summary closes and the

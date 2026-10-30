@@ -503,3 +503,16 @@ export function wallPieces():ArtPiece[]{
   }
   return out;
 }
+
+/** The area's wall caps as one seamless 8 × 8 cell tile (the cap art repeats
+ * every eight cells each way), at the joined sprites' own scale: the wave
+ * picker's buttons wear it as their background. */
+export const WALL_TILE = 8 * WALL_SOURCE_ART;
+export function wallTilePixels(area: AreaId) {
+  const out = new Uint32Array(WALL_TILE * WALL_TILE), s = WALL_SOURCE_ART;
+  for (let cy = 0; cy < 8; cy++) for (let cx = 0; cx < 8; cx++) {
+    const cell = wallSourcePixels(area, cx, cy);
+    for (let y = 0; y < s; y++) out.set(cell.subarray(y * s, y * s + s), (cy * s + y) * WALL_TILE + cx * s);
+  }
+  return out;
+}

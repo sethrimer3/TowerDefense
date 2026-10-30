@@ -29,7 +29,7 @@ export function wavePickerHTML(save: DefendSave, developerMode = false, testerSe
     if ((wave - 1) % WAVES_PER_AREA === 0) rows.push(`<h3 class="wave-area" style="${areaStyle(area)}">${area.name}<small>Waves ${wave}–${wave + WAVES_PER_AREA - 1}</small></h3>`);
     const difficulty = waveDifficulty(wave), boss = isBossWave(wave);
     const share = top > 0 ? Math.max(4, Math.round((Math.log(difficulty + 1) / top) * 100)) : 100;
-    rows.push(`<button class="wave-row${boss ? " boss" : ""}" style="${areaStyle(area)}" title="${area.name}" data-wave="${wave}" aria-pressed="${!testerSelected && wave === chosen}">` +
+    rows.push(`<button class="wave-row${boss ? " boss" : ""}" style="${areaStyle(area)};--wall-at:${-((wave - 1) * 46) % 128}px" title="${area.name}" data-wave="${wave}" aria-pressed="${!testerSelected && wave === chosen}">` +
       `<span class="wave-name">${t("control.wave")} <b>${wave}</b>${boss ? `<em>Boss</em>` : ""}</span>` +
       `<span class="wave-bar" aria-hidden="true"><i style="width:${share}%"></i></span>` +
       `<span class="wave-difficulty" title="Difficulty ${difficulty.toLocaleString("en-US")}"><small>Difficulty</small>${difficultyLabel(difficulty)}</span></button>`);
