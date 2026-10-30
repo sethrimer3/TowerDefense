@@ -1070,7 +1070,7 @@ export type EnemyDef = {
   scriptedOnly?: boolean;
   /** A solid black body on the eight-art-pixels-per-cell lattice. */
   darkPixels?: 1 | 2 | 3 | 4 | 5;
-  /** Its contour is a portal: a screen-anchored fiery noise shows through it (`portal-noise.ts`). */
+  /** Opt other factions into the fiery portal contour. Dark One enemies use it by faction. */
   portalOutline?: boolean;
   name: string;
   hp: number;

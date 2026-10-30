@@ -107,11 +107,10 @@ export type Burning = (x: number, y: number, id: number) => number;
 /** Draw enemies, or your troops, as plain squares (`simple-units.ts`). */
 export type Simple = { enemies?: boolean; troops?: boolean; reduceMotion?: boolean; merged?: boolean; effects?: boolean };
 
-/** An enemy's contour: crimson for the Dark One's, gold while a watch tower
+/** An enemy's contour: burning noise for the Dark One's, gold while a watch tower
  * marks it, violet for the brood, black for the rest. */
 function enemyInk(e: Enemy) {
-  if (ENEMIES[e.kind].portalOutline) return PORTAL_UNIT_INK;
-  if (ENEMIES[e.kind].faction === "darkOne") return DARK_UNIT_INK;
+  if (ENEMIES[e.kind].faction === "darkOne" || ENEMIES[e.kind].portalOutline) return PORTAL_UNIT_INK;
   if (e.marked) return MARKED_UNIT_INK;
   if (e.kind === "mother" || e.kind === "broodling") return BROOD_UNIT_INK;
   return NEUTRAL_UNIT_INK;
@@ -163,25 +162,26 @@ export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, hea
       else if (sides && simple.merged === false) for (const soldier of troops) { unit?.(soldier.id); drawSimpleTroops(u, [soldier], rims ?? undefined, sides); }
       else drawSimpleTroops(u, troops, layers?.rims, sides, rimFor);
     } else swords = drawSoldiers(u, sim, torches, simple.reduceMotion, unit, sides);
-    if (simple.enemies && contours) {
+    if (contours) {
       const groups = new Map<string | undefined, Enemy[]>();
       for (const enemy of sim.enemies) if (!enemy.raidProxy && wormBodyVisible(enemy)) { const ink = sides!.ink(enemy.id); const group = groups.get(ink); if (group) group.push(enemy); else groups.set(ink, [enemy]); }
       for (const [ink, group] of groups) {
         const rim = outline!.ink(ink);
-        if (group.some(e => ENEMIES[e.kind].darkPixels)) outline!.mergePixelGaps();
-        drawSimpleEnemies(u, group, rim, sides);
+        const pixels = group.filter(e => ENEMIES[e.kind].darkPixels);
+        if (pixels.length) {
+          outline!.mergePixelGaps();
+          drawDarklingBodies(u, pixels, !simple.enemies);
+          outline!.mergePixelGaps(false);
+        }
+        const others = group.filter(e => !ENEMIES[e.kind].darkPixels);
+        if (simple.enemies) drawSimpleEnemies(u, others, rim, sides);
       }
+      // Preserve native sprite ordering across factions, after the pixel mass.
+      if (!simple.enemies) for (const e of sim.enemies) if (!e.raidProxy && wormBodyVisible(e) && !ENEMIES[e.kind].darkPixels) { unit?.(e.id); drawEnemyArt(u, e, sim, layers ? b : undefined); }
     }
     else if (simple.enemies) drawSimpleEnemies(u, sim.enemies.filter(e=>!e.raidProxy && wormBodyVisible(e)), layers?.rims, sides, rimFor);
     else {
-      // Pixel bodies are filled as one union per contour ink (a portal's apart).
-      const pixel = contours && sim.enemies.some(e => !e.raidProxy && wormBodyVisible(e) && ENEMIES[e.kind].darkPixels);
-      if (pixel) {
-        const groups = new Map<string | undefined, Enemy[]>();
-        for (const e of sim.enemies) if (!e.raidProxy && wormBodyVisible(e) && ENEMIES[e.kind].darkPixels) { const ink = sides!.ink(e.id); const group = groups.get(ink); if (group) group.push(e); else groups.set(ink, [e]); }
-        for (const group of groups.values()) { unit?.(group[0].id); outline!.mergePixelGaps(); drawDarklingBodies(u, group); }
-      }
-      for (const e of sim.enemies) if (!e.raidProxy && wormBodyVisible(e) && !(pixel && ENEMIES[e.kind].darkPixels)) { unit?.(e.id); drawEnemyArt(u, e, sim, layers ? b : undefined); }
+      for (const e of sim.enemies) if (!e.raidProxy && wormBodyVisible(e)) { unit?.(e.id); drawEnemyArt(u, e, sim, layers ? b : undefined); }
     }
     if (contours) drawSwords(u, swords, unit);
   } finally {

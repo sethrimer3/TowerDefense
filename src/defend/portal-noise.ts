@@ -61,9 +61,12 @@ const BED = "rgb(240, 96, 18)";
 /** The hot cores' tint: only the brightest ridges, yellow, never grey. */
 const HOT = [255, 196, 70];
 
-let patterns: { c: Ctx; noise: CanvasPattern; hot: CanvasPattern } | null = null;
+// Each renderer keeps its patterns when a preview or another board draws.
+// Alternating contexts must not regenerate the tile on every frame.
+const patterns = new WeakMap<Ctx, { noise: CanvasPattern; hot: CanvasPattern }>();
 function patternsFor(c: Ctx) {
-  if (patterns?.c === c) return patterns;
+  const cached = patterns.get(c);
+  if (cached) return cached;
   const make = (tint: (v: number, d: Uint8ClampedArray, i: number) => void) => {
     const cv = document.createElement("canvas");
     cv.width = cv.height = TILE;
@@ -79,7 +82,7 @@ function patternsFor(c: Ctx) {
     for (let j = 0; j < 3; j++) d[i + j] = Math.round(HOT[j] * k * k);
   });
   if (!noise || !hot) return null;
-  return (patterns = { c, noise, hot });
+  const made = { noise, hot }; patterns.set(c, made); return made;
 }
 
 /** Fill a device-pixel box of `c` (identity transform) with the burning

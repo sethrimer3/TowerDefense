@@ -275,7 +275,7 @@ export class UnitOutline {
     return this.solo;
   }
 
-  mergePixelGaps() { if (this.thin) this.contours.mergePixelGaps(); }
+  mergePixelGaps(active = true) { if (this.thin) this.contours.mergePixelGaps(active); }
 
   /** Visibility colors stay above the world color drain, using cached geometry. */
   drawContours(c: Ctx, seconds?: number) {
