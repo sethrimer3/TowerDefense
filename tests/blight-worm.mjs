@@ -26,6 +26,7 @@ try {
       const { paintPortrait } = await import('/src/defend/journal-portrait.ts');
       const { cellIndex } = await import('/src/defend/grid.ts');
       const { BLIGHT_WORM: W } = await import('/src/defend/blight-worm.ts');
+      const { drawWormShadow } = await import('/src/defend/blight-worm-art.ts');
       document.body.innerHTML = ''; document.body.style.cssText = 'margin:0;background:#18151a';
       const width = phone ? 390 : 1280, height = phone ? 844 : 800;
       const cv = document.createElement('canvas'); cv.style.cssText = `width:${width}px;height:${height}px;display:block`;
@@ -45,11 +46,11 @@ try {
       const segments = sim.enemies.slice(), head = segments[0];
       head.worm.head.surfaceT = head.worm.head.turnT = 1e6;
       const renderer = new DefendRenderer(cv); renderer.resize(width, height);
-      const render = (focus = head, scale = phone ? 3 : 2) => {
+      const render = (focus = head, scale = phone ? 3 : 2, reduceMotion = true, effects = true) => {
         renderer.cam.s = scale;
         renderer.cam.x = cv.width / 2 - focus.x * renderer.px * scale;
         renderer.cam.y = cv.height / 2 - focus.y * renderer.px * scale;
-        renderer.draw(map, sim, null, { grid: 0, weather: null, night: 0, now: sim.time * 1000 + 2000, reduceMotion: true, effects: false, enemyHealthbars: true, mergedOutlines: true });
+        renderer.draw(map, sim, null, { grid: 0, weather: null, night: 0, now: sim.time * 1000 + 2000, reduceMotion, effects, enemyHealthbars: true, mergedOutlines: true });
       };
       const tick = (count = 1) => {
         for (let i = 0; i < count; i++) { sim.time += 1 / 120; for (const e of sim.enemies) if (e.hp > 0) stepEnemy(sim, e, 1 / 120); }
@@ -59,7 +60,7 @@ try {
       const joins = [], fireCount = canvas => {
         const data = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
         let fire = 0; for (let i = 0; i < data.length; i += 4)
-          if (data[i] > 110 && data[i] > data[i + 1] && data[i + 1] > data[i + 2] && data[i + 1] > 25 && data[i] - data[i + 2] > 80) fire++;
+          if (data[i + 3] >= 128 && data[i] > 110 && data[i] > data[i + 1] && data[i + 1] > data[i + 2] && data[i + 1] > 25 && data[i] - data[i + 2] > 80) fire++;
         return fire;
       };
       for (const pixelArt of [false, true]) for (const simple of [false, true]) {
@@ -80,7 +81,7 @@ try {
         const portrait = document.createElement('canvas'); paintPortrait(portrait, kind);
         portraits.push({ kind, fire: fireCount(portrait) });
       }
-      window.wormFixture = { sim, map, renderer, segments, head, wall, tick, render, W, fireCount, drawEnemyArt };
+      window.wormFixture = { sim, map, renderer, segments, head, wall, tick, render, W, fireCount, drawEnemyArt, drawWormShadow };
       render({ x: head.x, y: head.y - 8 }, phone ? 2 : 1.4);
       return { joins, portraits, segments: segments.length };
     }, phone);
@@ -99,12 +100,12 @@ try {
     assert.ok(bounce.damage > 0); assert.ok(bounce.cosine <= Math.SQRT1_2 + 1e-8);
     await page.screenshot({ path: `test-results/blight-worm-bounce-${label}.png` });
     const burrow = await page.evaluate(() => {
-      const f = window.wormFixture; f.head.worm.head.surfaceT = 0; f.tick(180);
+      const f = window.wormFixture; f.sim.rand = () => 0; f.head.worm.head.surfaceT = 0; f.tick(180);
       const underground = f.segments.filter(e => e.burrow);
       f.render(f.head);
       const probe = document.createElement('canvas'); probe.width = probe.height = 128;
       const c = probe.getContext('2d'); c.translate(64 - f.head.x * 64, 64 - f.head.y * 64);
-      f.drawEnemyArt({ c, px: 64 }, f.head, f.sim);
+      f.drawWormShadow({ c, px: 64 }, f.head, f.sim.time, false);
       const data = c.getImageData(40, 40, 48, 48).data;
       return { underground: underground.length, targetable: underground.filter(e => !e.untargetable).length,
         fire: f.fireCount(probe), opaque: Array.from(data).filter((v, i) => i % 4 === 3 && v === 255).length,
@@ -113,6 +114,38 @@ try {
     assert.ok(burrow.underground > 0 && burrow.shadow > 0); assert.equal(burrow.targetable, 0);
     assert.equal(burrow.fire, 0); assert.equal(burrow.opaque, 0);
     await page.screenshot({ path: `test-results/blight-worm-shadow-${label}.png` });
+    const dirt = await page.evaluate(() => {
+      const f = window.wormFixture;
+      function sample(e, time, effects = true, reduced = false) {
+        const probe = document.createElement('canvas'); probe.width = probe.height = 256;
+        const c = probe.getContext('2d'); c.translate(128 - e.x * 64, 155 - e.y * 64);
+        f.drawWormShadow({ c, px: 64 }, e, time, effects, reduced);
+        const data = c.getImageData(0, 0, 256, 256).data;
+        let brown = 0, black = 0, hash = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          if (!data[i + 3]) continue;
+          if (data[i] > 50 && data[i] > data[i + 1] && data[i + 1] > data[i + 2]) brown++;
+          if (data[i] === 0 && data[i + 1] === 0 && data[i + 2] === 0 && data[i + 3] === 255) black++;
+          hash = (hash * 31 + data[i] + data[i + 3] * 7) | 0;
+        }
+        return { brown, black, hash, fire: f.fireCount(probe) };
+      }
+      const body = f.segments.find(e => e.leader !== undefined && e.burrow);
+      const result = { head: sample(f.head, 1), body: sample(body, 1), off: sample(f.head, 1, false),
+        moving: sample(f.head, 1.3), still: [sample(f.head, 1, true, true), sample(f.head, 9, true, true)] };
+      // A close-up on open ground makes the head fountain and body clods easy
+      // to inspect, without scenery hiding their pixels in the larger scene.
+      const cv = document.createElement('canvas'); cv.width = 640; cv.height = 240; cv.style.cssText = 'position:fixed;left:0;top:0;width:100%;max-width:640px;background:#3e4b36';
+      document.body.append(cv); const c = cv.getContext('2d');
+      c.translate(150 - f.head.x * 64, 150 - f.head.y * 64); f.drawWormShadow({ c, px: 64 }, f.head, f.sim.time, true);
+      c.setTransform(1,0,0,1,450 - body.x * 64,150 - body.y * 64); f.drawWormShadow({ c, px: 64 }, body, f.sim.time, true);
+      return result;
+    });
+    assert.ok(dirt.head.brown > dirt.body.brown * 3 && dirt.body.brown > 0, JSON.stringify(dirt));
+    assert.equal(dirt.head.black, 0); assert.equal(dirt.head.fire, 0, JSON.stringify(dirt)); assert.equal(dirt.off.brown, 0, JSON.stringify(dirt));
+    assert.notEqual(dirt.head.hash, dirt.moving.hash); assert.deepEqual(dirt.still[0], dirt.still[1]);
+    await page.screenshot({ path: `test-results/blight-worm-dirt-${label}.png` });
+    await page.evaluate(() => document.querySelector('canvas[style*="position: fixed"]')?.remove());
     const split = await page.evaluate(phone => {
       const f = window.wormFixture, cut = f.segments[24]; cut.hp = 0; f.sim.sweepAway(); f.tick(90);
       const heads = f.sim.enemies.filter(e => e.kind === 'blightWorm' && e.leader === undefined);
@@ -146,7 +179,27 @@ try {
     assert.equal(performance.enemies, 450);
     assert.ok(performance.updateMs < 80 && performance.drawMs < 150, JSON.stringify(performance));
     await page.screenshot({ path: `test-results/blight-worm-stress-${label}.png` });
-    assert.deepEqual(errors, []); rows.push({ phone, ...initial, bounce, burrow, split, performance });
+    const burrowPerformance = await page.evaluate(async () => {
+      const f = window.wormFixture;
+      f.sim.scenario.passiveEnemies = true;
+      for (const e of f.sim.enemies) if (e.kind === 'blightWorm') { e.burrow = 1; e.untargetable = true; }
+      const rows = [];
+      // Isolate the new render work with all fifty segments underground; the
+      // live movement/update benchmark above still runs normal native AI.
+      for (const effects of [false, true]) {
+        const draws = [];
+        for (let i = 0; i < 45; i++) {
+          await new Promise(requestAnimationFrame); f.sim.time += 1 / 60;
+          const start = performance.now(); f.render({ x: 20, y: 23 }, 1, false, effects);
+          if (i >= 15) draws.push(performance.now() - start);
+        }
+        rows.push({ effects, drawMs: draws.reduce((a,b) => a+b, 0) / draws.length });
+      }
+      return rows;
+    });
+    assert.ok(burrowPerformance.every(row => row.drawMs < 150), JSON.stringify(burrowPerformance));
+    await page.screenshot({ path: `test-results/blight-worm-burrow-stress-${label}.png` });
+    assert.deepEqual(errors, []); rows.push({ phone, ...initial, bounce, burrow, dirt, split, performance, burrowPerformance });
     await page.close();
   }
   writeFileSync('test-results/blight-worm.json', JSON.stringify(rows, null, 2));

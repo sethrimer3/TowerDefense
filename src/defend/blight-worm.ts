@@ -11,12 +11,11 @@ import { CHILL_SPEED } from "./catalog.ts";
 import { mageChillSpeed } from "./mage-attunements.ts";
 import type { DefendSim, Enemy } from "./sim.ts";
 
-type TrailPoint = Point & { s: number; under: boolean; pass: number };
+type TrailPoint = Point & { s: number; under: boolean; pass: number; target?: number; reached?: boolean };
 export type WormTrail = { points: TrailPoint[]; start: number; count: number };
 type Head = {
   dx: number; dy: number; surfaceT: number; turnT: number;
-  under: boolean; pass: number; burrowT: number; exit: number;
-  lastOpen?: Point;
+  under: boolean; pass: number; outsideT: number; target?: number; reached: boolean;
 };
 export type WormState = {
   trail: WormTrail; s: number; head?: Head;
@@ -34,6 +33,7 @@ function append(t: WormTrail, p: TrailPoint) {
   if (t.count >= 2) {
     const a = point(t, t.count - 2), b = point(t, t.count - 1);
     if (a.under === p.under && b.under === p.under && a.pass === p.pass && b.pass === p.pass &&
+        a.target === p.target && b.target === p.target && a.reached === p.reached && b.reached === p.reached &&
         b.s > a.s && p.s > b.s && abs((b.x - a.x) * (p.y - b.y) - (b.y - a.y) * (p.x - b.x)) < 1e-12 &&
         (b.x - a.x) * (p.x - b.x) + (b.y - a.y) * (p.y - b.y) > 0) {
       t.points[wrap(t.start + t.count - 1)] = p;
@@ -50,7 +50,7 @@ function trim(t: WormTrail, s: number) {
   const a = point(t, 0), b = point(t, 1);
   if (a.s < cutoff && b.s > cutoff) {
     const f = (cutoff - a.s) / (b.s - a.s);
-    t.points[t.start] = { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f, s: cutoff, under: b.under, pass: b.pass };
+    t.points[t.start] = { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f, s: cutoff, under: b.under, pass: b.pass, target: b.target, reached: b.reached };
   }
 }
 
@@ -61,7 +61,7 @@ export function wormTrailAt(t: WormTrail, s: number): TrailPoint {
     if (s < a.s && n > 0) continue;
     if (n === t.count - 1 || s <= a.s) return { ...a, s };
     const b = point(t, n + 1), f = (s - a.s) / (b.s - a.s);
-    return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f, s, under: b.under, pass: b.pass };
+    return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f, s, under: b.under, pass: b.pass, target: b.target, reached: b.reached };
   }
   return { ...point(t, 0), s };
 }
@@ -69,7 +69,7 @@ export function wormTrailAt(t: WormTrail, s: number): TrailPoint {
 function randomHead(sim: DefendSim, dx: number, dy: number): Head {
   // Fixed draw order: surface duration, turn interval. Heading has its own draw.
   return { dx, dy, surfaceT: W.surfaceMin + sim.rand() * W.surfaceRange,
-    turnT: W.turnMin + sim.rand() * W.turnRange, under: false, pass: 0, burrowT: 0, exit: 0 };
+    turnT: W.turnMin + sim.rand() * W.turnRange, under: false, pass: 0, outsideT: 0, reached: false };
 }
 function randomHeading(sim: DefendSim): Point {
   const x = sim.rand() * 2 - 1, y = sim.rand() * 2 - 1, d = dist(x, y);
@@ -113,7 +113,7 @@ export function promoteWorm(sim: DefendSim, e: Enemy) {
   w.trail = t;
   w.head = randomHead(sim, d > EPS ? (at.x - before.x) / d : 0, d > EPS ? (at.y - before.y) / d : 1);
   w.head.pass = at.pass;
-  if (at.under) dive(sim, e, true);
+  if (at.under) dive(sim, e, at);
 }
 
 /** Nearby building IDs only; a large keep is still one hit per segment. */
@@ -177,7 +177,8 @@ function pose(sim: DefendSim, e: Enemy, p: TrailPoint) {
 }
 function record(e: Enemy) {
   const w = e.worm!, h = w.head!;
-  append(w.trail, { x: e.x, y: e.y, s: w.s, under: h.under, pass: h.pass });
+  append(w.trail, { x: e.x, y: e.y, s: w.s, under: h.under, pass: h.pass,
+    ...(h.under ? { target: h.target, reached: h.reached } : {}) });
 }
 function turn(h: Head, cosine: number, sine: number) {
   const x = h.dx * cosine - h.dy * sine, y = h.dx * sine + h.dy * cosine, d = dist(x, y);
@@ -185,7 +186,8 @@ function turn(h: Head, cosine: number, sine: number) {
 }
 function clearAhead(sim: DefendSim, e: Enemy, dx: number, dy: number) {
   for (let s = W.probeStep; s <= W.lookAhead + EPS; s += W.probeStep)
-    if (obstacle(sim, { x: e.x + dx * s, y: e.y + dy * s })) return false;
+    if (e.worm!.head!.under ? !onBoard({ x: e.x + dx * s, y: e.y + dy * s }, HALF + CONTACT_OUTLINE)
+      : obstacle(sim, { x: e.x + dx * s, y: e.y + dy * s })) return false;
   return true;
 }
 function bounce(sim: DefendSim, e: Enemy) {
@@ -203,33 +205,56 @@ function bounce(sim: DefendSim, e: Enemy) {
     while (i + 1 < choices.length && roll >= (i + 1) / choices.length) i++;
     turn(h, ...choices[i]);
   }
-  h.turnT = W.turnMin + sim.rand() * W.turnRange;
+  if (!h.under) h.turnT = W.turnMin + sim.rand() * W.turnRange;
 }
 
-function dive(sim: DefendSim, e: Enemy, continuing = false) {
-  const w = e.worm!, h = w.head!, goal = center(sim.keep.rect);
-  const dx = goal.x - e.x, dy = goal.y - e.y, d = dist(dx, dy);
-  if (!continuing) { h.dx = d > EPS ? dx / d : 0; h.dy = d > EPS ? dy / d : 1; }
-  const r = sim.keep.rect;
-  // Distance from keep center to its far edge along the committed ray.
-  const edgeX = abs(h.dx) > EPS ? r.w / 2 / abs(h.dx) : Infinity;
-  const edgeY = abs(h.dy) > EPS ? r.h / 2 / abs(h.dy) : Infinity;
-  const desired = dx * h.dx + dy * h.dy + min(edgeX, edgeY) + W.beyondKeep;
-  let last = 0, exit = 0;
-  // Commit a reachable open exit on this same ray before moving. This also
-  // handles a keep near the edge without teleporting backwards at the edge.
-  for (let along = W.probeStep; along < CELLS_W + CELLS_H; along += W.probeStep) {
-    const p = { x: e.x + h.dx * along, y: e.y + h.dy * along };
-    if (!onBoard(p, HALF + CONTACT_OUTLINE)) break;
-    if (!obstacle(sim, p)) {
-      last = along;
-      if (along >= desired) { exit = along; break; }
+/** Placed structure tiles stay reserved even while their building is rubble.
+ * Include the keep and troop buildings, and the whole segment/contour body. */
+export function wormOnTowerTile(sim: DefendSim, p: Point): boolean {
+  const r = HALF + 2 * CONTACT_OUTLINE;
+  // Owner cells persist through collapse, so rubble tiles need no separate
+  // index. Probe only cells under the body instead of scanning the city.
+  for (let y = clampCell(p.y - r - EPS, CELLS_H); y <= clampCell(p.y + r + EPS, CELLS_H); y++)
+    for (let x = clampCell(p.x - r - EPS, CELLS_W); x <= clampCell(p.x + r + EPS, CELLS_W); x++) {
+      const b = sim.map.buildings[sim.map.owner[cellIndex(x, y)]];
+      if (b && !b.hidden && b.structureUid !== undefined &&
+          p.x >= b.rect.x - r && p.x <= b.rect.x + b.rect.w + r &&
+          p.y >= b.rect.y - r && p.y <= b.rect.y + b.rect.h + r) return true;
     }
+  return false;
+}
+
+function dive(sim: DefendSim, e: Enemy, continuing?: TrailPoint) {
+  const h = e.worm!.head!;
+  if (continuing) {
+    h.target = continuing.target; h.reached = continuing.reached ?? true;
+  } else {
+    const targets = sim.map.buildings.filter(b => sim.hp[b.id] > 0 && sim.intact(b) && !sim.aloft(b.id));
+    if (targets.length) {
+      // Exactly one draw, in stable building order, for a uniform live target.
+      const roll = sim.rand(); let i = 0;
+      while (i + 1 < targets.length && roll >= (i + 1) / targets.length) i++;
+      const target = targets[i], goal = center(target.rect), d = dist(goal.x - e.x, goal.y - e.y);
+      h.target = target.id;
+      if (d > EPS) { h.dx = (goal.x - e.x) / d; h.dy = (goal.y - e.y) / d; }
+      h.reached = touching(sim, e, target.id, true);
+    } else { delete h.target; h.reached = true; }
+    h.pass++;
   }
-  h.exit = w.s + (exit || last);
-  h.under = true; h.burrowT = 0; if (!continuing) h.pass++;
-  h.lastOpen = !obstacle(sim, e) ? { x: e.x, y: e.y } : undefined;
+  h.under = true; h.outsideT = 0;
   setPhase(e, true); record(e);
+}
+
+function burrowStep(sim: DefendSim, e: Enemy, amount: number) {
+  const w = e.worm!, h = w.head!;
+  const wasClear = h.reached && !wormOnTowerTile(sim, e);
+  e.x += h.dx * amount; e.y += h.dy * amount; w.s += amount;
+  if (!h.reached && h.target !== undefined && touching(sim, e, h.target, true)) h.reached = true;
+  // Count only intervals wholly outside tiles; never surface a substep early.
+  if (!h.reached || !wasClear || wormOnTowerTile(sim, e)) h.outsideT = 0;
+  else h.outsideT += amount / W.burrowSpeed;
+  record(e); pose(sim, e, point(w.trail, w.trail.count - 1));
+  if (h.outsideT >= W.burrowClearSeconds - EPS && !obstacle(sim, e)) surface(sim, e);
 }
 function surface(sim: DefendSim, e: Enemy) {
   const h = e.worm!.head!, heading = randomHeading(sim);
@@ -239,8 +264,8 @@ function surface(sim: DefendSim, e: Enemy) {
   setPhase(e, false); record(e);
 }
 
-/** Deterministic nearest dry open center for underground offspring or a
- * pathological board-edge exit. Bounded by the fixed board, no random draws. */
+/** Deterministic nearest dry open center for underground offspring.
+ * Bounded by the fixed board, no random draws. */
 export function wormOpenPoint(sim: DefendSim, from: Point): Point {
   if (!obstacle(sim, from)) return { x: from.x, y: from.y };
   let best: Point | undefined, distance = Infinity;
@@ -281,25 +306,28 @@ export function stepBlightWorm(sim: DefendSim, e: Enemy, dt: number) {
       turn(h, Math.sqrt(1 - sine * sine), sine);
       h.turnT = W.turnMin + sim.rand() * W.turnRange;
     }
-  } else if (h.under) h.burrowT += dt;
+  }
   const slow = min(e.chill ? CHILL_SPEED : 1, mageChillSpeed(e));
   let left = (h.under ? W.burrowSpeed : W.surfaceSpeed * slow) * dt;
   while (left > EPS) {
-    const amount = min(W.probeStep, h.under ? min(left, h.exit - w.s) : left);
+    const amount = min(W.probeStep, left);
     const x = e.x + h.dx * amount, y = e.y + h.dy * amount;
     if (h.under) {
-      // Stop at the last open center on this ray before its first board edge.
-      if (amount <= EPS || !onBoard({ x, y }, HALF + CONTACT_OUTLINE) || h.burrowT >= W.maxBurrowSeconds) {
-        const p = h.lastOpen ?? wormOpenPoint(sim, e);
-        w.s += dist(p.x - e.x, p.y - e.y);
-        e.x = p.x; e.y = p.y; record(e); surface(sim, e); break;
+      if (!onBoard({ x, y }, HALF + CONTACT_OUTLINE)) {
+        let lo = 0, hi = amount;
+        for (let n = 0; n < 24; n++) {
+          const middle = (lo + hi) / 2;
+          if (!onBoard({ x: e.x + h.dx * middle, y: e.y + h.dy * middle }, HALF + CONTACT_OUTLINE)) hi = middle; else lo = middle;
+        }
+        burrowStep(sim, e, lo);
+        if (!h.under) break;
+        // Ignore buildings, water and rocks below ground; only the board edge
+        // filters the same fixed rotations used by a surface wall bounce.
+        bounce(sim, e); left -= lo;
+        continue;
       }
-      e.x = x; e.y = y; w.s += amount; record(e);
-      pose(sim, e, point(w.trail, w.trail.count - 1));
-      if (!obstacle(sim, e)) {
-        h.lastOpen = { x: e.x, y: e.y };
-        if (w.s >= h.exit) { surface(sim, e); break; }
-      }
+      burrowStep(sim, e, amount);
+      if (!h.under) break;
     } else {
       // A new head behind a cut can still be unspooling outside the top.
       // Continue its incoming trail until the whole body has entered.

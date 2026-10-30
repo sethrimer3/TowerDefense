@@ -6,8 +6,8 @@ export const BLIGHT_WORM = {
   surfaceSpeed: 3, burrowSpeed: 4,
   surfaceMin: 10, surfaceRange: 8, turnMin: .7, turnRange: 1.6,
   wanderTurn: .24,
-  contactDamage: 4, contactCooldown: .6, burrowDamage: 5, burrowWidth: 1.6,
-  headMultiplier: 4, beyondKeep: 4, maxBurrowSeconds: 60,
+  contactDamage: 4, contactCooldown: .6, burrowDamage: 5 / 4, burrowWidth: 1.6,
+  headMultiplier: 4, burrowClearSeconds: 1,
   probeStep: .08, lookAhead: 1, trailLength: 50 * 5 / 8 + 2,
   trailCapacity: 4096,
   // Smallest available deviation first; left/right ties use one sim draw.
