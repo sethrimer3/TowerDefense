@@ -378,7 +378,7 @@ export class DefendRenderer {
     }
     this.ctx.restore();
     this.darkDrain.draw(this.ctx, this.px, sim, opts.now, opts.night, this.protectCombat ? this.actors : null);
-    if (sim) this.outline?.drawContours(this.ctx);
+    if (sim) this.outline?.drawContours(this.ctx, opts.reduceMotion ? 0 : opts.now / 1000);
     if (sim && this.lit) this.outline?.shineContours(this.ctx, this.lighting);
     opts.markers?.(this.ctx,this.px);
     this.rallyFlag.draw(this.ctx, this.px, sim, sim?.warBanner?.flag && !opts.hideBanner ? sim.warBanner : null, opts);

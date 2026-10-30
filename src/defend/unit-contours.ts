@@ -1,9 +1,12 @@
 /** Vector unions of opaque body pixels. Stroke once per ink, then remove all
  * bodies: overlapping/touching shapes have no interior contour. No frame reads,
  * per-unit canvases, image filters, or pairwise overlap tests. */
+import { PORTAL_CONTOUR_WIDTH, PORTAL_UNIT_INK } from "./art-scale.ts";
+import { paintPortal } from "./portal-noise.ts";
+
 type Ctx = CanvasRenderingContext2D;
 type Stroke = { path: Path2D; width: number; cap: CanvasLineCap; join: CanvasLineJoin; miter: number };
-type Channel = { mergePixels: boolean; bounds: { x0: number; y0: number; x1: number; y1: number } | null; faded: boolean; rectangles: Path2D; expanded: Path2D; path: Path2D; strokes: Map<string, Stroke>; canvas: HTMLCanvasElement; c: Ctx };
+type Channel = { radius: number; shaped: boolean; mergePixels: boolean; bounds: { x0: number; y0: number; x1: number; y1: number } | null; faded: boolean; rectangles: Path2D; expanded: Path2D; path: Path2D; strokes: Map<string, Stroke>; canvas: HTMLCanvasElement; c: Ctx };
 export class UnitContours {
   private channels = new Map<string, Channel>();
   private ink: string | undefined;
@@ -13,6 +16,9 @@ export class UnitContours {
   private penRects: number[] = [];
   private radius = 0;
   private inner: HTMLCanvasElement | null = null;
+  private portal: HTMLCanvasElement | null = null;
+  /** Wall-clock seconds the portal dimension has scrolled to. */
+  seconds = 0;
   /** How far the contour reaches out from the bodies, in screen pixels. */
   get width() { return this.radius; }
   private scale = 1;
@@ -20,8 +26,8 @@ export class UnitContours {
   begin(c: Ctx, width: number) {
     this.matrix = c.getTransform(); this.scale = Math.hypot(this.matrix.a, this.matrix.b);
     this.radius = width * this.scale; this.ink = undefined; this.pen = new Path2D(); this.penRects.length = 0; this.rectOnly = true;
-    for (const channel of this.channels.values()) {
-      channel.path = new Path2D(); channel.rectangles = new Path2D(); channel.expanded = new Path2D(); channel.strokes.clear(); channel.faded = false; channel.mergePixels = false; channel.bounds = null;
+    for (const [ink, channel] of this.channels) {
+      channel.radius = this.radiusOf(ink); channel.shaped = false; channel.path = new Path2D(); channel.rectangles = new Path2D(); channel.expanded = new Path2D(); channel.strokes.clear(); channel.faded = false; channel.mergePixels = false; channel.bounds = null;
       if (channel.canvas.width !== c.canvas.width || channel.canvas.height !== c.canvas.height) {
         channel.canvas.width = c.canvas.width; channel.canvas.height = c.canvas.height;
       }
@@ -29,13 +35,14 @@ export class UnitContours {
     }
   }
   select(ink?: string) { this.ink = ink; }
+  private radiusOf(ink: string) { return ink === PORTAL_UNIT_INK ? this.radius * PORTAL_CONTOUR_WIDTH : this.radius; }
   transform(c: Ctx) { this.matrix = c.getTransform(); }
   private channel() {
     if (!this.ink) return;
     let channel = this.channels.get(this.ink);
     if (!channel) {
       const canvas = document.createElement('canvas'), c = canvas.getContext('2d')!;
-      this.channels.set(this.ink, (channel = { mergePixels: false, bounds: null, faded: false, rectangles: new Path2D(), expanded: new Path2D(), path: new Path2D(), strokes: new Map(), canvas, c }));
+      this.channels.set(this.ink, (channel = { radius: this.radiusOf(this.ink), shaped: false, mergePixels: false, bounds: null, faded: false, rectangles: new Path2D(), expanded: new Path2D(), path: new Path2D(), strokes: new Map(), canvas, c }));
     }
     return channel;
   }
@@ -50,16 +57,17 @@ export class UnitContours {
       const left = Math.min(x0, x1), top = Math.min(y0, y1), width = Math.abs(x1 - x0), height = Math.abs(y1 - y0);
       // Pixel crowds need only a batched union of expanded rectangles, avoiding
       // the stroker's extra geometry for thousands of tiny square bodies.
-      channel.expanded.rect(left - this.radius, top - this.radius, width + 2 * this.radius, height + 2 * this.radius);
+      const r = channel.radius;
+      channel.expanded.rect(left - r, top - r, width + 2 * r, height + 2 * r);
       const box = channel.bounds;
       if (box) { box.x0 = Math.min(box.x0, left); box.y0 = Math.min(box.y0, top); box.x1 = Math.max(box.x1, left + width); box.y1 = Math.max(box.y1, top + height); }
       else channel.bounds = { x0: left, y0: top, x1: left + width, y1: top + height };
       if (channel.faded) channel.rectangles.rect(left, top, width, height);
-    } else { const path = new Path2D(); path.rect(x, y, w, h); channel.path.addPath(path, m); }
+    } else { const path = new Path2D(); path.rect(x, y, w, h); channel.path.addPath(path, m); channel.shaped = true; }
   }
   image(path: Path2D, sx: number, sy: number, sw: number, sh: number, x: number, y: number, w: number, h: number) {
     const channel = this.channel(); if (!channel || !sw || !sh) return;
-    channel.path.addPath(path, this.matrix.translate(x, y).scale(w / sw, h / sh).translate(-sx, -sy));
+    channel.path.addPath(path, this.matrix.translate(x, y).scale(w / sw, h / sh).translate(-sx, -sy)); channel.shaped = true;
   }
   path(name: string, args: unknown[]) {
     if (name === 'beginPath') { this.pen = new Path2D(); this.penRects.length = 0; this.rectOnly = true; }
@@ -72,7 +80,7 @@ export class UnitContours {
   fill(path?: Path2D) {
     if (!path && this.rectOnly && this.penRects.length) {
       for (let i = 0; i < this.penRects.length; i += 4) this.rect(this.penRects[i], this.penRects[i + 1], this.penRects[i + 2], this.penRects[i + 3]);
-    } else this.channel()?.path.addPath(path ?? this.pen, this.matrix);
+    } else { const channel = this.channel(); if (channel) { channel.path.addPath(path ?? this.pen, this.matrix); channel.shaped = true; } }
   }
   stroke(c: Ctx, path?: Path2D) {
     const channel = this.channel(); if (!channel) return;
@@ -80,7 +88,7 @@ export class UnitContours {
     const key = `${width}:${c.lineCap}:${c.lineJoin}:${c.miterLimit}`;
     let stroke = channel.strokes.get(key);
     if (!stroke) channel.strokes.set(key, (stroke = { path: new Path2D(), width, cap: c.lineCap, join: c.lineJoin, miter: c.miterLimit }));
-    stroke.path.addPath(path ?? this.pen, this.matrix);
+    stroke.path.addPath(path ?? this.pen, this.matrix); channel.shaped = true;
   }
   /** Rebuilt only with the existing combat cache. Subtract the union of every
    * unit body, including opposing/neutral units, to suppress all overlap seams. */
@@ -91,11 +99,11 @@ export class UnitContours {
       c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, canvas.width, canvas.height);
       c.globalCompositeOperation = 'source-over'; c.strokeStyle = ink; c.fillStyle = ink;
       c.fill(channel.expanded);
-      if (channel.mergePixels && channel.bounds && this.radius > 0) this.closePixelRims(channel);
-      c.lineWidth = 2 * this.radius; c.lineJoin = 'miter'; c.lineCap = 'butt'; c.miterLimit = 10;
+      if (channel.mergePixels && channel.bounds && channel.radius > 0) this.closePixelRims(channel);
+      c.lineWidth = 2 * channel.radius; c.lineJoin = 'miter'; c.lineCap = 'butt'; c.miterLimit = 10;
       c.stroke(path);
       for (const stroke of strokes.values()) {
-        c.lineWidth = stroke.width + 2 * this.radius; c.lineCap = stroke.cap; c.lineJoin = stroke.join; c.miterLimit = stroke.miter;
+        c.lineWidth = stroke.width + 2 * channel.radius; c.lineCap = stroke.cap; c.lineJoin = stroke.join; c.miterLimit = stroke.miter;
         c.stroke(stroke.path);
       }
       c.globalCompositeOperation = 'destination-out';
@@ -117,7 +125,7 @@ export class UnitContours {
    * intersections erode the union of expanded axis-aligned pixel bodies.
    * One reusable scratch canvas, clipped to the crowd; no blur/readbacks. */
   private closePixelRims(channel: Channel) {
-    const { canvas, bounds: b } = channel, r = this.radius;
+    const { canvas, bounds: b } = channel, r = channel.radius;
     this.inner ??= document.createElement("canvas");
     if (this.inner.width !== canvas.width || this.inner.height !== canvas.height) { this.inner.width = canvas.width; this.inner.height = canvas.height; }
     const c = this.inner.getContext("2d")!;
@@ -130,10 +138,37 @@ export class UnitContours {
     channel.c.globalCompositeOperation = "destination-out"; channel.c.drawImage(this.inner, 0, 0); channel.c.globalCompositeOperation = "source-over";
   }
 
-  draw(c: Ctx) {
+  /** Every channel onto `c`; the portal's shows the burning dimension
+   * through it unless `plain` (a mask for the torchlight's shine). */
+  draw(c: Ctx, plain = false) {
     c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
-    for (const channel of this.channels.values()) c.drawImage(channel.canvas, 0, 0);
+    for (const [ink, channel] of this.channels) {
+      if (ink === PORTAL_UNIT_INK && !plain) this.drawPortal(c, channel);
+      else c.drawImage(channel.canvas, 0, 0);
+    }
     c.restore();
+  }
+  /** The dimension painted only over the contour's box, then cut to it. */
+  private drawPortal(c: Ctx, channel: Channel) {
+    const { canvas } = channel;
+    let box = { x: 0, y: 0, w: canvas.width, h: canvas.height };
+    if (!channel.shaped) {
+      const b = channel.bounds, pad = channel.radius * 2 + 2;
+      if (!b) return;
+      const x0 = Math.max(0, Math.floor(b.x0 - pad)), y0 = Math.max(0, Math.floor(b.y0 - pad));
+      box = { x: x0, y: y0, w: Math.min(canvas.width, Math.ceil(b.x1 + pad)) - x0, h: Math.min(canvas.height, Math.ceil(b.y1 + pad)) - y0 };
+      if (box.w <= 0 || box.h <= 0) return;
+    }
+    this.portal ??= document.createElement('canvas');
+    const scratch = this.portal;
+    if (scratch.width !== canvas.width || scratch.height !== canvas.height) { scratch.width = canvas.width; scratch.height = canvas.height; }
+    const s = scratch.getContext('2d')!;
+    s.setTransform(1, 0, 0, 1, 0, 0);
+    paintPortal(s, box, this.seconds, globalThis.devicePixelRatio || 1);
+    s.globalCompositeOperation = 'destination-in';
+    s.drawImage(canvas, box.x, box.y, box.w, box.h, box.x, box.y, box.w, box.h);
+    s.globalCompositeOperation = 'source-over';
+    c.drawImage(scratch, box.x, box.y, box.w, box.h, box.x, box.y, box.w, box.h);
   }
 }
 

@@ -1,6 +1,6 @@
 # Enemy migration tracker
 
-Started 2026-10-29. This is the working checklist for replacing the old enemy lineups. **Absolute Defend waves 1–5 are updated.** All 30 Ambush levels (600 waves) and Defend waves 6–200 remain **outdated**. Later endless Defend waves remain outdated as well.
+Started 2026-10-29. This is the working checklist for replacing the old enemy lineups. **Absolute Defend waves 1–10 are updated.** All 30 Ambush levels (600 waves) and Defend waves 11–200 remain **outdated**. Later endless Defend waves remain outdated as well.
 
 ## Direction
 
@@ -17,8 +17,9 @@ Started 2026-10-29. This is the working checklist for replacing the old enemy li
 | Defend 1 | Mini Darkling | 1 × 1 black art pixel | 2 | 1 / 1 second | 1.7 | No split |
 | Defend 1 | Darkling | 2 × 2 black art pixels | 6 | 2 / 1 second | 1.3 | Two Mini Darklings |
 | Defend 4 | Large Darkling | 3 × 3 black art pixels | 18 | 4 / 1 second | 1 | Two Darklings; each then splits into two minis |
+| Defend 6 | Major Darkling | 4 × 4 black art pixels, portal outline | 54 | 8 / 1 second | 0.8 | Three Large Darklings (21 bodies in all) |
 
-An art pixel is 1/8 of a board cell and scales with the camera. All three kinds use solid black square drawing under normal, Pixel Art, Simple enemies and merged-outline settings, without decorative sprites. The stats are initial tuning values.
+An art pixel is 1/8 of a board cell and scales with the camera. All four kinds use solid black square drawing under normal, Pixel Art, Simple enemies and merged-outline settings, without decorative sprites. The stats are initial tuning values.
 
 ## Change log
 
@@ -36,6 +37,18 @@ An art pixel is 1/8 of a board cell and scales with the camera. All three kinds 
 
 Totals assume every parent and child is defeated. Large Darkling stats start at 18 HP, 4 attack each second, and speed 1 cell/second; these are initial tuning values. Authored accounting budgets sum the initial bodies' catalog costs (75/100/180/120 for waves 2/3/4/5), not the entire offspring tree or a monotonic combat-strength estimate. Every size counts as one living enemy for the existing approximate color-drain threshold.
 
+- **2026-10-30 — [x] Updated Defend waves 6–10 (Mossbound Ruins).** Major Darklings (4 × 4, 54 HP, 8 attack each second, 0.8 cells/second, cost 8) split into three Large Darklings. Their contour is a portal: one art pixel wide (twice the usual), cut into a screen-anchored, wall-clock-scrolling fiery ridged-noise field after Sign99's building cores (`portal-noise.ts`), still under Reduce Motion. Every other Darkling keeps its crimson contour. Waves 11 onward and all Ambush lineups retain their legacy generators.
+
+| Defend wave | Initial composition | Descendants generated on death | Total bodies encountered |
+|---|---|---|---:|
+| 6 | 5 Major Darklings | 15 Large; 30 Darklings; 60 minis | 110 |
+| 7 | 10 Major Darklings | 30 Large; 60 Darklings; 120 minis | 220 |
+| 8 | 20 Major Darklings | 60 Large; 120 Darklings; 240 minis | 440 |
+| 9 | 30 Major Darklings | 90 Large; 180 Darklings; 360 minis | 660 |
+| 10 | 50 Major Darklings | 150 Large; 300 Darklings; 600 minis | 1,100 |
+
+Accounting budgets are 40/80/160/240/400 for waves 6–10.
+
 - **2026-10-29 — Visibility contours.** Dark One bodies now have a bright crimson half-art-pixel perimeter; player troops use dark blue. Touching/overlapping bodies share outer contours, with no lines through their overlap. The colors remain visible through the grayscale wash. Enemy definitions, wave compositions and migration checkboxes are unchanged.
 
 - **2026-10-29 — Contact spacing.** Native structure bites now close to a world-space contact pose before damage. Darkling body squares retain exact art scale at every zoom; their half-art-pixel crimson rim meets the stone wall’s half-art-pixel black rim. The old 0.4-cell reach allowance only selects the nearby target, never authorizes damage. Boat rams and ice-cube strikes share this gate. No wave compositions or migration checkboxes changed.
@@ -46,7 +59,7 @@ Totals assume every parent and child is defeated. Large Darkling stats start at 
 
 ## Color drain and performance rules
 
-Faction is explicit in the enemy catalog; never infer darkness from a sprite's color. Currently tagged: Mini Darkling, Darkling, Large Darkling, Mother, Broodling, Dark Knight, Void Sparrow, Necromancer, Skeleton, Blink Imp, Crypt Hound and Grave Wisp. Future Dark One enemies must carry the same faction tag. Other species' allegiance is still pending their migration/story review. Friendly dark wizards and shades do not contribute; neither do dead enemies, fortress parts or Siege proxy objects.
+Faction is explicit in the enemy catalog; never infer darkness from a sprite's color. Currently tagged: Mini Darkling, Darkling, Large Darkling, Major Darkling, Mother, Broodling, Dark Knight, Void Sparrow, Necromancer, Skeleton, Blink Imp, Crypt Hound and Grave Wisp. Future Dark One enemies must carry the same faction tag. Other species' allegiance is still pending their migration/story review. Friendly dark wizards and shades do not contribute; neither do dead enemies, fortress parts or Siege proxy objects.
 
 The estimate uses fixed 4-cell buckets, neighboring buckets for density, and two reusable 144 × 208 alpha fields (drain and night heat), sampled at most ten times per second while simulation time advances. Each occupied bucket emits one smooth radial patch at its centroid; strongest-patch blending keeps overlapping groups from artificially multiplying their strength. There are no pairwise crowd queries. Two canvas blend passes desaturate and wash out the existing detailed world, followed at night by the dark crimson halo without scene copies, full-scene CPU pixel reads, blur or per-enemy filters. The field lookup avoids square roots in its inner loop. Mask memory and patch work are bounded by board size. The world-space mask follows pan and zoom. A reusable combat-art layer and screen mask exclude unit/shot alpha, while visibility contours, HUD and inspection overlays remain readable. Counts and neighborhood boundaries are intentionally approximate.
 
@@ -814,7 +827,7 @@ Each level currently has 20 waves from the existing procedural placeholder lineu
 
 ## Defend — first 200-wave zone cycle
 
-Defend is endless: these are its first ten 20-wave areas, not a finite level list. Only absolute waves 1–5 use the new authored lineups. In later cycles, area-local wave 1 (201, 401, …) still uses the legacy generator.
+Defend is endless: these are its first ten 20-wave areas, not a finite level list. Only absolute waves 1–10 use the new authored lineups. In later cycles, area-local wave 1 (201, 401, …) still uses the legacy generator.
 
 ### Mossbound Ruins — waves 1–20
 
@@ -823,11 +836,11 @@ Defend is endless: these are its first ten 20-wave areas, not a finite level lis
 - [x] Wave 3: **updated** — 50 Darklings.
 - [x] Wave 4: **updated** — 80 Darklings + 5 Large Darklings.
 - [x] Wave 5: **updated** — 30 Large Darklings.
-- [ ] Wave 6: **outdated**
-- [ ] Wave 7: **outdated**
-- [ ] Wave 8: **outdated**
-- [ ] Wave 9: **outdated**
-- [ ] Wave 10: **outdated**
+- [x] Wave 6: **updated** — 5 Major Darklings; each splits into 3 Large Darklings.
+- [x] Wave 7: **updated** — 10 Major Darklings; each splits into 3 Large Darklings.
+- [x] Wave 8: **updated** — 20 Major Darklings; each splits into 3 Large Darklings.
+- [x] Wave 9: **updated** — 30 Major Darklings; each splits into 3 Large Darklings.
+- [x] Wave 10: **updated** — 50 Major Darklings; each splits into 3 Large Darklings.
 - [ ] Wave 11: **outdated**
 - [ ] Wave 12: **outdated**
 - [ ] Wave 13: **outdated**
