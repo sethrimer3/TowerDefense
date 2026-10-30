@@ -33,6 +33,7 @@ import { unlockAllTowers } from "./defend/progress.ts";
 import { ROSES, setRose, type Rose } from "./ui/hall-art.ts";
 import { fitViewport } from "./ui/viewport.ts";
 import { setLanguage, translateWithin } from "./i18n/index.ts";
+import { installSeal } from "./ui/seal-art.ts";
 
 // Wires the pages together: builds the shell, loads the save, and routes
 // navigation, the currency bar and the frame loop between the pages.
@@ -40,6 +41,7 @@ import { setLanguage, translateWithin } from "./i18n/index.ts";
 let save: Save = load();
 setLanguage(save.settings.language);
 fitViewport();
+installSeal();
 buildShell(document.querySelector<HTMLDivElement>("#app")!, save.settings.legacyGraphics);
 let shownLegacyGraphics = save.settings.legacyGraphics;
 document.querySelectorAll<HTMLCanvasElement>("nav canvas[data-icon]").forEach((c) => paintIcon(c, "cityTile"));
@@ -274,6 +276,7 @@ function refreshCurrencies() {
   const dev = save.settings.devMode;
   document.documentElement.classList.toggle("reduce-motion", save.settings.reduceMotion);
   document.documentElement.classList.toggle("pixel-font", save.settings.pixelFont);
+  document.documentElement.classList.toggle("legacy-graphics", save.settings.legacyGraphics);
   setPixelArt(save.settings.pixelArt);
   const show = (id: string, n: number) => {
     const value = whole(n), before = shown.get(id);

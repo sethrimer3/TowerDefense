@@ -29,7 +29,7 @@ try {
     assert.ok(Math.abs(g.buttons[2].center - g.head.center) < 1, 'Start Defense centered');
     assert.equal(await page.locator('#defend-start').textContent(), 'Start Defense');
     assert.equal(await page.locator('#defend-upgrades canvas').count(), 1);
-    await page.waitForFunction(() => [...document.querySelector('.defend-wave-wall').getContext('2d').getImageData(0, 0, 64, 16).data].some(v => v));
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('#defend-wave')).backgroundImage.includes('data:image/png'));
     await page.screenshot({ path: `test-results/defend-controls-build-${width}.png` });
     await page.locator('#defend-start').click();
     assert.equal(await page.locator('#defend-side-toggle').count(), 1);
@@ -99,10 +99,7 @@ try {
     p.save.unlockedWave = 200;
     for (const wave of [21, 41, 61, 81, 101, 121, 141, 161, 181]) {
       p.save.startWave = wave; p.renderControls();
-      const canvas = document.querySelector('.defend-wave-wall');
-      let hash = 0;
-      for (const byte of canvas.getContext('2d').getImageData(0, 0, 64, 16).data) hash = (Math.imul(hash, 31) + byte) | 0;
-      hashes.push(hash);
+      hashes.push(getComputedStyle(document.querySelector('#defend-wave')).backgroundImage);
     }
     return hashes;
   });

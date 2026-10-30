@@ -22,7 +22,7 @@ export function areaForWave(wave: number): Area {
   const safe = Number.isFinite(wave) ? Math.max(1, Math.floor(wave)) : 1;
   return AREAS[Math.floor((safe - 1) / WAVES_PER_AREA) % AREAS.length];
 }
-export const areaStyle = (area: Area) => `--area-color:${area.color};--area-dark:${area.dark}`;
+export const areaStyle = (area: Area) => `--area-color:${area.color};--area-dark:${area.dark};--area-wall:var(--wall-${area.id})`;
 export function areaFade(elapsedMs: number, reduceMotion = false) {
   if (reduceMotion) return 1;
   const t = Math.max(0, Math.min(1, elapsedMs / AREA_FADE_MS));
