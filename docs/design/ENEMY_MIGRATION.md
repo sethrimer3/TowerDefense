@@ -20,7 +20,7 @@ Started 2026-10-29. This is the working checklist for replacing the old enemy li
 | Defend 6 | Major Darkling | 4 × 4 black art pixels, portal outline | 54 | 8 / 1 second | 0.8 | Three Large Darklings (21 bodies in all) |
 
 | Defend 11 | Significant Darkling | 5 × 5 black art pixels, portal outline | 162 | 16 / 1 second | 0.65 | Two Major Darklings (44 descendants; 45 bodies including parent) |
-| Defend 20 | Blight Worm | Fifty touching 5 × 5 black art-pixel segments, portal perimeter | 300 each | 4 contact / 0.6 seconds per target; 5 underground per building pass | 3 surface / 4 underground | Each segment releases three Significant Darklings; cuts create independent heads |
+| Defend 20 | Blight Worm | Fifty touching 5 × 5 black art-pixel segments, portal perimeter | 300 each | 4 contact / 0.6 seconds per target; 1.25 underground per building pass | 3 surface / 4 underground | Each segment releases three Significant Darklings; cuts create independent heads |
 
 An art pixel is 1/8 of a board cell and scales with the camera. All five Darkling kinds use solid black square drawing under normal, Pixel Art, Simple enemies and merged-outline settings, without decorative sprites. The stats are initial tuning values.
 
@@ -80,6 +80,12 @@ Wave 20's tree is 50 worm segments + 150 Significant + 300 Major + 900 Large + 1
 A dive commits a straight ray at the keep center. Segments dive/surface in trail order, visible only as translucent shadows while underground, fully immune and untargetable. Each underground segment damages each structure on or beside its path once, through walls, water, boulders and keep. Heads continue on the ray to the first dry open point four cells past the keep's far edge, or the last open point before the board edge, with a timeout guard. Underground deaths release surfaced offspring at nearest open ground. These behaviors, contact with people, the sizes, per-wave cap and tuning are the implementation assumptions to review. A shared boss bar sums living segments. Normal and Simple art, journal portraits and outline-free exports use the same replaceable five-pixel bodies. All state is transient, and worm randomness uses `sim.rand` only.
 
 Replay fixture `mixed` advances into wave 11 at 80 seconds, so its later hashes are intentionally re-recorded for the new authored roster. Other replay scenarios and city/fence/save goldens are expected unchanged. Waves 21 onward and all Ambush levels retain their legacy rosters.
+
+- **2026-10-30 — Blight Worm burrow revision.** Underground damage is now **1.25 per segment per building pass**, one quarter of the previous 5; surface contact remains 4. Each fresh dive uses one `sim.rand` draw to choose uniformly among standing, visible, grounded buildings (walls, houses, structures and keep), then follows a straight ray through that target. The head must reach the target before surfacing becomes eligible, so an empty approach cannot end the dive early. Below ground, only playing-field edges deflect it: they use the same fixed-angle bounce table, checking board clearance alone, and the body follows every exact turn.
+
+After reaching its target, the head must spend **one uninterrupted second outside all placed structure tiles**, with its entire body/contour clear. Keep, troop-building and tower footprints remain reserved even as rubble. Entering another tile resets the timer. Surfacing also requires dry, unobstructed ground. Cuts inherit their current ray, target/reached markers and once-per-building pass ledger, without choosing another target mid-dive. This replaces the former keep-only aim, four-cells-past-keep exit, board-edge surfacing and timeout teleport.
+
+The underground shadow is slightly more transparent (combined core alpha about 25%, formerly 34%). Pixel-art dirt sprays 48 clods from each head and four from each body segment, driven by presentation hashes and simulation time, with no battle RNG or particle state. Effects Off removes dirt; Reduce Motion freezes its launch phases while retaining the shadow. All wave rosters and body reservations are unchanged. Existing replay/city/fence/save goldens should remain unchanged because the replay fixtures contain no worm.
 
 ## Color drain and performance rules
 

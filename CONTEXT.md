@@ -726,10 +726,14 @@ A rear Blight member’s own attack reaching the front line’s target through a
 A Dark One enemy consisting of a five-by-five black art-pixel square with a portal contour. Defeating it releases two Major Darklings and forty-four descendant bodies.
 
 **Blight Worm**:
-A Dark One boss of fifty touching five-by-five art-pixel segments. It wanders and bounces on the surface, each segment striking in turn, then burrows as an immune shadow straight through the keep. Heads take four times damage; cuts create independent worms, and each destroyed segment releases three Significant Darklings.
+A Dark One boss of fifty touching five-by-five art-pixel segments. It wanders and bounces on the surface, each segment striking in turn, then burrows as an immune shadow straight toward a random standing building. It bounces at the playing-field edges and emerges after reaching that target and spending one uninterrupted second outside placed building tiles. Dirt sprays heavily from each head and lightly from the body; underground damage is one quarter of its former strength. Heads take four times damage; cuts create independent worms, and each destroyed segment releases three Significant Darklings.
 
 **Surface spell**:
 The time a worm head spends wandering above ground before its next dive.
 
 **Worm trail**:
 The path a worm head has passed through, followed by every segment at one body width of distance, including its turns, dives and surfacing points.
+
+
+**Burrow clear time**:
+The uninterrupted second a burrowing worm head must spend fully outside placed building tiles after reaching its chosen target, before it can surface on open ground. Entering another tile resets the count.

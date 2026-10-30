@@ -105,7 +105,7 @@ function healthBar({ c, px }: Brush, bd: Building, frac: number) {
 export type Burning = (x: number, y: number, id: number) => number;
 
 /** Draw enemies, or your troops, as plain squares (`simple-units.ts`). */
-export type Simple = { enemies?: boolean; troops?: boolean; reduceMotion?: boolean; merged?: boolean };
+export type Simple = { enemies?: boolean; troops?: boolean; reduceMotion?: boolean; merged?: boolean; effects?: boolean };
 
 /** An enemy's contour: crimson for the Dark One's, gold while a watch tower
  * marks it, violet for the brood, black for the rest. */
@@ -122,7 +122,7 @@ function enemyInk(e: Enemy) {
 export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, healthbars = false, timing?: { entityMs: number }, simple: Simple = {}, outline?: UnitOutline, sides?: UnitInks, contours?: { defer?: boolean }) {
   // Track the wave peak even when the setting is off.
   if (!healthbars) trackHealthbarPeak(sim);
-  for (const e of sim.enemies) drawWormShadow(b, e);
+  for (const e of sim.enemies) drawWormShadow(b, e, sim.time, simple.effects !== false, simple.reduceMotion);
   drawBlackHoles(b, sim);
   drawPoisonClouds(b, sim);
   drawWatchRadii(b, sim);
@@ -667,7 +667,7 @@ function drawHandTorch({ c, px }: Brush, at: { x: number; y: number; id: number 
  * has only `time` and `effects`. */
 export function drawEnemyArt(b: Brush, e: Enemy, sim: DefendSim, under = b) {
   const def = ENEMIES[e.kind];
-  if (!wormBodyVisible(e)) { drawWormShadow(under, e); return; }
+  if (!wormBodyVisible(e)) { drawWormShadow(under, e, sim.time); return; }
   if (def.darkPixels) {
     // No sprite lookup, rims, shading, torch, or animated decoration.
     const d = b.px / ART * def.darkPixels;

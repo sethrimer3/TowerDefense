@@ -7,7 +7,7 @@ import { generateCity, CellType } from "../src/defend/citygen.ts";
 import { defaultLayout, fitLayout } from "../src/defend/layout.ts";
 import { CELLS_W, cellIndex } from "../src/defend/grid.ts";
 import { stepEnemy } from "../src/defend/enemies.ts";
-import { BLIGHT_WORM as W, wormTrailAt, wormOpenPoint } from "../src/defend/blight-worm.ts";
+import { BLIGHT_WORM as W, wormTrailAt, wormOpenPoint, wormOnTowerTile } from "../src/defend/blight-worm.ts";
 import { groundBody } from "../src/defend/enemy-crowd.ts";
 import { onFoot } from "../src/defend/wall-defenses.ts";
 import { nearest } from "../src/defend/pathing.ts";
@@ -17,7 +17,7 @@ import { buildingContactPoint } from "../src/defend/contact.ts";
 import { buildWave, slots, waveCap, waveDifficulty, DARKLING_WAVES } from "../src/defend/waves.ts";
 import { basicName, basicUnitPieces } from "../src/defend/basic-unit-art.ts";
 import { chillByMage } from "../src/defend/mage-attunements.ts";
-import { wormBodyVisible } from "../src/defend/blight-worm-art.ts";
+import { wormBodyVisible, drawWormShadow, WORM_BURROW_ART } from "../src/defend/blight-worm-art.ts";
 import { journalHTML } from "../src/defend/journal.ts";
 
 const close = (a: number, b: number, eps = 1e-6) => assert.ok(Math.abs(a - b) <= eps, `${a} ≠ ${b}`);
@@ -177,14 +177,16 @@ test("surface wandering ignores keep/flow, freeze/stagger, body packing; chill s
   close(aa[0].worm!.s - aa[1].worm!.s, W.spacing);
 });
 
-test("burrow is a straight, immune, untargetable shadow; each segment hits walls, structures and keep once and surfaces beyond it", () => {
+test("burrow is a straight, immune, untargetable shadow; each segment hits walls, structures and its target once at quarter damage", () => {
   const sim = fixture(), keep = structure(sim, sim.keepId, 20, 54, 4, 4);
   const wall = structure(sim, sim.map.buildings.find(b => b.kind === "wall")!.id, 21, 49);
   const house = structure(sim, sim.map.buildings.find(b => b.kind === "house")!.id, 21, 51);
   const segments = worm(sim, 21.5, 44), head = segments[0], start = { x: head.x, y: head.y };
   head.worm!.head!.surfaceT = 0;
-  const hits = new Map<number, number>();
-  sim.damageBuilding = (id, amount) => { if (amount === W.burrowDamage) hits.set(id, (hits.get(id) ?? 0) + 1); };
+  sim.rand = () => 0; // Pick the keep, the first standing building in stable ID order.
+  assert.equal(W.burrowDamage, 5 / 4);
+  const hits = new Map<number, number>(), damageBuilding = sim.damageBuilding.bind(sim);
+  sim.damageBuilding = (id, amount) => { if (amount === W.burrowDamage) hits.set(id, (hits.get(id) ?? 0) + 1); damageBuilding(id, amount); };
   tick(sim);
   const h = head.worm!.head!, dx = h.dx, dy = h.dy;
   const center = { x: keep.rect.x + keep.rect.w / 2, y: keep.rect.y + keep.rect.h / 2 };
@@ -201,12 +203,12 @@ test("burrow is a straight, immune, untargetable shadow; each segment hits walls
     if (head.burrow) close((head.x - start.x) * dy - (head.y - start.y) * dx, 0);
     else {
       if (!headSurfaced) { surfaceY = head.y; headSurfaced = true; }
-      h.surfaceT = h.turnT = 1e6;
+      h.surfaceT = h.turnT = 1e6; h.dx = dx; h.dy = dy;
     }
     if (headSurfaced && segments.every(e => !e.burrow)) { lastSurfaced = true; break; }
   }
-  assert.ok(headSurfaced && lastSurfaced); assert.ok(surfaceY >= keep.rect.y + keep.rect.h + W.beyondKeep);
-  for (const id of [wall.id, house.id, keep.id]) assert.equal(hits.get(id), 50, `building ${id}`);
+  assert.ok(headSurfaced && lastSurfaced); assert.ok(surfaceY >= keep.rect.y + keep.rect.h + W.burrowSpeed * W.burrowClearSeconds);
+  for (const id of [wall.id, house.id, keep.id]) { assert.equal(hits.get(id), 50, `building ${id}`); close(100000 - sim.hp[id], 50 * 5 / 4); }
   assert.equal(head.untargetable, undefined); assert.ok(wormBodyVisible(head));
 });
 
@@ -286,15 +288,61 @@ test("a fence bounce closes through its empty cell margin to the painted rail", 
   assert.ok(head.y > 42 - W.spacing / 2 - .5 / 8);
 });
 
-test("a keep beside the board edge yields a bounded straight dive to the last open point", () => {
+test("an underground edge bounce stays submerged and every segment follows its exact turn", () => {
   const sim = fixture(); structure(sim, sim.keepId, 20, 98, 4, 4);
-  const head = worm(sim, 22, 50)[0]; head.worm!.head!.surfaceT = 0;
+  const segments = worm(sim, 22, 50), head = segments[0], h = head.worm!.head!;
+  h.surfaceT = 0; sim.rand = () => 0;
   tick(sim, 1 / 30); assert.ok(head.burrow);
-  let ticks = 0;
-  while (head.burrow && ticks++ < 1800) { close(head.x, 22); tick(sim, 1 / 30); }
-  assert.ok(ticks < 1800 && !head.burrow);
-  assert.ok(head.y > 103 && head.y < 104);
-  assert.equal(sim.foeSolid[cellIndex(Math.floor(head.x), Math.floor(head.y))], 0);
+  let bounce: { x: number; y: number } | undefined, surfaced = false;
+  const nearest = segments.map(() => Infinity);
+  for (let ticks = 0; ticks < 3300; ticks++) {
+    tick(sim, 1 / 120);
+    if (!bounce && h.dy !== 1) {
+      assert.ok(head.burrow, "a board edge must bounce instead of surfacing");
+      bounce = { x: head.x, y: head.y };
+      assert.ok(h.dy <= Math.SQRT1_2 + 1e-8);
+      assert.ok(h.outsideT < 1);
+    }
+    if (bounce) for (let n = 1; n < segments.length; n++) nearest[n] = Math.min(nearest[n], Math.hypot(segments[n].x - bounce.x, segments[n].y - bounce.y));
+    if (bounce && !head.burrow) { surfaced = true; h.surfaceT = h.turnT = 1e6; }
+    assert.ok(head.x >= 0 && head.x < 72 && head.y >= 0 && head.y < 104);
+    if (surfaced && segments.every(e => !e.burrow)) break;
+  }
+  assert.ok(bounce && surfaced);
+  assert.equal(wormOnTowerTile(sim, head), false);
+  for (let n = 1; n < segments.length; n++) assert.ok(nearest[n] < .06, `segment ${n}: ${nearest[n]}`);
+});
+
+for (const rubble of [false, true]) test(`surfacing waits an uninterrupted second outside tower tiles, including ${rubble ? "rubble" : "a second tower"}`, () => {
+  const sim = fixture(); structure(sim, sim.keepId, 20, 40, 2, 4);
+  const tower = structure(sim, sim.map.buildings.find(b => b.kind === "house")!.id, 24, 40, 2, 4);
+  tower.kind = "archerTower"; tower.structureUid = 777;
+  if (rubble) { sim.hp[tower.id] = 0; sim.built[tower.id] = 0; }
+  const head = worm(sim, 18, 42)[0]; sim.rand = () => 0;
+  head.worm!.head!.surfaceT = 0;
+  let surfaced = false;
+  for (let n = 0; n < 800; n++) {
+    tick(sim);
+    if (!head.burrow) { surfaced = true; break; }
+    if (head.x < 30.4375 - .001) assert.ok(head.burrow);
+    if (head.x >= 23.5625 && head.x <= 26.4375) close(head.worm!.head!.outsideT, 0);
+  }
+  assert.ok(surfaced); assert.ok(head.x >= 30.4375 - 1e-6 && head.x < 30.6);
+  assert.equal(wormOnTowerTile(sim, head), false);
+});
+
+for (const roll of [0, .4, .99]) test(`a dive uniformly targets a standing building at roll ${roll} and cannot surface short of it`, () => {
+  const sim = fixture(); structure(sim, sim.keepId, 20, 65, 4, 4);
+  structure(sim, sim.map.buildings.find(b => b.kind === "wall")!.id, 5, 55);
+  structure(sim, sim.map.buildings.find(b => b.kind === "house")!.id, 45, 60, 2, 2);
+  const candidates = sim.map.buildings.filter(b => sim.hp[b.id] > 0 && sim.intact(b));
+  const target = candidates[Math.floor(roll * candidates.length)], head = worm(sim, 20, 40)[0];
+  head.worm!.head!.surfaceT = 0; sim.rand = () => roll;
+  tick(sim);
+  const h = head.worm!.head!, dx = target.rect.x + target.rect.w / 2 - head.x, dy = target.rect.y + target.rect.h / 2 - head.y;
+  assert.equal(h.target, target.id); close(dx * h.dy - dy * h.dx, 0);
+  for (let n = 0; n < 150; n++) tick(sim);
+  assert.ok(head.burrow && !h.reached, "the empty approach must not trigger surfacing");
 });
 
 test("surface contact runs over troops and civilians without stopping or hitting every substep", () => {
@@ -307,6 +355,27 @@ test("surface contact runs over troops and civilians without stopping or hitting
   close(head.y - start, W.surfaceSpeed * .1);
   assert.equal(soldier.hp, 100 - W.contactDamage);
   assert.equal(civilian.hp, 100 - W.contactDamage);
+});
+
+test("burrow art has lighter shadows, dense head spray, sparse body dirt and motion/effects settings without sim draws", () => {
+  const sim = fixture(), segments = worm(sim), head = segments[0], body = segments[1];
+  head.burrow = body.burrow = 1;
+  const state = JSON.stringify(segments);
+  sim.rand = () => { throw Error("art must not roll the battle stream"); };
+  function paint(e: typeof head, seconds: number, effects = true, reduceMotion = false) {
+    const calls: unknown[] = [], c = { fillStyle: "", globalAlpha: 1, save() {}, restore() {},
+      fillRect(...box: number[]) { calls.push([this.fillStyle, this.globalAlpha, ...box]); } };
+    drawWormShadow({ c: c as unknown as CanvasRenderingContext2D, px: 16 }, e, seconds, effects, reduceMotion);
+    return calls;
+  }
+  assert.equal(paint(head, 1).length, 3 + WORM_BURROW_ART.headClods);
+  assert.equal(paint(body, 1).length, 3 + WORM_BURROW_ART.bodyClods);
+  assert.equal(paint(head, 1, false).length, 3);
+  assert.notDeepEqual(paint(head, 1), paint(head, 1.2));
+  assert.deepEqual(paint(head, 1, true, true), paint(head, 9, true, true));
+  const alpha = 1 - WORM_BURROW_ART.shadow.reduce((clear, [, a]) => clear * (1 - a), 1);
+  assert.ok(alpha > .2 && alpha < .3, `shadow alpha ${alpha}`);
+  assert.equal(JSON.stringify(segments), state);
 });
 
 test("same-seed worm motion, phase transitions, cuts and cooldowns hash identically", () => {

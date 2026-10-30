@@ -590,7 +590,7 @@ export class DefendRenderer {
       actors.setTransform(1, 0, 0, 1, 0, 0); actors.clearRect(0, 0, this.actors.width, this.actors.height);
       actors.setTransform(c.getTransform()); actors.imageSmoothingEnabled = false;
     }
-    drawUnits({ c: actors, px: this.px }, sim, torches, opts.healthbars === true, opts.timings ? this.timings : undefined, { enemies: opts.simpleEnemies, troops: opts.simpleTroops, reduceMotion: opts.reduceMotion, merged: !!opts.mergedOutlines }, (this.outline ??= new UnitOutline()), opts.sides, { defer: true });
+    drawUnits({ c: actors, px: this.px }, sim, torches, opts.healthbars === true, opts.timings ? this.timings : undefined, { enemies: opts.simpleEnemies, troops: opts.simpleTroops, reduceMotion: opts.reduceMotion, merged: !!opts.mergedOutlines, effects: opts.effects !== false }, (this.outline ??= new UnitOutline()), opts.sides, { defer: true });
     this.dark.draw(actors, this.px, sim);
     if (actors !== c) {
       c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(this.actors!, 0, 0); c.restore();
