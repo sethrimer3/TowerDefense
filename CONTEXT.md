@@ -689,7 +689,7 @@ The gradual loss of color and contrast around a dense group of Dark One enemies,
 A Dark One enemy consisting of a three-by-three black pixel square, splitting into two Darklings when defeated.
 
 **Major Darkling**:
-A Dark One enemy consisting of a four-by-four black pixel square, splitting into three Large Darklings when defeated. Its outline is a portal contour.
+A Dark One enemy consisting of a four-by-four black pixel square, splitting into three Large Darklings when defeated. Like all Dark One enemies, its outline is a portal contour.
 
 **Portal contour**:
 A unit outline that shows a burning dimension through it, as if that dimension filled the whole screen unseen and the outline were a cut into it.
@@ -698,7 +698,7 @@ A unit outline that shows a burning dimension through it, as if that dimension f
 The world-art unit: one eighth of a board cell, scaled to screen pixels by camera zoom and display density.
 
 **Visibility contour**:
-A half-art-pixel perimeter around a combined group of unit bodies, deep crimson for Dark One enemies, dark navy for the player's troops and black (gold while marked) for everyone else, without seams through overlapping bodies.
+A perimeter around a combined group of unit bodies, without seams through overlapping bodies. Dark One enemies use a one-art-pixel burning portal contour; player troops use a half-art-pixel dark navy contour. Siege opponents keep crimson, and neutral units black, gold while marked or brood violet.
 
 
 **Contact damage**:
@@ -733,3 +733,6 @@ The time a worm head spends wandering above ground before its next dive.
 
 **Worm trail**:
 The path a worm head has passed through, followed by every segment at one body width of distance, including its turns, dives and surfacing points.
+
+**Blight infill**:
+The black visual joining narrow spaces inside packed Darkling groups. It blends back into the portal outline as bodies separate; it does not change their physical bodies or attack connections.

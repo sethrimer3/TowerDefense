@@ -32,4 +32,5 @@ Add Defend items here in the form: **What** (one line), **Why**, **Files**, **Te
 - [x] Deepen Darkling crimson; add a shared crowd-strength night halo; strengthen color-drain onset and protect unit bodies/shots while washing surrounding scenery.
 - [x] Pack ground enemy bodies without overlap and let connected Blight rear ranks transfer their own contact hits to a valid front; preserve outer pixel contours and verify bounded crowd work. [Rules](../design/BLIGHT_PRESSURE.md).
 - [x] Author Defend waves 11–19 from all five Darkling sizes, introduce the Significant Darkling, and make wave 20 one 50-segment Blight Worm with trail following, wall bounces, shadow burrows and independent heads after cuts.
+- [x] Give every Blight/Dark One enemy the shared noise portal outline; softly fill packed pixel cracks black and reopen them as enemies separate, with reusable masks and no scene readbacks.
 - [ ] Migrate later waves toward roughly 90% plain pixel filler; identify medium enemies by equipment and retain complex sprites for rare high-strength threats. Track each composition and story exception in the migration log.

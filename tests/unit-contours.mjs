@@ -9,7 +9,7 @@ try {
   await page.goto(new URL('tests/performance.html', process.env.TEST_URL || 'http://127.0.0.1:5173/').href);
   const result = await page.evaluate(async () => {
     const { UnitOutline } = await import('/src/defend/unit-outline.ts');
-    const { ART, UNIT_CONTOUR_ART_PIXELS, DARK_UNIT_INK, PLAYER_UNIT_INK } = await import('/src/defend/art-scale.ts');
+    const { ART, UNIT_CONTOUR_ART_PIXELS, DARK_UNIT_INK, PLAYER_UNIT_INK, PORTAL_UNIT_INK } = await import('/src/defend/art-scale.ts');
     const { drawUnits } = await import('/src/defend/battle-art.ts');
     const { DefendSim } = await import('/src/defend/sim.ts');
     const { DefendRenderer } = await import('/src/defend/render.ts');
@@ -94,7 +94,7 @@ try {
         for (let i = 0; i < ring.length; i += 4) if (ring[i + 3] >= 16 && [0, 1, 2].some(k => a[i + k] !== bare[i + k])) n++;
         return n;
       };
-      frames.push({ phone, simple, merged, motion, crimson: visible(DARK_UNIT_INK), blue: visible(PLAYER_UNIT_INK), opaqueCrimson: count(DARK_UNIT_INK), drain: renderer.darkDrain.density.active });
+      frames.push({ phone, simple, merged, motion, portal: visible(PORTAL_UNIT_INK), blue: visible(PLAYER_UNIT_INK), opaqueCrimson: count(DARK_UNIT_INK), drain: renderer.darkDrain.density.active });
       renderer.draw(map, sim, null, { ...opts, now: 1200 });
       cv.remove();
     }
@@ -143,7 +143,7 @@ try {
   assert.deepEqual(result.neutral[0].interior, [0, 0, 0, 255]);
   assert.deepEqual(result.neutral[1].interior, [67, 186, 115, 255]);
   for (const s of result.sprites) { assert.deepEqual(s.body, [67, 186, 115, 255]); assert.deepEqual(s.edge.slice(0, 3), rgb(result.blue)); assert.equal(s.outside[3], 0); }
-  assert.ok(result.frames.every(f => f.crimson > 0 && f.blue > 0 && f.drain), JSON.stringify(result.frames));
+  assert.ok(result.frames.every(f => f.portal > 0 && f.blue > 0 && f.drain), JSON.stringify(result.frames));
   assert.equal(result.benchmark.readbacks, 0); assert.ok(result.benchmark.canvases <= 2);
   assert.deepEqual(errors, []);
   mkdirSync('test-results', { recursive: true }); writeFileSync('test-results/unit-contours.json', JSON.stringify(result, null, 2));

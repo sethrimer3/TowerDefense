@@ -6,7 +6,8 @@ import { paintPortal } from "./portal-noise.ts";
 
 type Ctx = CanvasRenderingContext2D;
 type Stroke = { path: Path2D; width: number; cap: CanvasLineCap; join: CanvasLineJoin; miter: number };
-type Channel = { radius: number; shaped: boolean; mergePixels: boolean; bounds: { x0: number; y0: number; x1: number; y1: number } | null; faded: boolean; rectangles: Path2D; expanded: Path2D; path: Path2D; strokes: Map<string, Stroke>; canvas: HTMLCanvasElement; c: Ctx };
+type Bounds = { x0: number; y0: number; x1: number; y1: number };
+type Channel = { pixels: Path2D[]; pixelBounds: Bounds | null; radius: number; shaped: boolean; mergePixels: boolean; bounds: Bounds | null; faded: boolean; rectangles: Path2D; expanded: Path2D; path: Path2D; strokes: Map<string, Stroke>; canvas: HTMLCanvasElement; c: Ctx };
 export class UnitContours {
   private channels = new Map<string, Channel>();
   private ink: string | undefined;
@@ -15,7 +16,9 @@ export class UnitContours {
   private rectOnly = true;
   private penRects: number[] = [];
   private radius = 0;
+  private pixelMode = false;
   private inner: HTMLCanvasElement | null = null;
+  private innerChannel: Channel | null = null;
   private portal: HTMLCanvasElement | null = null;
   /** Wall-clock seconds the portal dimension has scrolled to. */
   seconds = 0;
@@ -25,16 +28,16 @@ export class UnitContours {
 
   begin(c: Ctx, width: number) {
     this.matrix = c.getTransform(); this.scale = Math.hypot(this.matrix.a, this.matrix.b);
-    this.radius = width * this.scale; this.ink = undefined; this.pen = new Path2D(); this.penRects.length = 0; this.rectOnly = true;
+    this.innerChannel = null; this.pixelMode = false; this.radius = width * this.scale; this.ink = undefined; this.pen = new Path2D(); this.penRects.length = 0; this.rectOnly = true;
     for (const [ink, channel] of this.channels) {
-      channel.radius = this.radiusOf(ink); channel.shaped = false; channel.path = new Path2D(); channel.rectangles = new Path2D(); channel.expanded = new Path2D(); channel.strokes.clear(); channel.faded = false; channel.mergePixels = false; channel.bounds = null;
+      channel.pixels = [new Path2D(), new Path2D(), new Path2D()]; channel.pixelBounds = null; channel.radius = this.radiusOf(ink); channel.shaped = false; channel.path = new Path2D(); channel.rectangles = new Path2D(); channel.expanded = new Path2D(); channel.strokes.clear(); channel.faded = false; channel.mergePixels = false; channel.bounds = null;
       if (channel.canvas.width !== c.canvas.width || channel.canvas.height !== c.canvas.height) {
         channel.canvas.width = c.canvas.width; channel.canvas.height = c.canvas.height;
       }
       channel.c.clearRect(0, 0, c.canvas.width, c.canvas.height);
     }
   }
-  select(ink?: string) { this.ink = ink; }
+  select(ink?: string) { this.ink = ink; this.pixelMode = false; }
   private radiusOf(ink: string) { return ink === PORTAL_UNIT_INK ? this.radius * PORTAL_CONTOUR_WIDTH : this.radius; }
   transform(c: Ctx) { this.matrix = c.getTransform(); }
   private channel() {
@@ -42,11 +45,11 @@ export class UnitContours {
     let channel = this.channels.get(this.ink);
     if (!channel) {
       const canvas = document.createElement('canvas'), c = canvas.getContext('2d')!;
-      this.channels.set(this.ink, (channel = { radius: this.radiusOf(this.ink), shaped: false, mergePixels: false, bounds: null, faded: false, rectangles: new Path2D(), expanded: new Path2D(), path: new Path2D(), strokes: new Map(), canvas, c }));
+      this.channels.set(this.ink, (channel = { pixels: [new Path2D(), new Path2D(), new Path2D()], pixelBounds: null, radius: this.radiusOf(this.ink), shaped: false, mergePixels: false, bounds: null, faded: false, rectangles: new Path2D(), expanded: new Path2D(), path: new Path2D(), strokes: new Map(), canvas, c }));
     }
     return channel;
   }
-  mergePixelGaps() { const channel = this.channel(); if (channel) channel.mergePixels = true; }
+  mergePixelGaps(active = true) { this.pixelMode = active; const channel = this.channel(); if (channel && active) channel.mergePixels = true; }
   faded() { const channel = this.channel(); if (channel) channel.faded = true; }
   rect(x: number, y: number, w: number, h: number) {
     if (!w || !h) return;
@@ -59,6 +62,17 @@ export class UnitContours {
       // the stroker's extra geometry for thousands of tiny square bodies.
       const r = channel.radius;
       channel.expanded.rect(left - r, top - r, width + 2 * r, height + 2 * r);
+      if (this.pixelMode) {
+        // Feather the dilation in three nested bands. The center sample in
+        // closePixelBodies makes narrow bridges darken as the gap shrinks.
+        for (let i = 0; i < 3; i++) {
+          const pad = r * (1 - i * .25);
+          channel.pixels[i].rect(left - pad, top - pad, width + 2 * pad, height + 2 * pad);
+        }
+        const b = channel.pixelBounds;
+        if (b) { b.x0 = Math.min(b.x0, left); b.y0 = Math.min(b.y0, top); b.x1 = Math.max(b.x1, left + width); b.y1 = Math.max(b.y1, top + height); }
+        else channel.pixelBounds = { x0: left, y0: top, x1: left + width, y1: top + height };
+      }
       const box = channel.bounds;
       if (box) { box.x0 = Math.min(box.x0, left); box.y0 = Math.min(box.y0, top); box.x1 = Math.max(box.x1, left + width); box.y1 = Math.max(box.y1, top + height); }
       else channel.bounds = { x0: left, y0: top, x1: left + width, y1: top + height };
@@ -99,7 +113,6 @@ export class UnitContours {
       c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, canvas.width, canvas.height);
       c.globalCompositeOperation = 'source-over'; c.strokeStyle = ink; c.fillStyle = ink;
       c.fill(channel.expanded);
-      if (channel.mergePixels && channel.bounds && channel.radius > 0) this.closePixelRims(channel);
       c.lineWidth = 2 * channel.radius; c.lineJoin = 'miter'; c.lineCap = 'butt'; c.miterLimit = 10;
       c.stroke(path);
       for (const stroke of strokes.values()) {
@@ -120,22 +133,46 @@ export class UnitContours {
       c.drawImage(bodies, 0, 0);
       c.globalCompositeOperation = 'source-over';
     }
+    // Keep actual bodies out of the rings before inserting soft joins. The
+    // portal mixes those joins into its opaque fire, rather than punching
+    // translucent holes through both body and rim to expose scenery.
+    for (const channel of this.channels.values()) {
+      if (channel.mergePixels && channel.pixelBounds && channel.radius > 0) this.closePixelBodies(channel, bodies);
+    }
   }
-  /** Close sub-contour gaps before taking the perimeter. Four shifted
-   * intersections erode the union of expanded axis-aligned pixel bodies.
-   * One reusable scratch canvas, clipped to the crowd; no blur/readbacks. */
-  private closePixelRims(channel: Channel) {
-    const { canvas, bounds: b } = channel, r = channel.radius;
+  /** A soft morphological closing of pixel bodies only. Intersect the
+   * feathered expanded union at its center and four corners, then insert its
+   * black interior behind the real bodies. Narrow cracks become solid; wider
+   * necks retain some fire until they close. No filters or scene readbacks. */
+  private closePixelBodies(channel: Channel, bodies: HTMLCanvasElement) {
+    const { pixelBounds: b, pixels } = channel, r = channel.radius;
+    this.portal ??= document.createElement('canvas');
+    const canvas = this.portal;
+    if (canvas.width !== bodies.width || canvas.height !== bodies.height) { canvas.width = bodies.width; canvas.height = bodies.height; }
+    const source = canvas.getContext('2d')!;
+    source.setTransform(1, 0, 0, 1, 0, 0); source.clearRect(0, 0, canvas.width, canvas.height);
+    source.globalCompositeOperation = "source-over"; source.fillStyle = "#000";
+    source.globalAlpha = .35; source.fill(pixels[0]);
+    source.globalAlpha = .65; source.fill(pixels[1]);
+    source.globalAlpha = 1; source.fill(pixels[2]);
     this.inner ??= document.createElement("canvas");
     if (this.inner.width !== canvas.width || this.inner.height !== canvas.height) { this.inner.width = canvas.width; this.inner.height = canvas.height; }
     const c = this.inner.getContext("2d")!;
     c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, canvas.width, canvas.height);
-    c.save(); c.beginPath(); c.rect(b!.x0 - r * 2, b!.y0 - r * 2, b!.x1 - b!.x0 + r * 4, b!.y1 - b!.y0 + r * 4); c.clip();
-    c.globalCompositeOperation = "source-over"; c.drawImage(canvas, -r, -r);
+    const x = Math.max(0, Math.floor(b!.x0 - r * 2 - 2)), y = Math.max(0, Math.floor(b!.y0 - r * 2 - 2));
+    const w = Math.min(canvas.width, Math.ceil(b!.x1 + r * 2 + 2)) - x, h = Math.min(canvas.height, Math.ceil(b!.y1 + r * 2 + 2)) - y;
+    if (w <= 0 || h <= 0) return;
+    this.innerChannel = channel;
+    c.save(); c.beginPath(); c.rect(x, y, w, h); c.clip();
+    c.globalCompositeOperation = "source-over"; c.drawImage(canvas, 0, 0);
     c.globalCompositeOperation = "destination-in";
-    c.drawImage(canvas, r, -r); c.drawImage(canvas, -r, r); c.drawImage(canvas, r, r);
+    c.drawImage(canvas, -r, -r); c.drawImage(canvas, r, -r); c.drawImage(canvas, -r, r); c.drawImage(canvas, r, r);
     c.restore(); c.globalCompositeOperation = "source-over";
-    channel.c.globalCompositeOperation = "destination-out"; channel.c.drawImage(this.inner, 0, 0); channel.c.globalCompositeOperation = "source-over";
+    const body = bodies.getContext("2d")!;
+    body.save(); body.setTransform(1, 0, 0, 1, 0, 0); body.globalAlpha = 1; body.globalCompositeOperation = "destination-over";
+    // Bypass UnitOutline's sprite interception: this transient mask is not a
+    // source sprite and must never be copied/read back or cached as one.
+    CanvasRenderingContext2D.prototype.drawImage.call(body, this.inner, x, y, w, h, x, y, w, h); body.restore();
   }
 
   /** Every channel onto `c`; the portal's shows the burning dimension
@@ -143,13 +180,13 @@ export class UnitContours {
   draw(c: Ctx, plain = false) {
     c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
     for (const [ink, channel] of this.channels) {
-      if (ink === PORTAL_UNIT_INK && !plain) this.drawPortal(c, channel);
+      if (ink === PORTAL_UNIT_INK) this.drawPortal(c, channel, plain);
       else c.drawImage(channel.canvas, 0, 0);
     }
     c.restore();
   }
   /** The dimension painted only over the contour's box, then cut to it. */
-  private drawPortal(c: Ctx, channel: Channel) {
+  private drawPortal(c: Ctx, channel: Channel, plain = false) {
     const { canvas } = channel;
     let box = { x: 0, y: 0, w: canvas.width, h: canvas.height };
     if (!channel.shaped) {
@@ -164,9 +201,18 @@ export class UnitContours {
     if (scratch.width !== canvas.width || scratch.height !== canvas.height) { scratch.width = canvas.width; scratch.height = canvas.height; }
     const s = scratch.getContext('2d')!;
     s.setTransform(1, 0, 0, 1, 0, 0);
-    paintPortal(s, box, this.seconds, globalThis.devicePixelRatio || 1);
-    s.globalCompositeOperation = 'destination-in';
-    s.drawImage(canvas, box.x, box.y, box.w, box.h, box.x, box.y, box.w, box.h);
+    const join = this.innerChannel === channel ? this.inner : null;
+    if (plain) {
+      s.clearRect(box.x, box.y, box.w, box.h);
+      s.drawImage(canvas, box.x, box.y, box.w, box.h, box.x, box.y, box.w, box.h);
+      // Torch shine belongs to the outer fire, never the black necks.
+      if (join) { s.globalCompositeOperation = 'destination-out'; s.drawImage(join, box.x, box.y, box.w, box.h, box.x, box.y, box.w, box.h); }
+    } else {
+      paintPortal(s, box, this.seconds, globalThis.devicePixelRatio || 1);
+      if (join) { s.globalCompositeOperation = 'source-atop'; s.drawImage(join, box.x, box.y, box.w, box.h, box.x, box.y, box.w, box.h); }
+      s.globalCompositeOperation = 'destination-in';
+      s.drawImage(canvas, box.x, box.y, box.w, box.h, box.x, box.y, box.w, box.h);
+    }
     s.globalCompositeOperation = 'source-over';
     c.drawImage(scratch, box.x, box.y, box.w, box.h, box.x, box.y, box.w, box.h);
   }

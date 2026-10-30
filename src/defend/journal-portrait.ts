@@ -78,11 +78,15 @@ function drawOnScratch(scratch: HTMLCanvasElement, kind: EnemyKind, px: number) 
   if (def.fortress) assembleFortress(sim, head);
   const b = { c, px };
   // Fortress parts are drawn by their core.
-  if (def.portalOutline && def.darkPixels) {
+  if (def.faction === "darkOne" || def.portalOutline) {
     portalPortrait ??= new UnitOutline();
     const layers = portalPortrait.begin(c, true, px / ART * UNIT_CONTOUR_ART_PIXELS);
-    portalPortrait.ink(PORTAL_UNIT_INK); portalPortrait.mergePixelGaps();
-    drawDarklingBodies({ c: layers.units, px }, enemies);
+    portalPortrait.ink(PORTAL_UNIT_INK);
+    if (def.darkPixels) {
+      portalPortrait.mergePixelGaps();
+      drawDarklingBodies({ c: layers.units, px }, enemies);
+      portalPortrait.mergePixelGaps(false);
+    } else for (const e of enemies) if (!e.fortressPart) drawEnemyArt({ c: layers.units, px }, e, sim, b);
     portalPortrait.end(c);
   } else for (const e of enemies) if (!e.fortressPart) drawEnemyArt(b, e, sim);
 

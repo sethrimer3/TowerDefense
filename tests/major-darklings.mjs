@@ -1,4 +1,4 @@
-// Major Darklings' portal contours in the production renderer: the fiery
+// All Darklings' portal contours in the production renderer: the fiery
 // dimension shows only through their outlines, scrolls with the wall clock and
 // holds still under Reduce Motion. Isolated fixture, no player saves. Start the
 // Vite server first.
@@ -51,7 +51,8 @@ try {
     }, phone);
     await page.screenshot({ path: `test-results/major-darklings-${phone ? 'phone' : 'desktop'}.png` });
     assert.deepEqual(errors, []);
-    assert.ok(r.a.fire > r.plain.fire + 200, `portal contours show fire (${r.a.fire} vs ${r.plain.fire})`);
+    assert.ok(r.plain.fire > 0, 'Large and smaller Darklings have fiery contours too');
+    assert.ok(r.a.fire > r.plain.fire, `portal contours show fire (${r.a.fire} vs ${r.plain.fire})`);
     assert.notEqual(r.a.hash, r.b.hash, 'the dimension scrolls with the wall clock');
     assert.deepEqual(r.still[0], r.still[1], 'Reduce Motion holds it still');
     results.push({ phone, ...r });
