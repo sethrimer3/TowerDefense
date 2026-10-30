@@ -75,22 +75,25 @@ test("Significant Darkling is five art pixels, releases two majors and descends 
   }
 });
 
-test("waves 11–19 use exact, interleaved darkling rosters, increasing split-tree HP, no RNG, and bounded slots", () => {
+test("waves 11–19 interleave Darkling hordes and late flying escorts with increasing HP, no RNG, and bounded slots", () => {
   const all = new Set<EnemyKind>(); let hp = treeHP("majorDarkling") * 50;
-  const bodies = [1330, 2080, 2650, 3280, 3350, 4500, 4410, 4790, 4940];
+  const bodies = [1330, 2080, 2650, 3280, 3353, 4504, 4415, 4796, 4951];
   for (let n = 11; n <= 19; n++) {
     const q = buildWave(n, () => { throw Error("authored wave rolled"); });
     for (const [kind, count] of DARKLING_WAVES[n]) {
       assert.equal(q.filter(k => k === kind).length, count); all.add(kind);
-      // Each quarter of the five-second release contains this kind.
-      for (let i = 0; i < 4; i++) assert.ok(q.slice(Math.floor(q.length * i / 4), Math.floor(q.length * (i + 1) / 4)).includes(kind));
+      // Dense kinds occupy every quarter; sparse escorts occupy equal bands.
+      const bands = Math.min(4, count);
+      for (let i = 0; i < bands; i++) assert.ok(q.slice(Math.floor(q.length * i / bands), Math.floor(q.length * (i + 1) / bands)).includes(kind));
     }
-    assert.ok(q.every(k => k.endsWith("Darkling") || k === "darkling"));
+    assert.ok(q.every(k => ENEMIES[k].faction === "darkOne" && (k.endsWith("Darkling") || k === "darkling" || k === "blightDart" || k === "blightPrism")));
+    assert.equal(q.filter(k => k === "blightDart").length, n >= 15 ? n - 12 : 0);
+    assert.equal(q.filter(k => k === "blightPrism").length, n === 19 ? 1 : 0);
     const reserved = q.reduce((s, k) => s + slots(ENEMIES[k]), 0), nextHP = q.reduce((s, k) => s + treeHP(k), 0);
     assert.equal(reserved, bodies[n - 11]); assert.ok(reserved <= waveCap(n)); assert.ok(nextHP > hp); hp = nextHP;
     assert.equal(waveDifficulty(n), q.reduce((s, k) => s + ENEMIES[k].cost, 0));
   }
-  assert.equal(all.size, 5);
+  assert.equal(all.size, 7);
   assert.equal(waveCap(19), 5000); assert.equal(waveCap(20), 7000); assert.equal(waveCap(21), 5000); assert.equal(waveCap(181), 5000);
 });
 
