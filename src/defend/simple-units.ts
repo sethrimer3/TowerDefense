@@ -4,39 +4,14 @@ import { ART } from "./art-scale.ts";
  * left and shaded along the bottom and right, one art pixel each. Squares
  * are batched into one path per colour, so a crowd of thousands costs a
  * handful of fills. Presentation only. */
-import { FLAG_BEARER, HERO, SHADE, HOPLITE, JAVELINEER, LANCER, SPEARMAN, ARCHER_UNIT, ASSASSIN_UNIT, BRAWLER, DARK_WIZARD, ENEMIES, enemySize, FIRE_MAGE, GATLING_GUNNER, GUNNER, MACHINE_GUNNER, MUSKETEER, RAIL_SNIPER, ROCKETEER, SLINGER, SNIPER, SOLDIER, VALKYRIE } from "./catalog.ts";
+import { ENEMIES, enemySize } from "./catalog.ts";
 import type { Enemy, Soldier } from "./sim.ts";
 import type { UnitInks } from "./unit-outline.ts";
 
 type Brush = { c: CanvasRenderingContext2D; px: number };
 
-/** Each troop kind's size and colour, shared with the garrison badges. */
-export const TROOPS: Record<Soldier["kind"], { size: number; color: string }> = {
-  sword: SOLDIER,
-  archer: ARCHER_UNIT,
-  mage: FIRE_MAGE,
-  valkyrie: VALKYRIE,
-  darkWizard: DARK_WIZARD,
-  undead: { size: SOLDIER.size, color: "#cfd3bf" },
-  reinforcement: { size: SOLDIER.size, color: "#a9bde0" },
-  brawler: BRAWLER,
-  slinger: SLINGER,
-  sniper: SNIPER,
-  musketeer: MUSKETEER,
-  gunner: GUNNER,
-  machineGunner: MACHINE_GUNNER,
-  gatlingGunner: GATLING_GUNNER,
-  railSniper: RAIL_SNIPER,
-  rocketeer: ROCKETEER,
-  spearman: SPEARMAN,
-  hoplite: HOPLITE,
-  javelineer: JAVELINEER,
-  lancer: LANCER,
-  hero: HERO,
-  shade: SHADE,
-  flagBearer: FLAG_BEARER,
-  assassin: ASSASSIN_UNIT,
-};
+export { TROOPS } from "./unit-bodies.ts";
+import { TROOPS } from "./unit-bodies.ts";
 
 /** Squares waiting to be filled, as flat x, y, side runs, by fill colour;
  * kept between frames so a frame allocates nothing once warm. */
@@ -106,14 +81,10 @@ function queue(px: number, k: number, x: number, y: number, size: number, color:
  * With `rims`, the outlines go there (merged outlines, `unit-outline.ts`). */
 export function drawSimpleEnemies({ c, px }: Brush, enemies: readonly Enemy[], rims = c, inks?: UnitInks, rimFor?: (color: string) => CanvasRenderingContext2D) {
   const k = artPixel(px);
+  drawDarklingBodies({ c, px }, enemies);
   for (const e of enemies) {
     const def = ENEMIES[e.kind];
-    if (def.darkPixels) {
-      const s = px / ART * def.darkPixels;
-      c.fillStyle = "#000000";
-      c.fillRect(e.x * px - s / 2, e.y * px - s / 2, s, s);
-      continue;
-    }
+    if (def.darkPixels) continue;
     queue(px, k, e.x, e.y, enemySize(e), e.flash > 0 ? "#ffffff" : def.color, inks?.ink(e.id) ?? (e.marked ? "#f2c94c" : def.boss ? "#7a1616" : "#000000"));
   }
   flush(c, k, rims, rimFor);
@@ -127,4 +98,18 @@ export function drawSimpleTroops({ c, px }: Brush, soldiers: readonly Soldier[],
     queue(px, k, u.x, u.y, t.size, u.flash > 0 ? "#ffffff" : t.color, inks?.ink(u.id) ?? "#000000");
   }
   flush(c, k, rims, rimFor);
+}
+
+/** Fill pixel bodies as one union. Separate antialiased fillRect calls can
+ * leave faint seams where two flush bodies meet under a fractional camera. */
+export function drawDarklingBodies({ c, px }: Brush, enemies: readonly Enemy[]) {
+  c.fillStyle = "#000000"; c.beginPath();
+  let any = false;
+  for (const e of enemies) {
+    const side = ENEMIES[e.kind].darkPixels;
+    if (!side || e.raidProxy) continue;
+    const d = px / ART * side;
+    c.rect(e.x * px - d / 2, e.y * px - d / 2, d, d); any = true;
+  }
+  if (any) c.fill();
 }

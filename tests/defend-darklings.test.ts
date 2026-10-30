@@ -65,7 +65,7 @@ test('one, two and three art-pixel bodies stay plain black in normal and Simple 
   for (const [kind, side] of [['miniDarkling', 1], ['darkling', 2], ['largeDarkling', 3]] as const) {
     for (const px of [8, 24]) {
       const boxes: number[][] = [];
-      const c = { fillStyle: '', fillRect(...args: number[]) { assert.equal(this.fillStyle, '#000000'); boxes.push(args); }, beginPath() {}, fill() {} } as unknown as CanvasRenderingContext2D;
+      const c = { fillStyle: '', fillRect(...args: number[]) { assert.equal(this.fillStyle, '#000000'); boxes.push(args); }, rect(...args: number[]) { assert.equal(this.fillStyle, '#000000'); boxes.push(args); }, beginPath() {}, fill() {} } as unknown as CanvasRenderingContext2D;
       const e = { ...crowd(1, kind, 10, 10)[0], flash: 1, marked: true };
       drawEnemyArt({ c, px }, e, { time: 0 } as DefendSim);
       drawSimpleEnemies({ c, px }, [e]);

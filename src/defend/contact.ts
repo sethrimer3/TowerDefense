@@ -3,12 +3,13 @@
 import { ART, UNIT_CONTOUR_ART_PIXELS, WALL_FACE_HANG } from "./art-scale.ts";
 import { ENEMIES, enemySize } from "./catalog.ts";
 import { dist } from "../exact.ts";
-import { cellAt, nearestPoint, type Point } from "./pathing.ts";
+import { blocked, cellAt, nearestPoint, type Point } from "./pathing.ts";
 import { CELLS_H, CELLS_W, cellIndex, type Rect } from "./grid.ts";
 import { enemySpeed } from "./enemy-abilities.ts";
 import { chilled } from "./wizard.ts";
 import type { Building } from "./citygen.ts";
-import type { DefendSim, Enemy } from "./sim.ts";
+import { defenderSize } from "./unit-bodies.ts";
+import type { Civilian, Soldier, DefendSim, Enemy } from "./sim.ts";
 
 const EPS = 1e-9;
 export const CONTACT_OUTLINE = UNIT_CONTOUR_ART_PIXELS / ART;
@@ -87,16 +88,40 @@ export function approachBuildingContact(sim: DefendSim, e: Enemy, b: Building, d
   const flying = ENEMIES[e.kind].flying || !!ENEMIES[e.kind].boat;
   if ((distance <= travel + EPS) && (flying || free(sim, e, b, goal))) {
     const middle = { x: (goal.x + e.x) / 2, y: (goal.y + e.y) / 2 };
-    if (flying || free(sim, e, b, middle)) { e.x = goal.x; e.y = goal.y; return true; }
+    if (flying || free(sim, e, b, middle)) {
+      sim.crowd.move(e, dx, dy, (x, y) => flying || free(sim, e, b, { x, y }));
+      return dist(goal.x - e.x, goal.y - e.y) <= EPS;
+    }
   }
   if (kinematic || b.fence) {
     const step = Math.min(distance, travel), n = Math.max(1, Math.ceil(step / .1));
     for (let i = 0; i < n; i++) {
       const p = { x: e.x + dx / distance * step / n, y: e.y + dy / distance * step / n };
       if (!flying && !free(sim, e, b, p)) break;
-      e.x = p.x; e.y = p.y;
+      sim.crowd.move(e, p.x - e.x, p.y - e.y, (x, y) => flying || free(sim, e, b, { x, y }));
     }
   } else sim.moveToward(e, goal, { speed: enemySpeed(sim, e) * chilled(e), dt, flying, radius: contactRadius(e), separate: false });
   const remaining = buildingContactPoint(sim, e, b);
   return dist(remaining.x - e.x, remaining.y - e.y) <= EPS;
+}
+
+/** Blight closes against a defender's body/contour before a native bite. */
+export function defenderContactPoint(e: Enemy, u: Soldier | Civilian): Point {
+  const half = (enemySize(e) + defenderSize(u)) / 2 + 2 * CONTACT_OUTLINE;
+  return perimeter({ x: u.x - half, y: u.y - half, w: 2 * half, h: 2 * half }, e);
+}
+export function defenderInContact(e: Enemy, u: Soldier | Civilian) {
+  const half = (enemySize(e) + defenderSize(u)) / 2 + 2 * CONTACT_OUTLINE;
+  return Math.abs(e.x - u.x) <= half + EPS && Math.abs(e.y - u.y) <= half + EPS;
+}
+export function approachDefenderContact(sim: DefendSim, e: Enemy, u: Soldier | Civilian, dt: number) {
+  if (defenderInContact(e, u)) return true;
+  const goal = defenderContactPoint(e, u), dx = goal.x - e.x, dy = goal.y - e.y, length = dist(dx, dy);
+  if (length <= EPS) return true;
+  const speed = enemySpeed(sim, e) * chilled(e);
+  if (speed * Math.max(0, dt) >= length && !blocked(sim.foeSolid, goal.x, goal.y, contactRadius(e)))
+    sim.crowd.move(e, dx, dy, (x, y) => !blocked(sim.foeSolid, x, y, contactRadius(e)));
+  else if (speed > 0 && dt > 0) sim.moveToward(e, goal, { speed, dt, radius: contactRadius(e), separate: false });
+  const left = defenderContactPoint(e, u);
+  return dist(left.x - e.x, left.y - e.y) <= EPS;
 }

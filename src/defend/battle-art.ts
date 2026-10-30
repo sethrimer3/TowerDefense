@@ -35,7 +35,7 @@ import { drawExplosion, drawScorches as drawScorchArt } from "./blast-art.ts";
 import { BUILDING_FLASH, type DefendSim, type Effect, type Enemy, type Soldier } from "./sim.ts";
 import { hallPaths } from "./muskets.ts";
 import { sniperAim } from "./snipers.ts";
-import { drawSimpleEnemies, drawSimpleTroops } from "./simple-units.ts";
+import { drawDarklingBodies, drawSimpleEnemies, drawSimpleTroops } from "./simple-units.ts";
 import { drawPixel, enemySprite } from "./pixel-sprites.ts";
 import { isMelee, meleeFacing } from "./melee-facing.ts";
 import { UnitOutline, type UnitInks } from "./unit-outline.ts";
@@ -161,10 +161,18 @@ export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, hea
     if (simple.enemies && contours) {
       const groups = new Map<string | undefined, Enemy[]>();
       for (const enemy of sim.enemies) if (!enemy.raidProxy) { const ink = sides!.ink(enemy.id); const group = groups.get(ink); if (group) group.push(enemy); else groups.set(ink, [enemy]); }
-      for (const [ink, group] of groups) drawSimpleEnemies(u, group, outline!.ink(ink), sides);
+      for (const [ink, group] of groups) {
+        const rim = outline!.ink(ink);
+        if (group.some(e => ENEMIES[e.kind].darkPixels)) outline!.mergePixelGaps();
+        drawSimpleEnemies(u, group, rim, sides);
+      }
     }
     else if (simple.enemies) drawSimpleEnemies(u, sim.enemies.filter(e=>!e.raidProxy), layers?.rims, sides, rimFor);
-    else for (const e of sim.enemies) if (!e.raidProxy) { unit?.(e.id); drawEnemyArt(u, e, sim, layers ? b : undefined); }
+    else {
+      const pixel = contours && sim.enemies.find(e => !e.raidProxy && ENEMIES[e.kind].darkPixels);
+      if (pixel) { unit?.(pixel.id); outline!.mergePixelGaps(); drawDarklingBodies(u, sim.enemies); }
+      for (const e of sim.enemies) if (!e.raidProxy && !(pixel && ENEMIES[e.kind].darkPixels)) { unit?.(e.id); drawEnemyArt(u, e, sim, layers ? b : undefined); }
+    }
     if (contours) drawSwords(u, swords, unit);
   } finally {
     rims = null;
