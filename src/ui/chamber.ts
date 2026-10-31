@@ -18,14 +18,14 @@ export class Chamber {
   readonly content: HTMLElement;
   private backdrop: HallBackdrop;
   private sconces: HTMLCanvasElement[];
-  /** The sun's shafts and dust, screened over the whole room (the keep's only). */
+  /** The sun's shafts and dust, screened over the wall behind the menu (the keep's only). */
   private light: HTMLCanvasElement | null;
 
   constructor(readonly root: HTMLElement, look: HallLook) {
     root.classList.add("chamber", `chamber-${look}`);
     root.innerHTML = `<canvas class="chamber-wall" aria-hidden="true"></canvas><div class="chamber-dim" aria-hidden="true"></div>
       <canvas class="sconce left" aria-hidden="true"></canvas><canvas class="sconce right" aria-hidden="true"></canvas>
-      <div class="chamber-content"></div>${look === "keep" ? `<canvas class="chamber-light" aria-hidden="true"></canvas>` : ""}`;
+      ${look === "keep" ? `<canvas class="chamber-light" aria-hidden="true"></canvas>` : ""}<div class="chamber-content"></div>`;
     this.backdrop = new HallBackdrop(root.querySelector<HTMLCanvasElement>(".chamber-wall")!, look);
     this.sconces = Array.from(root.querySelectorAll<HTMLCanvasElement>(".sconce"));
     this.content = root.querySelector<HTMLElement>(".chamber-content")!;

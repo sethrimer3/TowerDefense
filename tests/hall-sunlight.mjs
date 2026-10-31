@@ -1,5 +1,5 @@
 // Real Tiles UI plus isolated room renders. Fresh browser contexts only;
-// no player saves. Checks soft edges, motion, night, Reduce Motion and art toggles.
+// no player saves. Checks soft edges, motion, night, Reduce Motion and the legacy-graphics window toggle.
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
@@ -32,7 +32,7 @@ try {
       const { HallBackdrop, ROSES, setRose, roseOn } = await import('/src/ui/hall-art.ts');
       // Pin the rose so the timed draws below compare one glazing.
       setRose('flower');
-      const { setPixelArt } = await import('/src/defend/pixel-sprites.ts');
+      const setLegacy = on => document.documentElement.classList.toggle('legacy-graphics', on);
       const { SoftSunlight } = await import('/src/soft-sunlight.ts');
       const canvas = document.createElement('canvas');
       canvas.style = `position:fixed;inset:20px;width:${Math.min(600, innerWidth - 40)}px;height:700px;image-rendering:pixelated;z-index:1000`;
@@ -52,10 +52,10 @@ try {
       let shaft = 0; for (const [i, v] of lit().entries()) if (i % 4 === 3) shaft = Math.max(shaft, v);
       room.drawLight(light, 260000, 0, false); const night = lit();
       room.drawLight(light, 290000, 0, false); const nightLater = lit();
-      setPixelArt(false); room.draw(320000, [], 1, true); const legacy = pixels();
-      setPixelArt(true); room.draw(350000, [], 1, true); const restored = pixels();
-      setPixelArt(false); room.draw(380000, [], 1, true); const legacyAgain = pixels();
-      setPixelArt(true); room.draw(140000, [], 1, false);
+      setLegacy(true); room.draw(320000, [], 1, true); const legacy = pixels();
+      setLegacy(false); room.draw(350000, [], 1, true); const restored = pixels();
+      setLegacy(true); room.draw(380000, [], 1, true); const legacyAgain = pixels();
+      setLegacy(false); room.draw(140000, [], 1, false);
       // Symmetric native leadwork, including both halves of the rose/lancets.
       // Every rose glazing too, each its own leadwork, and the nights pick several.
       let asymmetric = 0;
@@ -73,7 +73,7 @@ try {
       setRose(null);
       const nights = new Set(Array.from({ length: 40 }, (_, n) => roseOn(n * 480000)));
       setRose('flower'); room.draw(140000, [], 1, false);
-      const distinctRoses = new Set(Object.values(roseLead)).size === ROSES.length && nights.size >= 4;
+      const distinctRoses = new Set(Object.values(roseLead)).size === ROSES.length && nights.size >= 4 && !nights.has('flower');
       const probe = document.createElement('canvas'); probe.width = 240; probe.height = 240;
       const field = new SoftSunlight(), c = probe.getContext('2d');
       field.draw(c, 120, 0, 40, 240, 0, 1);
