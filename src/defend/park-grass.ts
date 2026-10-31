@@ -11,6 +11,9 @@
  * written into one pixel buffer at `ART` pixels per cell covering the parks,
  * then drawn scaled up with smoothing off, so thousands of blades cost one
  * image copy. The buffer is rebuilt at most 30 times a second. */
+import type { BlightTrail } from "./blight-trail.ts";
+import { BLIGHT_TRAIL } from "./blight-trail.ts";
+import { witherColor } from "./blight-art.ts";
 import { CELLS_H, CELLS_W, cellInBounds, cellIndex, hash01 } from "./grid.ts";
 import { CellType, type CityMap } from "./citygen.ts";
 import { hasTree, pondDisc, pondField, treeCanopy } from "./park-geometry.ts";
@@ -30,6 +33,7 @@ export const PALETTE32 = Uint32Array.from([...PALETTE.map((hex) => [hex, 1] as c
   const v = parseInt(hex.slice(1), 16), r = Math.round((v >> 16) * k), g = Math.round(((v >> 8) & 0xff) * k), b = Math.round((v & 0xff) * k);
   return ((255 << 24) | (b << 16) | (g << 8) | r) >>> 0;
 });
+export const DEAD_PALETTE32 = PALETTE32.map(witherColor);
 /** Blade bend by height: CURVE[h][k] = (k / h)^1.5. */
 export const CURVE = Array.from({ length: 8 }, (_, h) => Float32Array.from({ length: h + 1 }, (_, k) => (h ? Math.pow(k / h, 1.5) : 0)));
 /** How hard the wind blows, in pixels of lean at a blade's tip. */
@@ -40,6 +44,7 @@ export type Walker = { x: number; y: number; size: number; id?: number };
 
 export type GrassFrame = {
   c: CanvasRenderingContext2D;
+  blight?: BlightTrail;
   /** Canvas pixels per cell (the camera is already applied). */
   px: number;
   now: number;
@@ -57,6 +62,8 @@ export class ParkGrass {
   private stir = new Map<number, number>();
   private buffer: { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D; img: ImageData; px: Uint32Array } | null = null;
   private builtAt = -Infinity;
+  private blight: BlightTrail | undefined;
+  private blightVersion = -1;
 
   /** Plans the blades for `map` (once per city). */
   sync(map: CityMap) {
@@ -86,7 +93,9 @@ export class ParkGrass {
     const buf = this.pixelBuffer((area.x1 - area.x0 + 3) * ART, (area.y1 - area.y0 + 2) * ART);
     if (!buf) return;
     const ox = (area.x0 - 1) * ART, oy = (area.y0 - 1) * ART;
-    if (f.reduceMotion ? this.builtAt === -Infinity : f.now - this.builtAt >= 1000 / 30) {
+    const changed = f.blight !== this.blight || (f.blight?.version ?? -1) !== this.blightVersion;
+    if (changed || (f.reduceMotion ? this.builtAt === -Infinity : f.now - this.builtAt >= 1000 / 30)) {
+      this.blight = f.blight; this.blightVersion = f.blight?.version ?? -1;
       this.builtAt = f.now;
       this.paint(buf, ox, oy, f);
       buf.ctx.putImageData(buf.img, 0, 0);
@@ -116,10 +125,11 @@ export class ParkGrass {
   private paint(buf: NonNullable<ParkGrass["buffer"]>, ox: number, oy: number, f: GrassFrame) {
     const { px, img } = buf, W = img.width, H = img.height;
     px.fill(0);
+    let palette = PALETTE32;
     const put = (color: number, x: number, y: number, h: number) => {
       const bx = x - ox;
       if (bx < 0 || bx >= W) return;
-      for (let yy = Math.max(0, y - oy), end = Math.min(H, y - oy + h); yy < end; yy++) px[yy * W + bx] = PALETTE32[color];
+      for (let yy = Math.max(0, y - oy), end = Math.min(H, y - oy + h); yy < end; yy++) px[yy * W + bx] = palette[color];
     };
     const near = nearbyWalkers(f.walkers, this.plans);
     const t = f.now / 1000, wind = WIND[f.wind];
@@ -130,6 +140,7 @@ export class ParkGrass {
       const stir = this.stir.get(i) ?? 0, walkers = near.get(i);
       for (const b of list) {
         const gx = cx * ART + b.i, gy = cy * ART + b.j;
+        palette = (f.blight?.at(gx / ART, gy / ART) ?? 0) >= BLIGHT_TRAIL.grass ? DEAD_PALETTE32 : PALETTE32;
         paintBlade(put, b, gx, gy, t, wind, stir, walkers, f.reduceMotion, 0);
       }
     }

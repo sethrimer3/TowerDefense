@@ -1,3 +1,5 @@
+import { witheredTreeSprite } from "./blight-art.ts";
+import type { BlightTrail, WitherStage } from "./blight-trail.ts";
 import { ART_NAMES } from "./art-overrides.ts";
 import { sourcePixels, type ArtPiece } from "./sprite-source.ts";
 import { outlinePixels, spriteCanvas, drawSprite } from "./damage-art.ts";
@@ -332,7 +334,7 @@ export function floorPixels(plan: ForestPlan, damage: ForestDamage | null, river
  * as the city layer paints it, so its banks lie on the forest's grass. Pixels
  * marked in `covered` (a scenario's buildings, raised after the plan) are left
  * clear, so the city layer's building shows through. */
-export function paintFloor(out: Uint32Array, plan: ForestPlan, damage: ForestDamage | null, box: Box, river: ForestRiver | null = null, covered?: Uint8Array) {
+export function paintFloor(out: Uint32Array, plan: ForestPlan, damage: ForestDamage | null, box: Box, river: ForestRiver | null = null, covered?: Uint8Array, blight?: BlightTrail) {
   clip = { x0: Math.max(0, box.x0), y0: Math.max(0, box.y0), x1: Math.min(W, box.x1), y1: Math.min(H, box.y1) };
   for (let Y = clip.y0; Y < clip.y1; Y++) out.fill(0, Y * W + clip.x0, Y * W + clip.x1);
   lawnIn(out, plan.open);
@@ -368,7 +370,8 @@ export function paintFloor(out: Uint32Array, plan: ForestPlan, damage: ForestDam
   for (let Y = clip.y0; Y < clip.y1; Y++) shaded.fill(0, Y * W + clip.x0, Y * W + clip.x1);
   for (const t of plan.trees) {
     if ((damage && !damage.upright(t)) || !nearClip(t.x, t.y, t.r * 2 + 1)) continue;
-    const s = outlinedScenery(treeSprite(t.kind, t.variant, 0, t.size)), R = t.r * ART, runs = runsOf(s);
+    const source = treeSprite(t.kind, t.variant, 0, t.size);
+    const s = outlinedScenery(witheredTreeSprite(source, blight?.treeStage(t.x, t.y, t.r) ?? 0, t.r, t.variant)), R = t.r * ART, runs = runsOf(s);
     const x0 = Math.round(t.x * ART) - s.ox + Math.round(R * 0.35) + 1, y0 = Math.round(t.y * ART) - s.oy + Math.round(R * 0.5) + 1;
     for (let k = 0; k < runs.length; k += 3) {
       const Y = y0 + runs[k];
@@ -807,6 +810,11 @@ export class ForestArt {
    * needs them in still air. */
   private band = 0;
   private dirty = true;
+  private blightVersion = -1;
+  private shadowBlightVersion = -1;
+  private witherStages = new Uint8Array(0);
+  /** Invalidates overlays when damage or a thinning crown changes the floor. */
+  floorVersion = 0;
   private fading = false;
   /** Bucketed beneath-the-trees lists, reused each frame. */
   private head = new Int32Array(CELL_COUNT);
@@ -851,6 +859,8 @@ export class ForestArt {
       this.cooldowns.clear();
       this.frailVersion = -1;
       this.lastTime = -1;
+      this.blightVersion = this.shadowBlightVersion = -1;
+      this.witherStages = new Uint8Array(this.plan!.trees.length);
       this.dirty = true;
       this.floorStale = [WHOLE];
     }
@@ -1180,11 +1190,23 @@ export class ForestArt {
    * share of a crossfade). */
   drawFloor(c: CanvasRenderingContext2D, px: number, alpha: number) {
     if (!this.plan || alpha <= 0 || typeof document === "undefined") return;
+    const blight = this.sim?.blight;
+    if (blight && blight.version !== this.shadowBlightVersion) {
+      this.shadowBlightVersion = blight.version;
+      for (const t of this.plan.trees) {
+        const stage = blight.treeStage(t.x, t.y, t.r);
+        if (stage === this.witherStages[t.id]) continue;
+        this.witherStages[t.id] = stage;
+        const reach = t.r * 2 + 2;
+        this.floorStale.push({ x0: Math.floor((t.x - reach) * ART), y0: Math.floor((t.y - reach) * ART), x1: Math.ceil((t.x + reach) * ART), y1: Math.ceil((t.y + reach) * ART) });
+      }
+    }
     this.floor ??= surface();
     const boxes = this.floorStale;
     this.floorStale = [];
+    if (boxes.length) this.floorVersion++;
     for (const box of boxes) {
-      paintFloor(this.floor.px, this.plan, this.damage, box, this.river, this.covered);
+      paintFloor(this.floor.px, this.plan, this.damage, box, this.river, this.covered, blight);
       const x0 = Math.max(0, box.x0), y0 = Math.max(0, box.y0);
       this.floor.cv.getContext("2d")!.putImageData(this.floor.img, 0, 0, x0, y0, Math.min(W, box.x1) - x0, Math.min(H, box.y1) - y0);
     }
@@ -1241,14 +1263,17 @@ export class ForestArt {
     // Swaying, one band of rows is composed afresh a frame, round and round;
     // a felled tree, or a fade in still air, has them all composed at once.
     const t = Math.floor(o.now / REDRAW_MS) * REDRAW_MS / 1000;
-    const all = this.dirty || (!o.wind && this.fading);
+    const blight = this.sim?.blight;
+    const changed = (blight?.version ?? -1) !== this.blightVersion;
+    this.blightVersion = blight?.version ?? -1;
+    const all = this.dirty || (!o.wind && (this.fading || changed));
     const bands = all ? Array.from({ length: BANDS }, (_, k) => k) : o.wind ? [this.band] : [];
     this.dirty = this.fading = false;
     this.band = (this.band + 1) % BANDS;
     const cc = this.crowns.cv.getContext("2d")!;
     for (const k of bands) {
       const y0 = Math.floor((k * H) / BANDS), y1 = Math.floor(((k + 1) * H) / BANDS);
-      composeCrowns(this.crowns.px, plan, this.damage, this.alpha, t, o.wind, y0, y1);
+      composeCrowns(this.crowns.px, plan, this.damage, this.alpha, t, o.wind, y0, y1, blight);
       cc.putImageData(this.crowns.img, 0, 0, 0, y0, W, y1 - y0);
       if (o.shade) {
         cc.save();
@@ -1279,7 +1304,7 @@ export class ForestArt {
     const dot = artPen(c, px), base = c.globalAlpha, time = Math.max(0, this.lastTime);
     for (const b of burning) {
       const t = b.tree, p = Math.max(0, Math.min(1, (time - b.since) / BURN));
-      const sprite = charSprite(t.kind, t.variant, t.size, Math.min(4, 1 + Math.floor(p * 4)));
+      const sprite = charSprite(t.kind, t.variant, t.size, Math.min(4, 1 + Math.floor(p * 4)), this.sim?.blight.treeStage(t.x, t.y, t.r) ?? 0);
       const x = Math.round(t.x * ART), y = Math.round(t.y * ART), s = treeSprite(t.kind, t.variant, 0, t.size);
       drawSprite(c,sprite, ((x - s.ox) * px) / ART, ((y - s.oy) * px) / ART, (s.w * px) / ART, (s.h * px) / ART);
       // Flames grow over the first second, roar, then die down at the end.
@@ -1348,8 +1373,9 @@ const charred = new Map<string, HTMLCanvasElement>();
 /** Tree `kind`, variant `v` of `size` burning, unleant, at char `level` 1
  * to 4: its leaves scorched toward black, more embers glowing in them the
  * further it has burnt, its outline kept. */
-export function charPixels(kind: TreeKind, v: number, size: TreeSize, level: number): Uint32Array {
-  const s = treeSprite(kind, v, 0, size), out = new Uint32Array(s.px.length), k = level / 4;
+export function charPixels(kind: TreeKind, v: number, size: TreeSize, level: number, stage: WitherStage = 0): Uint32Array {
+  const s = witheredTreeSprite(treeSprite(kind, v, 0, size), stage, canopyRadius(kind, v, size), v);
+  const out = new Uint32Array(s.px.length), k = level / 4;
   const ember = [rgba(0xd8602a), rgba(0xf6b048)];
   for (let i = 0; i < s.px.length; i++) {
     const p = s.px[i];
@@ -1361,15 +1387,15 @@ export function charPixels(kind: TreeKind, v: number, size: TreeSize, level: num
     const tr = 0x1a + lum * 0.25, tg = 0x14 + lum * 0.18, tb = 0x10 + lum * 0.12;
     out[i] = ((255 << 24) | (Math.round(b + (tb - b) * k) << 16) | (Math.round(g + (tg - g) * k) << 8) | Math.round(r + (tr - r) * k)) >>> 0;
   }
-  return sourcePixels(ART_NAMES.scenery(`tree-${kind}-${size}-${v}-char-${level}`),s.w,s.h,()=>out);
+  return stage ? out : sourcePixels(ART_NAMES.scenery(`tree-${kind}-${size}-${v}-char-${level}`),s.w,s.h,()=>out);
 }
 
-function charSprite(kind: TreeKind, v: number, size: TreeSize, level: number) {
-  const key = `${kind}:${v}:${size}:${level}`;
+function charSprite(kind: TreeKind, v: number, size: TreeSize, level: number, stage: WitherStage = 0) {
+  const key = `${kind}:${v}:${size}:${level}:${stage}`;
   let cv = charred.get(key);
   if (cv) return cv;
   const s = treeSprite(kind, v, 0, size);
-  cv=spriteCanvas(charPixels(kind,v,size,level),s.w,s.h);
+  cv=spriteCanvas(charPixels(kind,v,size,level,stage),s.w,s.h);
   charred.set(key, cv);
   return cv;
 }
@@ -1386,12 +1412,14 @@ function surface() {
 /** Writes every standing tree, back to front, leaning at `time`, into
  * `out` between art rows `y0` and `y1`: whole where nobody is under it,
  * blended at its fade otherwise. */
-export function composeCrowns(out: Uint32Array, plan: ForestPlan, damage: ForestDamage | null, alpha: Float32Array, time: number, wind: number, y0 = 0, y1 = H) {
+export function composeCrowns(out: Uint32Array, plan: ForestPlan, damage: ForestDamage | null, alpha: Float32Array, time: number, wind: number, y0 = 0, y1 = H, blight?: BlightTrail) {
   out.fill(0, y0 * W, y1 * W);
   for (const t of plan.trees) {
     const ty = Math.round(t.y * ART), reach = t.r * ART * 1.3 + 8;
     if (ty + reach < y0 || ty - reach >= y1 || (damage && !damage.standing(t))) continue;
-    const s = outlinedScenery(treeSprite(t.kind, t.variant, leanOf(t, time, wind), t.size)), runs = runsOf(s), px = s.px;
+    const stage = blight?.treeStage(t.x, t.y, t.r) ?? 0;
+    const source = treeSprite(t.kind, t.variant, stage === 3 ? 0 : leanOf(t, time, wind), t.size);
+    const s = outlinedScenery(witheredTreeSprite(source, stage, t.r, t.variant)), runs = runsOf(s), px = s.px;
     const sx = Math.round(t.x * ART) - s.ox, sy = ty - s.oy, a = alpha[t.id] ?? 1;
     for (let k = 0; k < runs.length; k += 3) {
       const Y = sy + runs[k];

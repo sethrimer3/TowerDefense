@@ -1,4 +1,5 @@
 import { BLIGHT_FLIERS, dartDirection, isBlightPrism } from "./blight-fliers.ts";
+import { BlightTrail } from "./blight-trail.ts";
 import { BLIGHT_WORM, initWorm, promoteWorm, wormOpenPoint, type WormState } from "./blight-worm.ts";
 import { EnemyCrowd } from "./enemy-crowd.ts";
 import { stepFlagBearer, friendlySafe } from "./flag-bearers.ts";
@@ -687,6 +688,8 @@ export class DefendSim {
   }
 
   readonly crowd = new EnemyCrowd();
+  /** Run-local scenery history, independent of rendering and combat rules. */
+  readonly blight = new BlightTrail();
 
   step(dt: number) {
     this.time += dt;
@@ -727,7 +730,12 @@ export class DefendSim {
       this.enemyLookup.clear();
       this.enemyLookupActive = this.enemies.some(e => e.fortressPart);
       if (this.enemyLookupActive) for (const e of this.enemies) this.enemyLookup.set(e.id, e);
-      if (!this.scenario?.passiveEnemies) for (const e of this.enemies) if (e.hp > 0) { stepEnemy(this, e, dt); this.crowd.sync(e); }
+      if (!this.scenario?.passiveEnemies) for (const e of this.enemies) if (e.hp > 0) {
+        const x = e.x, y = e.y;
+        stepEnemy(this, e, dt);
+        this.blight.travel(e, x, y);
+        this.crowd.sync(e);
+      }
       transferCrowdAttacks(this);
     } finally {
       this.defenderIndexActive = false;
