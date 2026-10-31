@@ -1382,7 +1382,7 @@ export class DefendPage {
   private respec() {
     const sp = this.specialty, game = this.host.game?.();
     if (!sp || !game || this.phase !== "build") return;
-    const tree = "side" in sp.target ? SIDE_UI[sp.target.side] : undefined;
+    const tree = "side" in sp.target ? SIDE_UI[sp.target.side] : targetKind(this.save, sp.target) === "repairShop" ? sharedBranches("repairShop") : undefined;
     const r = tree ? tree.respec(game) : respecBuilding(game, sp.target as SpecialtyTarget);
     this.wentBack(r, "Respecced", tree?.root);
   }
@@ -1529,9 +1529,9 @@ export class DefendPage {
     }
     this.treeCircle ??= new MagicCircle();
     this.treeCircle.attach(el.querySelector<HTMLElement>(".ug-host")!);
-    this.treeCircle.set(specialtyCircle(kind, wear, this.save.keepRanks, this.save.wallRanks, this.save.gateRanks, this.save.ballistaRanks, this.save.revolutionaryRanks, this.save.shadowRanks, this.save.nanoRanks, this.save.chronoRanks));
+    this.treeCircle.set(specialtyCircle(kind, wear, this.save.keepRanks, this.save.wallRanks, this.save.gateRanks, this.save.ballistaRanks, this.save.revolutionaryRanks, this.save.shadowRanks, this.save.nanoRanks, this.save.chronoRanks, this.save.repairRanks));
     const plainKind = kind as PaletteKind;
-    const spent = side ? side.allocated(game) : treeAllocated(plainKind, wear);
+    const spent = side ? side.allocated(game) : plainKind === "repairShop" ? sharedBranches(plainKind)!.allocated(game) : treeAllocated(plainKind, wear);
     const plain = side ? !side.owned(game) : spent === 0 && (plainKind === "wallSpikes" || rootOf(plainKind) === plainKind);
     el.setAttribute("aria-label", `Upgrade tree: ${name}`);
     el.querySelector(".ug-title b")!.textContent = name;
@@ -1542,7 +1542,7 @@ export class DefendPage {
     respec.textContent = "Respec · free";
     respec.title = plain ? "Nothing allocated yet" : side ? `Get all ${spent.toLocaleString("en")} Knowledge back and ${side.plain}` : `Get all ${spent.toLocaleString("en")} Knowledge back and turn it back into ${plainKind === "wallSpikes" ? "a plain row of spikes" : `${mergedFrom(plainKind) ? "three" : "a"} ${ITEM_NAMES[rootOf(plainKind)]}${mergedFrom(plainKind) ? "s, two of them waiting in the palette" : ""}`}`;
     const mapBtn = el.querySelector<HTMLButtonElement>(".ug-map-toggle")!;
-    mapBtn.hidden = !!side;
+    mapBtn.hidden = !!side || kind === "repairShop";
     mapBtn.textContent = sp.map ? "Tree" : "Map";
     mapBtn.title = sp.map ? "Back to this building's upgrade tree" : "Every upgrade discovered by buildings of its line";
     el.classList.toggle("mapping", !!sp.map && !side);

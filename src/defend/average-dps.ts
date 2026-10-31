@@ -79,6 +79,7 @@ export function averageDps(kind: EstimateKind, input: AverageInput): number {
   const archer = () => tower(archerDamage(L("archerDamage")), archerCooldown(L("archerRate")));
   const cannon = (damage = 1, reload = 1, r = cannonSplash(L("cannonDamage"))) => tower(cannonDamage(L("cannonDamage")) * damage, cannonCooldown(L("cannonRate")) * reload, inArea(r));
   switch (kind) {
+    case "repairShop": return 0;
     case "keep": {
       const loops = keepRank(b.keep, "arrowLoops"), oil = keepRank(b.keep, "boilingOil");
       const arrows = loops ? tower(archerDamage(L("archerDamage")) * ARROW_LOOPS.damage[loops], ARROW_LOOPS.reload[loops], loops >= 3 ? chained(ARROW_LOOPS.volley) : 1) : 0;

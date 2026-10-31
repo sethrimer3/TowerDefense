@@ -1,3 +1,4 @@
+import type { RepairRanks } from "../repair-upgrades.ts";
 import { BLIGHT_WORM } from "./blight-worm-tuning.ts";
 import type { ChronoRanks } from "../chrono-upgrades.ts";
 import type { KeepRanks } from "../keep-upgrades.ts";
@@ -15,15 +16,15 @@ import type { BattlePaths, PathId } from "../knowledge-paths.ts";
  * copper, silver and Gold, the universal upgrades, the bonuses the Smithy and the
  * skill trees add, and the enemy roster. */
 
-export type StructureKind = "keep" | "meleeGuild" | "rangedGuild" | "assassinDen" | "bloodHall" | "veilHouse" | "poisonDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "barracks" | "chapterHouse" | "berserkerLodge" | "halberdYard" | "heroHall" | "shadow" | "archerBarracks" | "rangerLodge" | "skirmishCamp" | "skyrangerLodge" | "sniperLodge" | "gunHall" | "musketHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "revolutionary" | "archerTower" | "brazierTower" | "hawkTower" | "wispTower" | "chronoTower" | "cannonTower" | "batteryTower" | "mortarTower" | "minelayerTower" | "nanoTower" | "watchTower" | "wizardTower" | "pyreTower" | "frostTower" | "stormTower" | "mageGuild" | "infernoHall" | "cinderHall" | "stormHall" | "valkyriePalace" | "darkKeep" | "monsterBait";
+export type StructureKind = "repairShop" | "keep" | "meleeGuild" | "rangedGuild" | "assassinDen" | "bloodHall" | "veilHouse" | "poisonDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "barracks" | "chapterHouse" | "berserkerLodge" | "halberdYard" | "heroHall" | "shadow" | "archerBarracks" | "rangerLodge" | "skirmishCamp" | "skyrangerLodge" | "sniperLodge" | "gunHall" | "musketHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "revolutionary" | "archerTower" | "brazierTower" | "hawkTower" | "wispTower" | "chronoTower" | "cannonTower" | "batteryTower" | "mortarTower" | "minelayerTower" | "nanoTower" | "watchTower" | "wizardTower" | "pyreTower" | "frostTower" | "stormTower" | "mageGuild" | "infernoHall" | "cinderHall" | "stormHall" | "valkyriePalace" | "darkKeep" | "monsterBait";
 /** Everything that appears in the build palette (the keep is placed from the
  * start and can only be moved, so it is not a palette item). */
 export type PaletteItem = "cityTile" | "cityGate" | "wallSpikes" | "wallBallista" | "wallBlock" | Exclude<StructureKind, "keep">;
-export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "meleeGuild", "rangedGuild", "barracks", "chapterHouse", "berserkerLodge", "halberdYard", "heroHall", "assassinDen", "bloodHall", "veilHouse", "poisonDen", "shadow", "spearHall", "phalanx", "javelinCamp", "lancerStable", "archerBarracks", "rangerLodge", "skirmishCamp", "skyrangerLodge", "gunHall", "musketHall", "sniperLodge", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "watchTower", "archerTower", "brazierTower", "hawkTower", "wispTower", "chronoTower", "cannonTower", "batteryTower", "mortarTower", "minelayerTower", "nanoTower", "wizardTower", "pyreTower", "frostTower", "stormTower", "mageGuild", "infernoHall", "cinderHall", "stormHall", "valkyriePalace", "darkKeep", "monsterBait", "wallBlock", "cityGate", "wallSpikes", "wallBallista"];
+export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "repairShop", "meleeGuild", "rangedGuild", "barracks", "chapterHouse", "berserkerLodge", "halberdYard", "heroHall", "assassinDen", "bloodHall", "veilHouse", "poisonDen", "shadow", "spearHall", "phalanx", "javelinCamp", "lancerStable", "archerBarracks", "rangerLodge", "skirmishCamp", "skyrangerLodge", "gunHall", "musketHall", "sniperLodge", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "watchTower", "archerTower", "brazierTower", "hawkTower", "wispTower", "chronoTower", "cannonTower", "batteryTower", "mortarTower", "minelayerTower", "nanoTower", "wizardTower", "pyreTower", "frostTower", "stormTower", "mageGuild", "infernoHall", "cinderHall", "stormHall", "valkyriePalace", "darkKeep", "monsterBait", "wallBlock", "cityGate", "wallSpikes", "wallBallista"];
 /** The only buildings the shop sells: every other tower or troop building
  * is one of these upgraded, a building at a time, with Knowledge
  * (`building-upgrades.ts`). */
-export const BASIC_BUILDINGS: PaletteItem[] = ["watchTower", "meleeGuild", "rangedGuild"];
+export const BASIC_BUILDINGS: PaletteItem[] = ["watchTower", "meleeGuild", "rangedGuild", "repairShop"];
 
 /** The build palette's categories: what each shows (All shows everything). */
 export type PaletteCategory = "all" | "towers" | "units" | "city";
@@ -36,6 +37,7 @@ export const PALETTE_CATEGORIES: { id: PaletteCategory; name: string }[] = [
 /** Which category each palette item belongs to: towers shoot, unit
  * buildings train troops, and the city's own pieces are the rest. */
 export const ITEM_CATEGORY: Record<PaletteItem, Exclude<PaletteCategory, "all">> = {
+  repairShop: "city",
   cityTile: "city",
   cityGate: "city",
   wallSpikes: "city",
@@ -165,6 +167,7 @@ export type StructureDef = {
 export type TileSpan = 1 | 2;
 
 export const STRUCTURES: Record<StructureKind, StructureDef> = {
+  repairShop: { kind: "repairShop", name: "Repair shop", w: 4, h: 2, maxHp: 160, outsideOk: false, description: "Two carpenters come out of this workshop to rebuild destroyed houses and service buildings. Its tree teaches Advanced carpentry for infantry buildings and towers, Masonry for walls and gates, larger crews, critical repair priorities and a retreating bow. Repairs restore a percentage of maximum HP." },
   keep: {
     kind: "keep",
     name: "Keep",
@@ -658,6 +661,7 @@ export const STARTING_OWNED: Record<PaletteItem, number> = {
   stormHall: 0,
   valkyriePalace: 0,
   darkKeep: 0,
+  repairShop: 0,
   monsterBait: 0,
 };
 
@@ -722,6 +726,7 @@ export function purchasePrice(item: PaletteItem, owned: number): Price {
     stormHall: { copper: 10 },
     valkyriePalace: { copper: 12, silver: 2 },
     darkKeep: { copper: 25, silver: 8, gold: 2 },
+    repairShop: { copper: 3 },
     monsterBait: { copper: 3 },
   };
   // Walls are laid by the dozen, so their price climbs slowly.
@@ -734,6 +739,7 @@ export function purchasePrice(item: PaletteItem, owned: number): Price {
 
 /** What each palette item is called on the page. */
 export const ITEM_NAMES: Record<PaletteItem, string> = {
+  repairShop: STRUCTURES.repairShop.name,
   cityTile: "City tile",
   cityGate: "City gate",
   wallSpikes: "Wall spikes",
@@ -928,9 +934,9 @@ export const UPGRADES: UpgradeDef[] = [
   { id: "ballistaRange", group: "Wall ballista", name: "Long stocks", maxLevel: 4, describe: (l) => `${ballistaRange(l)} cell range` },
   { id: "wallStrength", group: "City", name: "Masonry", maxLevel: 6, describe: (l) => `${wallHp(l)} HP per wall stone` },
   { id: "keepStrength", group: "City", name: "Keep bastions", maxLevel: 6, describe: (l) => `${keepHp(l)} keep HP` },
-  { id: "civilianCount", group: "Civilians", name: "Guild of builders", maxLevel: 5, describe: (l) => `${civilianCount(l)} civilians repair the city` },
-  { id: "civilianHealth", group: "Civilians", name: "Hardy folk", maxLevel: 5, describe: (l) => `${civilianHp(l)} civilian HP` },
-  { id: "rebuildSpeed", group: "Civilians", name: "Master masons", maxLevel: 5, describe: (l) => `${rebuildSeconds(l).toFixed(1)}s to rebuild each section` },
+  { id: "civilianCount", group: "Repair shop", name: "Spare tools", maxLevel: 5, describe: (l) => `Repair crews work ${l * 10}% faster` },
+  { id: "civilianHealth", group: "Repair shop", name: "Hardy carpenters", maxLevel: 5, describe: (l) => `${civilianHp(l)} civilian HP` },
+  { id: "rebuildSpeed", group: "Repair shop", name: "Master carpenters", maxLevel: 5, describe: (l) => `${(100 / (rebuildSeconds(l) * 10)).toFixed(1)}% maximum HP repaired per second` },
 ];
 
 /** A level's usual Forge price: copper, then silver from the fourth level
@@ -1257,8 +1263,13 @@ export type Bonuses = {
   wallHp: number;
   /** The keep's HP. */
   keepHp: number;
-  /** Seconds civilians take to rebuild a section. */
+  /** Multiplier on the seconds workers take to restore maximum HP. */
   rebuild: number;
+  repairHp: number;
+  repairDamage: number;
+  buildingHp: number;
+  towerHp: number;
+  repair?: RepairRanks;
   /** Bomb damage. */
   bombDamage: number;
   /** HP and damage of the warriors the Necromancy spell raises. */
@@ -1311,7 +1322,7 @@ export type Bonuses = {
   nano?: NanoRanks;
 };
 export const NO_BONUSES: Readonly<Bonuses> = Object.freeze({
-  troopHp: 1, troopDamage: 1, deployRange: 1, drill: 1, towerDamage: 1, towerReload: 1, wallHp: 1, keepHp: 1, rebuild: 1, bombDamage: 1, undeadHp: 1, undeadDamage: 1, graveTime: 1, meteorDamage: 1, meteorRadius: 1, frostTime: 1, frostRadius: 1, reinforceHp: 1, reinforceDamage: 1, reinforceTime: 1,
+  troopHp: 1, troopDamage: 1, deployRange: 1, drill: 1, towerDamage: 1, towerReload: 1, wallHp: 1, keepHp: 1, rebuild: 1, repairHp: 1, repairDamage: 1, buildingHp: 1, towerHp: 1, bombDamage: 1, undeadHp: 1, undeadDamage: 1, graveTime: 1, meteorDamage: 1, meteorRadius: 1, frostTime: 1, frostRadius: 1, reinforceHp: 1, reinforceDamage: 1, reinforceTime: 1,
 });
 
 export const SOLDIER = { hp: 40, damage: 6, cooldown: 0.8, speed: 2.4, reach: 0.75, leash: 16, size: 0.4, color: "#5b8fd9" };

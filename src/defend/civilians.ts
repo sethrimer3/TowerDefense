@@ -1,105 +1,137 @@
-/** DEFEND civilians rebuild rubble one cell at a time. A fixed pool of slots
- * (the Guild of builders level) sends a civilian out of the house nearest
- * the best job whenever a slot is free; each walks to its job, works it
- * until rebuilt (backing off when enemies come close), takes the next job,
- * and goes indoors when there's nothing left. A killed civilian's slot
- * refills after a delay. */
+/** Repair workers are recruited by intact Repair shops. No shop, no repairs.
+ * Jobs reserve whole buildings; work restores a percentage of maximum HP. */
+import { STONEWORK, wallRank } from "../wall-upgrades.ts";
+import { IRONBOUND, gateRank } from "../gate-upgrades.ts";
 import { dist } from "../exact.ts";
-import { CIVILIAN, civilianCount, civilianHp, rebuildSeconds, type UpgradeId } from "./catalog.ts";
+import { CIVILIAN, civilianHp, rebuildSeconds, type UpgradeId } from "./catalog.ts";
+import { REPAIR, repairCrew, repairRank } from "../repair-upgrades.ts";
 import { cellAt, cellCenter, center, findPath, rectDist, type Point } from "./pathing.ts";
 import { CELL_COUNT, CELLS_H, CELLS_W, cellInBounds, cellIndex, cellX, cellY, sideCells } from "./grid.ts";
-import { CellType } from "./citygen.ts";
+import { CellType, type Building } from "./citygen.ts";
 import type { Civilian, DefendSim } from "./sim.ts";
 import { restockable } from "./bait.ts";
 import { icyCell } from "./boats.ts";
 import { CLEANUP_DEPTH } from "./atmosphere.ts";
 
-/** Paths for civilians give up beyond this many cells. */
 const ERRAND = { maxCost: 400 };
+const AROUND = [[0, -1], [1, 0], [0, 1], [-1, 0], [-1, -1], [1, -1], [1, 1], [-1, 1]] as const;
 
 export class Builders {
-  /** Per slot: seconds until it can send out a civilian again (0 = ready). */
-  readonly respawn: number[];
+  /** Cooldowns belong to a shop and slot, never to a house. */
+  readonly respawn: number[] = [];
+  private slots = new Map<string, number>();
+  private dead = new WeakSet<Civilian>();
   private refugeVersion = -1;
   private refuge = new Uint8Array(CELL_COUNT);
   private escapeChecks = new WeakMap<Civilian, number>();
-
-  constructor(levels: Record<UpgradeId, number>) {
-    this.respawn = Array(civilianCount(levels.civilianCount)).fill(0);
-  }
+  constructor(_levels: Record<UpgradeId, number>) {}
 
   step(sim: DefendSim, dt: number) {
-    if (this.freeSlots(sim, dt) > 0) {
-      const job = pickJob(sim, center(sim.keep.rect));
-      if (job >= 0) spawnCivilian(sim, job);
+    for (let i = 0; i < this.respawn.length; i++) this.respawn[i] = Math.max(0, this.respawn[i] - dt);
+    for (const c of sim.civilians) if (c.hp <= 0 && !this.dead.has(c)) {
+      this.dead.add(c);
+      const slot = this.slots.get(`${c.shop}:${c.slot}`);
+      if (slot !== undefined) this.respawn[slot] = CIVILIAN.respawnSeconds;
+    }
+    for (const shop of sim.map.buildings) if (shop.kind === "repairShop" && sim.intact(shop)) {
+      for (let slot = 0; slot < repairCrew(sim.bonuses.repair); slot++) {
+        const key = `${shop.id}:${slot}`;
+        if (!this.slots.has(key)) { this.slots.set(key, this.respawn.length); this.respawn.push(0); }
+        if (this.respawn[this.slots.get(key)!] > 0 || sim.civilians.some(c => c.hp > 0 && c.shop === shop.id && c.slot === slot)) continue;
+        const door = sim.doorOf(shop);
+        if (door < 0) continue;
+        const at = cellCenter(door), job = pickJob(sim, at);
+        if (job < 0) break;
+        const hp = civilianHp(sim.levels.civilianHealth) * sim.bonuses.repairHp;
+        const c: Civilian = { id: sim.newId(), ...at, hp, maxHp: hp, job: -1, state: "home", work: 0, path: [], home: shop.id, shop: shop.id, slot, thinkT: 0, flash: 0 };
+        sim.civilians.push(c);
+        assignNext(sim, c);
+      }
     }
     for (const c of sim.civilians) if (c.hp > 0) {
       if (c.state !== "flee" && sim.map.type[cellAt(c.x, c.y)] === CellType.OUT && !this.canReturn(sim, c) && this.escapeChecks.get(c) !== sim.mapVersion) {
-        this.escapeChecks.set(c, sim.mapVersion);
-        panic(sim, c);
+        this.escapeChecks.set(c, sim.mapVersion); panic(sim, c);
       }
       stepCivilian(sim, c, dt);
     }
-    // Civilians who died free their slot after a delay.
-    for (const c of sim.civilians) if (c.hp <= 0) this.startRespawn();
   }
 
-  /** Flood from intact homes once per city change. Use the citizens' gate
-   * access and the same corner rules as their walking paths. */
   private canReturn(sim: DefendSim, c: Civilian) {
     if (this.refugeVersion !== sim.mapVersion) {
-      this.refugeVersion = sim.mapVersion;
-      this.refuge.fill(0);
+      this.refugeVersion = sim.mapVersion; this.refuge.fill(0);
       const queue: number[] = [];
-      for (const b of sim.map.buildings) if ((b.kind === "house" || b.kind === "keep") && sim.intact(b))
-        for (const cell of sideCells(b.rect)) if (!sim.ownSolid[cell] && !this.refuge[cell]) {
-          this.refuge[cell] = 1;
-          queue.push(cell);
-        }
+      for (const b of sim.map.buildings) if ((b.kind === "repairShop" || b.kind === "keep") && sim.intact(b))
+        for (const cell of sideCells(b.rect)) if (!sim.ownSolid[cell] && !this.refuge[cell]) { this.refuge[cell] = 1; queue.push(cell); }
       for (let i = 0; i < queue.length; i++) {
         const x = cellX(queue[i]), y = cellY(queue[i]);
         for (const [dx, dy] of AROUND) {
           if (!cellInBounds(x + dx, y + dy)) continue;
-          const next = cellIndex(x + dx, y + dy);
-          if (this.refuge[next] || sim.ownSolid[next]) continue;
-          if (dx && dy && (sim.ownSolid[cellIndex(x + dx, y)] || sim.ownSolid[cellIndex(x, y + dy)])) continue;
-          this.refuge[next] = 1;
-          queue.push(next);
+          const n = cellIndex(x + dx, y + dy);
+          if (this.refuge[n] || sim.ownSolid[n] || dx && dy && (sim.ownSolid[cellIndex(x + dx, y)] || sim.ownSolid[cellIndex(x, y + dy)])) continue;
+          this.refuge[n] = 1; queue.push(n);
         }
       }
     }
     return !!this.refuge[cellAt(c.x, c.y)];
   }
-
-  /** Counts slots down; how many are ready beyond the civilians already out. */
-  private freeSlots(sim: DefendSim, dt: number) {
-    let free = 0;
-    for (let i = 0; i < this.respawn.length; i++) {
-      if (this.respawn[i] > 0) this.respawn[i] -= dt;
-      else free++;
-    }
-    return free - sim.civilians.length;
-  }
-
-  private startRespawn() {
-    const slot = this.respawn.findIndex((t) => t <= 0);
-    if (slot >= 0) this.respawn[slot] = CIVILIAN.respawnSeconds;
-  }
 }
 
 function stepCivilian(sim: DefendSim, c: Civilian, dt: number) {
+  c.bowCd = Math.max(0, (c.bowCd ?? 0) - dt);
+  const danger = sim.enemiesNear(c.x, c.y, REPAIR.danger).find(e => e.hp > 0 && !e.untargetable);
+  if (danger) {
+    if (repairRank(sim.bonuses.repair, "retreatBow") && !c.bowCd) {
+      sim.arrows.push({ x: c.x, y: c.y, target: danger.id, tx: danger.x, ty: danger.y, damage: REPAIR.bowDamage * sim.bonuses.repairDamage, life: 2, origin: { x: c.x, y: c.y, attacker: c.id, building: c.shop } });
+      c.bowCd = REPAIR.bowCooldown;
+    }
+    if (c.state === "flee") return flee(sim, c, dt);
+    // Choose a reachable escape cell away from the threat; keep moving while shooting.
+    let best = -1, score = dist(c.x - danger.x, c.y - danger.y);
+    for (const [dx, dy] of AROUND) {
+      const x = Math.floor(c.x) + dx, y = Math.floor(c.y) + dy;
+      if (!cellInBounds(x, y)) continue;
+      const cell = cellIndex(x, y), p = cellCenter(cell), d = dist(p.x - danger.x, p.y - danger.y);
+      if (sim.ownSolid[cell] || d <= score || dx && dy && (sim.ownSolid[cellIndex(x, Math.floor(c.y))] || sim.ownSolid[cellIndex(Math.floor(c.x), y)])) continue;
+      best = cell; score = d;
+    }
+    if (best >= 0) { c.path = [best]; sim.followPath(c, cellCenter(best), CIVILIAN.speed * 1.8, dt); }
+    c.state = "toJob"; c.thinkT = 0;
+    return;
+  }
   if (c.state === "flee") return flee(sim, c, dt);
+  c.thinkT -= dt;
+  const b = sim.map.buildings[sim.map.owner[c.job]];
   if (c.jobKind === "sand") {
-    c.cleanupCheck = (c.cleanupCheck ?? 0) - dt;
-    if (c.cleanupCheck <= 0) {
-      c.cleanupCheck = .5;
-      if (!openRepairs(sim, -1).next().done) assignNext(sim, c);
+    if ((sim.atmosphere?.sand[c.job] ?? 0) < CLEANUP_DEPTH || c.thinkT <= 0 && pickJob(sim, c, c.job, c, true) >= 0) assignNext(sim, c);
+  } else if (!b || !canRepair(sim, b) || sim.civilians.some(o => o !== c && o.hp > 0 && o.job >= 0 && o.jobKind !== "sand" && sim.map.owner[o.job] === b.id)) assignNext(sim, c);
+  // Skilled crews reconsider critical jobs in transit, without throwing away completed work.
+  if (c.state === "toJob" && c.thinkT <= 0 && repairRank(sim.bonuses.repair, "triage")) assignNext(sim, c);
+  if (c.state === "home") return goHome(sim, c, dt);
+  const target = cellCenter(c.stand ?? c.job);
+  if (dist(target.x - c.x, target.y - c.y) > .35) {
+    c.state = "toJob";
+    if (c.thinkT <= 0) { c.path = findPath(sim.ownSolid, c, target, ERRAND) ?? []; c.thinkT = REPAIR.rethink; }
+    sim.followPath(c, target, CIVILIAN.speed, dt); return;
+  }
+  c.path = []; c.state = "working";
+  if (c.jobKind === "sand") { sim.atmosphere?.clean(c.job, dt * .35); return; }
+  const building = sim.map.buildings[sim.map.owner[c.job]];
+  if (!building || !canRepair(sim, building)) return assignNext(sim, c);
+  const craft = building.piece && wallRank(sim.bonuses.walls, "stonework") >= 3 ? STONEWORK.repair : building.kind === "gate" ? !sim.intact(building) && gateRank(sim.bonuses.gate, "ironbound") >= 3 ? IRONBOUND.rebuild : gateRank(sim.bonuses.gate, "ironbound") >= 2 ? IRONBOUND.repair : 1 : 1;
+  const seconds = REPAIR.seconds * (rebuildSeconds(sim.levels.rebuildSpeed) / rebuildSeconds(0)) * sim.bonuses.rebuild / (1 + sim.levels.civilianCount * .1) / craft;
+  if (sim.intact(building)) {
+    sim.hp[building.id] = Math.min(sim.maxHp[building.id], sim.hp[building.id] + sim.maxHp[building.id] * dt / seconds);
+    sim.changed.push(...building.cells);
+  } else {
+    c.work += dt / seconds;
+    const share = 1 / building.cells.length;
+    while (c.work + 1e-12 >= share) {
+      const cell = building.cells.find(cell => !sim.solid[cell] && !icyCell(sim, cell));
+      if (cell === undefined) break;
+      sim.rebuildCell(cell); c.work = Math.max(0, c.work - share);
     }
   }
-  c.thinkT -= dt;
-  if (c.state === "toJob") goToJob(sim, c, dt);
-  else if (c.state === "working") work(sim, c, dt);
-  else goHome(sim, c, dt);
+  if (!canRepair(sim, building)) assignNext(sim, c);
 }
 
 /** Take the nearest reachable board edge, then run beyond it. */
@@ -150,205 +182,78 @@ export function escaped(c: Civilian) {
   return c.state === "flee" && (c.x < -margin || c.y < -margin || c.x > CELLS_W + margin || c.y > CELLS_H + margin);
 }
 
-function goToJob(sim: DefendSim, c: Civilian, dt: number) {
-  if (c.jobKind === "sand" && (sim.atmosphere?.sand[c.job] ?? 0) < CLEANUP_DEPTH) return assignNext(sim, c);
-  if (sim.solid[c.job] || !jobOpen(sim, c.job, c)) return assignNext(sim, c);
-  const j = cellCenter(c.stand ?? c.job);
-  if (dist(j.x - c.x, j.y - c.y) < 0.35) {
-    c.state = "working";
-    c.work = 0;
-    return;
-  }
-  if (!c.path.length && c.thinkT <= 0) {
-    c.thinkT = 1;
-    c.path = findPath(sim.ownSolid, c, j, ERRAND) ?? [];
-    // Walled in: work it from an open cell beside it instead.
-    if (!c.path.length && c.stand === undefined && standBeside(sim, c)) return;
-    // Unreachable: try another job next time (but still step toward this one now).
-    if (!c.path.length && dist(j.x - c.x, j.y - c.y) > 1.5) assignNext(sim, c, c.job);
-  }
-  sim.followPath(c, j, CIVILIAN.speed, dt);
+
+/** Carpentry is innate; combat buildings and stone defenses need their own skills. */
+export function canRepair(sim: DefendSim, b: Building): boolean {
+  if (!sim.ownsBuilding(b) || b.hidden || sim.aloft(b.id) || sim.intact(b) && sim.hp[b.id] >= sim.maxHp[b.id]) return false;
+  if (b.kind === "keep") return sim.hp[b.id] > 0 && !!repairRank(sim.bonuses.repair, "advancedCarpentry");
+  if (b.kind === "wall" || b.kind === "gate" || b.kind === "wallBallista") return !!repairRank(sim.bonuses.repair, "masonry");
+  if (b.kind === "monsterBait") return restockable(sim, b) && !sim.intact(b);
+  if (b.kind === "house" || b.kind === "repairShop") return true;
+  return !!repairRank(sim.bonuses.repair, "advancedCarpentry");
 }
 
-/** The eight cells round a job, sides first. */
-const AROUND = [[0, -1], [1, 0], [0, 1], [-1, 0], [-1, -1], [1, -1], [1, 1], [-1, 1]] as const;
-
-/** A job no one can stand in (the last cell of a building rebuilt round
- * it): the civilian takes the first open cell beside it they can reach as
- * where to work from (a corner will do). False if there is none. */
-function standBeside(sim: DefendSim, c: Civilian): boolean {
-  const jx = cellX(c.job), jy = cellY(c.job);
-  for (const [dx, dy] of AROUND) {
-    if (!cellInBounds(jx + dx, jy + dy)) continue;
-    const n = cellIndex(jx + dx, jy + dy);
-    if (sim.solid[n]) continue;
-    const path = findPath(sim.ownSolid, c, cellCenter(n), ERRAND);
-    if (!path) continue;
-    c.stand = n;
-    c.path = path;
-    return true;
-  }
-  return false;
+function jobScore(sim: DefendSim, b: Building, from: Point) {
+  const distance = rectDist(b.rect, from.x, from.y);
+  if (!repairRank(sim.bonuses.repair, "triage")) return distance;
+  const ruined = !sim.intact(b), critical = sim.hp[b.id] / sim.maxHp[b.id] < .35;
+  const tier = b.kind === "keep" ? 0 : (b.kind === "gate" || b.kind === "wall") && ruined ? 1 : b.kind === "repairShop" ? 2 : b.kind !== "house" && (ruined || critical) ? 3 : critical ? 4 : 5;
+  return tier * 1000 + sim.hp[b.id] / sim.maxHp[b.id] * 100 + distance;
 }
 
-function work(sim: DefendSim, c: Civilian, dt: number) {
-  if (sim.solid[c.job] || icyCell(sim, c.job)) return assignNext(sim, c);
-  // Too dangerous: come back to it later.
-  if (sim.enemiesNear(c.x, c.y, 2.5).length) return assignNext(sim, c, c.job);
-  if (c.jobKind === "sand") {
-    sim.atmosphere?.clean(c.job, dt * .35);
-    c.work += dt;
-    if ((sim.atmosphere?.sand[c.job] ?? 0) < CLEANUP_DEPTH) assignNext(sim, c);
-    return;
+function standFor(sim: DefendSim, b: Building, from: Point): number | undefined {
+  const cells = sideCells(b.rect).filter(cell => !sim.ownSolid[cell] && !icyCell(sim, cell));
+  cells.sort((a, b) => { const p = cellCenter(a), q = cellCenter(b); return dist(p.x - from.x, p.y - from.y) - dist(q.x - from.x, q.y - from.y); });
+  for (const cell of cells) if (findPath(sim.ownSolid, from, cellCenter(cell), ERRAND)) return cell;
+}
+
+function pickJob(sim: DefendSim, from: Point, skip = -1, self?: Civilian, repairsOnly = false): number {
+  const buildings = sim.map.buildings.filter(b => canRepair(sim, b) && b.cells[0] !== skip && !sim.civilians.some(c => c !== self && c.hp > 0 && c.job >= 0 && c.jobKind !== "sand" && sim.map.owner[c.job] === b.id));
+  buildings.sort((a, b) => jobScore(sim, a, from) - jobScore(sim, b, from) || a.id - b.id);
+  for (const b of buildings) {
+    const p = center(b.rect);
+    if (sim.enemiesNear(p.x, p.y, Math.max(b.rect.w, b.rect.h) / 2 + REPAIR.danger).some(e => e.hp > 0 && !e.untargetable)) continue;
+    if (b.cells.every(cell => icyCell(sim, cell))) continue;
+    if (standFor(sim, b, from) !== undefined) return b.cells[0];
   }
-  c.work += dt;
-  if (c.work < rebuildSeconds(sim.levels.rebuildSpeed) * sim.bonuses.rebuild) return;
-  sim.rebuildCell(c.job);
-  assignNext(sim, c);
+  if (repairsOnly) return -1;
+  for (const cell of sim.atmosphere?.cleanup ?? []) {
+    if (cell === skip || sim.ownSolid[cell] || icyCell(sim, cell) || sim.civilians.some(c => c !== self && c.hp > 0 && c.job === cell)) continue;
+    const p = cellCenter(cell);
+    if (!sim.enemiesNear(p.x, p.y, REPAIR.danger).length && findPath(sim.ownSolid, from, p, ERRAND)) return cell;
+  }
+  return -1;
+}
+
+function assignNext(sim: DefendSim, c: Civilian) {
+  const job = pickJob(sim, c, -1, c), previous = c.job;
+  c.path = []; delete c.stand; c.thinkT = REPAIR.rethink;
+  if (job >= 0) {
+    c.job = job; c.state = "toJob";
+    if (previous !== job) c.work = 0;
+    if (sim.map.owner[job] < 0) c.jobKind = "sand";
+    else { delete c.jobKind; c.stand = standFor(sim, sim.map.buildings[sim.map.owner[job]], c); }
+    c.path = findPath(sim.ownSolid, c, cellCenter(c.stand ?? c.job), ERRAND) ?? [];
+  } else { delete c.jobKind; c.job = -1; c.state = "home"; c.thinkT = 0; }
 }
 
 function goHome(sim: DefendSim, c: Civilian, dt: number) {
-  const home = sim.map.buildings[c.home];
-  const hx = center(home.rect);
-  if (!c.path.length && c.thinkT <= 0) {
-    c.thinkT = 1;
-    const homes = [home, ...sim.map.buildings.filter(b => b.id !== home.id && (b.kind === "house" || b.kind === "keep") && sim.intact(b))];
-    for (const b of homes) {
-      if (!sim.intact(b)) continue;
-      const preferred = sim.doorOf(b);
-      for (const door of [preferred, ...sideCells(b.rect).filter(cell => cell !== preferred)]) {
-        if (door < 0) continue;
-        const path = findPath(sim.ownSolid, c, cellCenter(door), { maxCost: CELL_COUNT, maxNodes: CELL_COUNT });
-        if (!path) continue;
-        c.home = b.id;
-        c.path = path;
-        sim.followPath(c, center(b.rect), CIVILIAN.speed, dt);
-        return;
-      }
-    }
-    // Walled in with no way home (in the last rubble cell of a building
-    // rebuilt round it, say): take up any job there is, that one first.
-    if (pickJob(sim, c) >= 0) return assignNext(sim, c);
-    // Nothing free (others hold it, unable to reach it): the cell underfoot.
-    const here = cellAt(c.x, c.y), b = sim.map.owner[here] >= 0 ? sim.map.buildings[sim.map.owner[here]] : null;
-    if (b && !sim.solid[here] && !sim.intact(b) && (b.kind !== "monsterBait" || restockable(sim, b))) {
-      delete c.jobKind; delete c.cleanupCheck; delete c.stand;
-      c.job = here;
-      c.state = "toJob";
-      return;
-    }
+  const original = sim.map.buildings[c.shop ?? c.home];
+  const homes = [original, ...sim.map.buildings.filter(b => b.kind === "repairShop" && b.id !== original?.id)];
+  for (const b of homes) if (b && sim.intact(b)) {
+    const cell = standFor(sim, b, c);
+    if (cell === undefined) continue;
+    c.home = b.id;
+    if (!c.path.length || c.thinkT <= 0) { c.path = findPath(sim.ownSolid, c, cellCenter(cell), ERRAND) ?? []; c.thinkT = 1; }
+    sim.followPath(c, cellCenter(cell), CIVILIAN.speed, dt); return;
   }
-  sim.followPath(c, hx, CIVILIAN.speed, dt);
+  // Surviving workers may rebuild their fallen shop. Without a reachable
+  // refuge they leave the board and release their slot.
+  if (pickJob(sim, c, -1, c) >= 0) assignNext(sim, c);
+  else { panic(sim, c); flee(sim, c, dt); }
 }
 
-/** Home and standing beside an intact house: it goes indoors. */
 export function atHome(sim: DefendSim, c: Civilian): boolean {
-  if (c.state !== "home") return false;
   const b = sim.map.buildings[c.home];
-  return sim.intact(b) && rectDist(b.rect, c.x, c.y) < 0.7;
-}
-
-/** No other civilian out and about has already taken this cell. */
-function jobOpen(sim: DefendSim, cell: number, self?: Civilian): boolean {
-  if (icyCell(sim, cell)) return false;
-  return !sim.civilians.some((o) => o !== self && o.hp > 0 && o.state !== "home" && o.job === cell);
-}
-
-/** Rubble most worth rebuilding: structures, then walls, then houses —
- * nearest first, skipping anything with enemies close by. */
-function pickJob(sim: DefendSim, from: Point, skip = -1): number {
-  let best = -1,
-    bestScore = Infinity;
-  for (const { cell, tier } of openJobs(sim, skip)) {
-    const p = cellCenter(cell);
-    const score = tier * 1000 + dist(p.x - from.x, p.y - from.y);
-    if (score < bestScore) {
-      bestScore = score;
-      best = cell;
-    }
-  }
-  return best;
-}
-
-/** Every rubble cell a civilian could take, with its building's tier. */
-function* openJobs(sim: DefendSim, skip: number) {
-  yield* openRepairs(sim, skip);
-  for (const cell of sim.atmosphere?.cleanup ?? [])
-    if (jobAvailable(sim, cell, skip)) yield { cell, tier: 3 };
-}
-
-function* openRepairs(sim: DefendSim, skip: number) {
-  for (const b of sim.map.buildings) {
-    if (!sim.ownsBuilding(b) || b.hidden || sim.intact(b) || b.kind === "keep") continue;
-    // Fallen bait waits for Restocking.
-    if (b.kind === "monsterBait" && !restockable(sim, b)) continue;
-    const tier = b.kind === "house" ? 2 : b.kind === "wall" || b.kind === "gate" ? 1 : 0;
-    for (const cell of b.cells) if (jobAvailable(sim, cell, skip)) yield { cell, tier };
-  }
-}
-
-/** Rubble nobody else has taken, with no enemy within 3 cells. */
-function jobAvailable(sim: DefendSim, cell: number, skip: number) {
-  if (cell === skip || sim.solid[cell]) return false;
-  if (!jobOpen(sim, cell)) return false;
-  const p = cellCenter(cell);
-  return !sim.enemiesNear(p.x, p.y, 3).length;
-}
-
-/** The next job, or home to the nearest house when there is none. */
-function assignNext(sim: DefendSim, c: Civilian, skip = -1) {
-  c.path = [];
-  delete c.stand;
-  c.thinkT = 0;
-  const job = pickJob(sim, c, skip);
-  if (job >= 0) {
-    c.job = job;
-    if (sim.map.owner[job] < 0) c.jobKind = "sand";
-    else { delete c.jobKind; delete c.cleanupCheck; }
-    c.state = "toJob";
-  } else {
-    delete c.jobKind; delete c.cleanupCheck;
-    c.job = -1;
-    c.state = "home";
-    c.home = nearestHouse(sim, c);
-  }
-}
-
-/** The intact house nearest `p`, or the keep if none stands. */
-function nearestHouse(sim: DefendSim, p: Point): number {
-  let best = sim.keepId,
-    bd = Infinity;
-  for (const b of sim.map.buildings) {
-    if (b.kind !== "house" || !sim.intact(b)) continue;
-    const d = rectDist(b.rect, p.x, p.y);
-    if (d < bd) {
-      bd = d;
-      best = b.id;
-    }
-  }
-  return best;
-}
-
-/** A civilian comes out of the house nearest the job. */
-function spawnCivilian(sim: DefendSim, job: number) {
-  const house = sim.map.buildings[nearestHouse(sim, cellCenter(job))];
-  const door = sim.doorOf(house);
-  if (door < 0) return;
-  const hp = civilianHp(sim.levels.civilianHealth);
-  const at = cellCenter(door);
-  sim.civilians.push({
-    id: sim.newId(),
-    x: at.x,
-    y: at.y,
-    hp,
-    maxHp: hp,
-    job,
-    ...(sim.map.owner[job] < 0 ? { jobKind: "sand" as const } : {}),
-    state: "toJob",
-    work: 0,
-    path: [],
-    home: house.id,
-    thinkT: 0,
-    flash: 0,
-  });
+  return c.state === "home" && !!b && sim.intact(b) && rectDist(b.rect, c.x, c.y) < .7;
 }

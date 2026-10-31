@@ -80,6 +80,12 @@ function scenarios(): Record<string, Scenario> {
       citySeed: 13, levels: maxLevels({ archerRange: 0, archerDamage: 0 }), seed: 6, seconds: 200, wave: 1,
       opening: ['rollingCannon', 'rollingCannon', ...Array<EnemyKind>(6).fill('ballista'), 'fireworkLauncher', 'fireworkLauncher', 'trebuchet', 'bombard', 'rocketBattery'],
     },
+    // An unopposed trebuchet retains native stone-projectile coverage even
+    // when the mixed siege's engine dies before it can fire.
+    stoneSiege: {
+      layout: city(SQUARE, []), citySeed: 13, levels: maxLevels(), seed: 6,
+      seconds: 200, wave: 1, opening: ['trebuchet'], breakSeconds: 250,
+    },
     // Small explicit mixed siege retains late-enemy and ice coverage even
     // as the random difficulty budgets change the natural wave mix.
     mixed: {
@@ -89,7 +95,7 @@ function scenarios(): Record<string, Scenario> {
       smash: [[5, 'house']],
     },
     repairs: {
-      layout: city(SQUARE, []), citySeed: 5, levels: maxLevels(), seed: 2, seconds: 100,
+      layout: city(SQUARE, [["repairShop", 1, 0]]), citySeed: 5, levels: maxLevels(), seed: 2, seconds: 100,
       breakSeconds: 70, smash: [[1, 'house']],
     },
     // Only the keep: walls breached, houses smashed, civilians rebuilding, a loss.
@@ -144,7 +150,7 @@ function scenarios(): Record<string, Scenario> {
     // nearest stack first (fliers and a siege engine too); fallen stacks
     // burst and set the ground burning, and civilians restock them.
     bait: {
-      layout: city(SQUARE, [["monsterBait", 0, -2], ["monsterBait", -1, 1], ["archerTower", 1, -1], ["barracks", 1, 1], ["cannonTower", -1, -1]]),
+      layout: city(SQUARE, [["repairShop", 0, 1], ["monsterBait", 0, -2], ["monsterBait", -1, 1], ["archerTower", 1, -1], ["barracks", 1, 1], ["cannonTower", -1, -1]]),
       citySeed: 13, levels: levelsAt({ baitRestock: 2, baitBlast: 3, civilianCount: 3 }), seed: 6, seconds: 160, wave: 2,
       opening: [...Array<EnemyKind>(40).fill('orc'), ...Array<EnemyKind>(10).fill('bat'), ...Array<EnemyKind>(4).fill('ogre'), 'rollingCannon'],
     },

@@ -121,7 +121,7 @@ Old saves infer entered progress from the cleared record plus one, preserving th
   through them like the city wall; civilians rebuild them. Pressed, they
   lift and move; carried off the board they go back to the palette. Every
   section shares one tree, its branches climbed side by side: Stonework
-  (50% then 120% more HP, then stones that mend 2% a second), Trapped walls
+  (50% then 120% more HP, then twice as fast worker repairs), Trapped walls
   (each stone bursts once as it breaks, sparing your own people: 100 damage
   over 1.5 cells, then 250 over 2, then 2.5 cells out leaving the ground
   burning 4 s; a stone rebuilt whole is trapped again; Thornwork's ranks
@@ -273,11 +273,16 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   drawn back with a bolt laid on, rockets refilling their racks, the
   trebuchet's arm swinging over; rockets wobble up on spark trails and burst
   into fireworks.
-- Destruction lasts for the whole run. **Civilians** come out of houses to
-  rebuild rubble one cell at a time (walls and structures first); a
-  structure only works again once fully rebuilt. They avoid rubble with
-  enemies close by and respawn a while after being killed.
-- **Basic buildings and their upgrades.** The shop sells only three
+- Destruction lasts for the whole run. **Repair shops** recruit two workers
+  each; without a shop, houses never send out automatic builders. Initial
+  **Carpentry** rebuilds houses and service buildings. **Advanced carpentry**
+  unlocks infantry buildings and towers; **Masonry** unlocks walls and gates.
+  Independent skills add a third/fourth worker, critical repair priorities,
+  and weak bow shots while retreating. Repairs take a percentage of maximum
+  HP, so extra HP does not increase repair time. The Smithy improves repair
+  rate, worker HP, bow damage, building HP and tower HP. See
+  [Repair shop](upgrades/REPAIR_SHOP.md) for tuning and saved-state rules.
+- **Basic buildings and their upgrades.** The shop sells the Repair shop plus three basic combat
   buildings: the **watch tower**, the **Melee Guild** and the **Ranged
   Guild**. The Melee Guild trains **brawlers**, who walk out and punch
   (no weapon, short reach); the Ranged Guild trains **stone throwers**, who
@@ -606,7 +611,7 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   (`gateTowerSpots`), harder, further-piercing bolts at III; each turns
   and reloads under its `gateTowerKey`, `sim.gateTowerT`, and shoots
   `small` ballista bolts) and Ironbound (`IRONBOUND`: more HP, then
-  mending, then a fallen gate rising whole after 12 s, `sim.gateRise`).
+  50% faster worker repairs, then 150% faster worker rebuilding).
 - **Wall spikes** (`wall-defenses.ts`, `stepSpikes`) stand on the stones
   `citygen.ts` lists in `map.spikes` (each row's stones that face open
   ground). Every `spikeEvery` seconds (`sim.spikeT`) each enemy on foot
@@ -666,9 +671,10 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   Paths: Oil-soaked (whoever bites a stack catches fire, hotter each
   rank) or Fortified crates (more HP, then spikes hurting each biter
   thrice its bite).
-- Civilians work a rubble cell standing in it; when its building's own
-  rebuilt cells have walled it in, they work it from an open cell beside
-  it (a corner will do).
+- Repair workers stand in a reachable open cell beside their building,
+  reserve the whole job, and restore rubble cell by cell over a fixed total
+  work time. Gates and placed walls require workers even with their old
+  mending upgrades: those upgrades now accelerate the workers' repairs.
 - During a run the palette becomes the **consumables** palette. A **bomb**
   can be dragged onto the field to blast everything nearby.
   The bomb’s Knowledge tree is **Study → Spells → Bombs**: the bomb root

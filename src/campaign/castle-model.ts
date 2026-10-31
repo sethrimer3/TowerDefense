@@ -10,7 +10,7 @@ export const CASTLE_TILES = Object.freeze({ x: 2, y: 1, w: 5, h: 5 });
 export const CASTLE_KEEP = Object.freeze({ tx: 4, ty: 2 });
 export type CastleRanks = Pick<
   DefendSave,
-  "keepRanks" | "wallRanks" | "gateRanks" | "ballistaRanks" | "revolutionaryRanks" | "shadowRanks" | "nanoRanks" | "chronoRanks"
+  "keepRanks" | "wallRanks" | "gateRanks" | "ballistaRanks" | "revolutionaryRanks" | "shadowRanks" | "nanoRanks" | "chronoRanks" | "repairRanks"
 >;
 export type NativeCastle = CastleRanks & {
   layout: DefendSave["layout"];
@@ -70,7 +70,7 @@ export function castleAtForge(seed: number, band: number) {
 export function castleSnapshot(game: Save, forgeBand: number): NativeCastle {
   const d = game.defend,
     ranks: CastleRanks = {};
-  for (const key of ["keepRanks", "wallRanks", "gateRanks", "ballistaRanks", "revolutionaryRanks", "shadowRanks", "nanoRanks", "chronoRanks"] as const)
+  for (const key of ["keepRanks", "wallRanks", "gateRanks", "ballistaRanks", "revolutionaryRanks", "shadowRanks", "nanoRanks", "chronoRanks", "repairRanks"] as const)
     if (d[key]) (ranks as Record<string, unknown>)[key] = { ...d[key] };
   return { layout: structuredClone(d.layout), levels: { ...d.levels }, training: { ...game.training }, skills: { ...game.skills }, forgeBand, ...ranks };
 }

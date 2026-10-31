@@ -2,9 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Atmosphere, windAt, WIND, WEED_SIZES, CLEANUP_DEPTH, SAND_PRESS, DUNE_PERIOD, DUNE_SPEED, DUNE_WAVE, DUNE_CREST, duneAt } from '../src/defend/atmosphere.ts';
 import { DefendSim } from '../src/defend/sim.ts';
-import { defaultLayout, fitLayout, placeCityTile, placeGate } from '../src/defend/layout.ts';
+import { defaultLayout, fitLayout, placeCityTile, placeGate, placeStructure } from '../src/defend/layout.ts';
 import { generateCity } from '../src/defend/citygen.ts';
-import { UPGRADES } from '../src/defend/catalog.ts';
+import { UPGRADES, NO_BONUSES } from '../src/defend/catalog.ts';
 import { CELLS_W, CELLS_H, CELL_COUNT } from '../src/defend/grid.ts';
 import { ART } from '../src/defend/park-art.ts';
 import { SNOW_CAP, STORM_CHANCE, rollWeather, skyLabel, Snow } from '../src/defend/weather.ts';
@@ -12,11 +12,12 @@ import { areaForWave } from '../src/defend/areas.ts';
 import { tumbleweedPixels, dunePixels, duneHeights, SandMarks, CHUNK, DUNE_RELIEF, FLOOR, SUN, sunlight } from '../src/defend/atmosphere-art.ts';
 import { OUTLINE } from '../src/defend/pixel-fx.ts';
 
-function scene(wave = 21, gate = false) {
+function scene(wave = 21, gate = false, repair = false) {
   const layout = defaultLayout();
   let expanded = placeCityTile(layout, layout.keep.tx + 1, layout.keep.ty)!;
   if (gate) expanded = placeGate(expanded, { tx: layout.keep.tx, ty: layout.keep.ty, side: 'n' })!;
-  const sim = new DefendSim(generateCity(fitLayout(expanded), 3), Object.fromEntries(UPGRADES.map(u => [u.id, 0])) as any, 4);
+  if (repair) expanded = placeStructure(expanded, "repairShop", layout.keep.tx + 1, layout.keep.ty)!;
+  const sim = new DefendSim(generateCity(fitLayout(expanded), 3), Object.fromEntries(UPGRADES.map(u => [u.id, 0])) as any, 4, repair ? { ...NO_BONUSES, repair: { masonry: 1 } } : undefined);
   sim.wave = wave; sim.breakT = 1e9;
   sim.atmosphere = new Atmosphere(); sim.atmosphere.step(sim, .1);
   return sim;
@@ -146,15 +147,15 @@ test('walkers leave the sand where it lies, without changing combat random draws
 });
 
 test('civilians sweep only after repairs, preempt cleanup, and stop near enemies', () => {
-  const sim = scene(), env = sim.atmosphere!, builders = (sim as any).builders;
+  const sim = scene(21, false, true), env = sim.atmosphere!, builders = (sim as any).builders;
   builders.respawn.length = 1; builders.respawn[0] = 0;
   const i = sim.map.city.findIndex((v, i) => !!v && !sim.solid[i] && sim.map.owner[i] < 0);
   env.sand[i] = .8; env.cleanup.add(i);
   builders.step(sim, .1);
-  const c = sim.civilians[0]; assert.ok(c); assert.equal(c.jobKind, 'sand');
-  c.x = i % CELLS_W + .5; c.y = Math.floor(i / CELLS_W) + .5; c.state = 'working';
+  const c = sim.civilians[0]; assert.ok(c); assert.equal(c.jobKind, 'sand'); builders.respawn.fill(1e9);
+  c.x = i % CELLS_W + .5; c.y = Math.floor(i / CELLS_W) + .5; c.state = 'working'; c.path = [];
   builders.step(sim, .1); assert.ok(env.sand[i] < .8);
-  const b = wall(sim); sim.damageBuilding(b.id, 1e9); c.cleanupCheck = 0;
+  const b = wall(sim); sim.damageBuilding(b.id, 1e9); c.thinkT = 0;
   builders.step(sim, .1); assert.equal(c.jobKind, undefined); assert.equal(c.job, b.cells[0]);
   sim.rebuildCell(b.cells[0]); c.job = i; c.jobKind = 'sand'; c.state = 'working';
   sim.spawnAuxiliary('orc', c.x, c.y); (sim as any).indexEnemies();

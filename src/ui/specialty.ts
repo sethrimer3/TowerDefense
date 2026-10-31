@@ -1,3 +1,5 @@
+import { civilianHp, rebuildSeconds } from "../defend/catalog.ts";
+import { REPAIR, REPAIR_PATHS, repairAllocated, repairCrew, respecRepair, undoRepair, upgradeRepair, type RepairRanks, type RepairPathId } from "../repair-upgrades.ts";
 import {CHRONO,CHRONO_PATHS,chronoAllocated,chronoRank,respecChrono,undoChrono,upgradeChrono,type ChronoRanks,type ChronoPathId} from "../chrono-upgrades.ts";
 import type { CircleState } from "../magic-circle/formation.ts";
 /** A building's upgrades as the player meets them: what a path does to the
@@ -139,6 +141,7 @@ export function kindStats(save: Save, kind: PaletteItem, path?: PathId, rank = 0
   }
   if (kind === "revolutionary") return revolutionaryStats(save, save.defend.revolutionaryRanks);
   if (kind === "shadow") return shadowStats(save, save.defend.shadowRanks);
+  if (kind === "repairShop") return repairStats(save, save.defend.repairRanks);
   if (kind === "chronoTower") return chronoStats(save,save.defend.chronoRanks);
   if (kind === "nanoTower") return nanoStats(save, save.defend.nanoRanks);
   const GUNS = { meleeGuild: BRAWLER, rangedGuild: SLINGER, sniperLodge: SNIPER, musketHall: MUSKETEER, gunHall: GUNNER, gunNest: MACHINE_GUNNER, gatlingNest: GATLING_GUNNER, rocketBattery: ROCKETEER } as const;
@@ -210,7 +213,13 @@ const coreStats = (line: string, core: number) => line.split(" · ").slice(0, co
 
 /** A building of `kind` wearing `wear`: its basic stats and its upgrades' abilities. */
 export function buildingSheet(save: Save, kind: PaletteItem | "wallSpikes", wear?: Wear): StatSheet {
-  const sheet = ownSheet(save, kind, wear), deploy = kind === "wallSpikes" ? 0 : deployRangeOf(kind as BuildingKind, bonuses(save));
+  const sheet = ownSheet(save, kind, wear);
+  if (kind in STRUCTURES && kind !== "monsterBait") {
+    const b = bonuses(save), def = STRUCTURES[kind as keyof typeof STRUCTURES];
+    const hp = def.maxHp * (kind.endsWith("Tower") ? b.towerHp : b.buildingHp);
+    sheet.stats.push(`${Number(hp.toFixed(1))} building HP`);
+  }
+  const deploy = kind === "wallSpikes" ? 0 : deployRangeOf(kind as BuildingKind, bonuses(save));
   return deploy ? { ...sheet, stats: [...sheet.stats, `deploys within ${Number(deploy.toFixed(1))} cells`] } : sheet;
 }
 
@@ -218,6 +227,7 @@ function ownSheet(save: Save, kind: PaletteItem | "wallSpikes", wear?: Wear): St
   const d = save.defend;
   if (kind === "revolutionary") return { stats: coreStats(revolutionaryStats(save, d.revolutionaryRanks), 3), abilities: sharedAbilities(REVOLUTIONARY_PATHS, d.revolutionaryRanks) };
   if (kind === "shadow") return { stats: coreStats(shadowStats(save, d.shadowRanks), 4), abilities: sharedAbilities(SHADOW_PATHS, d.shadowRanks) };
+  if (kind === "repairShop") return { stats: repairStats(save, d.repairRanks).split(" · "), abilities: [{ text: "Carpentry (initial): rebuild destroyed houses and service buildings", hue: "verdant" }, ...sharedAbilities(REPAIR_PATHS, d.repairRanks)] };
   if (kind === "chronoTower") return {stats:coreStats(chronoStats(save,d.chronoRanks),3),abilities:sharedAbilities(CHRONO_PATHS,d.chronoRanks)};
   if (kind === "nanoTower") return { stats: coreStats(nanoStats(save, d.nanoRanks), 3), abilities: sharedAbilities(NANO_PATHS, d.nanoRanks) };
   if (kind === "wallBlock") return { stats: coreStats(wallStats(save, d.wallRanks), 1), abilities: sharedAbilities(WALL_PATHS, d.wallRanks) };
@@ -324,6 +334,7 @@ export function mapCardHtml(save: Save, kind: PaletteItem | "wallSpikes", found:
 /** The card for node `id` of a building of `kind` wearing `wear`: what it
  * is, what it does, its level and price, and Buy when it can be bought. */
 export function treeCardHtml(save: Save, kind: PaletteItem | "wallSpikes", wear: Wear | undefined, id: string): string {
+  if (kind === "repairShop" && id === "repair:carpentry") return `<div class="ug-card-head"><b>Carpentry</b><small>Initial skill</small></div><p>Available from the beginning. Workers leave an intact Repair shop to rebuild destroyed houses and service buildings. Advanced carpentry unlocks infantry buildings and towers; Masonry unlocks walls and gates.</p><b class="ug-owned">Owned from the beginning · free</b>`;
   const n = buildingTree(kind as never, wear).find((o) => o.id === id);
   if (!n) return `<p class="ug-hint">Tap a node to see what it does.</p>`;
   const free = save.settings.devMode;
@@ -479,7 +490,7 @@ export const wallStep = (ranks: WallRanks | undefined, id: string) => sideStep(W
 export function wallStats(save: Save, ranks: WallRanks | undefined): string {
   const b = bonuses(save), stone = wallRank(ranks, "stonework"), trap = wallRank(ranks, "trapped"), town = wallRank(ranks, "townWalls");
   const parts = [`${Math.round(wallHp(save.defend.levels.wallStrength) * b.wallHp * STONEWORK.hp[stone]).toLocaleString("en")} HP a stone`];
-  if (stone >= 3) parts.push(`mends ${STONEWORK.mend * 100}% a second`);
+  if (stone >= 3) parts.push(`repair workers mend stones ${STONEWORK.repair}× as fast`);
   if (trap) parts.push(`bursts as it breaks: ${TRAPPED.damage[trap]} damage over ${TRAPPED.radius[trap]} cells${trap >= 3 ? ` · burns ${TRAPPED.fire}s` : ""}`);
   parts.push(town >= TOWN_WALLS.posterns ? "inside or outside the city · your people pass through" : town >= TOWN_WALLS.inside ? "inside or outside the city" : "outside the city");
   return parts.join(" · ");
@@ -498,8 +509,8 @@ export function gateStats(save: Save, ranks: GateRanks | undefined): string {
     gateBarred(ranks) ? "enemies can't slip in" : "enemies may slip in while it is open"];
   if (holes >= 2) parts.push(`murder holes: ${n(PORTCULLIS.damage[holes] * b.towerDamage)} damage every ${PORTCULLIS.every[holes]}s${holes >= 3 ? ` · ${PORTCULLIS.burn}s burn` : ""}`);
   if (towers) parts.push(`${towers >= GATE_TOWERS.twin ? "2 small ballistas" : "a small ballista"}: ${n(ballistaDamage(l.ballistaDamage ?? 0) * b.towerDamage * GATE_TOWERS.share[towers])} damage every ${n(GATE_TOWERS.cooldown * b.towerReload)}s · ${GATE_TOWERS.range[towers]} range · pierces ${GATE_TOWERS.pierce[towers]}`);
-  if (iron >= 2) parts.push(`mends ${IRONBOUND.mend * 100}% a second`);
-  if (iron >= 3) parts.push(`rises again ${IRONBOUND.rise}s after it falls`);
+  if (iron >= 2) parts.push(`repair workers mend gates ${IRONBOUND.repair}× as fast`);
+  if (iron >= 3) parts.push(`workers rebuild fallen gates ${IRONBOUND.rebuild}× as fast`);
   return parts.join(" · ");
 }
 
@@ -630,16 +641,20 @@ export const NANO_UI: SideUi = sideUi(NANO_TREE, (s) => s.defend.nanoRanks, {
   buy: upgradeNano, undo: undoNano, respec: respecNano, allocated: nanoAllocated,
 });
 /** The shared branches growing off a building of `kind`'s own node, if it has any. */
-export const sharedBranches = (kind: string): SideUi | undefined => (kind === "revolutionary" ? REVOLUTIONARY_UI : kind === "shadow" ? SHADOW_UI : kind === "nanoTower" ? NANO_UI : kind === "chronoTower" ? CHRONO_UI : undefined);
+export const sharedBranches = (kind: string): SideUi | undefined => (kind === "repairShop" ? REPAIR_UI : kind === "revolutionary" ? REVOLUTIONARY_UI : kind === "shadow" ? SHADOW_UI : kind === "nanoTower" ? NANO_UI : kind === "chronoTower" ? CHRONO_UI : undefined);
 /** A building's tree with its shared branches grafted onto its node. */
 export function graftedGraph(save: Save, kind: PaletteItem | "wallSpikes", wear?: Wear): GraphNode[] {
   const own = treeGraph(kind, wear), shared = sharedBranches(kind);
+  if (kind === "repairShop" && shared) {
+    const innate: GraphNode = { id: "repair:carpentry", parent: shared.root, state: "owned", face: '<canvas width="33" height="33" data-path-icon="hammer:verdant" aria-label="Carpentry (initial)"></canvas>', tag: "Initial", hue: "hue-verdant" };
+    return [...own, innate, ...shared.graph(save).filter(n => n.id !== shared.root).map(n => n.parent === shared.root ? { ...n, parent: innate.id } : n)];
+  }
   return shared ? [...own, ...shared.graph(save).filter((n) => n.id !== shared.root)] : own;
 }
 
 /** A family keeps its base identity through kind changes and respecs.
  * Placement UIDs intentionally do not affect the visual identity. */
-export function specialtyCircle(kind: PaletteItem | "wallSpikes" | SideKind, wear?: Wear, ranks?: KeepRanks, wallRanks?: WallRanks, gateRanks?: GateRanks, ballistaRanks?: BallistaRanks, revolutionaryRanks?: RevolutionaryRanks, shadowRanks?: ShadowRanks, nanoRanks?: NanoRanks, chronoRanks?: ChronoRanks): CircleState {
+export function specialtyCircle(kind: PaletteItem | "wallSpikes" | SideKind, wear?: Wear, ranks?: KeepRanks, wallRanks?: WallRanks, gateRanks?: GateRanks, ballistaRanks?: BallistaRanks, revolutionaryRanks?: RevolutionaryRanks, shadowRanks?: ShadowRanks, nanoRanks?: NanoRanks, chronoRanks?: ChronoRanks, repairRanks?: RepairRanks): CircleState {
   const root = kind === "keep" || kind === "walls" || kind === "wallSpikes" || kind === "gate" || kind === "ballistas" ? kind : rootOf(kind as never);
   const upgrades: Array<CircleState['upgrades'][number]> = [{ id: `kind:${kind}`, rank: 1, visualOnly: true }];
   // The actual owned tree includes every earlier transformation and crowned
@@ -652,9 +667,10 @@ export function specialtyCircle(kind: PaletteItem | "wallSpikes" | SideKind, wea
   if (kind === "ballistas") for (const p of BALLISTA_PATHS) upgrades.push({ id: `ballista:${p.id}`, rank: ballistaRank(ballistaRanks, p.id) });
   if (kind === "revolutionary") for (const p of REVOLUTIONARY_PATHS) upgrades.push({ id: `revolutionary:${p.id}`, rank: revolutionaryRank(revolutionaryRanks, p.id) });
   if (kind === "shadow") for (const p of SHADOW_PATHS) upgrades.push({ id: `shadow:${p.id}`, rank: shadowRank(shadowRanks, p.id) });
+  if (kind === "repairShop") for (const p of REPAIR_PATHS) upgrades.push({ id: `repair:${p.id}`, rank: sideRank(repairRanks, p.id) });
   if (kind === "chronoTower") for(const p of CHRONO_PATHS)upgrades.push({id:`chrono:${p.id}`,rank:chronoRank(chronoRanks,p.id)});
   if (kind === "nanoTower") for (const p of NANO_PATHS) upgrades.push({ id: `nano:${p.id}`, rank: nanoRank(nanoRanks, p.id) });
-  const city = ["keep", "walls", "gate", "ballistas", "wallBlock", "wallSpikes", "cityTile", "cityGate", "wallBallista", "monsterBait"].includes(kind);
+  const city = ["keep", "walls", "gate", "ballistas", "wallBlock", "wallSpikes", "cityTile", "cityGate", "wallBallista", "monsterBait", "repairShop"].includes(kind);
   return { topic: `building:${root}`, upgrades, motif: city ? "tesseract" : "voronoi" };
 }
 
@@ -665,4 +681,15 @@ const CHRONO_TREE:SideTree<ChronoPathId>={root:"k:chronoTower",icon:"chronoTower
 export const CHRONO_UI:SideUi=sideUi(CHRONO_TREE,s=>s.defend.chronoRanks,{
  name:"Ultimate Archer Tower",whom:"the Ultimate Archer Towers",plain:"take every upgrade off the Ultimate Archer Towers",about:STRUCTURES.chronoTower.description,stats:chronoStats,
  buy:upgradeChrono,undo:undoChrono,respec:respecChrono,allocated:chronoAllocated,
+});
+
+export function repairStats(save: Save, ranks: RepairRanks | undefined): string {
+  const b = bonuses(save), l = save.defend.levels;
+  const rate = 100 / (REPAIR.seconds * (rebuildSeconds(l.rebuildSpeed) / rebuildSeconds(0)) * b.rebuild) * (1 + l.civilianCount * .1);
+  return `${repairCrew(ranks)} repair workers per shop · ${Number((civilianHp(l.civilianHealth) * b.repairHp).toFixed(1))} worker HP · ${Number(rate.toFixed(2))}% maximum HP repaired/s · ${Number((REPAIR.bowDamage * b.repairDamage).toFixed(1))} bow damage with Parting shot · Carpentry (initial): rebuild destroyed houses and service buildings`;
+}
+const REPAIR_TREE: SideTree<RepairPathId> = { root: "k:repairShop", icon: "repairShop", every: "Every Repair shop", paths: REPAIR_PATHS };
+export const REPAIR_UI: SideUi = sideUi(REPAIR_TREE, s => s.defend.repairRanks, {
+  name: "Repair shop", whom: "the Repair shops", plain: "remove purchased skills; keep initial Carpentry", about: STRUCTURES.repairShop.description, stats: repairStats,
+  buy: upgradeRepair, undo: undoRepair, respec: respecRepair, allocated: repairAllocated,
 });

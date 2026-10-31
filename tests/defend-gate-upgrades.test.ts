@@ -146,21 +146,20 @@ test("gate towers put small ballistas on the gatehouse, two from II", () => {
 });
 
 // ── Ironbound ──────────────────────────────────────────────────────────
-test("Ironbound and the Smithy's doors give the gate more HP; it mends, then rises again", () => {
+test("Ironbound and the Smithy's doors give the gate more HP; repairs still require workers", () => {
   const plain = sim(), iron = sim({ ironbound: 1 }, { gateStrength: 2 });
   const id = gateOf(plain).id;
   assert.ok(Math.abs(iron.maxHp[id] - plain.maxHp[id] * IRONBOUND.hp[1] * gateHpScale(2)) < 1e-3);
   const mend = sim({ ironbound: 2 });
   mend.hp[id] = mend.maxHp[id] / 2;
   run(mend, 1);
-  assert.ok(Math.abs(mend.hp[id] - mend.maxHp[id] * (0.5 + IRONBOUND.mend)) < mend.maxHp[id] * 0.002, "2% a second");
+  assert.equal(mend.hp[id], mend.maxHp[id] / 2, "no passive gate repairs");
   for (const rank of [2, 3]) {
     const s = sim({ ironbound: rank });
     s.damageBuilding(id, 1e9);
     assert.ok(!s.intact(gateOf(s)));
-    run(s, IRONBOUND.rise + 0.2);
-    assert.equal(s.intact(gateOf(s)), rank >= 3, `rank ${rank}`);
-    if (rank >= 3) assert.equal(s.hp[id], s.maxHp[id], "whole");
+    run(s, 30);
+    assert.equal(s.intact(gateOf(s)), false, `rank ${rank} still needs repair workers`);
   }
 });
 
@@ -202,7 +201,7 @@ test("the gates' tree shows in Defend's panel with its numbers", () => {
   assert.deepEqual(nodes.filter((n) => n.state === "next").map((n) => n.id), ["q:portcullis:1", "q:gateTowers:1", "q:ironbound:1"]);
   assert.equal(tree.step(s, "q:portcullis:1"), "portcullis");
   assert.match(gateStats(s, undefined), /enemies may slip in/);
-  assert.match(gateStats(s, { portcullis: 3, gateTowers: 2, ironbound: 3 }), /can't slip in.*murder holes.*2 small ballistas.*mends.*rises again/);
+  assert.match(gateStats(s, { portcullis: 3, gateTowers: 2, ironbound: 3 }), /can't slip in.*murder holes.*2 small ballistas.*mend gates.*rebuild fallen gates/);
   assert.match(tree.card(s, "q:gateTowers:2"), /Twin towers/);
   assert.ok(tree.buy(s, "gateTowers").ok);
   assert.equal(tree.allocated(s), gateAllocated(s.defend.gateRanks));

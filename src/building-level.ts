@@ -25,7 +25,7 @@ function topicsOf(kind: LeveledKind): { topic: Topic; only?: (id: string) => boo
   if (kind === "wallBallista") return [{ topic: topic("wallBallista") }, { topic: topic("towers") }];
   const own = ownTopic(kind),
     shared = ITEM_CATEGORY[kind] === "units" ? topic("troops") : ITEM_CATEGORY[kind] === "towers" ? topic("towers") : undefined;
-  return [...(own ? [{ topic: own }] : []), ...(shared ? [{ topic: shared }] : [])];
+  return [...(own ? [{ topic: own }] : []), ...(shared ? [{ topic: shared }] : []), ...(ITEM_CATEGORY[kind] === "units" ? [{ topic: topic("repairShop"), only: (id: string) => id === "buildingHp" }] : [])];
 }
 /** The Smithy rows a kind's level counts. */
 export function smithyRows(kind: LeveledKind): SmithyRows {

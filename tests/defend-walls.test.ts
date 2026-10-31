@@ -192,7 +192,7 @@ const enemyAt = (sim: DefendSim, x: number, y: number): Enemy => {
   sim.enemies.push(e); (sim as any).indexEnemies(); return e;
 };
 
-test("Stonework hardens and mends placed walls, not the city's", () => {
+test("Stonework hardens placed walls, but repairs need workers", () => {
   const plain = battle(), stone = battle({ stonework: 3 });
   const piece = plain.pieces[0], ring = plain.map.buildings.find((b) => b.kind === "wall" && !b.piece)!;
   assert.equal(plain.pieces.length, stone.pieces.length);
@@ -200,7 +200,7 @@ test("Stonework hardens and mends placed walls, not the city's", () => {
   assert.equal(stone.maxHp[ring.id], plain.maxHp[ring.id]);
   stone.hp[piece.id] = stone.maxHp[piece.id] / 2;
   stone.update(1);
-  assert.ok(stone.hp[piece.id] > stone.maxHp[piece.id] / 2, "it mends");
+  assert.equal(stone.hp[piece.id], stone.maxHp[piece.id] / 2, "no automatic mending without repair workers");
 });
 
 test("Trapped walls burst once as a placed stone breaks, and burn at III", () => {

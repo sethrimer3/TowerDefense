@@ -1,3 +1,4 @@
+import { decodeRepairRanks } from "../repair-upgrades.ts";
 import { CASTLE_KEEP, castleGame, type NativeCastle } from "./castle-model.ts";
 import { SIDE_GROUPS } from "./siege-dps-catalog.ts";
 import { decodeSideRanks } from "../side-ranks.ts";
@@ -74,6 +75,8 @@ export function decodeNativeCastle(raw: unknown): NativeCastle | null {
       const ranks = decodeSideRanks(group.paths, raw[group.key]);
       if (ranks) (base.defend as any)[group.key] = ranks;
     }
+    const repairs = decodeRepairRanks(raw.repairRanks);
+    if (repairs) base.defend.repairRanks = repairs;
     base.defend.layout = {
       keep: { ...CASTLE_KEEP },
       cityTiles: [...l.cityTiles],
@@ -105,6 +108,7 @@ export function decodeNativeCastle(raw: unknown): NativeCastle | null {
       skills: base.skills,
       forgeBand: int(raw.forgeBand, 0, 4) ? raw.forgeBand : 0,
       ...ranks,
+      ...(repairs ? { repairRanks: repairs } : {}),
     };
   } catch {
     return null;

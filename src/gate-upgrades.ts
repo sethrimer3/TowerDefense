@@ -2,7 +2,7 @@
  * branches climbed side by side like the walls' (`side-ranks.ts`):
  * Portcullis (enemies no longer slip in while your people go out, then
  * murder holes over the way in), Gate towers (small ballistas on the
- * gatehouse) and Ironbound (more HP, mending, rising again). The ranks are
+ * gatehouse) and Ironbound (more HP and faster worker repairs). The ranks are
  * saved on the Defend save (`DefendSave.gateRanks`, absent while it has
  * none) and snapshotted into `Bonuses.gate` when a battle starts. */
 import { studyPathCost } from "./economy.ts";
@@ -24,10 +24,9 @@ export const PORTCULLIS = { bar: 1, every: [0, 0, 1.5, 1], damage: [0, 0, 18, 30
  * II, each shooting light bolts: `share[rank]` of a wall ballista's damage,
  * `range[rank]` cells, every `cooldown` seconds, piercing `pierce[rank]`. */
 export const GATE_TOWERS = { share: [0, 0.45, 0.45, 0.7], range: [0, 9, 10, 11], cooldown: 2.2, pierce: [0, 2, 2, 4], twin: 2 };
-/** Ironbound: the gate's HP times `hp[rank]`; from II a standing gate
- * mends `mend` of its HP a second; at III a fallen gate rises again whole
- * `rise` seconds after it fell. */
-export const IRONBOUND = { hp: [1, 1.6, 1.6, 1.6], mend: 0.02, rise: 12 };
+/** Ironbound: HP times `hp[rank]`; workers repair faster from II
+ * and rebuild fallen gates faster at III. Never heals automatically. */
+export const IRONBOUND = { hp: [1, 1.6, 1.6, 1.6], repair: 1.5, rebuild: 2.5 };
 
 export const GATE_PATHS: SidePath<GatePathId>[] = [
   {
@@ -50,8 +49,8 @@ export const GATE_PATHS: SidePath<GatePathId>[] = [
     id: "ironbound", name: "Ironbound", motto: "Oak, iron and stubbornness", hue: "verdant",
     ranks: [
       { name: "Iron bands", icon: "hammer", cost: studyPathCost(2, 0), text: "The gate has 60% more HP" },
-      { name: "Wardens' care", icon: "heart", cost: studyPathCost(2, 1), text: "A damaged gate mends 2% of its HP a second" },
-      { name: "Ever-standing", icon: "oath", cost: studyPathCost(2, 2), text: "A fallen gate rises again, whole, 12 seconds after it fell" },
+      { name: "Wardens' care", icon: "heart", cost: studyPathCost(2, 1), text: "Repair workers mend damaged gates 50% faster" },
+      { name: "Ever-standing", icon: "oath", cost: studyPathCost(2, 2), text: "Repair workers rebuild fallen gates 150% faster" },
     ],
   },
 ];

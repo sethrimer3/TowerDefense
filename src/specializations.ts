@@ -668,7 +668,7 @@ export function buildingTree(kind: PlacedKind | "wallSpikes", wear?: Wear): Tree
 /** Whether a palette item has an upgrade tree worth showing: something it
  * grew from, can become, or a path it can climb. */
 export function hasTree(kind: string): kind is PaletteKind {
-  if (buildingPathsOf(kind).length) return true;
+  if (kind === "repairShop" || buildingPathsOf(kind).length) return true;
   return kind !== "wallSpikes" && placeOf(kind as PlacedKind).tier !== "other";
 }
 
