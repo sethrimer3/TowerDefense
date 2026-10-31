@@ -405,6 +405,12 @@ The flagstones' bump map outside the city: lights brighten the stone edges facin
 **Torch light**:
 A flame's flickering, swaying, occlusion-aware glow: lanterns, braziers, tower fires and hand torches.
 
+**Townsfolk**:
+Noncombat residents making errands between city buildings while the streets are safe, carrying torches after dusk.
+
+**Watchmen**:
+Noncombat night patrols inside the city and, when a stone gate permits, just outside its walls. Monsters send them to a building indoors or fleeing away outside.
+
 ### The mine
 
 **Work lamp**, **torch** and **lantern**:

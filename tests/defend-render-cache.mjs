@@ -113,8 +113,9 @@ try {
         reports.push({check:'scorch',px,time,...compare(a,b)});
       }
     }
-    // Pin main's art-based occlusion and inner-rim lighting. Exact
-    // parity is required, including its actual building body/rim masks.
+    // Pin inner-rim compositing with today's art and occlusion bakes.
+    // Native-pixel occlusion intentionally changed; city-night-life checks
+    // rounded silhouettes. Both compositors must still draw identical bakes.
     const {DefendLighting,MASK}=await import('/src/defend/lighting.ts');
     const {DefendLighting:ReferenceLighting}=await import(`${lightingRoot}/lighting.ts`);
     const {carriedLights}=await import('/src/defend/battle-art.ts');
@@ -128,8 +129,9 @@ try {
     });
     for(const px of [6,9.23076923076923,18])for(const [night,rain] of [[1,true],[0.3,false]]){
       const w=Math.round(72*px),h=Math.round(104*px),shots=[];
-      for(const L of [new ReferenceLighting(),new DefendLighting()]){
-        L.setMap(map);L.setMasks(...buildingMasks);L.update(sim.solid,[],intact);L.bakePending(sim.solid,1e4);L.update(sim.solid,[],intact);
+      const current=new DefendLighting();current.setMap(map);current.setMasks(...buildingMasks);current.bakePending(sim.solid,1e4);
+      for(const L of [new ReferenceLighting(),current]){
+        L.setMap(map);L.lights=current.lights;L.setMasks(...buildingMasks);L.bakes=current.bakes;L.queue.clear();L.update(sim.solid,[],intact);
         const cv=make(w,h),g=cv.getContext('2d');
         paintCityLayer(g,px,{map,sim,lights:L.lights,stones:L.roadStones});
         L.drawLight(g,{px,now:1234,reduceMotion:false,intact},ambientFor({rain},night),{torches:carriedLights(sim),solid:sim.solid,version:sim.mapVersion});

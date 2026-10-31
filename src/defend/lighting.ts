@@ -13,7 +13,8 @@
  * cell records its brightest light ("dominant light"). A unit's shadow is
  * then just a few small rects stepped away from that one light — no ray
  * casting per unit per frame. */
-import { ART } from "./art-scale.ts";
+import { ART, WALL_FACE_HANG } from "./art-scale.ts";
+import { torchLevel } from "./city-torches.ts";
 import { LIGHTING_CONFIG, getTorchFlicker, getTorchSway } from "../lighting.ts";
 import { glowColor, lightFalloff } from "../torch-light.ts";
 import { CELL_COUNT, CELLS_H, CELLS_W, ORTHO, boardSize, cellInBounds, cellIndex, hash, hash01, type Rect } from "./grid.ts";
@@ -52,6 +53,21 @@ export function cityLights(map: CityMap): Light[] {
   const add = (l: NewLight) => lights.push({ ...l, id: lights.length });
   for (const b of map.buildings) buildingLights(map, b).forEach(add);
   streetLanterns(map, lights.map((l) => ({ x: l.x, y: l.y }))).forEach(add);
+  // Outer wall sconces face open terrain, rather than lighting only streets.
+  for (const b of map.buildings) {
+    if (b.kind !== "wall" || b.fence || b.hidden || (b.rect.x + b.rect.y) % 6) continue;
+    for (const [dx, dy] of [[0,-1],[1,0],[0,1],[-1,0]]) {
+      const x = b.rect.x + dx, y = b.rect.y + dy;
+      if (!cellInBounds(x,y) || map.type[cellIndex(x,y)] !== CellType.OUT) continue;
+      // South-facing masonry hangs below its collision cell. Keep its
+      // flame beyond that painted face too, so the wall cannot engulf it.
+      const reach = .75 + (dy === 1 ? WALL_FACE_HANG : 0);
+      const lx = b.rect.x + .5 + dx * reach, ly = b.rect.y + .5 + dy * reach;
+      if (lights.some(l => Math.hypot(l.x-lx,l.y-ly) < 3)) continue;
+      add({kind:"lantern",x:lx,y:ly,radius:5.5,strength:.9,owner:b.id,inside:false,pillars:[]});
+      break;
+    }
+  }
   return lights;
 }
 
@@ -203,7 +219,7 @@ export class DefendLighting {
   /** What stands, painted from the buildings' own art at `MASK` pixels a
    * cell: `body` their pixels, `rim` their outlines. Null until the city
    * layer first paints them (then torches clip to open cells). */
-  private masks: { body: HTMLCanvasElement; rim: HTMLCanvasElement; covered: Uint8Array } | null = null;
+  private masks: { body: HTMLCanvasElement; rim: HTMLCanvasElement; covered: Uint8Array; pixels: Uint8Array } | null = null;
   private bodyUp: HTMLCanvasElement | null = null;
   private rimUp: HTMLCanvasElement | null = null;
   private tint: HTMLCanvasElement | null = null;
@@ -213,9 +229,11 @@ export class DefendLighting {
    * while the city's lights are going out, else null (all burning). */
   burning: ((l: Light) => number) | null = null;
 
+  /** Null retains standalone/legacy rendering; live scenes use solar time. */
+  solarTime: number | null = null;
   /** How brightly light `l` burns now. */
   burn(l: Light) {
-    return this.burning ? this.burning(l) : 1;
+    return (this.burning ? this.burning(l) : 1) * (this.solarTime === null ? 1 : torchLevel(this.solarTime, l.id, l.x, l.y));
   }
 
   /** Point the lighting at a (new) city. */
@@ -230,13 +248,23 @@ export class DefendLighting {
     this.reliefKey = "";
   }
 
-  /** Takes what stands from the buildings' art (see `masks`). A cell
-   * casts shadows only while its sprite covers most of it, so light runs
-   * on over a lot's open edges up to the building itself. */
+  /** Takes what stands from cached building art, including its outline.
+   * Occlusion follows native sprite pixels, including padded/rounded edges. */
   setMasks(body: HTMLCanvasElement, rim: HTMLCanvasElement) {
-    const covered = coverage(body);
-    const old = this.masks?.covered;
-    this.masks = { body, rim, covered };
+    // Read only cached source masks, never a rendered scene. Resolve light
+    // occlusion at native art pixels so rounded corners are not whole cells.
+    const a = body.getContext("2d", { willReadFrequently: true })!.getImageData(0,0,body.width,body.height).data;
+    const b = rim.getContext("2d", { willReadFrequently: true })!.getImageData(0,0,rim.width,rim.height).data;
+    const covered = coverage(body, a);
+    const width = CELLS_W * ART, pixels = new Uint8Array(width * CELLS_H * ART), ratio = MASK / ART;
+    for (let y=0;y<CELLS_H*ART;y++) for(let x=0;x<width;x++) {
+      for(let sy=0;sy<ratio&&!pixels[y*width+x];sy++) for(let sx=0;sx<ratio;sx++) {
+        const i=((y*ratio+sy)*body.width+x*ratio+sx)*4+3;
+        if(a[i]>=128 || b[i]>=128) { pixels[y*width+x]=1; break; }
+      }
+    }
+    const old = this.masks?.covered, oldPixels = this.masks?.pixels;
+    this.masks = { body, rim, covered, pixels };
     this.upKey = "";
     if (!old) {
       this.bakes.clear();
@@ -246,7 +274,11 @@ export class DefendLighting {
     }
     const changed: number[] = [];
     for (let i = 0; i < covered.length; i++) if (covered[i] !== old[i]) changed.push(i);
-    this.invalidate(changed);
+    if(oldPixels) {
+      const cells=new Set(changed);
+      for(let i=0;i<pixels.length;i++) if(pixels[i]!==oldPixels[i]) cells.add(cellIndex(Math.floor((i%width)/ART),Math.floor(i/width/ART)));
+      this.invalidate([...cells]);
+    } else this.invalidate(changed);
   }
 
   get roadStones() {
@@ -271,7 +303,7 @@ export class DefendLighting {
       if (budget-- <= 0) break;
       this.queue.delete(id);
       const l = this.lights[id];
-      const pair: [Bake, Bake] = [bakeLight(l, this.map, solid, -SWAY, this.masks?.covered), bakeLight(l, this.map, solid, SWAY, this.masks?.covered)];
+      const pair: [Bake, Bake] = [bakeLight(l, this.map, solid, -SWAY, this.masks?.pixels), bakeLight(l, this.map, solid, SWAY, this.masks?.pixels)];
       const pool = { ...poolSamples([pair[0].values, pair[1].values], pair[0].cols, glowColor), cols: pair[0].cols, rows: pair[0].rows, left: pair[0].left, top: pair[0].top };
       this.bakes.set(id, { pair, pool });
       this.domDirty = true;
@@ -732,8 +764,7 @@ function rgbOf(color: string) {
 export const MASK = 16;
 
 /** Per cell, 1 where the body mask covers at least half of it. */
-function coverage(body: HTMLCanvasElement) {
-  const data = body.getContext("2d", { willReadFrequently: true })!.getImageData(0, 0, body.width, body.height).data;
+function coverage(body: HTMLCanvasElement, data: Uint8ClampedArray) {
   const out = new Uint8Array(CELL_COUNT);
   const half = (MASK * MASK) / 2;
   for (let cy = 0; cy < CELLS_H; cy++)
@@ -800,7 +831,7 @@ function makeFlameSprite() {
 }
 
 /** Bake one light's pool with occlusion (optionally nudged sideways). */
-function bakeLight(l: Light, map: CityMap, solid: Uint8Array, offsetX: number, covered?: Uint8Array): Bake {
+function bakeLight(l: Light, map: CityMap, solid: Uint8Array, offsetX: number, pixels?: Uint8Array): Bake {
   const R = l.radius;
   const left = Math.floor(l.x - R - 1),
     top = Math.floor(l.y - R - 1);
@@ -810,7 +841,11 @@ function bakeLight(l: Light, map: CityMap, solid: Uint8Array, offsetX: number, c
   const src: Source = {
     l,
     o: { x: l.x + offsetX, y: l.y },
-    blocks: (i: number) => solid[i] === 1 && map.owner[i] >= 0 && (!covered || covered[i] === 1) && !(l.inside && map.owner[i] === l.owner),
+    blocks: (x: number, y: number) => {
+      const i = cellIndex(Math.floor(x), Math.floor(y));
+      if (l.inside && map.owner[i] === l.owner) return false;
+      return pixels ? !!pixels[Math.floor(y * ART) * CELLS_W * ART + Math.floor(x * ART)] : solid[i] === 1 && map.owner[i] >= 0;
+    },
   };
   const raw = new Float32Array(cols * rows);
   for (let sy = 0; sy < rows; sy++) {
@@ -827,7 +862,7 @@ type Point = { x: number; y: number };
 
 /** A light being baked: its flame `o` (maybe nudged) and which cells cast
  * its shadows. */
-type Source = { l: Light; o: Point; blocks: (i: number) => boolean };
+type Source = { l: Light; o: Point; blocks: (x: number, y: number) => boolean };
 
 /** The light reaching sample point (wx, wy), 0 when out of reach or shadowed. */
 function lightAt(src: Source, wx: number, wy: number) {
@@ -838,20 +873,20 @@ function lightAt(src: Source, wx: number, wy: number) {
   return lightFalloff(d, l.radius);
 }
 
-/** Marches from the flame to the sample `d` away: the first solid cell
+/** Marches from the flame to the sample `d` away: the first solid art pixel
  * other than the sample's own casts the shadow (so building faces toward the
  * light glow). */
 function rayBlocked({ o, blocks }: Source, wx: number, wy: number, d: number) {
-  const tcx = Math.floor(wx),
-    tcy = Math.floor(wy);
-  const steps = Math.ceil(d / 0.2);
+  const tcx = Math.floor(wx * ART),
+    tcy = Math.floor(wy * ART);
+  const steps = Math.ceil(d * ART * 2);
   for (let k = 1; k < steps; k++) {
     const px = o.x + ((wx - o.x) * k) / steps,
       py = o.y + ((wy - o.y) * k) / steps;
     const cx = Math.floor(px),
       cy = Math.floor(py);
-    if (cx === tcx && cy === tcy) return false;
-    if (cellInBounds(cx, cy) && blocks(cellIndex(cx, cy))) return true;
+    if (Math.floor(px * ART) === tcx && Math.floor(py * ART) === tcy) return false;
+    if (cellInBounds(cx, cy) && blocks(px, py)) return true;
   }
   return false;
 }

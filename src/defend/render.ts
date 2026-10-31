@@ -1,3 +1,6 @@
+import { CityLife } from "./city-life.ts";
+import { drawCityLife } from "./city-life-art.ts";
+import { torchLevel } from "./city-torches.ts";
 import { worldSky } from "../daylight.ts";
 import { SunShadows } from "./sun-shadows.ts";
 import { BlightGround } from "./blight-art.ts";
@@ -150,6 +153,9 @@ export class DefendRenderer {
   private readonly sky = new SkyPalaceArt();
   readonly atmosphere = new AtmosphereArt();
   private readonly darkDrain = new DarkDrain();
+  readonly cityLife = new CityLife();
+  private lifeSim: DefendSim | null = null;
+  private lifeTime = 0;
   private readonly sunlight = new SunShadows();
   private worldLighting = false;
   private readonly deadPark = new BlightGround();
@@ -355,9 +361,19 @@ export class DefendRenderer {
     this.douse(sim, opts);
     const dt = this.lastNow ? (opts.now - this.lastNow) / 1000 : 0;
     this.lastNow = opts.now;
+    this.lighting.solarTime = sky?.time ?? null;
+    this.cityLife.sync(map, sim, hasForest(this.area));
+    const lifeDt = sim ? (sim === this.lifeSim ? Math.max(0, sim.time - this.lifeTime) : 0) : dt;
+    this.lifeSim = sim; this.lifeTime = sim?.time ?? 0;
+    this.cityLife.update(lifeDt, sky?.time ?? 0, sky ? torchLevel(sky.time,0) > .5 : opts.night > .5, opts.reduceMotion, sim?.enemies ?? []);
     const cityStart = opts.timings ? performance.now() : 0;
     this.drawCity(map, sim, opts, dt);
     if (opts.timings) this.timings.terrainMs += performance.now() - cityStart;
+    if (!sim && sky && opts.weather && opts.night > .001) {
+      this.lighting.update(this.cityLife.solid, [], standing(map, null));
+      if(opts.tint?.strength) { this.ctx.save(); this.ctx.globalCompositeOperation='soft-light'; this.ctx.globalAlpha=opts.tint.strength; this.ctx.fillStyle=opts.tint.color; this.ctx.fillRect(0,0,this.board.W,this.board.H); this.ctx.restore(); }
+      this.drawLighting(map, null, opts.weather, opts); this.lit = true;
+    }
     if (sim) this.advanceWizard(sim);
     if (sim) this.drawBattle(map, sim, opts);
     if (sim) this.atmosphere.draw(this.ctx, this.px, sim, opts.reduceMotion, opts.effects ?? true);
@@ -374,17 +390,11 @@ export class DefendRenderer {
     }
     this.drawKeepFlag(map, sim, opts);
     if (sim) this.drawBattleUnits(sim, opts.weather && !(opts.sun && opts.night === 0) ? this.burning ?? (() => 1) : null, opts);
+    if (this.lit) this.lighting.drawUnitShadows(this.ctx, this.px, this.cityLife.visible, .65);
+    drawCityLife(this.ctx, this.px, this.cityLife, sky?.time ?? 0, opts.now, opts.reduceMotion);
     opts.scenery?.(this.ctx, this.px);
     this.drawTrees(map, sim, opts, dt);
     this.drawForest(sim, opts, dt);
-    if (!sim && sky) {
-      this.ctx.save();
-      const warm = sky.warmth;
-      this.ctx.fillStyle = `rgba(${Math.round(8 + warm * 62)},${Math.round(14 + warm * 20)},${Math.round(38 - warm * 22)},${sky.night * (.72 - warm * .22)})`;
-      this.ctx.fillRect(0, 0, this.board.W, this.board.H);
-      this.ctx.globalCompositeOperation = "soft-light"; this.ctx.globalAlpha = sky.tint.strength; this.ctx.fillStyle = sky.tint.color;
-      this.ctx.fillRect(0, 0, this.board.W, this.board.H); this.ctx.restore();
-    }
     this.ghosts.watch(sim, opts.now / 1000);
     this.ghosts.draw(this.ctx, this.px, opts.now / 1000, opts.reduceMotion);
     if (opts.effects ?? true) this.drawSmoke(map, sim, opts);
@@ -473,7 +483,7 @@ export class DefendRenderer {
     // An outpost's wooden fences stand on the forest's grass, and the gates
     // swing over it.
     if (this.forestShare() > 0) paintFences(ctx, this.px, map, sim, true);
-    if (sim) this.drawGates(map, sim, opts, dt);
+    this.drawGates(map, sim, opts, dt);
     // Park fences sit on the ground layer, under the lighting and units.
     this.fences.sync(map);
     if (sim) this.fences.update(sim);
@@ -506,15 +516,15 @@ export class DefendRenderer {
   /** The city gates swing open while any of the city's people are at
    * them, and shut behind them; the layer shows them shut (a wooden
    * gate's leaves, shut or not, are drawn here over its posts). */
-  private drawGates(map: CityMap, sim: DefendSim, opts: DrawOptions, dt: number) {
+  private drawGates(map: CityMap, sim: DefendSim | null, opts: DrawOptions, dt: number) {
     for (const b of map.buildings) {
       if (b.kind !== "gate" || !b.gate) continue;
-      if (!sim.intact(b)) {
+      if (sim && !sim.intact(b)) {
         this.gateOpen.delete(b.id);
         continue;
       }
       // Open while the sim holds it open to the enemy too, or anyone of the city is at it.
-      const near = sim.gateOpen.has(b.id) || peopleAt(sim, b);
+      const near = !!(sim && (sim.gateOpen.has(b.id) || peopleAt(sim, b))) || this.cityLife.nearGate(b);
       const was = this.gateOpen.get(b.id) ?? 0;
       const open = opts.reduceMotion ? (near ? 1 : 0) : Math.max(0, Math.min(1, was + (near ? 2.5 : -1.5) * Math.min(dt, 0.1)));
       this.gateOpen.set(b.id, open);
@@ -532,7 +542,7 @@ export class DefendRenderer {
   private drawParkLife(map: CityMap, sim: DefendSim | null, opts: DrawOptions, dt: number): Walker[] {
     const rain = !!(sim && opts.weather?.rain);
     this.water.sync(map);
-    const feet = sim ? walkers(sim) : [];
+    const feet = [...(sim ? walkers(sim) : []), ...this.cityLife.visible];
     if (sim?.cold || opts.weather?.snow || (opts.effects ?? true)) this.water.draw({ c: this.ctx, px: this.px, now: opts.now, rain, cold: sim?.cold ?? !!opts.weather?.snow, thawedPonds: sim?.thawedPonds, night: opts.night, walkers: feet, reduceMotion: opts.reduceMotion, layer: this.layer, layerScale: this.layerScale });
     if (sim) {
       if (map !== this.deadParkMap) {
@@ -644,8 +654,8 @@ export class DefendRenderer {
    * battle's weather darkened with the city below them. */
   private drawTrees(map: CityMap, sim: DefendSim | null, opts: DrawOptions, dt: number) {
     this.trees.sync(map);
-    this.trees.update(sim ? beneath(sim) : [], dt, opts.reduceMotion);
-    const dim = sim && opts.weather ? (o: CanvasRenderingContext2D) => {
+    this.trees.update([...(sim ? beneath(sim) : []), ...this.cityLife.visible], dt, opts.reduceMotion);
+    const dim = this.lit && opts.weather ? (o: CanvasRenderingContext2D) => {
       o.fillStyle = `rgba(118,118,118,${opts.weather!.rain ? 0.2 : 0.12})`;
       o.fillRect(0, 0, this.board.W, this.board.H);
       this.lighting.darken(o);
@@ -664,11 +674,11 @@ export class DefendRenderer {
    * battle's blasts, leaning in the wind and darkened like the parks'. */
   private drawForest(sim: DefendSim | null, opts: DrawOptions, dt: number) {
     const alpha = this.forestShare();
-    this.forest.update(sim, sim ? beneath(sim) : [], dt, opts.reduceMotion);
+    this.forest.update(sim, [...(sim ? beneath(sim) : []), ...this.cityLife.visible], dt, opts.reduceMotion);
     if (alpha <= 0) return;
     const w = sim ? opts.weather : null;
     const wind = opts.reduceMotion || !(opts.effects ?? true) ? 0 : w?.rain ? 2 : w && !w.clear ? 1.4 : 1;
-    const shade = sim && opts.weather ? (o: CanvasRenderingContext2D) => {
+    const shade = this.lit && opts.weather ? (o: CanvasRenderingContext2D) => {
       o.fillStyle = `rgba(118,118,118,${opts.weather!.rain ? 0.2 : 0.12})`;
       o.fillRect(0, 0, this.board.W, this.board.H);
       this.lighting.darken(o);
@@ -830,18 +840,19 @@ export class DefendRenderer {
   }
 
   /** Darkness and torchlight, the gravel's lit relief, and the flames. */
-  private drawLighting(map: CityMap, sim: DefendSim, weather: Weather, opts: DrawOptions) {
+  private drawLighting(map: CityMap, sim: DefendSim | null, weather: Weather, opts: DrawOptions) {
     const frame: LightFrame = { px: this.px, now: opts.now, reduceMotion: opts.reduceMotion, intact: standing(map, sim) };
-    const flames = flameLights(sim), mages = mageLights(sim), stabs = stabLights(sim), hero = heroLights(sim), dark = darkLights(sim), meteors = meteorLights(sim);
+    const empty = { carried: [], relief: [] };
+    const flames = sim ? flameLights(sim) : empty, mages = sim ? mageLights(sim) : empty, stabs = sim ? stabLights(sim) : empty, hero = sim ? heroLights(sim) : empty, dark = sim ? darkLights(sim) : empty, meteors = sim ? meteorLights(sim) : empty;
     const ambient = ambientFor(weather, opts.night, this.previousArea ? this.previousWeather : null, this.areaMix);
     if (opts.sun) ambient.alpha *= Math.min(1, opts.night * 3);
     this.lighting.drawLight(this.ctx, frame, ambient, {
-      torches: [...this.carried(sim), ...flames.carried, ...mages.carried, ...stabs.carried, ...hero.carried, ...dark.carried, ...meteors.carried],
-      solid: sim.solid,
-      version: sim.mapVersion,
+      torches: [...(sim ? this.carried(sim) : []), ...this.cityLife.lights(this.lighting.solarTime ?? 0), ...flames.carried, ...mages.carried, ...stabs.carried, ...hero.carried, ...dark.carried, ...meteors.carried],
+      solid: sim?.solid ?? this.cityLife.solid,
+      version: sim?.mapVersion ?? -1,
     });
     this.lighting.drawRelief(this.ctx, this.px, weather.rain ? 0.85 : 0.65);
-    this.drawGroundRelief(map, sim, opts, [...flames.relief, ...mages.relief, ...stabs.relief, ...hero.relief, ...dark.relief, ...raisingLights(sim), ...meteors.relief, ...frostLights(sim), ...reinforceLights(sim)]);
+    if (sim) this.drawGroundRelief(map, sim, opts, [...flames.relief, ...mages.relief, ...stabs.relief, ...hero.relief, ...dark.relief, ...raisingLights(sim), ...meteors.relief, ...frostLights(sim), ...reinforceLights(sim)]);
     this.lighting.drawFlames(this.ctx, frame);
   }
 
@@ -882,4 +893,4 @@ function beneath(sim: DefendSim): (Under & { foot?: boolean })[] {
 }
 
 /** Whether building `id` still stands in the battle. */
-const standing = (map: CityMap, sim: DefendSim) => (id: number) => sim.intact(map.buildings[id]);
+const standing = (map: CityMap, sim: DefendSim | null) => (id: number) => !!map.buildings[id] && (!sim || sim.intact(map.buildings[id]));
