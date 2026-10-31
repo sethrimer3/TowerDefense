@@ -680,7 +680,7 @@ export function drawEnemyArt(b: Brush, e: Enemy, sim: DefendSim, under = b, redu
     drawSprite(b.c, basicUnitSprite(e.kind,true),e.x * b.px - d / 2,e.y * b.px - d / 2,d,d);
   }
   else if (def.siege) drawSiegeEngine(b, e, sim.time);
-  else if (def.boat) drawBoat(b, e, sim.time);
+  else if (def.boat) drawBoat(b, e, sim.time, reduceMotion);
   else drawEnemy(b, e, sim, under);
 }
 

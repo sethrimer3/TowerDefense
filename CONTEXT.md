@@ -778,3 +778,7 @@ A small Blight walker whose deep-orange laser pierces people and structures alon
 
 **Blight Fortress**:
 A medium Blight walker carrying one energy-cannon turret and one piercing-laser turret. Its weapons, legs and armor can be destroyed independently.
+
+
+**Blight ships**:
+The Dark One's counterparts of the eight magic boats: Blight Dinghy, Sailboat, Cutter, Cog, Skiff, Sloop, Galleon and Ark. Their hulls are black, sails orange and rails, runes and bow crystals red. Each retains its original ship's size, strength and water effects.

@@ -20,7 +20,7 @@ import { onPixelArt } from "./pixel-sprites.ts";
  *
  * Foam curls off the bow as it sails. Presentation only: it reads the sim
  * and draws from hashes of the battle's time. */
-import { ENEMIES, type EnemyKind } from "./catalog.ts";
+import { BLIGHT_SHIPS, ENEMIES, type BlightShipKind, type EnemyKind } from "./catalog.ts";
 import { hash01 } from "./grid.ts";
 import type { CarriedLight } from "./lighting.ts";
 import type { Brush } from "./battle-art.ts";
@@ -39,8 +39,11 @@ type Look = {
   sail: [string, string, string];
   rune: [string, string];
   trim: string | null;
+  trimWidth?: number;
   masts: number;
   cabin: boolean;
+  /** Brighter bow-crystal frame; ordinary boats flash white. */
+  crystal?: string;
 };
 
 const LOOK: Partial<Record<EnemyKind, Look>> = {
@@ -53,6 +56,13 @@ const LOOK: Partial<Record<EnemyKind, Look>> = {
   boatCog: { hull: ["#5a4a62", "#382c40", "#201a28"], deck: ["#4a3c52", "#3e3246"], sail: ["#e2b8ff", "#a674e0", "#6a3ea8"], rune: ["#ffc8ff", "#d26aff"], trim: "#f2c94c", masts: 2, cabin: true },
   boatSovereign: { hull: ["#5a4a62", "#382c40", "#201a28"], deck: ["#4a3c52", "#3e3246"], sail: ["#e2b8ff", "#a674e0", "#6a3ea8"], rune: ["#ffc8ff", "#d26aff"], trim: "#f2c94c", masts: 4, cabin: true },
 };
+
+// Reuse every native hull, cabin and mast layout; only its material palette changes.
+for (const [kind, source] of Object.entries(BLIGHT_SHIPS)) {
+  LOOK[kind as BlightShipKind] = { ...LOOK[source]!, hull: ["#000000", "#000000", "#000000"],
+    deck: ["#000000", "#000000"], sail: ["#ffa32f", "#f2760b", "#bc4000"],
+    rune: ["#ff4646", "#a81425"], trim: "#b51c2c", trimWidth: 1.2, crystal: "#ff6860" };
+}
 
 const sprites = new Map<string, HTMLCanvasElement>();
 
@@ -84,7 +94,7 @@ export function boatPixels(kind: EnemyKind, dir: number, frame: number, struck =
         if (Math.abs(v) > w - 1.3 || u > L - 1.6) {
           const nx = -dy * Math.sign(v || 1), ny = dx * Math.sign(v || 1);
           const lit = nx * -0.7 + ny * -0.7 > 0;
-          col = look.trim && Math.abs(v) > w - 0.7 ? look.trim : lit ? look.hull[0] : look.hull[2];
+          col = look.trim && Math.abs(v) > w - (look.trimWidth ?? 0.7) ? look.trim : lit ? look.hull[0] : look.hull[2];
         } else {
           // Deck planks running along the hull, with staggered butt joints.
           const plank = Math.floor((v + half) / 1.8);
@@ -100,7 +110,7 @@ export function boatPixels(kind: EnemyKind, dir: number, frame: number, struck =
           col = edge ? look.hull[2] : v < 0 ? look.hull[0] : look.hull[1];
         }
         // The crystal at the bow.
-        if (Math.abs(u - L * 0.72) < 1.2 && Math.abs(v) < 1.2) col = frame % 2 ? "#ffffff" : look.rune[0];
+        if (Math.abs(u - L * 0.72) < 1.2 && Math.abs(v) < 1.2) col = frame % 2 ? (look.crystal ?? "#ffffff") : look.rune[0];
       }
       // Sails across each mast, bellied toward the bow, the spar behind.
       for (const m of masts) {
@@ -139,7 +149,8 @@ function headingOf(e: Enemy) {
   return ((Math.round((a / (Math.PI * 2)) * DIRS) % DIRS) + DIRS) % DIRS;
 }
 
-export function drawBoat({ c, px }: Brush, e: Enemy, now: number) {
+export function drawBoat({ c, px }: Brush, e: Enemy, now: number, reduceMotion = false) {
+  if (reduceMotion) now = 0;
   const dir = headingOf(e), frame = Math.floor(now * 4 + hash01(e.id, 3) * 4) % 4;
   const cv = sprite(e.kind, dir, frame, e.flash > 0);
   const k = px / SP, w = cv.width * k;
