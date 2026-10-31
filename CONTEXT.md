@@ -704,7 +704,7 @@ A unit outline that shows a burning dimension through it, as if that dimension f
 The world-art unit: one eighth of a board cell, scaled to screen pixels by camera zoom and display density.
 
 **Visibility contour**:
-A perimeter around a combined group of unit bodies, without seams through overlapping bodies. Dark One enemies use a one-art-pixel burning portal contour; player troops use a half-art-pixel dark navy contour. Siege opponents keep crimson, and neutral units black, gold while marked or brood violet.
+A perimeter around a combined group of unit bodies, without seams through overlapping bodies. Dark One enemies use a burning portal contour: half an art pixel for Mini Darklings, three quarters for Darklings and one for larger bodies; player troops use a half-art-pixel dark navy contour. Siege opponents keep crimson, and neutral units black, gold while marked or brood violet.
 
 
 **Contact damage**:

@@ -1,11 +1,11 @@
 /** Vector unions of opaque body pixels. Stroke once per ink, then remove all
  * bodies: overlapping/touching shapes have no interior contour. No frame reads,
  * per-unit canvases, image filters, or pairwise overlap tests. */
-import { PORTAL_CONTOUR_WIDTH, PORTAL_UNIT_INK } from "./art-scale.ts";
+import { UNIT_CONTOUR_ART_PIXELS, PORTAL_CONTOUR_WIDTH, PORTAL_UNIT_INK } from "./art-scale.ts";
 import { paintPortal } from "./portal-noise.ts";
 
 type Ctx = CanvasRenderingContext2D;
-type Stroke = { path: Path2D; width: number; cap: CanvasLineCap; join: CanvasLineJoin; miter: number };
+type Stroke = { path: Path2D; width: number; cap: CanvasLineCap; join: CanvasLineJoin; miter: number; radius?: number; filled?: boolean };
 type Bounds = { x0: number; y0: number; x1: number; y1: number };
 type Channel = { pixels: Path2D[]; pixelBounds: Bounds | null; radius: number; shaped: boolean; mergePixels: boolean; bounds: Bounds | null; faded: boolean; rectangles: Path2D; expanded: Path2D; path: Path2D; strokes: Map<string, Stroke>; canvas: HTMLCanvasElement; c: Ctx };
 export class UnitContours {
@@ -50,6 +50,13 @@ export class UnitContours {
     return channel;
   }
   mergePixelGaps(active = true) { this.pixelMode = active; const channel = this.channel(); if (channel && active) channel.mergePixels = true; }
+  private pixelRadius(channel: Channel, w: number, h: number) {
+    if (!this.pixelMode || this.ink !== PORTAL_UNIT_INK) return channel.radius;
+    const artPixel = this.radius / UNIT_CONTOUR_ART_PIXELS;
+    // 1/2/3+ art-pixel bodies get 0.5/0.75/1 art-pixel rims. Keep one
+    // faction union, with fractional coverage at every camera scale.
+    return Math.min(channel.radius, (Math.min(w, h) + artPixel) / 4);
+  }
   faded() { const channel = this.channel(); if (channel) channel.faded = true; }
   rect(x: number, y: number, w: number, h: number) {
     if (!w || !h) return;
@@ -60,7 +67,7 @@ export class UnitContours {
       const left = Math.min(x0, x1), top = Math.min(y0, y1), width = Math.abs(x1 - x0), height = Math.abs(y1 - y0);
       // Pixel crowds need only a batched union of expanded rectangles, avoiding
       // the stroker's extra geometry for thousands of tiny square bodies.
-      const r = channel.radius;
+      const r = this.pixelRadius(channel, width, height);
       channel.expanded.rect(left - r, top - r, width + 2 * r, height + 2 * r);
       if (this.pixelMode) {
         // Feather the dilation in three nested bands. The center sample in
@@ -77,11 +84,21 @@ export class UnitContours {
       if (box) { box.x0 = Math.min(box.x0, left); box.y0 = Math.min(box.y0, top); box.x1 = Math.max(box.x1, left + width); box.y1 = Math.max(box.y1, top + height); }
       else channel.bounds = { x0: left, y0: top, x1: left + width, y1: top + height };
       if (channel.faded) channel.rectangles.rect(left, top, width, height);
-    } else { const path = new Path2D(); path.rect(x, y, w, h); channel.path.addPath(path, m); channel.shaped = true; }
+    } else { const path = new Path2D(); path.rect(x, y, w, h); this.bodyPath(channel, path, m, w, h); }
+  }
+  /** Artist replacements and rotated pixel bodies use the same widths. */
+  private bodyPath(channel: Channel, path: Path2D, matrix: DOMMatrix, w: number, h: number) {
+    if (this.pixelMode) {
+      const scale = Math.hypot(this.matrix.a, this.matrix.b), radius = this.pixelRadius(channel, Math.abs(w) * scale, Math.abs(h) * scale), key = `body:${radius}`;
+      let stroke = channel.strokes.get(key);
+      if (!stroke) channel.strokes.set(key, (stroke = { path: new Path2D(), width: 0, cap: 'butt', join: 'miter', miter: 10, radius, filled: true }));
+      stroke.path.addPath(path, matrix);
+    } else channel.path.addPath(path, matrix);
+    channel.shaped = true;
   }
   image(path: Path2D, sx: number, sy: number, sw: number, sh: number, x: number, y: number, w: number, h: number) {
     const channel = this.channel(); if (!channel || !sw || !sh) return;
-    channel.path.addPath(path, this.matrix.translate(x, y).scale(w / sw, h / sh).translate(-sx, -sy)); channel.shaped = true;
+    this.bodyPath(channel, path, this.matrix.translate(x, y).scale(w / sw, h / sh).translate(-sx, -sy), w, h);
   }
   path(name: string, args: unknown[]) {
     if (name === 'beginPath') { this.pen = new Path2D(); this.penRects.length = 0; this.rectOnly = true; }
@@ -116,7 +133,7 @@ export class UnitContours {
       c.lineWidth = 2 * channel.radius; c.lineJoin = 'miter'; c.lineCap = 'butt'; c.miterLimit = 10;
       c.stroke(path);
       for (const stroke of strokes.values()) {
-        c.lineWidth = stroke.width + 2 * channel.radius; c.lineCap = stroke.cap; c.lineJoin = stroke.join; c.miterLimit = stroke.miter;
+        c.lineWidth = stroke.width + 2 * (stroke.radius ?? channel.radius); c.lineCap = stroke.cap; c.lineJoin = stroke.join; c.miterLimit = stroke.miter;
         c.stroke(stroke.path);
       }
       c.globalCompositeOperation = 'destination-out';
@@ -126,6 +143,7 @@ export class UnitContours {
         if (!body.faded) continue; // Opaque bodies are already removed by the shared body canvas.
         c.fill(body.path); c.fill(body.rectangles);
         for (const stroke of body.strokes.values()) {
+          if (stroke.filled) { c.fill(stroke.path); continue; }
           c.lineWidth = stroke.width; c.lineCap = stroke.cap; c.lineJoin = stroke.join; c.miterLimit = stroke.miter;
           c.stroke(stroke.path);
         }
