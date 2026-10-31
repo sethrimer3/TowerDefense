@@ -45,8 +45,11 @@ export class HallBackdrop {
   /** Each pane's own brightness, lighter along its top came and darker along its foot. */
   private glassShade = new Float32Array(0);
   private detailed = false;
-  /** Which glazing fills the rose (`ROSES`), changed at midnight. */
+  /** Which glazing fills the rose (`ROSES`), changed at midnight, but only
+   * picked up while the room is out of sight. */
   private rose: Rose = "flower";
+  /** Wall-clock time the room was last fitted, so a gap means it was hidden. */
+  private seen = -Infinity;
   private sunlight: SoftSunlight | null = null;
   private city = new Float32Array(0);
   private outside: { x: number; y: number; radius: number; seed: number }[] = [];
@@ -61,7 +64,11 @@ export class HallBackdrop {
   /** Bakes the wall when the canvas's size changed. */
   private fit(now: number) {
     const w = Math.max(8, Math.ceil(this.canvas.clientWidth / ART)), h = Math.max(8, Math.ceil(this.canvas.clientHeight / ART));
-    const detailed = this.look === "keep" && !legacyGraphics(), rose = detailed ? roseOn(now) : this.rose;
+    const away = !(now - this.seen <= AWAY_MS);
+    this.seen = now;
+    // The glaziers never work while someone's watching: the glazing only
+    // changes when the room comes back into view (or the console pins one).
+    const detailed = this.look === "keep" && !legacyGraphics(), rose = detailed ? roseOverride ?? (away ? roseOn(now) : this.rose) : this.rose;
     if (w === this.w && h === this.h && this.detailed === detailed && this.rose === rose) return false;
     this.detailed = detailed;
     const pierW = pierWidth(w);
@@ -373,6 +380,9 @@ type Pane = { id: number; tint: number };
 export const ROSES = ["flower", "diamonds", "sword", "sky", "cells", "triangles"] as const;
 export type Rose = (typeof ROSES)[number];
 let roseOverride: Rose | null = null;
+/** A gap in drawing longer than this means the room was out of sight (another
+ * tab, or the browser hidden), when the window may take the day's glazing. */
+const AWAY_MS = 1000;
 /** Sets the rose's glazing (the console's `tilesRose`), or null for the night's own. */
 export function setRose(rose: Rose | null) {
   roseOverride = rose;
@@ -385,6 +395,7 @@ const CYCLE = ROSES.filter(r => r !== "flower");
 /** The glazing for wall-clock `now`: one a day, changed at midnight (a
  * quarter `DAY_MS` before the day's turn), each special equally often. */
 export function roseOn(now: number): Rose {
+  // (`HallBackdrop.fit` only asks after the room has been out of sight.)
   if (roseOverride) return roseOverride;
   const night = Math.floor((now + DAY_MS / 4) / DAY_MS), roll = h01(night, 3, 97);
   return CYCLE[Math.min(CYCLE.length - 1, Math.floor(roll * CYCLE.length))];
