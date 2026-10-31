@@ -15,7 +15,13 @@ try {
     const page = await context.newPage(), errors = [];
     page.on('pageerror', e => errors.push(e.message));
     // Midmorning: visible daylight and a modest diagonal solar heading.
-    await page.addInitScript(() => { Date.now = () => 1100000; });
+    await page.addInitScript(() => {
+      Date.now = () => 1100000;
+      localStorage.setItem('towerdefense.v1', JSON.stringify({ version: 7,
+        profile: { name: 'Window Tester', flag: { base: 3, layers: [] } },
+        settings: { soundOff: true, ambienceOff: true },
+      }));
+    });
     await page.goto(base); await page.waitForSelector('#defend-start');
     await page.locator('[data-tab="tiles"]').click();
     await page.waitForSelector('.tiles-grid .tile');

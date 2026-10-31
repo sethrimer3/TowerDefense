@@ -756,4 +756,4 @@ Dead grass and withered vegetation left where the Blight has walked. Repeated pa
 
 
 **Play-time sky**:
-The shared visible day and night, turning once in five minutes of foreground play. It pauses while the game is hidden or closed and can be fixed to Day, Sunset, Dusk, Twilight, Night or Dawn.
+The shared visible day and night, turning once in five minutes of foreground play. It pauses while the game is hidden or closed and can be fixed to Day, Sunset, Dusk, Twilight, Night or Dawn. Faster sun during catch-up optionally runs this shared cycle at five times normal speed while the Mine or Library processes queued idle work.

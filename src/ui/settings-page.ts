@@ -9,7 +9,7 @@ import { LANGUAGES, isLanguage, t } from "../i18n/index.ts";
 /** The settings on the page, in order; each control comes from its row in SETTINGS. */
 /** Gameplay settings, under their own heading first. */
 const GAMEPLAY = ["showEmpty", "raiseDrag", "magnifier", "tripleTapFlag"] as const satisfies readonly SettingKey[];
-const PAGE = ["pixelArt", "legacyGraphics", "dayNightCycle", "reduceMotion", "effectsOff", "simpleEnemies", "simpleTroops", "mergedOutlines", "crispZoom", "tileGrid", "soundOff", "ambienceOff", "pixelFont"] as const satisfies readonly SettingKey[];
+const PAGE = ["pixelArt", "legacyGraphics", "dayNightCycle", "fasterSunCatchup", "reduceMotion", "effectsOff", "simpleEnemies", "simpleTroops", "mergedOutlines", "crispZoom", "tileGrid", "soundOff", "ambienceOff", "pixelFont"] as const satisfies readonly SettingKey[];
 /** The dev options, under ALL ON. */
 const DEV = ["devMode", "devTowers", "devJournal", "instantResearch"] as const satisfies readonly SettingKey[];
 /** All research unlocked: the Smithy's rows and each skill tree. */
@@ -21,7 +21,8 @@ type PageKey = (typeof GAMEPLAY)[number] | (typeof PAGE)[number] | (typeof ALL_D
 function checkbox(key: PageKey, ctx: AppContext): string {
   const row = SETTINGS[key], value = ctx.save().settings[key];
   const checked = "invert" in row.page ? !value : value;
-  return `<input type="checkbox" id="${row.page.id}" ${checked ? "checked" : ""}>`;
+  const disabled = key === "fasterSunCatchup" && !ctx.save().settings.dayNightCycle;
+  return `<input type="checkbox" id="${row.page.id}" ${checked ? "checked" : ""} ${disabled ? "disabled" : ""}>`;
 }
 /** One toggle, labelled. */
 const control = (key: PageKey, ctx: AppContext) => `<label class="setting">${t(`setting.${key}`)}${checkbox(key, ctx)}</label>`;
@@ -54,7 +55,7 @@ export function renderSettingsPage(ctx: AppContext) {
     `<h3 class="settings-group">${t("settings.gameplay")}</h3>` +
     GAMEPLAY.map((key) => control(key, ctx)).join("") +
     `<h3 class="settings-group">${t("settings.display")}</h3>` +
-    PAGE.map((key) => control(key, ctx) + (key === "tileGrid" ? gridControls(ctx) : key === "dayNightCycle" ? daylightControls(ctx) : "")).join("") +
+    PAGE.map((key) => control(key, ctx) + (key === "tileGrid" ? gridControls(ctx) : key === "dayNightCycle" ? daylightControls(ctx) : key === "fasterSunCatchup" ? `<p class="hint">${t("settings.fasterSunCatchupHint")}</p>` : "")).join("") +
     control("developerMode", ctx) +
     (settings.developerMode ? `<h3 class="settings-group">${t("settings.dev")}</h3>` +
     `<label class="setting setting-all">${t("settings.allOn")}<input type="checkbox" id="dev-all" ${allOn ? "checked" : ""}></label>` +
@@ -78,7 +79,10 @@ export function renderSettingsPage(ctx: AppContext) {
       settings[key] = "invert" in row.page ? !input.checked : input.checked;
       if ((ALL_DEV as readonly SettingKey[]).includes(key)) ctx.devChanged();
       else ctx.update();
-      if (key === "dayNightCycle") (el("time-of-day") as HTMLSelectElement).disabled = input.checked;
+      if (key === "dayNightCycle") {
+        (el("time-of-day") as HTMLSelectElement).disabled = input.checked;
+        (el("faster-sun-catchup") as HTMLInputElement).disabled = !input.checked;
+      }
       if (key === "tileGrid") {
         el("grid-opacity-row").hidden = !input.checked;
         el("grid-color-row").hidden = !input.checked;

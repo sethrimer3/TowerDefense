@@ -1,4 +1,4 @@
-import { visualTime, worldSky } from "../daylight.ts";
+import { skyAtTime, worldSky } from "../daylight.ts";
 /** The walls behind the in-world menus, as lit pixel art: the Smithy's worn
  * oak boards, the Study's vault stone and the keep's hall with its great
  * window. Each wall is baked once a size (colour and a height map, at `ART`
@@ -12,7 +12,7 @@ import { getTorchFlicker, getTorchSway } from "../lighting.ts";
 import { DAY_MS } from "../daylight.ts";
 import { FLAME, OUTLINE, puff } from "../defend/pixel-fx.ts";
 import { pixelArtOn } from "../defend/pixel-sprites.ts";
-import { SoftSunlight, SUNLIGHT } from "../soft-sunlight.ts";
+import { SoftSunlight, SUNLIGHT, windowSunlight } from "../soft-sunlight.ts";
 
 type RGB = [number, number, number];
 /** Screen (CSS) pixels to an art pixel. */
@@ -323,8 +323,9 @@ export class HallBackdrop {
     if (this.look !== "keep" || day <= 0.02 || !cw || !ch) return;
     this.sunlight ??= new SoftSunlight(SUNLIGHT.hallDensity, SUNLIGHT.hallFade);
     const { win, h } = this, clock = reduced ? 0 : now, span = win.x1 - win.x0 - 8;
-    const tilt = reduced ? 0.2 : Math.sin((visualTime(now) / DAY_MS) * Math.PI * 2 - Math.PI / 2) * 0.55
-      + Math.sin(now / SUNLIGHT.swayMs) * SUNLIGHT.sway + Math.sin(now / SUNLIGHT.hallSwayMs) * SUNLIGHT.hallSway;
+    const solar = windowSunlight(worldSky() ?? skyAtTime(now));
+    const tilt = reduced ? 0.2 : solar.tilt;
+    day = Math.min(day, solar.strength);
     const beams = 5, width = span / beams, top = win.y0 + (win.y1 - win.y0) * 0.6, length = h - top;
     ctx.save();
     ctx.scale(cw / this.w, ch / this.h);

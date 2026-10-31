@@ -1,19 +1,27 @@
 /** Atmospheric light only: a cached, feathered density field, screen-blended
  * over crisp scene art. No full-scene blur, frame allocations or new clocks. */
+import type { DaySky } from "./daylight.ts";
 export const SUNLIGHT = {
   density: 0.18,
   feather: 0.18,
   spread: 0.85,
   distanceFade: 1.7,
-  sway: 0.025,
-  swayMs: 28000,
-  /** The Tiles hall: denser shafts, a slower, wider sway and more dust. */
+  /** The Tiles hall: denser shafts, gentler distance fade and more dust. */
   hallDensity: 0.5,
   hallFade: 0.9,
-  hallSway: 0.09,
-  hallSwayMs: 11000,
   dustCount: 70,
 } as const;
+
+/** Rays travel away from the actual sun: right at dawn, vertical at noon,
+ * left at sunset. Fade out at the horizon before the nighttime return;
+ * fixed times have fixed headings, without a second oscillating clock. */
+export function windowSunlight(sky: Pick<DaySky, "sunX" | "altitude" | "daylight">) {
+  const altitude = Math.max(0, Math.min(1, sky.altitude));
+  return {
+    tilt: sky.sunX === 0 ? 0 : -sky.sunX * (.25 + .8 * (1 - altitude)),
+    strength: sky.daylight * Math.min(1, altitude / .16),
+  };
+}
 
 const TINTS = [[255, 244, 222], [226, 239, 255], [255, 238, 202]] as const;
 

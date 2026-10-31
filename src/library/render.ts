@@ -1,4 +1,4 @@
-import { visualTime, worldSky } from "../daylight.ts";
+import { skyAtTime, worldSky } from "../daylight.ts";
 /** Draws the Library: a cathedral nave in pixels, one pixel a world unit,
  * scaled up crisp. The stone walls are lit by their torches through a bump
  * map, the technique Defend's flagstones use (`defend/ground-relief.ts`):
@@ -32,8 +32,8 @@ import { ELIXIRS } from "./lab.ts";
 import { HATCH_Y, LabRenderer } from "./lab-render.ts";
 import { LAB_TOP } from "./geometry.ts";
 import { PILLAR_OUTLINE, ashlar, facing, pillarShade } from "./ashlar.ts";
-import { shaftAt, SoftSunlight, SUNLIGHT } from "../soft-sunlight.ts";
-import { DAY_MS, daylight } from "../daylight.ts";
+import { shaftAt, SoftSunlight, SUNLIGHT, windowSunlight } from "../soft-sunlight.ts";
+import { daylight } from "../daylight.ts";
 export { DAY_MS, daylight } from "../daylight.ts";
 
 /** Each role's robe. */
@@ -596,10 +596,10 @@ export class LibraryRenderer {
     this.resize();
   }
 
-  draw(sim: LibrarySim, now: number, time: number, effects: boolean) {
-    // Flames flicker on the wall clock, so they stay calm while the library
-    // fast-forwards through idle time.
-    this.flame = this.lab.flame = performance.now() / 1000;
+  draw(sim: LibrarySim, now: number, time: number, effects: boolean, animationTime = performance.now()) {
+    // Ambient animation follows frame time, independently of the economic
+    // clock that fast-forwards through queued idle work.
+    this.flame = this.lab.flame = animationTime / 1000;
     const day = daylight(now);
     const dt = this.lastTime < 0 ? 0 : Math.min(0.2, Math.max(0, time - this.lastTime));
     this.lastTime = time;
@@ -668,8 +668,10 @@ export class LibraryRenderer {
     const top = -oy / scale, bottom = (this.canvas.height - oy) / scale, labShown = LabRenderer.visible(top, bottom);
     if (labShown) this.lab.draw(ctx, sim, this.flame, wallDt, effects);
     this.drawTrapdoor();
-    if (day < 0.6) this.drawStars(now, 1 - day / 0.6);
-    if (effects && day > 0.02) this.drawRays(now, day);
+    const sunlight = windowSunlight(worldSky() ?? skyAtTime(now));
+    if (day < 0.6) this.drawStars(animationTime, 1 - day / 0.6);
+    if (effects && sunlight.strength > 0) this.drawRays(animationTime, sunlight.strength, sunlight.tilt);
+    else this.motes.length = 0;
     for (const r of sim.remains) this.drawRemains(r.x, Math.min(1, (600 - (sim.time - r.at)) / 30));
     this.drawRunes(sim);
     this.drawButts(sim);
@@ -964,9 +966,8 @@ export class LibraryRenderer {
   }
 
   /** Sunbeams from the window, slanting with the hour, and dust in them. */
-  private drawRays(now: number, day: number) {
-    const ctx = this.ctx, tilt = Math.sin((visualTime(now) / DAY_MS) * Math.PI * 2 - Math.PI / 2) * 0.55
-      + Math.sin(now / SUNLIGHT.swayMs) * SUNLIGHT.sway;
+  private drawRays(animationTime: number, strength: number, tilt: number) {
+    const ctx = this.ctx;
     ctx.save();
     // The light stays in the nave: never out past its walls or under its floor.
     ctx.beginPath();
@@ -975,9 +976,9 @@ export class LibraryRenderer {
     const shafts: Shaft[] = [];
     for (let k = 0; k < 5; k++) {
       const a = WINDOW.x0 + 3 + k * 8, b = a + 6, top = HEAD + 6 + (k % 2) * 10, len = FLOOR - top;
-      const pulse = 0.75 + 0.25 * Math.sin(now / (3100 + k * 700) + k);
-      shafts.push({ x: (a + b) / 2, y: top, width: b - a, length: len, strength: day * pulse });
-      this.sunlight.draw(ctx, (a + b) / 2, top, b - a, len, tilt, day * pulse, k);
+      const pulse = 0.75 + 0.25 * Math.sin(animationTime / (3100 + k * 700) + k);
+      shafts.push({ x: (a + b) / 2, y: top, width: b - a, length: len, strength: strength * pulse });
+      this.sunlight.draw(ctx, (a + b) / 2, top, b - a, len, tilt, strength * pulse, k);
     }
     // How strongly the sun lights the dust at a point: the brightest beam
     // there, and none at all outside the nave, where it is dark.
@@ -988,7 +989,7 @@ export class LibraryRenderer {
       return most;
     };
     // New motes come in at a beam's edge, unseen, and brighten as the light takes them.
-    while (day > 0 && this.motes.length < DUST.count) {
+    while (strength > 0 && this.motes.length < DUST.count) {
       const s = shafts[Math.floor(this.fx() * shafts.length)], along = 0.1 + this.fx() * 0.6;
       const side = this.fx() < 0.5 ? -1 : 1, edge = SUNLIGHT.feather * (1 + along * SUNLIGHT.spread) * (1.2 + this.fx() * 0.8);
       const y = s.y + along * s.length, x = s.x + tilt * (y - s.y) + side * edge * s.width * 1.8;

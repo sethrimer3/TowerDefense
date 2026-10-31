@@ -34,6 +34,8 @@ try {
     const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem('towerdefense.v1')));
     await settings();
     assert.equal(await page.locator('#day-night-cycle').isChecked(), true);
+    assert.equal(await page.locator('#faster-sun-catchup').isChecked(), true);
+    await page.locator('#faster-sun-catchup').uncheck();
     assert.equal(await page.locator('#time-of-day').isDisabled(), true);
     assert.equal((await sky()).phase, 'day', 'a new game starts in daylight');
     await page.locator('#day-night-cycle').uncheck();
@@ -68,6 +70,8 @@ try {
     await settings();
     assert.equal(await page.locator('#day-night-cycle').isChecked(), false);
     assert.equal(await page.locator('#time-of-day').inputValue(), 'night');
+    assert.equal(await page.locator('#faster-sun-catchup').isChecked(), false);
+    assert.equal(await page.locator('#faster-sun-catchup').isDisabled(), true);
     assert.equal((await sky()).phase, 'night');
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'settings fit on a phone');
     await page.screenshot({ path: `test-results/day-cycle-${width}-settings.png` });
