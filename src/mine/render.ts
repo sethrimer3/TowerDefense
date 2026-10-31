@@ -312,8 +312,7 @@ export class MineRenderer {
         }
         const passable = isPassable(m), inSky = passable && y < surface[x];
         if (inSky && m === AIR) {
-          const sunDistance = scene && scene.altitude > 0 ? (x - sunX) ** 2 + (y - sunY) ** 2 : Infinity;
-          let c = sunDistance < 10 ? pack(scene!.warmth > .1 ? [255, 204, 122] : [255, 244, 198], 1) : sunDistance < 36 ? pack(mix(skyRgb, [255, 199, 119], (1 - sunDistance / 36) * .3), 1) : skyPx;
+          let c = skyPx;
           if (water[i]) {
             const rgb = mix(WATER_RGB, skyRgb, 0.3).map((v) => v * (0.35 + 0.65 * open)) as RGB;
             c = pack(rgb, 1);
@@ -483,6 +482,26 @@ export class MineRenderer {
             }
           }
           px[o + sy * W2 + sx] = pack3(c[0] * k * lr[q], c[1] * k * lg[q], c[2] * k * lb[q]);
+        }
+      }
+    }
+    if (scene && scene.altitude > 0) {
+      // Anchor one circle to the native half-cell pixel lattice. Sampling
+      // whole cells around a fractional centre used to deform it in motion.
+      // Paint after stars, so its opaque disc always covers them and its
+      // translucent halo warms the starlight behind it.
+      const sx = Math.round(sunX * 2), sy = Math.round(sunY * 2);
+      const disc = pack(scene.warmth > .1 ? [255, 204, 122] : [255, 244, 198], 1);
+      for (let y = Math.max(y0 * 2, sy - 12); y < Math.min(y1 * 2, sy + 12); y++) {
+        for (let x = Math.max(0, sx - 12); x < Math.min(W2, sx + 12); x++) {
+          const cx = x >> 1, cy = y >> 1, i = idx(cx, cy);
+          if (cy >= surface[cx] || cells[i] !== AIR || water[i] || burn[i]) continue;
+          const d = ((x + .5 - sx) ** 2 + (y + .5 - sy) ** 2) / 4, at = y * W2 + x;
+          if (d < 10) px[at] = disc;
+          else if (d < 36) {
+            const a = (1 - d / 36) * .3, c = px[at];
+            px[at] = pack3((c & 255) * (1 - a) + 255 * a, ((c >>> 8) & 255) * (1 - a) + 199 * a, ((c >>> 16) & 255) * (1 - a) + 119 * a);
+          }
         }
       }
     }
