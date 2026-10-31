@@ -689,7 +689,7 @@ A weak Dark One enemy consisting of one dark pixel.
 A Dark One enemy consisting of a two-by-two black pixel square, splitting into two Mini Darklings when defeated.
 
 **Color drain**:
-The gradual loss of color and contrast around a dense group of Dark One enemies, strongest at the group's center and fading toward the edges.
+The gradual loss of color, with tonal contrast preserved, around a dense group of Dark One enemies, strongest at the group's center and fading toward the edges.
 
 **Large Darkling**:
 A Dark One enemy consisting of a three-by-three black pixel square, splitting into two Darklings when defeated.
@@ -714,8 +714,8 @@ Damage dealt by an enemy pressing against a structure, with its visibility conto
 A PNG, one pixel an art pixel and without an outline, that replaces the game's own drawn art for one piece of the city; the game still paints its damage, rubble and outline.
 
 
-**Dark crimson glow**:
-The steady night halo around Dark One enemies, brighter and wider where they gather and fading with distance and daylight.
+**Blight night glow**:
+The dim, deep neon orange halo around Dark One enemies at night, brighter and wider where they gather and fading with distance. It is absent during day, sunset, dusk, twilight and dawn.
 
 
 **Blight**:
