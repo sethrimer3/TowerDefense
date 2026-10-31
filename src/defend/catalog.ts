@@ -1067,7 +1067,13 @@ export const HOUSE_HP_PER_CELL = 22;
 
 export type ZoneReinforcementKind = "fernMantis" | "mossTroll" | "lanternHornet" | "glassJackal" | "duneTortoise" | "dustDjinn" | "cinderImp" | "slagGolem" | "emberMoth" | "kelpStalker" | "capCrawler" | "myceliumHulk" | "rotMite" | "geodeCrab" | "prismMoth" | "shardBrood" | "cryptHound" | "graveWisp" | "novaMoth";
 export type ZoneEnemyKind = ZoneReinforcementKind | "briarling" | "mossBoar" | "rootTreant" | "duneScorpion" | "sunScarab" | "sandVulture" | "brineCrab" | "lanternJelly" | "coralGuardian" | "sporeling" | "fungalBrute" | "sporeMoth" | "shardling" | "crystalSentinel" | "prismRay" | "starWisp" | "cometHound" | "astralWarden";
-export type EnemyKind = "blightCannon" | "blightLance" | "blightFortress" | "blightDart" | "blightPrism" | "greaterBlightPrism" | "miniDarkling" | "darkling" | "largeDarkling" | "majorDarkling" | "significantDarkling" | "blightWorm" | ZoneEnemyKind | "iceGolem" | "iceCube" | "roach" | "orc" | "ogre" | "bat" | "warlord" | "mother" | "broodling" | "snake" | "dragon" | "shieldBearer" | "aegis" | "darkKnight" | "bombOrc" | "bombBird" | "voidSparrow" | "shieldLesser" | "shieldGreater" | "poisonLesser" | "poisonBearer" | "poisonGreater" | "poisonSovereign" | "siegeBeetle" | "burrowingMole" | "necromancer" | "skeleton" | "bannerCaptain" | "mirrorKnight" | "leechSwarm" | "ashPhoenix" | "phoenixEgg" | "blinkImp" | "fortressHut" | "fortressOutpost" | "fortressTower" | "fortressKeep" | "fortressLesser" | "fortress" | "fortressGreater" | "fortressSovereign" | "rollingCannon" | "ballista" | "fireworkLauncher" | "trebuchet" | "bombard" | "rocketBattery" | "boatDinghy" | "boatSailboat" | "boatCutter" | "boatCog" | "boatLesser" | "boat" | "boatGreater" | "boatSovereign";
+/** Blight counterparts use the same hulls, statistics and water rules. */
+export const BLIGHT_SHIPS = {
+  blightDinghy: "boatDinghy", blightSailboat: "boatSailboat", blightCutter: "boatCutter", blightCog: "boatCog",
+  blightSkiff: "boatLesser", blightSloop: "boat", blightGalleon: "boatGreater", blightArk: "boatSovereign",
+} as const;
+export type BlightShipKind = keyof typeof BLIGHT_SHIPS;
+export type EnemyKind = BlightShipKind | "blightCannon" | "blightLance" | "blightFortress" | "blightDart" | "blightPrism" | "greaterBlightPrism" | "miniDarkling" | "darkling" | "largeDarkling" | "majorDarkling" | "significantDarkling" | "blightWorm" | ZoneEnemyKind | "iceGolem" | "iceCube" | "roach" | "orc" | "ogre" | "bat" | "warlord" | "mother" | "broodling" | "snake" | "dragon" | "shieldBearer" | "aegis" | "darkKnight" | "bombOrc" | "bombBird" | "voidSparrow" | "shieldLesser" | "shieldGreater" | "poisonLesser" | "poisonBearer" | "poisonGreater" | "poisonSovereign" | "siegeBeetle" | "burrowingMole" | "necromancer" | "skeleton" | "bannerCaptain" | "mirrorKnight" | "leechSwarm" | "ashPhoenix" | "phoenixEgg" | "blinkImp" | "fortressHut" | "fortressOutpost" | "fortressTower" | "fortressKeep" | "fortressLesser" | "fortress" | "fortressGreater" | "fortressSovereign" | "rollingCannon" | "ballista" | "fireworkLauncher" | "trebuchet" | "bombard" | "rocketBattery" | "boatDinghy" | "boatSailboat" | "boatCutter" | "boatCog" | "boatLesser" | "boat" | "boatGreater" | "boatSovereign";
 export type EnemyDef = {
   kind: EnemyKind;
   /** Allegiance controls the crowd color drain, never inferred from sprite color. */
@@ -1134,6 +1140,23 @@ export type BoatDef = { tier: number; water: number; walls?: boolean; keep?: boo
  * in `radius`. `people` engines shoot defenders before buildings. `damage`
  * and `cooldown` are the enemy's own (per rocket, per volley). */
 export type SiegeDef = { shot: "ball" | "stone" | "bolt" | "rocket"; range: number; radius: number; volley?: number; spread?: number; people?: boolean };
+
+const BOAT_ENEMIES: Record<(typeof BLIGHT_SHIPS)[BlightShipKind], EnemyDef> = {
+  boatDinghy: { kind: "boatDinghy", name: "Runed Dinghy", hp: 20, speed: 1.3, damage: 3, cooldown: 1.2, size: .6, color: "#6d4a2c", distraction: 0, flying: false, boat: { tier: 1, water: .8, decorativeWater: true }, cost: 5 },
+  boatSailboat: { kind: "boatSailboat", name: "Charmbound Sailboat", hp: 35, speed: 1.15, damage: 5, cooldown: 1.2, size: .8, color: "#5a3e28", distraction: 0, flying: false, boat: { tier: 2, water: 1, decorativeWater: true }, cost: 10 },
+  boatCutter: { kind: "boatCutter", name: "Mystic Cutter", hp: 110, speed: 1, damage: 10, cooldown: 1.2, size: 1, color: "#46302a", distraction: 0, flying: false, boat: { tier: 3, water: 1.2, decorativeWater: true }, cost: 50 },
+  boatCog: { kind: "boatCog", name: "Arcane Cog", hp: 210, speed: .9, damage: 16, cooldown: 1.2, size: 1.2, color: "#2a2230", distraction: 0, flying: false, boat: { tier: 4, water: 1.4, decorativeWater: true }, cost: 100 },
+  boatLesser: { kind: "boatLesser", name: "Enchanted Skiff", hp: 1500, speed: 0.75, damage: 40, cooldown: 1.2, size: 1.4, color: "#6d4a2c", distraction: 0, flying: false, boat: { tier: 1, water: 1.6 }, cost: 1000 },
+  boat: { kind: "boat", name: "Spellbound Sloop", hp: 7000, speed: 0.7, damage: 120, cooldown: 1.2, size: 2, color: "#5a3e28", distraction: 0, flying: false, boat: { tier: 2, water: 2.4 }, cost: 10000 },
+  boatGreater: { kind: "boatGreater", name: "Arcane Galleon", hp: 35000, speed: 0.62, damage: 300, cooldown: 1.2, size: 2.8, color: "#46302a", distraction: 0, flying: false, boat: { tier: 3, water: 3.3, walls: true }, cost: 100000 },
+  boatSovereign: { kind: "boatSovereign", name: "Deluge Ark", hp: 160000, speed: 0.55, damage: 800, cooldown: 1.2, size: 3.8, color: "#2a2230", distraction: 0, flying: false, boat: { tier: 4, water: 4.4, walls: true, keep: true }, cost: 1000000 },
+};
+
+function blightShip(kind: BlightShipKind, name: string): EnemyDef {
+  const source = BOAT_ENEMIES[BLIGHT_SHIPS[kind]];
+  return { ...source, kind, name, faction: "darkOne", scriptedOnly: true, color: "#000000", boat: { ...source.boat! },
+    description: `A Blight counterpart of the ${source.name}: a black hull with orange sails, red rails, runes and a red bow crystal, edged by the burning dimension. Retains its original ship's size, strength, movement and water effects.` };
+}
 
 export const ENEMIES: Record<EnemyKind, EnemyDef> = {
   fernMantis: { kind: "fernMantis", name: "Fern Mantis", hp: 28, speed: 2.4, damage: 4, cooldown: .45, size: .5, color: "#7caf6d", distraction: .1, flying: false, cost: 3, description: "A fragile leaf hunter with rapid scythe strikes. Stop it with ranged fire before it reaches your soldiers." },
@@ -1226,14 +1249,15 @@ export const ENEMIES: Record<EnemyKind, EnemyDef> = {
   bombard: { kind: "bombard", name: "Great Bombard", hp: 2600, speed: 0.6, damage: 220, cooldown: 5, size: 1.4, color: "#4a4e57", distraction: 0, flying: false, siege: { shot: "ball", range: 9, radius: 1.9 }, cost: 12000 },
   rocketBattery: { kind: "rocketBattery", name: "Dragonfire Battery", hp: 2000, speed: 0.7, damage: 35, cooldown: 6, size: 1.4, color: "#8c2a24", distraction: 0, flying: false, siege: { shot: "rocket", range: 10, radius: 0.9, volley: 16, spread: 3 }, cost: 30000 },
 
-  boatDinghy: { kind: "boatDinghy", name: "Runed Dinghy", hp: 20, speed: 1.3, damage: 3, cooldown: 1.2, size: .6, color: "#6d4a2c", distraction: 0, flying: false, boat: { tier: 1, water: .8, decorativeWater: true }, cost: 5 },
-  boatSailboat: { kind: "boatSailboat", name: "Charmbound Sailboat", hp: 35, speed: 1.15, damage: 5, cooldown: 1.2, size: .8, color: "#5a3e28", distraction: 0, flying: false, boat: { tier: 2, water: 1, decorativeWater: true }, cost: 10 },
-  boatCutter: { kind: "boatCutter", name: "Mystic Cutter", hp: 110, speed: 1, damage: 10, cooldown: 1.2, size: 1, color: "#46302a", distraction: 0, flying: false, boat: { tier: 3, water: 1.2, decorativeWater: true }, cost: 50 },
-  boatCog: { kind: "boatCog", name: "Arcane Cog", hp: 210, speed: .9, damage: 16, cooldown: 1.2, size: 1.2, color: "#2a2230", distraction: 0, flying: false, boat: { tier: 4, water: 1.4, decorativeWater: true }, cost: 100 },
-  boatLesser: { kind: "boatLesser", name: "Enchanted Skiff", hp: 1500, speed: 0.75, damage: 40, cooldown: 1.2, size: 1.4, color: "#6d4a2c", distraction: 0, flying: false, boat: { tier: 1, water: 1.6 }, cost: 1000 },
-  boat: { kind: "boat", name: "Spellbound Sloop", hp: 7000, speed: 0.7, damage: 120, cooldown: 1.2, size: 2, color: "#5a3e28", distraction: 0, flying: false, boat: { tier: 2, water: 2.4 }, cost: 10000 },
-  boatGreater: { kind: "boatGreater", name: "Arcane Galleon", hp: 35000, speed: 0.62, damage: 300, cooldown: 1.2, size: 2.8, color: "#46302a", distraction: 0, flying: false, boat: { tier: 3, water: 3.3, walls: true }, cost: 100000 },
-  boatSovereign: { kind: "boatSovereign", name: "Deluge Ark", hp: 160000, speed: 0.55, damage: 800, cooldown: 1.2, size: 3.8, color: "#2a2230", distraction: 0, flying: false, boat: { tier: 4, water: 4.4, walls: true, keep: true }, cost: 1000000 },
+  ...BOAT_ENEMIES,
+  blightDinghy: blightShip("blightDinghy", "Blight Dinghy"),
+  blightSailboat: blightShip("blightSailboat", "Blight Sailboat"),
+  blightCutter: blightShip("blightCutter", "Blight Cutter"),
+  blightCog: blightShip("blightCog", "Blight Cog"),
+  blightSkiff: blightShip("blightSkiff", "Blight Skiff"),
+  blightSloop: blightShip("blightSloop", "Blight Sloop"),
+  blightGalleon: blightShip("blightGalleon", "Blight Galleon"),
+  blightArk: blightShip("blightArk", "Blight Ark"),
   blightCannon: { kind: "blightCannon", name: "Blight Cannon", faction: "darkOne", scriptedOnly: true, blightFortress: "cannon", hp: 140, speed: .8, damage: 14, cooldown: 2.4, size: 1.5, color: "#000000", distraction: 0, flying: false, cost: 120, fortress: { tier: 1, turrets: 1, legs: 4, armor: 2, height: 1.5, partHp: 24, partScale: .65 }, description: "A small black walking fortress edged by the burning dimension. Orange motes turn at right angles inside its square body, fading behind them and renewing at random edges. Its turret fires orange energy cannonballs that burst on impact. Break its armor to expose the core; lost legs slow it and a destroyed turret stops firing." },
   blightLance: { kind: "blightLance", name: "Blight Lance", faction: "darkOne", scriptedOnly: true, blightFortress: "laser", hp: 120, speed: .85, damage: 10, cooldown: 2, size: 1.5, color: "#000000", distraction: 0, flying: false, cost: 120, fortress: { tier: 1, turrets: 1, legs: 4, armor: 2, height: 1.5, partHp: 22, partScale: .65 }, description: "A small black walking fortress with restless orange right-angle trails in its square body. A deep-orange laser pierces every defender and structure along its full firing line. Dismantle its turret, legs and armor to silence, slow and expose it." },
   blightFortress: { kind: "blightFortress", name: "Blight Fortress", faction: "darkOne", scriptedOnly: true, blightFortress: "dual", hp: 600, speed: .65, damage: 28, cooldown: 2.4, size: 2.5, color: "#000000", distraction: 0, flying: false, cost: 600, fortress: { tier: 2, turrets: 2, legs: 4, armor: 2, height: 2.5, partHp: 85, partScale: .9 }, description: "A medium black square fortress on walking legs, edged by the burning dimension and filled with orange right-angle particle trails. Two independent turrets carry an orange energy cannon and a piercing deep-orange laser. Destroy its armor to expose the core, its legs to slow it, or either turret to stop that weapon." },

@@ -1,6 +1,6 @@
 import { AREAS } from "./areas.ts";
 import { AREA_ENEMIES } from "./area-enemies.ts";
-import { ENEMIES, type EnemyKind } from "./catalog.ts";
+import { BLIGHT_SHIPS, ENEMIES, type EnemyKind } from "./catalog.ts";
 
 /** The enemy journal's button: a bestiary bound in oxblood leather, a
  * skull with burning eyes on its cover and gold on its corners, outlined in
@@ -72,6 +72,7 @@ export function journalHTML(discovered: EnemyKind[]): string {
     const roster = new Set(AREA_ENEMIES[area.id]);
     // Authored opening enemies do not enter the legacy procedural roster.
     if (area.id === "moss") { roster.add("darkling"); roster.add("miniDarkling"); roster.add("largeDarkling"); roster.add("majorDarkling"); roster.add("significantDarkling"); roster.add("blightWorm"); roster.add("blightDart"); roster.add("blightPrism"); roster.add("greaterBlightPrism"); roster.add("blightCannon"); roster.add("blightLance"); roster.add("blightFortress"); }
+    if (area.id === "moss") for (const kind of Object.keys(BLIGHT_SHIPS) as EnemyKind[]) roster.add(kind);
     // Raised and hatched enemies belong beside their parent species.
     if (roster.has("necromancer")) roster.add("skeleton");
     if (roster.has("ashPhoenix")) roster.add("phoenixEgg");

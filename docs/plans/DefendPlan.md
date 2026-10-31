@@ -48,3 +48,5 @@ Add Defend items here in the form: **What** (one line), **Why**, **Files**, **Te
 
 - [x] Thin the Mini Darkling portal rim to 0.5 art pixel and the 2 × 2 Darkling rim to 0.75, retaining a shared noise/infill union in normal/Simple art and portraits.
 - [x] Add black square Blight walking fortresses: small energy cannon, small piercing laser, and medium dual-turret variants, with the shared noise perimeter and fixed orange orthogonal particles with fading tails and edge replacement. Native destructible parts; catalog/journal/art support. `blight-fortress.ts`, `blight-fortress-art.ts`, `blight-fortress-particles.ts`; combat/particle Node tests and desktop/phone browser checks. Authored wave placement remains for a later composition pass.
+
+- [x] Add Blight counterparts of all eight ships, directly reusing native stats, hull geometry, mast/cabin layouts and water/ice/ramming/sinking behavior. Black hulls, orange sails, red features and shared portal contours; journal, exports and Reduce Motion. `catalog.ts`, `boat-art.ts`; Node parity tests and desktop/phone comparison gallery. Wave placement remains pending.
