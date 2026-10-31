@@ -94,3 +94,7 @@ Suggested order: 1 (fences) and 2 (strike quick bar) first, since Ambush's outpo
 - [x] Add warm sunset light, distinct dusk/twilight/night, a sun moving across the Mine sky and changing city/forest shadows using existing pixel art and cached height maps.
 - [x] Keep offline production, worker schedules, battle RNG and replay fixtures unchanged.
 - [x] Verify pure timing/visibility, sky phases, save decoding, directional shadows, and actual desktop/phone controls, phase colors, persistence and hidden-tab pause.
+
+- [x] Correct Library/Tiles window rays to follow the actual shared sun position, with a full one-way daylight sweep and horizon fade. Keep Library pulses/stars on ordinary frame animation time so idle catch-up cannot wiggle them; verify actual renderer calls across a full day and catch-up on desktop/phone.
+
+- [x] Add Faster sun during catch-up (default on): the shared visible clock runs at 5x while either Mine or Library has queued idle work, with a persistent opt-out for normal speed. Fixed phases and hidden tabs stay still; economic catch-up is unchanged. Verify exact 5x/1x timing in pure and actual desktop/phone app tests.

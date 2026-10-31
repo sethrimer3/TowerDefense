@@ -1,7 +1,12 @@
-/** A full visible day takes five minutes of foreground play. Offline work
+/** A visible day normally takes five minutes of foreground play; the optional
+ * catch-up boost runs it at 5x. Offline work
  * keeps its own simulation clocks; scenery never catches up while away. */
 import type { Settings } from "./settings.ts";
 export const DAY_MS = 5 * 60 * 1000;
+/** Match the visible fast-forward state, rather than ordinary frame backlog. */
+export function sunSpeed(fasterCatchup: boolean, mineOwedMs: number, libraryOwedMs: number): 1 | 5 {
+  return fasterCatchup && Math.max(mineOwedMs, libraryOwedMs) >= 5000 ? 5 : 1;
+}
 export const TIMES_OF_DAY = ["day", "sunset", "dusk", "twilight", "night", "dawn"] as const;
 export type TimeOfDay = typeof TIMES_OF_DAY[number];
 export type Sun = { x: number; y: number; strength: number };
@@ -40,9 +45,9 @@ export class DayClock {
   private last: number | null = null;
   constructor(elapsed = 0) { this.elapsed = dayTime(elapsed); }
   reset() { this.last = null; }
-  advance(now: number, visible: boolean, running: boolean) {
+  advance(now: number, visible: boolean, running: boolean, speed: 1 | 5 = 1) {
     if (!Number.isFinite(now)) { this.reset(); return; }
-    if (this.last !== null && visible && running) this.elapsed = dayTime(this.elapsed + Math.max(0, now - this.last));
+    if (this.last !== null && visible && running) this.elapsed = dayTime(this.elapsed + Math.max(0, now - this.last) * speed);
     this.last = visible ? now : null;
   }
 }

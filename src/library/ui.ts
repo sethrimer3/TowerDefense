@@ -412,9 +412,9 @@ export class LibraryPage {
   }
 
   /** Draws the nave (while the tab shows). */
-  frame(_time: number) {
+  frame(time: number) {
     if (!this.renderer) return;
-    this.renderer.draw(this.sim, this.day, this.sim.time, this.host.effects());
+    this.renderer.draw(this.sim, this.day, this.sim.time, this.host.effects(), time);
     this.refresh();
   }
 }

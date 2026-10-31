@@ -1,4 +1,4 @@
-import { DayClock, useDayClock } from "./daylight.ts";
+import { DayClock, useDayClock, sunSpeed } from "./daylight.ts";
 import { ProfileEditor } from "./profile/editor.ts";
 import { loadArtOverrides } from "./defend/art-overrides.ts";
 import { defaults, load, persist, type Save } from "./save.ts";
@@ -361,7 +361,7 @@ function idleTimers() {
  * mine's and the library's work, saved every half minute they pay. */
 let lastTick = 0, lastMineSave = 0;
 function frame(time: number) {
-  dayClock.advance(time, !document.hidden, save.settings.dayNightCycle);
+  dayClock.advance(time, !document.hidden, save.settings.dayNightCycle, sunSpeed(save.settings.fasterSunCatchup, minePage.owedMs, libraryPage.owedMs));
   minePage.advance(clock(), libraryPage.owedMs);
   libraryPage.advance(clock(), minePage.owedMs);
   idleTimers();

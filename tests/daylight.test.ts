@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DAY_MS, DayClock, TIMES_OF_DAY, dayTime, daylight, simulationDaylight, skyAtTime, useDayClock, worldSky } from '../src/daylight.ts';
+import { DAY_MS, DayClock, TIMES_OF_DAY, dayTime, daylight, simulationDaylight, skyAtTime, useDayClock, worldSky, sunSpeed } from '../src/daylight.ts';
 import { defaults, decode } from '../src/save.ts';
 import { CELLS_W, CELLS_H } from '../src/defend/grid.ts';
 import { ART } from '../src/defend/art-scale.ts';
@@ -88,4 +88,30 @@ test('fixed scenes stay fixed while economic daylight remains independent', () =
   }
   settings.dayNightCycle = true;
   assert.deepEqual(worldSky(), skyAtTime(clock.elapsed));
+});
+
+
+test('catch-up sun speed is exactly 5x when enabled and normal when disabled', () => {
+  for (const [mine, library] of [[3600000, 0], [0, 3600000], [5000, 5000]]) {
+    assert.equal(sunSpeed(true, mine, library), 5);
+    assert.equal(sunSpeed(false, mine, library), 1);
+  }
+  assert.equal(sunSpeed(true, 4999, 4999), 1, 'ordinary frame backlog does not accelerate the sun');
+  const fast = new DayClock(), normal = new DayClock();
+  fast.advance(0, true, true, 5); normal.advance(0, true, true, 1);
+  fast.advance(10000, true, true, 5); normal.advance(10000, true, true, 1);
+  assert.equal(fast.elapsed, 50000); assert.equal(normal.elapsed, 10000);
+  fast.advance(11000, true, true, 1);
+  assert.equal(fast.elapsed, 51000, 'normal speed resumes without a phase jump');
+  fast.reset(); fast.advance(99999999, true, true, 5);
+  assert.equal(fast.elapsed, 51000, 'returning to the game does not accelerate hidden time');
+  fast.advance(100999999, true, false, 5);
+  assert.equal(fast.elapsed, 51000, 'a fixed time does not move even during 5x catch-up');
+});
+
+test('the faster-sun preference defaults on, persists off and rejects malformed values', () => {
+  assert.equal(defaults().settings.fasterSunCatchup, true);
+  const save = defaults(); save.settings.fasterSunCatchup = false;
+  assert.equal(decode(JSON.stringify(save)).settings.fasterSunCatchup, false);
+  assert.equal(decode(JSON.stringify({ version: 7, settings: { fasterSunCatchup: 'false' } })).settings.fasterSunCatchup, true);
 });
