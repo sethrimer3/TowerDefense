@@ -1,3 +1,4 @@
+import { REPAIR_PATHS } from "./repair-upgrades.ts";
 import {CHRONO_PATHS} from "./chrono-upgrades.ts";
 /** The tile collection, as the Tiles tab shows it: everything the player
  * owns to put into a defense is a tile, a real piece of the realm. City
@@ -183,6 +184,7 @@ export function tileMarks(save: Save, id: TileId, wear?: Wear): TileMark[] {
   // The Revolutionaries' shared branches.
   if (id === "revolutionary") for (const p of REVOLUTIONARY_PATHS) ranks(p.name, p.hue, sideRank(save.defend.revolutionaryRanks, p.id));
   if (id === "shadow") for (const p of SHADOW_PATHS) ranks(p.name, p.hue, sideRank(save.defend.shadowRanks, p.id));
+  if (id === "repairShop") for (const p of REPAIR_PATHS) ranks(p.name, p.hue, sideRank(save.defend.repairRanks, p.id));
   if(id === "chronoTower") for(const p of CHRONO_PATHS)ranks(p.name,p.hue,sideRank(save.defend.chronoRanks,p.id));
   if (id === "nanoTower") for (const p of NANO_PATHS) ranks(p.name, p.hue, sideRank(save.defend.nanoRanks, p.id));
   return marks;

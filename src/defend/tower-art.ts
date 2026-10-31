@@ -131,6 +131,7 @@ const HAZARD = 0xe8c03a;
 
 /** What each structure's damage throws down and its rubble is made of. */
 const MATERIAL: Record<PlacedKind, { m: Material; ruin: Pick<Ruin, "stone" | "top" | "beams" | "round"> }> = {
+  repairShop: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.plank, beams: true } },
   meleeGuild: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.straw, beams: true } },
   rangedGuild: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: [0x3a3c42, 0x5a5c62, 0x7a7c84], beams: true } },
   sniperLodge: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.canvas.slice(0, 3), beams: true } },
@@ -261,9 +262,10 @@ function drawnStructureRubblePixels(kind: PlacedKind, cw: number, ch: number, se
   return rubblePixels(w, h, hash(seed, KINDS.indexOf(kind), 3), { ...frame(w, h), ...MATERIAL[kind].ruin });
 }
 
-export const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall", "assassinDen", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "spearHall", "phalanx", "javelinCamp", "lancerStable", "heroHall", "shadow", "nanoTower", "pyreTower", "frostTower", "stormTower", "chapterHouse", "berserkerLodge", "halberdYard", "bloodHall", "veilHouse", "poisonDen", "brazierTower", "hawkTower", "batteryTower", "mortarTower", "rangerLodge", "skirmishCamp", "infernoHall", "cinderHall", "skyrangerLodge", "minelayerTower", "stormHall", "wispTower", "chronoTower"];
+export const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall", "assassinDen", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "spearHall", "phalanx", "javelinCamp", "lancerStable", "heroHall", "shadow", "nanoTower", "pyreTower", "frostTower", "stormTower", "chapterHouse", "berserkerLodge", "halberdYard", "bloodHall", "veilHouse", "poisonDen", "brazierTower", "hawkTower", "batteryTower", "mortarTower", "rangerLodge", "skirmishCamp", "infernoHall", "cinderHall", "skyrangerLodge", "minelayerTower", "stormHall", "wispTower", "chronoTower", "repairShop"];
 
 const PAINT: Record<PlacedKind, (p: Pix, look: string) => void> = {
+  repairShop: paintRepairShop,
   meleeGuild: paintMeleeGuild,
   rangedGuild: paintRangedGuild,
   sniperLodge: paintSniperLodge,
@@ -1894,4 +1896,18 @@ function paintChronoTower(p:Pix,_look:string){
 
 export function structureRubblePixels(kind: PlacedKind, cw: number, ch: number, seed = 0):Uint32Array {
   return sourcePixels(ART_NAMES.rubble(ART_NAMES.structure(kind,cw,ch)),cw*ART,ch*ART,()=>drawnStructureRubblePixels(kind,cw,ch,seed));
+}
+
+/** A long timber workshop with plank stacks, an open door and a hammer sign. */
+function paintRepairShop(p: Pix) {
+  rect(p, 2, 2, p.w - 3, p.h - 3, C.plank[1]);
+  rect(p, 3, 3, p.w - 4, p.h - 6, C.plank[3]);
+  for (let y = 4; y < p.h - 6; y += 3) rect(p, 3, y, p.w - 4, y, C.plank[2]);
+  rect(p, 3, 3, p.w - 4, 3, C.straw[2]);
+  rect(p, 3, p.h - 6, p.w - 4, p.h - 6, C.plank[0]);
+  rect(p, p.w - 10, p.h - 5, p.w - 7, p.h - 3, C.plank[0]);
+  for (let y = p.h - 5; y < p.h - 2; y += 2) rect(p, 4, y, 11, y, C.straw[1]);
+  const x = Math.floor(p.w / 2), y = Math.floor(p.h / 2);
+  rect(p, x, y - 1, x + 1, y + 3, C.plank[0]);
+  rect(p, x - 2, y - 2, x + 3, y, C.iron[3]);
 }

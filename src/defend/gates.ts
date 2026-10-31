@@ -3,9 +3,9 @@
  * gone; until Portcullis bars it, the enemy may slip through while it is
  * open (`DefendSim.foeSolid`), and whoever is caught in the gateway as it
  * shuts is shoved out. The gates' upgrades (`gate-upgrades.ts`) add murder
- * holes, small ballistas on the gatehouse, mending and rising again. A city
+ * holes and small ballistas on the gatehouse. Repairs require shop workers. A city
  * without gates does none of it, so such runs replay exactly as before. */
-import { GATE_TOWERS, IRONBOUND, PORTCULLIS, gateBarred, gateRank } from "../gate-upgrades.ts";
+import { GATE_TOWERS, PORTCULLIS, gateBarred, gateRank } from "../gate-upgrades.ts";
 import { sq } from "../exact.ts";
 import { GATE, ballistaDamage, enemySize, gateShut } from "./catalog.ts";
 import type { Building } from "./citygen.ts";
@@ -20,19 +20,6 @@ export function stepGates(sim: DefendSim, dt: number) {
   const ranks = sim.bonuses.gate;
   if (!gateBarred(ranks)) swingGates(sim, dt);
   if (!ranks) return;
-  const iron = gateRank(ranks, "ironbound");
-  for (const b of sim.gates) {
-    if (!sim.ownsBuilding(b)) continue;
-    if (sim.intact(b)) {
-      sim.gateRise.delete(b.id);
-      if (iron >= 2 && sim.hp[b.id] < sim.maxHp[b.id]) sim.hp[b.id] = Math.min(sim.maxHp[b.id], sim.hp[b.id] + sim.maxHp[b.id] * IRONBOUND.mend * dt);
-    } else if (iron >= 3) {
-      // Ever-standing: the fallen gate rises again, whole.
-      const left = (sim.gateRise.get(b.id) ?? IRONBOUND.rise) - dt;
-      if (left > 0) sim.gateRise.set(b.id, left);
-      else for (const c of b.cells) sim.rebuildCell(c);
-    }
-  }
   murderHoles(sim, dt);
   gateTowers(sim, dt);
 }

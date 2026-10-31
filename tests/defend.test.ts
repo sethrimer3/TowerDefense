@@ -321,7 +321,10 @@ function dist2(i: number, p: { x: number; y: number }) {
 }
 
 test('civilians rebuild ruins one section at a time', () => {
-  const sim = new DefendSim(mapOf(squareCity()), zeroLevels(), 1);
+  const layout = squareCity();
+  const shop = placeStructure(layout, 'repairShop', layout.keep.tx + 1, layout.keep.ty)!;
+  const sim = new DefendSim(mapOf(shop), zeroLevels(), 1);
+  sim.breakT = 1e9;
   // The multi-cell house nearest the keep, where the civilians live.
   const centre = (b: { cells: number[] }) => [0, 1].map((k) => b.cells.reduce((s, c) => s + (k ? cellY(c) : cellX(c)), 0) / b.cells.length);
   const [kx, ky] = centre(sim.map.buildings.find((b) => b.kind === 'keep')!);
@@ -999,6 +1002,7 @@ test('monster bait: every enemy goes for the nearest stack before the keep', () 
 test('monster bait: Restocking lets civilians rebuild a stack so many times; Powder kegs burst and burn', () => {
   let l = squareCity();
   l = placeStructure(l, 'monsterBait', l.keep.tx - 1, l.keep.ty - 1)!;
+  l = placeStructure(l, 'repairShop', l.keep.tx + 1, l.keep.ty)!;
   const map = mapOf(l);
   const run = (levels: Record<string, number>) => {
     const sim = new DefendSim(map, { ...zeroLevels(), ...levels }, 1);

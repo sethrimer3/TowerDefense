@@ -105,6 +105,7 @@ export const FLOOR_CASTLE:NativeCastle={
     "rebuildSpeed": 0
   },
   "training": {
+    "repairHp": 0, "repairDamage": 0, "buildingHp": 0, "towerHp": 0,
     "troopHp": 0,
     "troopDamage": 0,
     "drill": 0,
@@ -607,6 +608,7 @@ export const CEILING_CASTLE:NativeCastle={
     "rebuildSpeed": 5
   },
   "training": {
+    "repairHp": 0, "repairDamage": 0, "buildingHp": 0, "towerHp": 0,
     "troopHp": 50,
     "troopDamage": 50,
     "drill": 30,

@@ -20,6 +20,13 @@ function battle(hero = false) {
     Object.assign(scratch.defend.layout.structures[0], { path: "legend", rank: 3 });
     castle.castle = castleSnapshot(scratch, 0);
   }
+  if (!hero) {
+    for (const key of castle.castle.layout.cityTiles) {
+      const [tx, ty] = key.split(',').map(Number);
+      const withShop = placeStructure(castle.castle.layout, 'repairShop', tx, ty);
+      if (withShop) { castle.castle.layout = withShop; break; }
+    }
+  }
   const mode = new CampaignSim("siege", 0, [], game.defend.owned, game.defend.levels, castle, game);
   mode.start();
   mode.step(1 / 30);
@@ -62,10 +69,12 @@ test("Each defending soldier or summon pays once; buildings, civilians and attac
   mode.step(1 / 30);
   r.attack.hurtEnemy(proxy, 99999);
   assert.equal(mana.value, 2);
-  const building = r.attack.enemies.find((e) => e.raidBuilding && e.id !== 10000000 + r.field.defenderKeep)!;
+  const building = r.attack.enemies.find((e) => e.raidBuilding && e.id !== 10000000 + r.field.defenderKeep && r.defense.map.buildings[e.id - 10000000]?.kind !== "repairShop")!;
   r.attack.hurtEnemy(building, building.maxHp * 1000);
   assert.equal(mana.value, 2);
-  mode.step(1 / 30); // Native builders leave their homes only after rubble creates a job.
+  const house = r.defense.map.buildings.find(b => b.kind === "house" && r.defense.ownsBuilding(b))!;
+  r.defense.damageBuilding(house.id, 1e9);
+  mode.step(1 / 30); // Repair shop workers emerge after rubble creates a job.
   const civilian = r.defense.civilians[0];
   assert.ok(civilian);
   r.attack.hurtEnemy(r.attack.enemies.find((e) => e.id === civilian.id)!, civilian.maxHp * 1000);

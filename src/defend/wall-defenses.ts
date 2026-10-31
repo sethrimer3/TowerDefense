@@ -7,7 +7,7 @@ import { spikeKey } from "../specializations.ts";
  * so such runs replay exactly as before. */
 import { dist, sq } from "../exact.ts";
 import { BLAST_STAKES, RIME_STAKES, SPRING_STAKES, pathRank } from "../knowledge-paths.ts";
-import { STONEWORK, TRAPPED, wallRank } from "../wall-upgrades.ts";
+import { TRAPPED, wallRank } from "../wall-upgrades.ts";
 import { BALLISTA, ENEMIES, ballistaCooldown, ballistaDamage, ballistaRange, enemySize, spikeDamage, spikeEvery } from "./catalog.ts";
 import { FIRE_BOLTS, HEAVY_BOLTS, WINDLASS, ballistaRank } from "../ballista-upgrades.ts";
 import { fizzles } from "./boats.ts";
@@ -132,17 +132,6 @@ function springRow(sim: DefendSim, r: number, rank: number, cut: number) {
       sim.hurtEnemy(e, cut * SPRING_STAKES.damage[rank], true, "melee");
     }
   }
-}
-
-/** The walls the player placed on their own, with the walls' upgrades:
- * standing stones mend (Stonework III). Nothing happens in a run without
- * placed walls or that rank. */
-export function stepPlacedWalls(sim: DefendSim, dt: number) {
-  const ranks = sim.bonuses.walls;
-  if (!ranks || !sim.pieces.length) return;
-  if (wallRank(ranks, "stonework") >= 3)
-    for (const b of sim.pieces)
-      if (sim.solid[b.cells[0]] && sim.hp[b.id] < sim.maxHp[b.id]) sim.hp[b.id] = Math.min(sim.maxHp[b.id], sim.hp[b.id] + sim.maxHp[b.id] * STONEWORK.mend * dt);
 }
 
 /** A placed wall stone has broken (Trapped walls): its charge bursts,

@@ -19,6 +19,6 @@ test("Every building has Smithy rows, and a fully upgraded one counts each of th
     assert.equal(buildingLevel(kind, maxLevels, maxTraining), 1 + total, kind);
   }
   // An archer tower's own three Forge rows and the two All towers Training rows.
-  assert.deepEqual(smithyRows("archerTower"), { upgrades: ["archerDamage", "archerRange", "archerRate"], training: ["towerDamage", "towerReload"] });
+  assert.deepEqual(smithyRows("archerTower"), { upgrades: ["archerDamage", "archerRange", "archerRate"], training: ["towerDamage", "towerReload", "towerHp"] });
   assert.deepEqual(smithyRows("keep"), { upgrades: ["keepStrength"], training: ["keepHp"] });
 });

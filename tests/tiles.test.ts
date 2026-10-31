@@ -145,7 +145,8 @@ test("a held tile opens its own copy's tree: where it stands, else its palette c
 test("an opened tile shows its basic stats, then each upgrade it carries as an ability in its path's colour", () => {
   const s = defaults();
   const plain = buildingSheet(s, "wizardTower");
-  assert.equal(plain.stats.length, 5);
+  assert.equal(plain.stats.length, 6);
+  assert.ok(plain.stats.some(s => /building HP/.test(s)));
   assert.match(plain.stats[0], /fire damage\/s/);
   assert.deepEqual(plain.abilities, []);
   const storm = buildingSheet(s, "stormTower", { path: "storm", rank: 2 });

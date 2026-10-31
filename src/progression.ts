@@ -17,7 +17,7 @@ import { ECONOMY, quadraticCost } from "./economy.ts";
 
 /** What the Smithy and the skill trees can raise: the battle's `Bonuses`,
  * and how fast the Smithy's upgrades are worked. */
-export type BonusTarget = Exclude<keyof Bonuses, "paths" | "banner" | "structurePaths" | "spikePaths" | "keep" | "walls" | "gate" | "ballista" | "revolutionary" | "shadow" | "nano" | "chrono" | "necromancy" | "meteor" | "frostNova" | "reinforcements"> | "smithing";
+export type BonusTarget = Exclude<keyof Bonuses, "paths" | "banner" | "structurePaths" | "spikePaths" | "keep" | "walls" | "gate" | "ballista" | "revolutionary" | "shadow" | "nano" | "chrono" | "repair" | "necromancy" | "meteor" | "frostNova" | "reinforcements"> | "smithing";
 /** Bonuses that shorten a time: their percent divides instead of multiplies. */
 const TIMES = new Set<BonusTarget>(["drill", "towerReload", "rebuild", "smithing"]);
 
@@ -25,13 +25,17 @@ const TIMES = new Set<BonusTarget>(["drill", "towerReload", "rebuild", "smithing
 export const STARTING_METAL: Metals = { copper: 10, silver: 0, gold: 0 };
 
 // ── The Smithy's upgrades (Training) ───────────────────────────────────
-export type TrainingId = "troopHp" | "troopDamage" | "deployRange" | "drill" | "towerDamage" | "towerReload" | "wallHp" | "keepHp" | "rebuild" | "bombDamage" | "undeadHp" | "undeadDamage" | "graveTime" | "meteorDamage" | "meteorRadius" | "frostTime" | "frostRadius" | "reinforceHp" | "reinforceDamage" | "reinforceTime";
+export type TrainingId = "repairHp" | "repairDamage" | "buildingHp" | "towerHp" | "troopHp" | "troopDamage" | "deployRange" | "drill" | "towerDamage" | "towerReload" | "wallHp" | "keepHp" | "rebuild" | "bombDamage" | "undeadHp" | "undeadDamage" | "graveTime" | "meteorDamage" | "meteorRadius" | "frostTime" | "frostRadius" | "reinforceHp" | "reinforceDamage" | "reinforceTime";
 /** `seconds`, when set, shows the row as a time: that many seconds at no ranks. */
 export type TrainingRow = { id: TrainingId; group: keyof typeof TRAINING_GROUPS; name: string; per: number; max: number; seconds?: number };
 export const TRAINING_GROUPS = { army: "Army", towers: "Towers", city: "City", spells: "Spells" } as const;
 /** Each rank adds `per` percent to its target, with quadratic metal cost
  * (`rankCost`) in its tier (`rankPrice`). */
 export const TRAINING: TrainingRow[] = [
+  { id: "repairHp", group: "city", name: "Repair worker HP", per: 5, max: 50 },
+  { id: "repairDamage", group: "city", name: "Repair worker bow damage", per: 5, max: 50 },
+  { id: "buildingHp", group: "city", name: "Building HP", per: 5, max: 50 },
+  { id: "towerHp", group: "towers", name: "Tower HP", per: 5, max: 50 },
   { id: "troopHp", group: "army", name: "Troop HP", per: 4, max: 50 },
   { id: "troopDamage", group: "army", name: "Troop damage", per: 4, max: 50 },
   { id: "drill", group: "army", name: "Drill speed", per: 3, max: 30 },
@@ -41,7 +45,7 @@ export const TRAINING: TrainingRow[] = [
   { id: "bombDamage", group: "towers", name: "Bomb damage", per: 5, max: 40 },
   { id: "wallHp", group: "city", name: "Wall HP", per: 5, max: 50 },
   { id: "keepHp", group: "city", name: "Keep HP", per: 5, max: 50 },
-  { id: "rebuild", group: "city", name: "Rebuild speed", per: 4, max: 30 },
+  { id: "rebuild", group: "city", name: "Repair speed", per: 4, max: 30 },
   { id: "undeadHp", group: "spells", name: "Risen HP", per: 5, max: 40 },
   { id: "undeadDamage", group: "spells", name: "Risen damage", per: 5, max: 40 },
   { id: "graveTime", group: "spells", name: "Grave time", per: 100, max: 2, seconds: 10 },
@@ -196,7 +200,7 @@ export function multiplier(save: Save, target: BonusTarget) {
 /** What the next defense fights with. */
 export function bonuses(save: Save): Bonuses {
   const out = { ...NO_BONUSES } as Bonuses;
-  for (const k of Object.keys(out) as Exclude<keyof Bonuses, "paths" | "banner" | "structurePaths" | "spikePaths" | "keep" | "walls" | "gate" | "ballista" | "revolutionary" | "shadow" | "nano" | "chrono" | "necromancy" | "meteor" | "frostNova" | "reinforcements">[]) out[k] = multiplier(save, k);
+  for (const k of Object.keys(out) as Exclude<keyof Bonuses, "paths" | "banner" | "structurePaths" | "spikePaths" | "keep" | "walls" | "gate" | "ballista" | "revolutionary" | "shadow" | "nano" | "chrono" | "repair" | "necromancy" | "meteor" | "frostNova" | "reinforcements">[]) out[k] = multiplier(save, k);
   if (SKILL_IDS.some(id => id.startsWith("banner") && skillRank(save, id) > 0)) out.banner = { cooldown: 10 - skillTotal(save, "bannerCooldown"), defense: skillTotal(save, "bannerDefense") / 100, reach: 5 + skillTotal(save, "bannerReach"), damage: 1 + skillTotal(save, "bannerDamage") / 100, march: 1 + skillTotal(save, "bannerMarch") / 100, life: 1 + skillTotal(save, "bannerLife") / 100, regen: skillTotal(save, "bannerRegen") / 100 };
   Object.assign(out, placedBattlePaths(save));
   if (save.defend.keepRanks) out.keep = { ...save.defend.keepRanks };
@@ -205,6 +209,7 @@ export function bonuses(save: Save): Bonuses {
   if (save.defend.ballistaRanks) out.ballista = { ...save.defend.ballistaRanks };
   if (save.defend.revolutionaryRanks) out.revolutionary = { ...save.defend.revolutionaryRanks };
   if (save.defend.shadowRanks) out.shadow = { ...save.defend.shadowRanks };
+  if (save.defend.repairRanks) out.repair = { ...save.defend.repairRanks };
   if (save.defend.chronoRanks) out.chrono = { ...save.defend.chronoRanks };
   if (save.defend.nanoRanks) out.nano = { ...save.defend.nanoRanks };
   const necromancy = spellPath(save, "necromancy");

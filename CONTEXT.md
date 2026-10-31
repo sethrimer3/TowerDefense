@@ -763,3 +763,9 @@ Dead grass and withered vegetation left where the Blight has walked. Repeated pa
 
 **Play-time sky**:
 The shared visible day and night, turning once in five minutes of foreground play. It pauses while the game is hidden or closed and can be fixed to Day, Sunset, Dusk, Twilight, Night or Dawn. Faster sun during catch-up optionally runs this shared cycle at five times normal speed while the Mine or Library processes queued idle work.
+
+### Repair shop
+A workshop whose carpenters leave to repair the city. It begins with two workers and Carpentry; its skills teach combat-building repairs, masonry, larger crews, critical-job priorities and retreating bow shots.
+
+### Carpentry
+The Repair shop's initial skill: rebuilding destroyed houses and service buildings. Advanced carpentry extends repairs to infantry buildings and towers.

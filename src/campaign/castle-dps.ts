@@ -41,6 +41,7 @@ const sideBonusKey = {
   shadowRanks: "shadow",
   nanoRanks: "nano",
   chronoRanks: "chrono",
+  repairRanks: "repair",
 } as const;
 export type DpsBreakdown = { total: number; direct: number; watch: number };
 export function castleDpsBreakdown(input: NativeCastle | { castle: NativeCastle }): DpsBreakdown {

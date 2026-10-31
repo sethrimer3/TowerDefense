@@ -89,7 +89,7 @@ import { sheltered, fizzles, stepFloods, type Flood, type Sinking } from "./boat
 import { baitFell, baitStanding } from "./bait.ts";
 import { stepGates } from "./gates.ts";
 import { IRONBOUND, gateBarred, gateRank } from "../gate-upgrades.ts";
-import { stepBallistaBolts, stepPlacedWalls, stepSpikes, trappedWallFell, type BallistaBolt, type SpikeThrust } from "./wall-defenses.ts";
+import { stepBallistaBolts, stepSpikes, trappedWallFell, type BallistaBolt, type SpikeThrust } from "./wall-defenses.ts";
 import { STONEWORK, TOWN_WALLS, wallRank } from "../wall-upgrades.ts";
 
 export type Levels = Record<UpgradeId, number>;
@@ -234,6 +234,10 @@ export type Civilian = {
   /** Absent for ordinary rebuilding. Sand is always the lowest priority. */
   jobKind?: "sand";
   cleanupCheck?: number;
+  /** Repair shop that owns this worker slot. */
+  shop?: number;
+  slot?: number;
+  bowCd?: number;
   state: "toJob" | "working" | "home" | "flee";
   /** Off-board destination once a stranded builder panics. */
   exit?: Point;
@@ -763,7 +767,6 @@ export class DefendSim {
     stepArrows(this, dt);
     stepBallistaBolts(this, dt);
     stepSpikes(this, dt);
-    stepPlacedWalls(this, dt);
     stepGates(this, dt);
     stepShells(this, dt);
     stepMines(this, dt);
@@ -1161,8 +1164,8 @@ export class DefendSim {
     if (e.kind === "mirrorKnight" && projectile && source === "ranged" && origin) {
       const reflected = amount * .4;
       if (origin.attacker !== undefined) {
-        const shooter = this.soldiers.find(s => s.id === origin.attacker && s.hp > 0);
-        if (shooter && !shooter.guard) { this.hurtDefender(shooter, reflected); shooter.flash = .12; }
+        const shooter = this.soldiers.find(s => s.id === origin.attacker && s.hp > 0) ?? this.civilians.find(c => c.id === origin.attacker && c.hp > 0);
+        if (shooter && !("guard" in shooter && shooter.guard)) { this.hurtDefender(shooter, reflected); shooter.flash = .12; }
       } else if (origin.building !== undefined) this.damageBuilding(origin.building, reflected);
     }
     // Armor piercing cuts through `pierce` of whatever armor holds a blow
@@ -1484,11 +1487,11 @@ function maxHpOf(b: Building, levels: Levels, bonuses: Readonly<Bonuses>) {
   if (b.kind === "wall" && b.piece) return wallHp(levels.wallStrength) * bonuses.wallHp * STONEWORK.hp[wallRank(bonuses.walls, "stonework")];
   if (b.kind === "wall") return wallHp(levels.wallStrength) * bonuses.wallHp;
   if (b.kind === "gate") return wallHp(levels.wallStrength) * bonuses.wallHp * GATE.hpPerCell * b.cells.length * gateHpScale(levels.gateStrength ?? 0) * IRONBOUND.hp[gateRank(bonuses.gate, "ironbound")];
-  if (b.kind === "wallBallista") return wallHp(levels.wallStrength) * bonuses.wallHp * BALLISTA.hpPerCell * b.cells.length;
+  if (b.kind === "wallBallista") return wallHp(levels.wallStrength) * bonuses.wallHp * BALLISTA.hpPerCell * b.cells.length * bonuses.towerHp;
   if (b.kind === "house") return HOUSE_HP_PER_CELL * b.cells.length;
   if (b.kind === "keep") return keepHp(levels.keepStrength) * bonuses.keepHp * BASTIONS.hp[keepRank(bonuses.keep, "bastions")];
   if (b.kind === "monsterBait") return STRUCTURES[b.kind].maxHp * FORTIFY.hp[pathRank(buildingPaths({ bonuses }, b), "bait", "fortified")];
-  return STRUCTURES[b.kind].maxHp;
+  return STRUCTURES[b.kind].maxHp * (b.kind.endsWith("Tower") ? bonuses.towerHp : bonuses.buildingHp);
 }
 
 /** Road cells inside the city. */

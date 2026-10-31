@@ -37,7 +37,7 @@ export const SUBJECTS: Subject[] = [
       // The guilds and their newest branches have no upgrades of their own:
       // the shared troop upgrades are theirs.
       { id: "troops", name: "All troops", items: ["meleeGuild", "rangedGuild", "heroHall", "shadow", "assassinDen", "bloodHall", "veilHouse", "poisonDen", "spearHall", "phalanx", "javelinCamp", "lancerStable", "gunHall", "musketHall", "sniperLodge", "gunNest", "gatlingNest", "rocketBattery", "revolutionary"], upgrades: ["barracksCapacity", "barracksTraining", "soldierArms"], extras: ["speed3"], training: ["troopHp", "troopDamage", "drill", "deployRange"], skills: ["drillSergeant", "veterans", "bladework"] },
-      { id: "towers", name: "All towers", training: ["towerDamage", "towerReload"], skills: ["fletchers", "ballistics"] },
+      { id: "towers", name: "All towers", training: ["towerDamage", "towerReload", "towerHp"], skills: ["fletchers", "ballistics"] },
     ],
   },
   {
@@ -47,7 +47,7 @@ export const SUBJECTS: Subject[] = [
       { id: "cityGate", name: "City gate", item: "cityGate", upgrades: ["gateStrength", "gateHinges"] },
       { id: "wallBallista", name: "Wall ballista", item: "wallBallista", upgrades: ["ballistaDamage", "ballistaRate", "ballistaRange"] },
       { id: "spikes", name: "Wall spikes", item: "wallSpikes", upgrades: ["spikeDamage", "spikeRate"] },
-      { id: "civilians", name: "Civilians", upgrades: ["civilianCount", "civilianHealth", "rebuildSpeed"], training: ["rebuild"], skills: ["guilds"] },
+      { id: "repairShop", name: "Repair shop", item: "repairShop", upgrades: ["civilianCount", "civilianHealth", "rebuildSpeed"], training: ["rebuild", "repairHp", "repairDamage", "buildingHp"], skills: ["guilds"] },
       {
         id: "bait", name: "Monster bait", item: "monsterBait", upgrades: ["baitRestock", "baitBlast"],
       },

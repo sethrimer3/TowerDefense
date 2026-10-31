@@ -134,7 +134,7 @@ test('city, strike spells, infantry and towers select distinct motif families', 
   const save = defaults(), topics = SUBJECTS.flatMap(s => s.topics);
   for (const id of ['meteor', 'necromancy', 'frostNova', 'reinforcements'])
     assert.equal(studyCircle(save, topics.find(t => t.id === id)!).motif, 'triangles');
-  for (const id of ['walls', 'spikes', 'civilians', 'bait'])
+  for (const id of ['walls', 'spikes', 'repairShop', 'bait'])
     assert.equal(studyCircle(save, topics.find(t => t.id === id)!).motif, 'tesseract');
   for (const id of ['troops', 'towers', 'barracks', 'wizardTower'])
     assert.equal(studyCircle(save, topics.find(t => t.id === id)!).motif, 'voronoi');
