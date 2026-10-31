@@ -88,7 +88,7 @@ export function journalHTML(discovered: EnemyKind[]): string {
       const notes: string[] = [d.flying ? "Flies over walls." : "Travels on the ground."];
       if (d.description) notes.push(d.description);
       if (d.regeneration) notes.push(`Regenerates ${d.regeneration} HP per battle second, up to its maximum health.`);
-      if (d.fortress) notes.push(`Walking structure with ${d.fortress.turrets} independently destroyable turrets, ${d.fortress.legs} legs and ${d.fortress.armor} armor plates. Destroy every armor plate to expose the core. Each lost leg slows movement, down to 25% speed with all legs gone. Destroyed turrets stop firing. Dismantle its parts before attacking the core.`);
+      if (d.fortress) notes.push(`Walking structure with ${d.fortress.legs} legs and ${d.fortress.turrets} rooftop weapons. Legs take air and ground attacks; turrets are always air targets. With at least three legs the body is invulnerable and untargetable. Losing all but two legs crashes it down in dust; after landing, ground attacks on the body deal their full damage separately to every surviving turret. Each lost leg slows movement; one leg can drag it, no legs immobilize it. Dragging leaves temporary rubble. Destroy every turret to destroy the whole fortress; the chassis and armor have no separate life.`);
       if (d.chainLength) notes.push(`${d.chainLength} individually damageable segments; cuts create independent worms.`);
       if (d.splits) notes.push(`Hatches ${d.splits.count} ${ENEMIES[d.splits.into].name}s when killed.`);
       if (d.shield) notes.push(`Shields itself and nearby enemies against ranged damage within ${d.shield.radius} cells. ${Number.isFinite(d.shield.hp) ? `${d.shield.hp.toLocaleString()} shield HP; shatters when depleted.` : "Permanent shield; only melee damage gets through."}`);
@@ -127,7 +127,7 @@ export function journalHTML(discovered: EnemyKind[]): string {
       if (k === "bombOrc") notes.push("Carries dynamite and explodes on contact in a two-cell radius.");
       if (k === "bombBird") notes.push("Dives for 0.6 seconds, then explodes in a 2.5-cell radius. Kill it before it lands.");
       if (k === "voidSparrow") notes.push("Creates a black hole 1.5 tiles across: 300 damage every half-second for eight seconds.");
-      return `<article><canvas class="defend-journal-portrait" data-portrait="${k}" width="80" height="80" aria-hidden="true"></canvas><div><h3>${d.name}</h3><p class="defend-journal-stats">Difficulty ${d.cost.toLocaleString()} · HP ${d.hp.toLocaleString()} · Attack ${d.damage} · Speed ${d.speed}</p><p>${notes.join(" ")}</p></div></article>`;
+      return `<article><canvas class="defend-journal-portrait" data-portrait="${k}" width="80" height="80" aria-hidden="true"></canvas><div><h3>${d.name}</h3><p class="defend-journal-stats">Difficulty ${d.cost.toLocaleString()} · HP ${(d.fortress ? d.fortress.turrets * d.fortress.partHp : d.hp).toLocaleString()} · Attack ${d.damage} · Speed ${d.speed}</p><p>${notes.join(" ")}</p></div></article>`;
     }).join("")}</section>`).join("") : "<p>Encounter enemies during a defense to record them here.</p>"}</div>
     <div class="dialog-actions"><button data-journal-close autofocus>Close journal</button></div>`;
 }

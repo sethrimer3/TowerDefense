@@ -1,3 +1,4 @@
+import { enemyFlying } from "./catalog.ts";
 /** Per-battle Minelayer ammunition and aim. Only this attunement draws RNG here. */
 import { dist, sq } from "../exact.ts";
 import { MINELAYER, pathRank } from "../knowledge-paths.ts";
@@ -74,7 +75,7 @@ export function stepMines(sim: DefendSim, dt: number) {
     if (!mineGround(sim, m.x, m.y)) continue;
     if (m.age < MINELAYER.arm) { kept.push(m); continue; }
     const r = m.smart ? MINELAYER.seek : MINELAYER.trigger;
-    const candidates = sim.enemiesNear(m.x, m.y, r).filter(e => e.hp > 0 && !ENEMIES[e.kind].flying);
+    const candidates = sim.enemiesNear(m.x, m.y, r).filter(e => e.hp > 0 && !enemyFlying(e));
     const target = nearest(candidates, m, sq(r) + 1e-9);
     if (target && m.smart) {
       const d = dist(target.x - m.x, target.y - m.y), travel = Math.min(Math.max(0, d - MINELAYER.trigger), MINELAYER.speed * armedDt);
@@ -89,7 +90,7 @@ export function stepMines(sim: DefendSim, dt: number) {
       }
     }
     if (target && sq(target.x - m.x) + sq(target.y - m.y) <= sq(MINELAYER.trigger) + 1e-9) {
-      sim.explode(m.x, m.y, { damage: m.damage, r: m.r, friendlyFire: !sim.levels.cannonSafe, origin: m.origin });
+      sim.explode(m.x, m.y, { damage: m.damage, r: m.r, friendlyFire: !sim.levels.cannonSafe, groundOnly: true, origin: m.origin });
     } else kept.push(m);
   }
   sim.mines = kept;

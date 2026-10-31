@@ -1,3 +1,4 @@
+import { enemyFlying } from "./catalog.ts";
 import { enemySize } from "./catalog.ts";
 /** Thin wooden fences along the street sides of some parks. Purely
  * decorative — nothing is blocked by them — but enemies that walk across a
@@ -128,7 +129,7 @@ export class Fences {
   private trample(sim: DefendSim) {
     for (const e of sim.enemies) {
       const def = ENEMIES[e.kind];
-      if (def.flying) continue;
+      if (enemyFlying(e)) continue;
       for (const s of this.byCell.get(cellIndex(Math.floor(e.x), Math.floor(e.y))) ?? [])
         if (!s.broken && segDist(s, e.x, e.y) < enemySize(e) / 2 + 0.06) this.snap(s, e.x, e.y);
     }

@@ -16,7 +16,7 @@ import { boulderPlan, hasForest } from "./forest.ts";
 import { IceMotion } from "./ice-motion.ts";
 import { icyCell } from "./boats.ts";
 import { enemySize } from "./catalog.ts";
-import { assembleFortress, syncFortress } from "./fortress.ts";
+import { assembleFortress, syncFortress, finishFortressStep, refreshFortress, fortressAreaTargets } from "./fortress.ts";
 import { damageModifier } from "./enemy-abilities.ts";
 import { stepBlackHoles, stepPoison } from "./hostile-attacks.ts";
 import { stepSiegeShots, type SiegeAim, type SiegeShot } from "./siege.ts";
@@ -140,8 +140,9 @@ export type Enemy = {
   burnOrigin?: DamageOrigin;
   /** The share of its pace a signal fire leaves it while marked; absent otherwise. */
   slowed?: number;
-  fortressPart?: { core: number; role: "turret" | "leg" | "armor"; dx: number; dy: number; weapon?: "cannon" | "laser" };
+  fortressPart?: { core: number; role: "turret" | "leg" | "armor"; dx: number; dy: number; side?: number; weapon?: "cannon" | "laser" };
   fortressParts?: Enemy[];
+  walker?: { phase: "raised" | "falling" | "grounded"; fall: number; walk: number; x: number; y: number; scrape: number };
   facing?: { x: number; y: number };
   /** Locked, axis-aligned destination for a sliding cube. */
   iceSlide?: { x: number; y: number; cell: number };
@@ -308,7 +309,7 @@ export type SimEvent = { type: "waveStart" | "waveCleared" | "lost"; wave: numbe
 export type Stride = { speed: number; dt: number; flying?: boolean; own?: boolean; radius?: number; separate?: boolean };
 /** A blast's radius and centre damage (40% at the edge); with friendly fire
  * it also hurts your own people. */
-export type Blast = { r: number; damage: number; friendlyFire: boolean; origin?: Arrow["origin"] };
+export type Blast = { r: number; damage: number; friendlyFire: boolean; origin?: Arrow["origin"]; groundOnly?: boolean };
 
 const STEP = 1 / 30;
 const STEP_SOLDIER: Record<Soldier["kind"], (sim: DefendSim, s: Soldier, dt: number) => void> = {
@@ -495,6 +496,7 @@ export class DefendSim {
   readonly posterns: boolean;
   scorches: Scorch[] = [];
   effects: Effect[] = [];
+  fortressRubble: { x: number; y: number; r: number; life: number; seed: number }[] = [];
   /** The war banner the player planted, rallying the troops; null when none
    * stands (and so in every run without one). */
   warBanner: WarBanner | null = null;
@@ -748,7 +750,7 @@ export class DefendSim {
       this.enemyLookupActive = false;
       this.enemyLookup.clear();
     }
-    for (const e of this.enemies) if (e.fortressParts) syncFortress(e);
+    for (const e of this.enemies) if (e.fortressParts) finishFortressStep(this, e);
     // Projectiles and friendly attacks do not move/spawn enemies. Preserve
     // the first blast's reindex timing, then share that snapshot until
     // builders push enemies out or ice slides them at the end of the tick.
@@ -843,6 +845,8 @@ export class DefendSim {
       this.mageBolts = this.mageBolts.filter(b => b.t < b.life);
     }
     for (const e of this.enemies) ageMageChill(e, dt);
+    for (const rock of this.fortressRubble) rock.life -= dt;
+    if (this.fortressRubble.length) this.fortressRubble = this.fortressRubble.filter(rock => rock.life > 0);
     for (const fx of this.effects) fx.t += dt;
     this.effects = this.effects.filter((fx) => fx.t < 0.6);
     for (const s of this.scorches) s.t += dt;
@@ -1075,7 +1079,7 @@ export class DefendSim {
     const y0 = Math.max(0, Math.floor(y - r)), y1 = Math.min(CELLS_H - 1, Math.floor(y + r));
     for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++)
       for (const e of this.grid[cellIndex(cx, cy)]) {
-        if (e.hp <= 0) continue;
+        if (e.hp <= 0 || (e.walker || e.fortressPart?.role === "armor") && e.untargetable) continue;
         const d = sq(e.x - x) + sq(e.y - y);
         if ((d < bd || (d === bd && !best)) && !struck.has(e.id)) { best = e; bd = d; }
       }
@@ -1108,7 +1112,7 @@ export class DefendSim {
       y1 = Math.min(CELLS_H - 1, Math.floor(y + r));
     for (let cy = y0; cy <= y1; cy++)
       for (let cx = x0; cx <= x1; cx++)
-        for (const e of this.grid[cellIndex(cx, cy)]) if (e.hp > 0 && sq(e.x - x) + sq(e.y - y) <= r * r) out.push(e);
+        for (const e of this.grid[cellIndex(cx, cy)]) if (e.hp > 0 && e.fortressPart?.role !== "armor" && !(e.walker && e.untargetable) && sq(e.x - x) + sq(e.y - y) <= r * r) out.push(e);
     return out;
   }
 
@@ -1148,8 +1152,18 @@ export class DefendSim {
   /** Hurts `e` (double when marked); a steady burn hurts it without the
    * flash of a blow. Optional credit is statistics-only; it never changes
    * the physical origin used for shields, reflection or directional armor. */
-  hurtEnemy(e: Enemy, amount: number, flash = true, source: "ranged" | "melee" = "ranged", origin?: DamageOrigin, projectile = false, element: "physical" | "fire" | "explosion" = "physical", pierce = 0, credit?: DamageOrigin) {
+  hurtEnemy(e: Enemy, amount: number, flash = true, source: "ranged" | "melee" = "ranged", origin?: DamageOrigin, projectile = false, element: "physical" | "fire" | "explosion" = "physical", pierce = 0, credit?: DamageOrigin, viaBody = false): boolean {
     if (e.hp <= 0 || !Number.isFinite(amount) || amount <= 0) return false;
+    if (e.walker) {
+      if (e.walker.phase !== "grounded") return false;
+      let landed = false;
+      for (const part of e.fortressParts!) if (part.hp > 0 && part.fortressPart?.role === "turret")
+        landed = this.hurtEnemy(part, amount, flash, source, origin, projectile, element, pierce, credit, true) || landed;
+      if (landed && flash) e.flash = .12;
+      return landed;
+    }
+    if (e.fortressPart?.role === "armor") return false;
+    if (e.fortressPart?.role === "turret" && source === "melee" && !viaBody && (origin as Partial<Soldier> | undefined)?.kind !== "valkyrie") return false;
     if (e.kind === "blightWorm" && (e.burrow || e.untargetable)) return false;
     if (source === "ranged") {
       let shield: Enemy | undefined;
@@ -1186,10 +1200,11 @@ export class DefendSim {
     this.stats.current.dealt += Math.min(e.hp, hit);
     if (this.tally) {
       const from = this.tallyOrigin(credit ?? origin);
-      if (from?.building !== undefined) this.tally(from.building, Math.min(e.hp, hit), e.hp - hit <= 0 && !e.fortressPart);
+      if (from?.building !== undefined) this.tally(from.building, Math.min(e.hp, hit), e.hp - hit <= 0 && (!e.fortressPart || e.fortressPart.role === "turret" && !this.livingEnemy(e.fortressPart.core)?.fortressParts?.some(p => p !== e && p.hp > 0 && p.fortressPart?.role === "turret")));
     }
     e.hp -= hit;
     if (flash) e.flash = 0.12;
+    if (e.fortressPart) { const core = this.livingEnemy(e.fortressPart.core); if (core) refreshFortress(this, core); }
     if (e.hp <= 0) {
       this.effects.push({ kind: "spark", x: e.x, y: e.y, t: 0, r: enemySize(e) });
       if (e.venom) spreadVenom(this, e);
@@ -1286,7 +1301,7 @@ export class DefendSim {
   private pushOut(cell: number) {
     const cx = cellX(cell),
       cy = cellY(cell);
-    const units: Point[] = [...this.enemies.filter((e) => !ENEMIES[e.kind].flying), ...this.soldiers, ...this.civilians];
+    const units: Point[] = [...this.enemies.filter((e) => !e.fortressPart && !ENEMIES[e.kind].flying), ...this.soldiers, ...this.civilians];
     for (const u of units) {
       if (Math.floor(u.x) !== cx || Math.floor(u.y) !== cy) continue;
       const to = nearestOpen(this.solid, cx, cy, u);
@@ -1296,7 +1311,7 @@ export class DefendSim {
 
   /** A blast: full damage at the centre falling to 40% at the edge. Returns
    * the seed its fireball and scorch are drawn from. */
-  explode(x: number, y: number, { r, damage, friendlyFire, origin }: Blast): number {
+  explode(x: number, y: number, { r, damage, friendlyFire, origin, groundOnly = false }: Blast): number {
     this.atmosphere?.disturb(x, y, r * 1.6 + .5, 0, 0, true);
     // A blast in a magic boat's water fizzles.
     if (fizzles(this, x, y, r)) return 0;
@@ -1305,7 +1320,7 @@ export class DefendSim {
       this.blastIndexReady = this.stationaryAttacks;
     }
     const hit = (d: number) => damage * (1 - 0.6 * Math.min(1, d / r));
-    for (const e of this.enemiesNear(x, y, r)) if (!sheltered(this, e.x, e.y)) this.hurtEnemy(e, hit(dist(e.x - x, e.y - y)), true, "ranged", origin ?? { x, y }, !!origin, "explosion");
+    for (const e of fortressAreaTargets(this.enemiesNear(x, y, r), groundOnly)) if (!sheltered(this, e.x, e.y)) this.hurtEnemy(e, hit(dist(e.x - x, e.y - y)), true, "ranged", origin ?? { x, y }, !!origin, "explosion");
     if (friendlyFire)
       for (const u of [...this.soldiers, ...this.civilians]) {
         if ("kind" in u && friendlySafe(u)) continue;

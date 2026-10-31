@@ -17,9 +17,9 @@ try {
     const { defaultLayout, fitLayout } = await import('/src/defend/layout.ts');
     const { generateCity } = await import('/src/defend/citygen.ts');
     const { drawFortress } = await import('/src/defend/fortress-art.ts');
-    const { syncFortress } = await import('/src/defend/fortress.ts');
+    const { syncFortress, stepFortressCore, FORTRESS_FALL } = await import('/src/defend/fortress.ts');
     const kinds = ['fortressHut', 'fortressOutpost', 'fortressTower', 'fortressKeep', 'fortressLesser'];
-    const states = ['Armored', 'Exposed core', 'Damaged', 'Dismantled'];
+    const states = ['Raised', 'Falling', 'Dragging', 'Immobilized'];
     const canvas = document.querySelector('canvas');
     canvas.width = 1000; canvas.height = 760;
     canvas.style.cssText = 'width:1000px;height:760px';
@@ -34,9 +34,12 @@ try {
       // Every core uses the same sprite seed: this exposes dimension cache collisions.
       core.id = 4; core.x = (col * 200 + 100) / 24; core.y = (row * 185 + 100) / 24;
       syncFortress(core); sim.time = 2;
-      if (row === 1) for (const part of core.fortressParts) if (part.fortressPart.role === 'armor') part.hp = 0;
-      if (row === 2) { core.hp *= .3; for (const part of core.fortressParts) part.hp *= .3; }
-      if (row === 3) for (const part of core.fortressParts) part.hp = 0;
+      if (row > 0) {
+        const legs = core.fortressParts.filter(part => part.fortressPart.role === 'leg');
+        for (const leg of legs.slice(row === 1 ? 2 : row === 2 ? 1 : 0)) leg.hp = 0;
+        stepFortressCore(sim, core, row === 1 ? FORTRESS_FALL * .5 : FORTRESS_FALL);
+        if (row === 2) for (const part of core.fortressParts) if (part.fortressPart.role === 'turret') part.hp *= .3;
+      }
       const bodies = [];
       const originalDraw = c.drawImage.bind(c);
       c.drawImage = (image, ...args) => {

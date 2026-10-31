@@ -1,3 +1,4 @@
+import { drawFortress } from "./fortress-art.ts";
 import { drawBoat } from "./boat-art.ts";
 import { drawBlightFortress } from "./blight-fortress-art.ts";
 import { isBlightFlier } from "./blight-fliers.ts";
@@ -82,6 +83,7 @@ export function drawSimpleEnemies({ c, px }: Brush, enemies: readonly Enemy[], r
   for (const e of enemies) {
     const def = ENEMIES[e.kind];
     if (def.darkPixels) continue;
+    if (def.fortress && !def.blightFortress) { drawFortress({ c, px }, e, undefined, true); continue; }
     if (def.boat && def.faction === "darkOne") { drawBoat({ c, px }, e, 0, true); continue; }
     if (def.blightFortress) { drawBlightFortress({ c, px }, e, 0, true); continue; }
     if (isBlightFlier(e.kind)) { drawBlightFlier({ c, px }, e, 0, true, undefined, true); continue; }

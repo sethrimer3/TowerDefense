@@ -1113,19 +1113,14 @@ with rune-lit rails and a bow crystal, one to four masts with billowing
 sails (cream, sea green, blue, violet), gold rails on the two biggest.
 
 
-Living Fortresses have four tiers: Walking Bastion (1,000 difficulty; two
-turrets, four legs, two armor plates), Living Fortress (10,000; four/six/four),
-Walking Citadel (100,000; six/eight/six) and Dread Colossus (1,000,000;
-eight/ten/eight). Body dimensions grow from 2.5 � 3 cells to 5.5 � 6, core HP
-from 1,200 to 150,000, and component HP from 160 to 12,000 (armor has 1.5�
-component HP). Each part has its own small hitbox and HP, follows the body,
-and is individually targetable by existing attacks. Armor plates must all
-be destroyed before the core takes damage. Every lost leg proportionally
-reduces speed, down to 25% with none; destroyed turrets stop firing. Turrets
-bombard player units and buildings every two seconds. Destroyed parts remain
-charred sockets. Core destruction removes surviving parts; only the core counts
-as a kill. The wave budget reserves all 9/15/21/27 components and spawning
-checks room for the complete fortress before releasing it.
+Walking fortresses range from compact Watchposts to massive Colossi. Small chassis (up to 2 cells wide) have six legs: two on each flank and one at the front and rear. Medium chassis (2.5–3.5 cells) have eight, two per side. Massive chassis have twelve, three per side. Every side's legs are evenly spaced. Original and Blight variants share these rules.
+
+Legs accept ground and air attacks. Rooftop turrets are always air targets. With at least three legs, the chassis is invulnerable and untargetable. Dropping to two legs triggers a 0.65-second collapse; the body remains immune until it lands with a dust plume. Ground attacks can then target the whole chassis, dealing the full hit independently to every surviving turret (5 melee damage becomes 5 to each turret). The body flashes gently, has no separate health and cannot keep the enemy alive. Cosmetic armor does not protect it. The health bar shows total surviving turret HP.
+
+Every lost leg slows the walker proportionally. One leg can still drag it forward, leaving bounded crumbled rock that fades over five seconds; zero legs immobilize it while surviving guns continue to fire. Destroying all turrets immediately explodes and removes the whole enemy, including its legs and decorative armor, and grants exactly one kill. Area attacks cannot hit a grounded chassis and duplicate damage on its mounts in the same event. Ground-only cannon blasts and mines cannot hit rooftop mounts directly.
+
+Top-down sprites have symmetric parapets and deck plates. Jointed legs alternate planted stances and lifted return strokes driven by actual distance, so they stay still while the fortress is idle. Long cannon barrels and rail channels visibly aim while reloading. The body drops between the ground-level feet; rooftop target positions follow it. Reduce Motion holds the stride and snaps the body drop. Full assembly, including legacy decorative armor slots, is still reserved atomically against the wave cap.
+
 
 
 ## Cannon attunements

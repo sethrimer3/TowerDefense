@@ -1,167 +1,191 @@
+import { fortressFootStride } from "../src/defend/fortress-motion-art.ts";
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DefendSim } from '../src/defend/sim.ts';
 import { defaultLayout, fitLayout } from '../src/defend/layout.ts';
 import { generateCity } from '../src/defend/citygen.ts';
-import { ENEMIES, UPGRADES, enemySize, type EnemyKind } from '../src/defend/catalog.ts';
+import { ENEMIES, UPGRADES, enemyFlying, groundMeleeTarget, type EnemyKind } from '../src/defend/catalog.ts';
 import { enemySpeed } from '../src/defend/enemy-abilities.ts';
 import { stepEnemy } from '../src/defend/enemies.ts';
-import { syncFortress } from '../src/defend/fortress.ts';
-import { buildDifficultyWave, MAX_WAVE_ENEMIES } from '../src/defend/waves.ts';
+import { syncFortress, stepFortressCore, finishFortressStep, FORTRESS_FALL, fortressLift, fortressAreaTargets } from '../src/defend/fortress.ts';
+import { MAX_WAVE_ENEMIES, slots, buildDifficultyWave } from '../src/defend/waves.ts';
 import { fortressBodyPixels } from '../src/defend/fortress-art.ts';
 import { journalHTML } from '../src/defend/journal.ts';
 import { decodeDefendSave, defaultDefendSave } from '../src/defend/progress.ts';
 
-function simulation() {
+const kinds = Object.values(ENEMIES).filter(d => d.fortress).map(d => d.kind);
+function scene(kind: EnemyKind = 'fortress') {
   const fit = fitLayout(defaultLayout()); assert.ok(fit.ok);
-  return new DefendSim(generateCity(fit, 3), Object.fromEntries(UPGRADES.map(u => [u.id, 0])) as any, 4);
+  const sim = new DefendSim(generateCity(fit, 3), Object.fromEntries(UPGRADES.map(u => [u.id, 0])) as any, 4);
+  sim.breakT = 1e9; sim.soldiers = []; sim.civilians = [];
+  (sim as any).spawnEnemy(kind);
+  const core = sim.enemies[0]; core.x = 10; core.y = 8;
+  core.walker!.x = core.x; core.walker!.y = core.y; syncFortress(core);
+  const legs = core.fortressParts!.filter(p => p.fortressPart!.role === 'leg');
+  const turrets = core.fortressParts!.filter(p => p.fortressPart!.role === 'turret');
+  return { sim, core, legs, turrets };
 }
-const kinds: EnemyKind[] = ['fortressLesser', 'fortress', 'fortressGreater', 'fortressSovereign'];
-const smallKinds: EnemyKind[] = ['fortressHut', 'fortressOutpost', 'fortressTower', 'fortressKeep'];
+function ground(s: ReturnType<typeof scene>, left = 2) {
+  for (const leg of s.legs.slice(left)) s.sim.hurtEnemy(leg, 1e9, true, 'melee');
+  stepFortressCore(s.sim, s.core, FORTRESS_FALL);
+}
 
-test('small walkers cost exactly 5, 10, 50 and 100, with progressively smaller-than-bastion bodies and parts', () => {
-  for (const [n, kind] of smallKinds.entries()) {
-    const def = ENEMIES[kind], fort = def.fortress!;
-    assert.equal(def.cost, [5, 10, 50, 100][n]);
-    assert.ok(def.size < ENEMIES.fortressLesser.size && fort.height < ENEMIES.fortressLesser.fortress!.height);
-    if (n) {
-      const previous = ENEMIES[smallKinds[n - 1]];
-      assert.ok(def.size > previous.size && def.hp > previous.hp && fort.partScale! > previous.fortress!.partScale!);
+test('every walker has six, eight or twelve evenly spaced legs on all four sides', () => {
+  for (const kind of kinds) {
+    const { core, legs, turrets } = scene(kind), def = ENEMIES[kind], fort = def.fortress!;
+    const expected = def.size <= 2 ? 6 : def.size <= 3.5 ? 8 : 12;
+    assert.equal(legs.length, expected);
+    assert.deepEqual([0, 1, 2, 3].map(side => legs.filter(p => p.fortressPart!.side === side).length), expected === 6 ? [2, 1, 2, 1] : Array(4).fill(expected / 4));
+    for (let side = 0; side < 4; side++) {
+      const positions = legs.filter(p => p.fortressPart!.side === side).map(p => side % 2 ? p.fortressPart!.dx : p.fortressPart!.dy);
+      const span = side % 2 ? def.size : fort.height;
+      positions.forEach((position, n) => assert.equal(position, ((n + 1) / (positions.length + 1) - .5) * span));
     }
-    // Select each variant through the actual affordable wave roster.
-    const roster = Object.values(ENEMIES).filter(d => !d.hatched && !d.scriptedOnly && d.cost <= def.cost);
-    const roll = (roster.findIndex(d => d.kind === kind) + .5) / roster.length;
-    assert.deepEqual(buildDifficultyWave(def.cost, () => roll), [kind]);
-    const sim = simulation(); (sim as any).spawnEnemy(kind);
-    const core = sim.enemies[0], parts = core.fortressParts!;
-    assert.equal(parts.length, fort.legs + fort.armor + fort.turrets);
-    assert.ok(parts.every(p => enemySize(p) < enemySize(core)));
-    assert.equal(new Set(sim.enemies.map(e => e.id)).size, parts.length + 1);
-    for (const part of parts) {
-      assert.ok(Math.abs(part.fortressPart!.dy) < fort.height / 2);
-      assert.equal(part.hp, fort.partHp * (part.fortressPart!.role === 'armor' ? 1.5 : 1));
-    }
+    assert.equal(core.hp, turrets.reduce((sum, t) => sum + t.hp, 0));
+    assert.equal(core.walker!.phase, 'raised'); assert.equal(core.untargetable, true);
+    assert.ok(turrets.every(enemyFlying)); assert.ok(turrets.every(t => !groundMeleeTarget(t)));
+    assert.ok(legs.every(t => !enemyFlying(t) && groundMeleeTarget(t)));
   }
 });
 
-test('each small walker retains armor, leg damage, independent guns and a single rewarded core', () => {
-  for (const kind of smallKinds) {
-    const sim = simulation(); (sim as any).spawnEnemy(kind);
-    const core = sim.enemies[0], parts = core.fortressParts!, speed = enemySpeed(sim, core);
-    assert.equal(sim.hurtEnemy(core, 1), false);
-    core.x = 10; core.y = 10; syncFortress(core);
-    const turret = parts.find(p => p.fortressPart!.role === 'turret')!;
-    sim.soldiers.push({ id: 100, x: turret.x, y: turret.y + 1, hp: 1000, flash: 0, kind: 'sword' } as any);
-    turret.cd = 0; stepEnemy(sim, turret, 1 / 30);
-    assert.ok(sim.soldiers[0].hp < 1000);
-    const hp = sim.soldiers[0].hp;
-    sim.hurtEnemy(turret, 1e9, true, 'melee'); stepEnemy(sim, turret, 10);
-    assert.equal(sim.soldiers[0].hp, hp);
-    for (const part of parts.filter(p => p.fortressPart!.role === 'leg')) sim.hurtEnemy(part, 1e9, true, 'melee');
-    assert.equal(enemySpeed(sim, core), speed * .25);
-    assert.equal(sim.hurtEnemy(core, 1), false);
-    for (const part of parts.filter(p => p.fortressPart!.role === 'armor')) sim.hurtEnemy(part, 1e9, true, 'melee');
-    assert.equal(sim.hurtEnemy(core, 1), true);
-    sim.hurtEnemy(core, 1e9, true, 'melee'); (sim as any).sweepAway();
-    assert.equal(sim.enemies.length, 0);
-    assert.equal(sim.slain[kind], 1);
-  }
+test('planted feet hold their world position and opposite legs use alternate banks', () => {
+  const a = fortressFootStride(.1, .65, 0, 0), b = fortressFootStride(.11, .65, 0, 0);
+  assert.equal(a.lift, 0); assert.equal(b.lift, 0);
+  assert.ok(Math.abs((.1 + a.forward) - (.11 + b.forward)) < 1e-12);
+  const left = fortressFootStride(.2, .65, 0, 0), right = fortressFootStride(.2, .65, 0, 2);
+  assert.equal(left.lift, 0); assert.ok(right.lift > 0);
 });
 
-test('small walkers spawn atomically at the cap and round-trip journal discovery', () => {
-  for (const kind of smallKinds) {
-    const sim = simulation(), f = ENEMIES[kind].fortress!, count = 1 + f.legs + f.armor + f.turrets;
-    (sim as any).waveSpawned = MAX_WAVE_ENEMIES - count + 1;
-    (sim as any).spawnEnemy(kind); assert.equal(sim.enemies.length, 0);
-    (sim as any).waveSpawned = MAX_WAVE_ENEMIES - count;
-    (sim as any).spawnEnemy(kind);
-    assert.equal(sim.enemies.length, count);
-    assert.equal((sim as any).waveSpawned, MAX_WAVE_ENEMIES);
-  }
-  const saved = defaultDefendSave(); saved.discovered = [...smallKinds]; saved.journalRead = [...smallKinds];
-  const decoded = decodeDefendSave(saved)!;
-  assert.deepEqual(decoded.discovered, smallKinds);
-  assert.deepEqual(decoded.journalRead, smallKinds);
-  const html = journalHTML(decoded.discovered);
-  for (const kind of smallKinds) assert.ok(html.includes(ENEMIES[kind].name));
+test('raised and falling chassis are absolutely immune; air and ground attacks can break legs', () => {
+  const s = scene(), { sim, core, legs, turrets } = s;
+  const hp = turrets.map(t => t.hp);
+  assert.equal(sim.hurtEnemy(core, 1e9, true, 'ranged', undefined, true, 'physical', 1), false);
+  assert.equal(sim.hurtEnemy(turrets[0], 5, true, 'melee'), false);
+  assert.equal(sim.hurtEnemy(legs[0], 5, true, 'melee'), true);
+  assert.equal(sim.hurtEnemy(legs[0], 5, true, 'ranged'), true);
+  for (const leg of legs.slice(2)) sim.hurtEnemy(leg, 1e9, true, 'melee');
+  assert.equal(core.walker!.phase, 'falling');
+  stepFortressCore(sim, core, FORTRESS_FALL / 2);
+  assert.ok(fortressLift(core) > 0 && fortressLift(core) < .18);
+  assert.equal(sim.hurtEnemy(core, 5, true, 'melee'), false);
+  assert.deepEqual(turrets.map(t => t.hp), hp);
+  stepFortressCore(sim, core, FORTRESS_FALL / 2);
+  assert.equal(core.walker!.phase, 'grounded'); assert.equal(core.untargetable, undefined);
+  assert.equal(fortressLift(core), 0); assert.equal(sim.effects.filter(e => e.kind === 'dust').length, 1);
+  stepFortressCore(sim, core, 1);
+  assert.equal(sim.effects.filter(e => e.kind === 'dust').length, 1);
 });
 
-test('compact fortress art fits each native footprint and shows armor loss, damage and pennants', () => {
-  for (const kind of smallKinds) {
-    const def = ENEMIES[kind], f = def.fortress!, w = def.size * 8, h = f.height * 8;
-    const art = (armor = true, hurt = false, flag = 0) => fortressBodyPixels(f.tier, w, h, armor, hurt, flag, 1);
-    const whole = art();
-    assert.equal(whole.length, w * h);
-    assert.ok(whole.filter(p => p !== 0).length > w * h / 2);
-    assert.notDeepEqual(art(false), whole);
-    assert.notDeepEqual(art(true, true), whole);
-    assert.notDeepEqual(art(true, false, 1), whole);
-    assert.deepEqual(art(), whole);
-  }
+test('a fortress blocked by a crowd still completes its collapse', () => {
+  const s = scene();
+  for (const leg of s.legs.slice(2)) s.sim.hurtEnemy(leg, 1e9, true, 'melee');
+  s.sim.crowd.holds = () => true;
+  stepEnemy(s.sim, s.core, FORTRESS_FALL);
+  assert.equal(s.core.walker!.phase, 'grounded');
+  assert.ok(s.sim.effects.some(e => e.kind === 'dust'));
 });
 
-test('fortress tiers have growing bodies and independent parts, with one shared species', () => {
-  for (const [n, kind] of kinds.entries()) {
-    const sim = simulation(); (sim as any).spawnEnemy(kind);
-    const core = sim.enemies.find(e => !e.fortressPart)!;
-    assert.equal(sim.enemies.length, [9, 15, 21, 27][n]);
-    assert.equal(core.fortressParts!.filter(p => p.fortressPart?.role === 'turret').length, 2 + n * 2);
-    assert.ok(core.fortressParts!.every(p => p.id !== core.id && p.hp > 0 && enemySize(p) < enemySize(core)));
-    assert.equal(new Set(sim.enemies.map(e => e.id)).size, sim.enemies.length);
-    assert.equal(ENEMIES[kind].cost, [1000, 10000, 100000, 1000000][n]);
-    if (n) assert.ok(enemySize(core) > ENEMIES[kinds[n - 1]].size);
-  }
+test('each grounded body hit deals its full damage separately to every surviving turret', () => {
+  const s = scene(); ground(s); const { sim, core, turrets } = s;
+  const before = turrets.map(t => t.hp);
+  assert.equal(sim.hurtEnemy(core, 5, true, 'melee'), true);
+  assert.deepEqual(turrets.map(t => t.hp), before.map(hp => hp - 5));
+  assert.ok(core.flash > 0); assert.equal(core.hp, turrets.reduce((sum, t) => sum + t.hp, 0));
+  assert.equal(sim.hurtEnemy(turrets[0], 5, true, 'melee'), false);
+  assert.equal(sim.hurtEnemy(turrets[0], 5, true, 'ranged'), true);
+  assert.equal(turrets[0].hp, before[0] - 10);
+  assert.equal(turrets[1].hp, before[1] - 5);
+  assert.equal(groundMeleeTarget(core), true);
 });
 
-test('plates block core damage; destroying legs slows it; breaking parts never harms siblings', () => {
-  const sim = simulation(); (sim as any).spawnEnemy('fortressLesser');
-  const core = sim.enemies[0], parts = core.fortressParts!, hp = core.hp;
-  assert.equal(sim.hurtEnemy(core, 100), false); assert.equal(core.hp, hp);
-  const legs = parts.filter(p => p.fortressPart?.role === 'leg');
-  const base = enemySpeed(sim, core);
+test('two or one legs pull the grounded chassis; no legs means no movement', () => {
+  const s = scene(); ground(s, 2); const { sim, core, legs } = s;
+  sim.scenario = { routeEnemy: (e, dt) => { e.y += enemySpeed(sim, e) * dt; return true; } };
+  const base = ENEMIES[core.kind].speed;
+  assert.equal(enemySpeed(sim, core), base * 2 / legs.length);
+  const y = core.y; stepEnemy(sim, core, .2); finishFortressStep(sim, core);
+  assert.ok(core.y > y); assert.ok(core.walker!.walk > 0);
+  sim.hurtEnemy(legs[1], 1e9, true, 'melee');
+  assert.equal(enemySpeed(sim, core), base / legs.length);
+  const y1 = core.y; stepEnemy(sim, core, .2); finishFortressStep(sim, core); assert.ok(core.y > y1);
   sim.hurtEnemy(legs[0], 1e9, true, 'melee');
-  assert.ok(enemySpeed(sim, core) < base);
-  assert.equal(legs[1].hp, legs[1].maxHp);
-  for (const leg of legs.slice(1)) sim.hurtEnemy(leg, 1e9, true, 'melee');
-  assert.equal(enemySpeed(sim, core), base * .25);
-  const armor = parts.filter(p => p.fortressPart?.role === 'armor');
-  sim.hurtEnemy(armor[0], 1e9, true, 'melee'); assert.equal(sim.hurtEnemy(core, 100), false);
-  sim.hurtEnemy(armor[1], 1e9, true, 'melee'); assert.equal(sim.hurtEnemy(core, 100), true);
-  assert.equal(core.hp, hp - 100);
+  assert.equal(enemySpeed(sim, core), 0);
+  const point = { x: core.x, y: core.y }; stepEnemy(sim, core, 1);
+  assert.deepEqual({ x: core.x, y: core.y }, point);
 });
 
-test('turrets attack independently, stop when destroyed, and stay attached to movement', () => {
-  const sim = simulation(); (sim as any).spawnEnemy('fortressLesser');
-  const core = sim.enemies[0], turret = core.fortressParts!.find(p => p.fortressPart?.role === 'turret')!;
-  core.x = 10; core.y = 10; syncFortress(core);
-  sim.soldiers.push({ id: 100, x: turret.x, y: turret.y + 1, hp: 1000, flash: 0, kind: 'sword' } as any);
-  turret.cd = 0; stepEnemy(sim, turret, 1 / 30);
-  assert.ok(sim.soldiers[0].hp < 1000);
-  const hp = sim.soldiers[0].hp; turret.hp = 0; stepEnemy(sim, turret, 10);
-  assert.equal(sim.soldiers[0].hp, hp);
-  core.x += 2; core.y += 1; syncFortress(core);
-  const alive = core.fortressParts!.find(p => p.hp > 0)!;
-  assert.equal(alive.x, core.x + alive.fortressPart!.dx);
-  assert.equal(alive.y, core.y + alive.fortressPart!.dy);
+test('dragging leaves bounded transient rock debris only along actual movement', () => {
+  const s = scene(); ground(s); const { sim, core } = s;
+  finishFortressStep(sim, core); assert.equal(sim.fortressRubble.length, 0);
+  for (let n = 0; n < 300; n++) { core.y += .2; finishFortressStep(sim, core); }
+  assert.equal(sim.fortressRubble.length, 256);
+  assert.ok(sim.fortressRubble.every(r => r.life === 5));
+  (sim as any).tick(6); assert.equal(sim.fortressRubble.length, 0);
 });
 
-test('core death cleans up parts and rewards exactly one enemy', () => {
-  const sim = simulation(); (sim as any).spawnEnemy('fortressLesser'); const core = sim.enemies[0];
-  for (const p of core.fortressParts!) if (p.fortressPart?.role === 'armor') p.hp = 0;
-  sim.hurtEnemy(core, 1e9, true, 'melee'); (sim as any).sweepAway();
-  assert.equal(sim.enemies.length, 0); assert.equal(sim.slain.fortressLesser, 1);
-  assert.equal(sim.corpses.length, 0);
+test('all turrets dead destroys the whole walker immediately and credits exactly one kill', () => {
+  for (const kind of kinds) {
+    const { sim, core, legs, turrets } = scene(kind);
+    let credited = 0; sim.tally = (_b, _d, killed) => { if (killed) credited++; };
+    for (const turret of turrets) sim.hurtEnemy(turret, 1e9, true, 'ranged', { x: 0, y: 0, building: 0 });
+    assert.equal(core.hp, 0); assert.ok(legs.every(p => p.hp === 0));
+    assert.ok(sim.enemies.every(p => p.hp <= 0)); assert.equal(credited, 1);
+    assert.equal(sim.effects.filter(e => e.kind === 'boom').length, 1);
+    (sim as any).sweepAway(); assert.equal(sim.enemies.length, 0); assert.equal(sim.slain[kind], 1);
+  }
 });
 
-test('fortress spawning is atomic at the lifetime cap, and wave reservations include all parts', () => {
-  const sim = simulation(); (sim as any).waveSpawned = 4995;
-  (sim as any).spawnEnemy('fortressLesser'); assert.equal(sim.enemies.length, 0);
-  for (const budget of [1000, 100000, 1000000000000]) {
-    const queue = buildDifficultyWave(budget, () => .99);
-    const count = queue.reduce((sum, k) => {
-      const d = ENEMIES[k], f = d.fortress;
-      return sum + (f ? 1 + f.turrets + f.legs + f.armor : d.chainLength ?? d.summonSlots ?? 1 + (d.splits?.count ?? 0));
-    }, 0);
-    assert.ok(count <= 5000);
+test('area hits cannot double strike both chassis and rooftop mounts; ground blasts cannot hit raised mounts', () => {
+  const s = scene(), { sim, core, turrets } = s;
+  const t = turrets[0], hp = t.hp;
+  sim.explode(t.x, t.y, { r: .1, damage: 10, friendlyFire: false, groundOnly: true });
+  assert.equal(t.hp, hp);
+  sim.explode(t.x, t.y, { r: .1, damage: 10, friendlyFire: false }); assert.equal(t.hp, hp - 10);
+  ground(s);
+  const before = turrets.map(t => t.hp);
+  assert.ok(fortressAreaTargets(sim.enemies).every(e => e.fortressPart?.role !== 'turret'));
+  sim.explode(core.x, core.y, { r: 10, damage: 10, friendlyFire: false });
+  assert.deepEqual(turrets.map(t => t.hp), before.map(hp => hp - 10));
+});
+
+test('collision queries omit raised chassis and decorative armor, then expose the grounded body', () => {
+  const s = scene(); (s.sim as any).indexEnemies();
+  const raised = s.sim.enemiesNear(s.core.x, s.core.y, 10);
+  assert.ok(!raised.includes(s.core)); assert.ok(raised.every(e => e.fortressPart?.role !== 'armor'));
+  assert.ok(s.turrets.every(t => raised.includes(t)));
+  ground(s); (s.sim as any).indexEnemies();
+  assert.ok(s.sim.enemiesNear(s.core.x, s.core.y, 10).includes(s.core));
+});
+
+test('turrets continuously aim while reloading and remain aligned during the fall', () => {
+  const { sim, core, turrets: [turret], legs } = scene();
+  const foe = { id: 100, x: turret.x + 1, y: turret.y + 1, hp: 1000, flash: 0, kind: 'sword' } as any;
+  sim.soldiers.push(foe); turret.cd = 0; stepEnemy(sim, turret, 1 / 30);
+  assert.ok(foe.hp < 1000); assert.deepEqual(turret.aim, { x: foe.x, y: foe.y });
+  foe.x += .5; stepEnemy(sim, turret, 1 / 30); assert.equal(turret.aim!.x, foe.x);
+  for (const p of legs.slice(2)) sim.hurtEnemy(p, 1e9, true, 'melee');
+  stepFortressCore(sim, core, .2); syncFortress(core);
+  assert.equal(turret.y, core.y + turret.fortressPart!.dy - fortressLift(core));
+});
+
+test('spawn reservations remain atomic and the journal preserves all walker discoveries', () => {
+  for (const kind of kinds) {
+    const s = scene(kind).sim, reserve = slots(ENEMIES[kind]); s.enemies = [];
+    (s as any).waveSpawned = MAX_WAVE_ENEMIES - reserve + 1; (s as any).spawnEnemy(kind); assert.equal(s.enemies.length, 0);
+    (s as any).waveSpawned = MAX_WAVE_ENEMIES - reserve; (s as any).spawnEnemy(kind); assert.equal(s.enemies.length, reserve);
+  }
+  const saved = defaultDefendSave(); saved.discovered = [...kinds]; saved.journalRead = [...kinds];
+  assert.deepEqual(decodeDefendSave(saved).discovered, kinds);
+  const html = journalHTML(kinds); for (const kind of kinds) assert.match(html, new RegExp(ENEMIES[kind].name));
+  assert.ok(buildDifficultyWave(1e12, () => .99).reduce((sum, k) => sum + slots(ENEMIES[k]), 0) <= MAX_WAVE_ENEMIES);
+});
+
+test('top-down body sources retain native dimensions, damage variants and deterministic material', () => {
+  for (const kind of kinds.filter(k => !ENEMIES[k].blightFortress)) {
+    const d = ENEMIES[kind], f = d.fortress!, w = d.size * 8, h = f.height * 8;
+    const whole = fortressBodyPixels(f.tier, w, h, true, false, 0, 1);
+    assert.equal(whole.length, w * h); assert.ok(whole.every(p => p !== 0));
+    assert.notDeepEqual(fortressBodyPixels(f.tier, w, h, true, true, 0, 1), whole);
+    assert.deepEqual(fortressBodyPixels(f.tier, w, h, true, false, 0, 1), whole);
   }
 });

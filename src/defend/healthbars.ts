@@ -24,7 +24,7 @@ export function healthbarEnemies(sim: DefendSim): Enemy[] {
   const threshold = trackHealthbarPeak(sim), best: Enemy[] = [];
   let wormShown = false;
   for (const e of sim.enemies) {
-    if (e.hp <= 0 || e.kind === "blightWorm" && e.untargetable || (e.burrow && e.burrow > 0) || e.leader !== undefined || ENEMIES[e.kind].cost < threshold) continue;
+    if (e.fortressPart || e.hp <= 0 || e.kind === "blightWorm" && e.untargetable || (e.burrow && e.burrow > 0) || e.leader !== undefined || ENEMIES[e.kind].cost < threshold) continue;
     if (e.kind === "blightWorm") { if (wormShown) continue; wormShown = true; }
     let i = best.length;
     while (i > 0 && compare(e, best[i - 1]) < 0) i--;

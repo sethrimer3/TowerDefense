@@ -1,3 +1,4 @@
+import { drawFortressRubble } from "./fortress-motion-art.ts";
 import { drawBlightFortress, drawBlightLasers } from "./blight-fortress-art.ts";
 import { isBlightFlier } from "./blight-fliers.ts";
 import { drawBlightFlier } from "./blight-flier-art.ts";
@@ -124,6 +125,7 @@ function enemyInk(e: Enemy) {
 export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, healthbars = false, timing?: { entityMs: number }, simple: Simple = {}, outline?: UnitOutline, sides?: UnitInks, contours?: { defer?: boolean }) {
   // Track the wave peak even when the setting is off.
   if (!healthbars) trackHealthbarPeak(sim);
+  drawFortressRubble(b, sim);
   for (const e of sim.enemies) drawWormShadow(b, e, sim.time, simple.effects !== false, simple.reduceMotion);
   drawBlackHoles(b, sim);
   drawPoisonClouds(b, sim);
@@ -672,6 +674,7 @@ function drawHandTorch({ c, px }: Brush, at: { x: number; y: number; id: number 
 export function drawEnemyArt(b: Brush, e: Enemy, sim: DefendSim, under = b, reduceMotion = false) {
   const def = ENEMIES[e.kind];
   if (!wormBodyVisible(e)) { drawWormShadow(under, e, sim.time); return; }
+  if (def.fortress && !def.blightFortress) return drawFortress(b, e, sim, reduceMotion);
   if (def.blightFortress) return drawBlightFortress(b, e, sim.time, reduceMotion);
   if (isBlightFlier(e.kind)) return drawBlightFlier(b, e, sim.time, reduceMotion, under);
   if (def.darkPixels) {
@@ -773,6 +776,15 @@ function drawEffect(b: Brush, fx: Effect) {
   if (fx.kind === "boom") return drawExplosion(c, px, fx);
   if (fx.kind === "firework") return drawFirework(b, fx);
   if (fx.kind === "steam") return drawSteam(b, fx, k);
+  if (fx.kind === "dust" && fx.seed !== undefined) {
+    for (let n = 0; n < 22; n++) {
+      const a = n * 2.4, spread = fx.r * (.25 + k * .85) * (.5 + hash01(fx.seed, n) * .5);
+      const size = px * fx.r * (.12 + hash01(n, fx.seed) * .1) * (1 + k * .8);
+      c.fillStyle = `rgba(158,145,125,${(1 - k) * .42})`;
+      c.fillRect((fx.x + Math.cos(a) * spread) * px - size / 2, (fx.y + Math.sin(a) * spread) * px - size / 2, size, size);
+    }
+    return;
+  }
   if (fx.kind === "dust") {
     c.fillStyle = `rgba(150,140,125,${0.45 * (1 - k)})`;
     c.beginPath();

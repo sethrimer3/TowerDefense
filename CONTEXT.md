@@ -126,7 +126,7 @@ A black enemy that splits into three broodlings when she dies.
 A small, quick enemy hatched only from a fallen Mother.
 
 **Walking fortress**:
-An enemy castle on legs (Walking Watchpost, Walking Outpost, Walking Fortlet, Walking Stronghold, Walking Bastion, Living Fortress, Walking Citadel, Dread Colossus). Its turrets, legs and armor are separately destructible; lost legs slow it, and destroying all armor exposes its core.
+An enemy castle on legs (Walking Watchpost, Walking Outpost, Walking Fortlet, Walking Stronghold, Walking Bastion, Living Fortress, Walking Citadel, Dread Colossus). Its legs are ground-and-air targets and its rooftop weapons are always air targets. Small walkers have six legs, medium ones eight (two per side) and massive ones twelve (three per side). With three or more legs its body is invulnerable; at two it crashes down in dust. Once grounded, a body hit deals the same damage to each surviving turret. One leg still pulls it along, leaving temporary crumbled rock; no legs immobilize it. Destroying every turret destroys the whole walker; its body has no independent life.
 
 **Briarling**, **Moss Boar** and **Root Treant**:
 Mossbound creatures: a quick thorn sprout, a sturdy tusked raider and a slow walking tree that releases three briarlings when felled.

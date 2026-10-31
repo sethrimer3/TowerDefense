@@ -1,3 +1,4 @@
+import { stepFortressCore } from "./fortress.ts";
 import { isBlightFlier, stepDartBurst } from "./blight-fliers.ts";
 import { stepBlightWorm } from "./blight-worm.ts";
 import { approachBuildingContact, approachDefenderContact, buildingContactPoint, defenderInContact, structureContactRect, CONTACT_OUTLINE } from "./contact.ts";
@@ -35,6 +36,7 @@ export function stepEnemy(sim: DefendSim, e: Enemy, dt: number) {
   sim.crowd.add(e);
   const def = ENEMIES[e.kind];
   e.cd -= dt;
+  if (e.walker && stepFortressCore(sim, e, dt)) return;
   if (sim.crowd.holds(e)) return;
   if (e.impaled !== undefined) return;
   if (stepAbilities(sim, e, dt)) return;

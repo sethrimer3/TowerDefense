@@ -1,3 +1,4 @@
+import { drawFortressLegs, drawFortressGun, fortressBodyY } from "./fortress-motion-art.ts";
 /** Solid black walkers; internal light never participates in their contour. */
 import { basicUnitSprite } from "./basic-unit-art.ts";
 import { drawSprite } from "./damage-art.ts";
@@ -42,35 +43,16 @@ function particles(c: CanvasRenderingContext2D, e: Enemy, x: number, y: number, 
 export function drawBlightFortress({ c, px }: Brush, e: Enemy, seconds: number, reduceMotion = false) {
   if (e.fortressPart) return;
   const def = ENEMIES[e.kind], fort = def.fortress!, size = def.size * px;
-  const t = reduceMotion ? 0 : seconds, x = e.x * px - size / 2, y = e.y * px - size / 2;
-  const scale = (fort.partScale ?? 1) * px, parts = e.fortressParts ?? [];
-  c.save(); c.fillStyle = "#000000"; c.strokeStyle = "#000000"; c.lineCap = "square";
-  // Jointed legs and feet behind the square core, matching the attached hitboxes.
-  parts.filter(p => p.fortressPart!.role === "leg" && p.hp > 0).forEach((p, n) => {
-    const side = p.fortressPart!.dx < 0 ? -1 : 1;
-    const hip = e.x * px + side * size * .43, py = p.y * px;
-    const stride = Math.sin(t * 4 + n * Math.PI / 2) * scale * .12;
-    c.lineWidth = scale * .17; c.beginPath(); c.moveTo(hip, py);
-    c.lineTo(hip + side * scale * .42, py - scale * .12);
-    c.lineTo(hip + side * scale * .5, py + scale * .24 + stride); c.stroke();
-    c.fillRect(hip + side * scale * .5 - scale * .14, py + scale * .2 + stride, scale * .28, scale * .15);
-  });
+  const t = reduceMotion ? 0 : seconds, x = e.x * px - size / 2, y = fortressBodyY(e, px, reduceMotion) - size / 2;
+  const scale = (fort.partScale ?? 1) * px;
+  c.save();
+  drawFortressLegs({ c, px }, e, reduceMotion, true);
   drawSprite(c, basicUnitSprite(e.kind, true), x, y, size, size);
   particles(c, e, x, y, size, t, reduceMotion);
-  for (const part of parts) {
-    if (part.hp <= 0) continue;
-    const role = part.fortressPart!.role, qx = part.x * px, qy = part.y * px;
-    c.fillStyle = "#000000";
-    if (role === "armor") { c.fillRect(qx - scale * .14, qy - size * .32, scale * .28, size * .64); continue; }
-    if (role !== "turret") continue;
-    const laser = part.fortressPart!.weapon === "laser";
-    const aim = part.aim, angle = aim ? Math.atan2(aim.y - part.y, aim.x - part.x) : -Math.PI / 2;
-    c.save(); c.translate(qx, qy); c.rotate(angle);
-    c.fillRect(-scale * .23, -scale * .24, scale * .46, scale * .48);
-    c.fillRect(0, -scale * (laser ? .1 : .17), scale * .66, scale * (laser ? .2 : .34));
-    c.fillStyle = laser ? "#c44700" : "#ff8c16";
-    c.fillRect(scale * .53, -scale * (laser ? .045 : .105), scale * .12, scale * (laser ? .09 : .21));
-    c.restore();
+  for (const part of e.fortressParts ?? [])
+    if (part.hp > 0 && part.fortressPart?.role === "turret") drawFortressGun({ c, px }, part, scale, true);
+  if (e.flash > 0) {
+    c.fillStyle = `rgba(255,158,75,${Math.min(.15, e.flash * 1.25)})`; c.fillRect(x, y, size, size);
   }
   c.restore();
 }

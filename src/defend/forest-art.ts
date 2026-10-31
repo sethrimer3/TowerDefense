@@ -1,3 +1,4 @@
+import { enemyFlying } from "./catalog.ts";
 import type { Sun } from "../daylight.ts";
 import { witheredTreeSprite } from "./blight-art.ts";
 import type { BlightTrail, WitherStage } from "./blight-trail.ts";
@@ -1022,7 +1023,7 @@ export class ForestArt {
       if (before !== undefined && u.cd > before + 0.05) felled.push(...damage.hit(u.x, u.y, u.x, u.y, cut));
     };
     for (const s of sim.soldiers) if (isMelee(s)) look(s, BLADES.has(s.kind));
-    for (const e of sim.enemies) if (!ENEMIES[e.kind].flying) look(e, false);
+    for (const e of sim.enemies) if (!enemyFlying(e)) look(e, false);
     this.cooldowns = now;
   }
 

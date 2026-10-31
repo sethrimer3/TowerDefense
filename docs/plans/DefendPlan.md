@@ -52,3 +52,5 @@ Add Defend items here in the form: **What** (one line), **Why**, **Files**, **Te
 - [x] Add Blight counterparts of all eight ships, directly reusing native stats, hull geometry, mast/cabin layouts and water/ice/ramming/sinking behavior. Black hulls, orange sails, red features and shared portal contours; journal, exports and Reduce Motion. `catalog.ts`, `boat-art.ts`; Node parity tests and desktop/phone comparison gallery. Wave placement remains pending.
 
 - [x] Retint Blight heat to dim deep neon orange, gate it to actual night (excluding sunset/dusk/twilight/dawn), and remove the grayscale contrast-reduction wash.
+
+- [x] Rework original/Blight walking fortresses into turret-controlled enemies: 6/8/12 legs on all four sides; air-only rooftop mounts, ground/air legs, an invulnerable raised/falling body, 0.65-second dust collapse at two legs, landed body damage forwarded once to each turret, one-leg dragging with fading rock and zero-leg immobilization. Strict top-down bodies, distance-driven planted feet and continuously aiming cannon/rail barrels. Native targeting/area/kill-accounting tests, desktop/phone gallery and intended `newEnemies` replay update.

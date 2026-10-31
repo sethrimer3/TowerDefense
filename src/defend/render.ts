@@ -1,3 +1,4 @@
+import { enemyFlying } from "./catalog.ts";
 import { CityLife } from "./city-life.ts";
 import { drawCityLife } from "./city-life-art.ts";
 import { torchLevel } from "./city-torches.ts";
@@ -880,7 +881,7 @@ function standingKeep(map: CityMap, sim: DefendSim | null) {
 /** Everyone on foot, for the grass to part around. */
 function walkers(sim: DefendSim): Walker[] {
   const out: Walker[] = [];
-  for (const e of sim.enemies) if (!e.raidProxy && !ENEMIES[e.kind].flying) out.push({ id: e.id, x: e.x, y: e.y, size: enemySize(e) });
+  for (const e of sim.enemies) if (!e.raidProxy && !enemyFlying(e)) out.push({ id: e.id, x: e.x, y: e.y, size: enemySize(e) });
   for (const s of sim.soldiers) if (!garrisoned(s)) out.push({ id: s.id, x: s.x, y: s.y, size: 0.4 });
   for (const c of sim.civilians) out.push({ id: c.id, x: c.x, y: c.y, size: 0.3 });
   return out;
@@ -889,7 +890,7 @@ function walkers(sim: DefendSim): Walker[] {
 /** Everyone a tree can stand over. */
 function beneath(sim: DefendSim): (Under & { foot?: boolean })[] {
   const out: (Under & { foot?: boolean })[] = [];
-  for (const e of sim.enemies) if (!e.raidProxy) out.push({ x: e.x, y: e.y, size: enemySize(e), foot: !ENEMIES[e.kind].flying });
+  for (const e of sim.enemies) if (!e.raidProxy) out.push({ x: e.x, y: e.y, size: enemySize(e), foot: !enemyFlying(e) });
   for (const s of sim.soldiers) if (!garrisoned(s)) out.push({ x: s.x, y: s.y, size: 0.4 });
   for (const c of sim.civilians) out.push({ x: c.x, y: c.y, size: 0.3 });
   return out;

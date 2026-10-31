@@ -1,3 +1,4 @@
+import { enemyFlying } from "./catalog.ts";
 import {captureShot,shotField,chronoTarget} from "./chrono.ts";
 import { spikeKey } from "../specializations.ts";
 /** The city wall's own defenses. Wall spikes cut every enemy on foot that
@@ -148,7 +149,7 @@ export function trappedWallFell(sim: DefendSim, b: Building) {
 
 /** Fliers pass over the stakes, boats sail through the wall and a mole
  * under the ground never touches them. */
-export const onFoot = (e: Enemy) => !ENEMIES[e.kind].flying && !ENEMIES[e.kind].boat && !e.burrow;
+export const onFoot = (e: Enemy) => !enemyFlying(e) && !ENEMIES[e.kind].boat && !e.burrow;
 
 /** How far a wall ballista shoots, with the Smithy's levels and Windlass II. */
 export const wallBallistaRange = (sim: Pick<DefendSim, "levels" | "bonuses">) =>
