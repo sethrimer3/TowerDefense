@@ -1,3 +1,4 @@
+import { drawBlightFortress, drawBlightLasers } from "./blight-fortress-art.ts";
 import { isBlightFlier } from "./blight-fliers.ts";
 import { drawBlightFlier } from "./blight-flier-art.ts";
 import { drawWormShadow, wormBodyVisible } from "./blight-worm-art.ts";
@@ -199,6 +200,7 @@ export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, hea
   drawLasers(b.c, b.px, sim);
   drawShells(b.c, b.px, sim);
   drawSiegeShots(b, sim);
+  drawBlightLasers(b, sim);
   drawFireballs(b.c, b.px, sim, simple.reduceMotion);
   drawMageBolts(b.c, b.px, sim, simple.reduceMotion);
   drawStabs(b.c, b.px, sim);
@@ -670,6 +672,7 @@ function drawHandTorch({ c, px }: Brush, at: { x: number; y: number; id: number 
 export function drawEnemyArt(b: Brush, e: Enemy, sim: DefendSim, under = b, reduceMotion = false) {
   const def = ENEMIES[e.kind];
   if (!wormBodyVisible(e)) { drawWormShadow(under, e, sim.time); return; }
+  if (def.blightFortress) return drawBlightFortress(b, e, sim.time, reduceMotion);
   if (isBlightFlier(e.kind)) return drawBlightFlier(b, e, sim.time, reduceMotion, under);
   if (def.darkPixels) {
     // No sprite lookup, rims, shading, torch, or animated decoration.

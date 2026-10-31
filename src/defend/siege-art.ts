@@ -378,6 +378,15 @@ export function drawSiegeShots({ c, px }: Brush, sim: DefendSim) {
     if (s.t < 0) continue;
     const k = Math.min(1, s.t / s.dur);
     const { gx, gy, ax, ay } = at(s, k);
+    if (s.energy) {
+      for (let n = 8; n >= 1; n--) {
+        const t = at(s, Math.max(0, k - n * .018));
+        dot(t.ax, t.ay, `rgba(255,92,0,${(1 - n / 8) * .65})`, 3 * (1 - n / 12));
+      }
+      c.fillStyle = "#e65500"; c.beginPath(); c.arc(ax * px, ay * px, px * .16, 0, Math.PI * 2); c.fill();
+      c.fillStyle = "#ffb13b"; c.beginPath(); c.arc(ax * px, ay * px, px * .1, 0, Math.PI * 2); c.fill();
+      continue;
+    }
     if (s.kind === "bolt") {
       const d = Math.hypot(s.x1 - s.x0, s.y1 - s.y0) || 1;
       const ux = (s.x1 - s.x0) / d, uy = (s.y1 - s.y0) / d;

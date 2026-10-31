@@ -1,3 +1,4 @@
+import { drawBlightFortress } from "./blight-fortress-art.ts";
 import { isBlightFlier } from "./blight-fliers.ts";
 import { drawBlightFlier } from "./blight-flier-art.ts";
 import { wormBodyVisible } from "./blight-worm-art.ts";
@@ -80,6 +81,7 @@ export function drawSimpleEnemies({ c, px }: Brush, enemies: readonly Enemy[], r
   for (const e of enemies) {
     const def = ENEMIES[e.kind];
     if (def.darkPixels) continue;
+    if (def.blightFortress) { drawBlightFortress({ c, px }, e, 0, true); continue; }
     if (isBlightFlier(e.kind)) { drawBlightFlier({ c, px }, e, 0, true, undefined, true); continue; }
     queue(px, k, e.x, e.y, enemySize(e), e.flash > 0 ? "#ffffff" : def.color, inks?.ink(e.id) ?? (e.marked ? "#f2c94c" : def.boss ? "#7a1616" : "#000000"));
   }

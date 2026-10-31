@@ -769,3 +769,12 @@ A workshop whose carpenters leave to repair the city. It begins with two workers
 
 ### Carpentry
 The Repair shop's initial skill: rebuilding destroyed houses and service buildings. Advanced carpentry extends repairs to infantry buildings and towers.
+
+**Blight Cannon**:
+A small solid-black walking fortress with a burning noise perimeter, orange right-angle particle trails inside its square body, and a turret firing orange energy cannonballs.
+
+**Blight Lance**:
+A small Blight walker whose deep-orange laser pierces people and structures along its firing line.
+
+**Blight Fortress**:
+A medium Blight walker carrying one energy-cannon turret and one piercing-laser turret. Its weapons, legs and armor can be destroyed independently.

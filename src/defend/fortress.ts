@@ -1,3 +1,4 @@
+import { fireBlightTurret } from "./blight-fortress.ts";
 import { ENEMIES } from "./catalog.ts";
 import { hostileBurst } from "./hostile-attacks.ts";
 import { enemyDamage } from "./enemy-abilities.ts";
@@ -13,10 +14,12 @@ export function assembleFortress(sim: DefendSim, core: Enemy) {
       const side = n % 2 ? 1 : -1, row = Math.floor(n / 2), rows = Math.ceil(count / 2);
       const scale = fort.partScale ?? 1;
       const dx = count === 1 && role === "turret" ? 0 : side * (def.size / 2 + (role === "leg" ? .2 : role === "armor" ? -.2 : -.65) * scale);
-      const dy = count === 1 && role === "turret" ? -fort.height / 4 : (row - (rows - 1) / 2) * (fort.height - .8 * scale) / Math.max(1, rows - 1);
+      let dy = count === 1 && role === "turret" ? -fort.height / 4 : (row - (rows - 1) / 2) * (fort.height - .8 * scale) / Math.max(1, rows - 1);
+      if (def.blightFortress && role === "turret") dy = -fort.height / 2 + .12 * scale;
       const part = sim.spawnAuxiliary(core.kind, core.x + dx, core.y + dy);
       if (!part) continue;
       part.fortressPart = { core: core.id, role, dx, dy };
+      if (role === "turret" && def.blightFortress) part.fortressPart.weapon = def.blightFortress === "dual" ? (n === 0 ? "cannon" : "laser") : def.blightFortress;
       part.hp = part.maxHp = fort.partHp * (role === "armor" ? 1.5 : 1);
       part.raisedDamage = def.damage * .5;
       part.cd = n * .15;
@@ -43,6 +46,10 @@ export function stepFortress(sim: DefendSim, part: Enemy, _dt: number): boolean 
   const building = sim.map.buildings.find(b => sim.intact(b) && rectDist(b.rect, part.x, part.y) <= range);
   const target = foe ?? (building ? nearestPoint(building.rect, part.x, part.y) : null);
   if (!target) return true;
+  if (data.weapon) {
+    fireBlightTurret(sim, part, target, range);
+    return true;
+  }
   part.cd = 2;
   hostileBurst(sim, target.x, target.y, .7, enemyDamage(sim, part));
   sim.effects.push({ kind: "boom", x: target.x, y: target.y, r: .7, t: 0, seed: part.id });

@@ -1,3 +1,4 @@
+import { stepBlightLasers, type BlightLaser } from "./blight-fortress.ts";
 import { BLIGHT_FLIERS, dartDirection, isBlightPrism } from "./blight-fliers.ts";
 import { BlightTrail } from "./blight-trail.ts";
 import { BLIGHT_WORM, initWorm, promoteWorm, wormOpenPoint, type WormState } from "./blight-worm.ts";
@@ -139,7 +140,7 @@ export type Enemy = {
   burnOrigin?: DamageOrigin;
   /** The share of its pace a signal fire leaves it while marked; absent otherwise. */
   slowed?: number;
-  fortressPart?: { core: number; role: "turret" | "leg" | "armor"; dx: number; dy: number };
+  fortressPart?: { core: number; role: "turret" | "leg" | "armor"; dx: number; dy: number; weapon?: "cannon" | "laser" };
   fortressParts?: Enemy[];
   facing?: { x: number; y: number };
   /** Locked, axis-aligned destination for a sliding cube. */
@@ -395,7 +396,7 @@ export class DefendSim {
   /** The run's tally for the summary when the keep falls; not part of the
    * replayed state. */
   readonly stats = new BattleStats();
-  readonly slain: Record<EnemyKind, number> = { blightDart: 0, blightPrism: 0, greaterBlightPrism: 0, miniDarkling: 0, darkling: 0, largeDarkling: 0, majorDarkling: 0, significantDarkling: 0, blightWorm: 0, roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0, darkKnight: 0, bombOrc: 0, bombBird: 0, voidSparrow: 0, shieldLesser: 0, shieldGreater: 0, poisonLesser: 0, poisonBearer: 0, poisonGreater: 0, poisonSovereign: 0, siegeBeetle: 0, burrowingMole: 0, necromancer: 0, skeleton: 0, bannerCaptain: 0, mirrorKnight: 0, leechSwarm: 0, ashPhoenix: 0, phoenixEgg: 0, blinkImp: 0, fortressHut: 0, fortressOutpost: 0, fortressTower: 0, fortressKeep: 0, fortressLesser: 0, fortress: 0, fortressGreater: 0, fortressSovereign: 0, rollingCannon: 0, ballista: 0, fireworkLauncher: 0, trebuchet: 0, bombard: 0, rocketBattery: 0, boatDinghy: 0, boatSailboat: 0, boatCutter: 0, boatCog: 0, boatLesser: 0, boat: 0, boatGreater: 0, boatSovereign: 0, iceGolem: 0, iceCube: 0, briarling: 0, mossBoar: 0, rootTreant: 0, duneScorpion: 0, sunScarab: 0, sandVulture: 0, sporeling: 0, fungalBrute: 0, sporeMoth: 0, shardling: 0, crystalSentinel: 0, prismRay: 0, starWisp: 0, cometHound: 0, astralWarden: 0, brineCrab: 0, lanternJelly: 0, coralGuardian: 0, fernMantis: 0, mossTroll: 0, lanternHornet: 0, glassJackal: 0, duneTortoise: 0, dustDjinn: 0, cinderImp: 0, slagGolem: 0, emberMoth: 0, kelpStalker: 0, capCrawler: 0, myceliumHulk: 0, rotMite: 0, geodeCrab: 0, prismMoth: 0, shardBrood: 0, cryptHound: 0, graveWisp: 0, novaMoth: 0 };
+  readonly slain: Record<EnemyKind, number> = { blightCannon: 0, blightLance: 0, blightFortress: 0, blightDart: 0, blightPrism: 0, greaterBlightPrism: 0, miniDarkling: 0, darkling: 0, largeDarkling: 0, majorDarkling: 0, significantDarkling: 0, blightWorm: 0, roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0, darkKnight: 0, bombOrc: 0, bombBird: 0, voidSparrow: 0, shieldLesser: 0, shieldGreater: 0, poisonLesser: 0, poisonBearer: 0, poisonGreater: 0, poisonSovereign: 0, siegeBeetle: 0, burrowingMole: 0, necromancer: 0, skeleton: 0, bannerCaptain: 0, mirrorKnight: 0, leechSwarm: 0, ashPhoenix: 0, phoenixEgg: 0, blinkImp: 0, fortressHut: 0, fortressOutpost: 0, fortressTower: 0, fortressKeep: 0, fortressLesser: 0, fortress: 0, fortressGreater: 0, fortressSovereign: 0, rollingCannon: 0, ballista: 0, fireworkLauncher: 0, trebuchet: 0, bombard: 0, rocketBattery: 0, boatDinghy: 0, boatSailboat: 0, boatCutter: 0, boatCog: 0, boatLesser: 0, boat: 0, boatGreater: 0, boatSovereign: 0, iceGolem: 0, iceCube: 0, briarling: 0, mossBoar: 0, rootTreant: 0, duneScorpion: 0, sunScarab: 0, sandVulture: 0, sporeling: 0, fungalBrute: 0, sporeMoth: 0, shardling: 0, crystalSentinel: 0, prismRay: 0, starWisp: 0, cometHound: 0, astralWarden: 0, brineCrab: 0, lanternJelly: 0, coralGuardian: 0, fernMantis: 0, mossTroll: 0, lanternHornet: 0, glassJackal: 0, duneTortoise: 0, dustDjinn: 0, cinderImp: 0, slagGolem: 0, emberMoth: 0, kelpStalker: 0, capCrawler: 0, myceliumHulk: 0, rotMite: 0, geodeCrab: 0, prismMoth: 0, shardBrood: 0, cryptHound: 0, graveWisp: 0, novaMoth: 0 };
   /** 1 while a cell is part of a standing (built) building. */
   readonly solid: Uint8Array;
   /** What blocks the city's own people: `solid`, but for the standing city
@@ -443,6 +444,7 @@ export class DefendSim {
   readonly rallies = new Map<number, Rally>();
   /** Siege engines' balls, bolts, stones and rockets in flight. */
   siegeShots: SiegeShot[] = [];
+  blightLasers: BlightLaser[] = [];
   /** Wizard towers' fire and ice. */
   flames: Flame[] = [];
   frosts: Frost[] = [];
@@ -772,6 +774,7 @@ export class DefendSim {
     stepMines(this, dt);
     stepNano(this, dt);
     stepSiegeShots(this, dt);
+    stepBlightLasers(this, dt);
     this.wizards.step(this, dt);
     stepFlames(this, this.wizards, dt);
     stepFrosts(this, dt);
