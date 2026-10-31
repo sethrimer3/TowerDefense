@@ -30,6 +30,8 @@ import { lureOf } from "./bait.ts";
  * `building` is the building a bolt was aimed at. */
 export type SiegeShot = {
   kind: SiegeDef["shot"];
+  /** Orange energy ammunition fired by Blight walkers. */
+  energy?: true;
   x0: number;
   y0: number;
   x1: number;

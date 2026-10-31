@@ -57,7 +57,7 @@ export function basicUnitPieces(): ArtPiece[] {
       Object.keys(ENEMIES).filter((k) => {
         const d = ENEMIES[k as EnemyKind];
         return (
-          !zoneEnemyRows(k as EnemyKind) && !d.fortress && !d.boat && !d.siege && k !== "iceGolem" && k !== "iceCube"
+          !zoneEnemyRows(k as EnemyKind) && (!d.fortress || d.blightFortress) && !d.boat && !d.siege && k !== "iceGolem" && k !== "iceCube"
         );
       }),
     ],

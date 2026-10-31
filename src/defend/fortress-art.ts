@@ -324,7 +324,7 @@ export function legPixels(tier: number,lifted: boolean,left: boolean) {
 export function fortressPieces(): ArtPiece[] {
   const out: ArtPiece[]=[];
   for(let tier=1;tier<=4;tier++){
-    for(const [w,h] of Object.values(ENEMIES).filter(d=>d.fortress?.tier===tier).map(d=>[Math.round(d.size*ART),Math.round(d.fortress!.height*ART)]))for(const armored of [false,true])for(const hurt of [false,true])for(let flag=0;flag<2;flag++){
+    for(const [w,h] of Object.values(ENEMIES).filter(d=>d.fortress?.tier===tier && !d.blightFortress).map(d=>[Math.round(d.size*ART),Math.round(d.fortress!.height*ART)]))for(const armored of [false,true])for(const hurt of [false,true])for(let flag=0;flag<2;flag++){
       const name=ART_NAMES.enemy(`fortress-${tier}`,`body-${w}x${h}-${armored ? "armored" : "bare"}-${hurt ? "hurt" : "whole"}-${flag}`);
       out.push({name,w,h,about:`Walking fortress tier ${tier}`,pixels:()=>fortressBodyPixels(tier,w,h,armored,hurt,flag,0)});
     }
