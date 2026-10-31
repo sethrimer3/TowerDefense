@@ -4,8 +4,8 @@ import { ENEMIES } from "./catalog.ts";
 import { CELLS_W, CELLS_H } from "./grid.ts";
 import type { DefendSim, Enemy } from "./sim.ts";
 
-export const DARK_DRAIN = { bucket: 4, samples: 2, threshold: 10, full: 60, radius: 7, interval: 100, contrast: .3, onset: .22 } as const;
-export const DARK_GLOW = { rgb: [148, 8, 38], opacity: .65, radius: 2.5 } as const;
+export const DARK_DRAIN = { bucket: 4, samples: 2, threshold: 10, full: 60, radius: 7, interval: 100, onset: .22 } as const;
+export const DARK_GLOW = { rgb: [212, 58, 6], opacity: .32, radius: 2.5 } as const;
 const COLS = Math.ceil(CELLS_W / DARK_DRAIN.bucket), ROWS = Math.ceil(CELLS_H / DARK_DRAIN.bucket);
 export const DRAIN_W = CELLS_W * DARK_DRAIN.samples, DRAIN_H = CELLS_H * DARK_DRAIN.samples;
 const smooth = (x: number) => x * x * (3 - 2 * x);
@@ -95,10 +95,9 @@ export class DarkDensity {
   }
 }
 
-/** Gray source with saturation blending drains chroma while preserving scene
- * detail. A second, 30%-strength gray wash reduces contrast around mid-gray.
- * At full density saturation is zero (exceeding the requested 30% reduction),
- * and contrast is 70%. UI/inspection overlays are painted afterward. */
+/** Saturation blending drains chroma while preserving luminosity and tonal
+ * contrast. A separate dim orange halo is gated by the renderer's night.
+ * UI/inspection overlays are painted afterward. */
 export class DarkDrain {
   readonly density = new DarkDensity();
   private canvas: HTMLCanvasElement | null = null;
@@ -170,7 +169,6 @@ export class DarkDrain {
     if (this.density.active && this.canvas && this.density.bounds) {
       const mask = this.protectedMask(c, px, this.canvas, this.density.bounds, actors);
       paint(mask, "saturation", this.density.bounds);
-      paint(mask, "source-over", this.density.bounds, DARK_DRAIN.contrast);
     }
     if (night > 0 && this.density.glowing && this.glowCanvas && this.density.glowBounds) {
       const mask = this.protectedMask(c, px, this.glowCanvas, this.density.glowBounds, actors);

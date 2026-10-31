@@ -35,11 +35,11 @@ try {
       const ox = panel % 2 * 550, oy = Math.floor(panel / 2) * 450;
       pixels.push({ count: n, center: sample(ox + 200, oy + 200), edge: sample(ox + 290, oy + 200), outside: sample(ox + 400, oy + 200) });
       c.fillStyle = '#eee3c7'; c.font = '20px monospace'; c.fillText(`${n} dark enemies`, 22, 35);
-      c.font = '14px monospace'; c.fillText(n < 10 ? 'Below threshold' : n < 60 ? 'Growing radial drain' : 'Grayscale core + 30% less contrast', 22, 58);
+      c.font = '14px monospace'; c.fillText(n < 10 ? 'Below threshold' : n < 60 ? 'Growing radial drain' : 'Grayscale core, contrast preserved', 22, 58);
       for (let i = 0; i < Math.min(n, 60); i++) drawEnemyArt({ c, px: 10 }, { ...crowd(1)[0], kind: i % 13 === 0 ? 'largeDarkling' : i % 7 ? 'miniDarkling' : 'darkling', x: 19 + (i % 10) * .25, y: 19 + Math.floor(i / 10) * .25 }, sim);
       c.restore();
     }
-    // Saturation blend removes all color; the wash is exactly a 30% pull to 128.
+    // Saturation blending removes color while retaining the original gray span.
     const full = pixels[3].center;
     const grayscale = Math.max(...full) - Math.min(...full);
     const contrast = [];
@@ -79,7 +79,7 @@ try {
   });
   assert.equal(checks.grayscale, 0, 'maximum center is fully grayscale');
   assert.deepEqual(checks.pixels[0].center, [220, 100, 50], 'nine enemies preserve color');
-  assert.ok(Math.abs((checks.contrast[1] - checks.contrast[0]) / 200 - .7) < .01, 'center contrast reduced 30%');
+  assert.deepEqual(checks.contrast, [20, 220], 'grayscale preserves the full tonal contrast');
   assert.ok(checks.frames.every(f => f.active), 'effect survives all viewports/settings');
   assert.deepEqual(errors, []);
   mkdirSync('test-results', { recursive: true });

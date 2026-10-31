@@ -335,6 +335,9 @@ export class DefendRenderer {
     const sky = worldSky();
     this.worldLighting = !!sky;
     if (sky) opts = { ...opts, sun: sky.sun, tint: sky.tint, night: sky.night, weather: opts.weather ?? { rain: false, clear: true } };
+    // The shared darkness value also rises at sunset/dusk/dawn. Blight's
+    // halo belongs only to night; leave all other world lighting untouched.
+    const blightNight = sky && sky.phase !== "night" ? 0 : opts.night;
     this.lit = false;
     if (sim && opts.collapsed) sim = this.collapse.view(sim,map,opts.collapsed);
     const start = opts.timings ? performance.now() : 0;
@@ -351,7 +354,7 @@ export class DefendRenderer {
     if (!sim) { this.areaMix = 1; this.previousArea = null; }
     if (this.areaMix === 1) this.previousArea = null;
     this.lastWeather = opts.weather;
-    this.protectCombat = this.darkDrain.prepare(sim, opts.now, opts.night);
+    this.protectCombat = this.darkDrain.prepare(sim, opts.now, blightNight);
     this.refreshLayer(map, sim, opts.looks);
     if (opts.timings) this.timings.terrainMs = performance.now() - start;
     // Beyond the board's edges: the dark ground the city stands on.
@@ -411,7 +414,7 @@ export class DefendRenderer {
       this.ctx.restore();
     }
     this.ctx.restore();
-    this.darkDrain.draw(this.ctx, this.px, sim, opts.now, opts.night, this.protectCombat ? this.actors : null);
+    this.darkDrain.draw(this.ctx, this.px, sim, opts.now, blightNight, this.protectCombat ? this.actors : null);
     if (sim) this.outline?.drawContours(this.ctx, opts.reduceMotion ? 0 : opts.now / 1000);
     if (sim && this.lit) this.outline?.shineContours(this.ctx, this.lighting);
     opts.markers?.(this.ctx,this.px);

@@ -77,6 +77,28 @@ try {
       const x = p.plain ? 0 : 600, y = p.night ? 450 : 0; gc.drawImage(p.plain ?? p.active, x, y);
       gc.fillStyle = '#f4ead5'; gc.font = '19px monospace'; gc.fillText(`${p.night ? 'Night' : 'Day'}: ${p.plain ? 'without aura' : 'color drain + protected units/shots'}`, x + 15, y + 28);
     }
+    // The world darkness scalar is nonzero at sunset/dusk/twilight/dawn.
+    // A lone Blight isolates the halo from the thresholded grayscale effect.
+    const solar = await import('/src/daylight.ts'); let phase = 'day';
+    solar.useDayClock(new solar.DayClock(), () => ({ dayNightCycle: false, timeOfDay: phase }));
+    const phases = [];
+    for (phase of solar.TIMES_OF_DAY) {
+      const sim = new DefendSim(map, levels, 4); sim.breakT = 1e9; sim.soldiers = []; sim.civilians = [];
+      sim.spawnAuxiliary('darkling', cx, cy);
+      const cv = make(600, 450); cv.style.cssText = 'width:600px;height:450px'; document.body.append(cv);
+      const r = new DefendRenderer(cv); r.resize(600, 450); r.px = 12;
+      r.cam.s = 2.5; r.cam.x = cv.width / 2 - cx * r.px * r.cam.s; r.cam.y = cv.height / 2 - cy * r.px * r.cam.s;
+      const opts = { grid: 0, weather: { rain: false }, night: 1, now: 1000, reduceMotion: true, effects: false };
+      let glowNight;
+      const draw = r.darkDrain.draw.bind(r.darkDrain);
+      r.darkDrain.draw = (c, px, sim, now, night, actors) => { glowNight = night; draw(c, px, sim, now, night, actors); };
+      r.draw(map, sim, null, opts); r.lighting.bakePending(sim.solid, 1000); r.draw(map, sim, null, opts);
+      const c = cv.getContext('2d'), lit = c.getImageData(0, 0, cv.width, cv.height).data;
+      r.darkDrain.draw = () => {}; r.draw(map, sim, null, opts);
+      const bare = c.getImageData(0, 0, cv.width, cv.height).data;
+      let changed = 0; for (let i = 0; i < lit.length; i += 4) if ([0, 1, 2].some(k => Math.abs(lit[i + k] - bare[i + k]) > 1)) changed++;
+      phases.push({ phase, darkness: solar.worldSky().night, glowNight, changed }); cv.remove();
+    }
     // Include density/raster/mask compositing in the crowd timing. A paused
     // repeat must allocate no new canvas and perform no scene reads.
     const cv = make(600, 450), c = cv.getContext('2d'), actors = make(600, 450), drain = new DarkDrain();
@@ -91,7 +113,7 @@ try {
       for (let i = 0; i < 30; i++) { const t = performance.now(); drain.draw(c, 6, sim, 10000, 1, actors); steady.push(performance.now() - t); }
     } finally { document.createElement = saved; CanvasRenderingContext2D.prototype.getImageData = get; }
     times.sort((a, b) => a - b); steady.sort((a, b) => a - b);
-    return { ink: DARK_UNIT_INK, direct, frames, crowd: { n: es.length, medianUpdateMs: times[15], p95UpdateMs: times[28], medianSteadyMs: steady[15], allocations, reads } };
+    return { ink: DARK_UNIT_INK, direct, frames, phases, crowd: { n: es.length, medianUpdateMs: times[15], p95UpdateMs: times[28], medianSteadyMs: steady[15], allocations, reads } };
   });
   mkdirSync('test-results', { recursive: true }); writeFileSync('test-results/darkling-aura.json', JSON.stringify(result, null, 2));
   await page.screenshot({ path: 'test-results/darkling-aura.png' });
@@ -102,6 +124,11 @@ try {
   assert.equal(Math.max(...find(60, 0).center) - Math.min(...find(60, 0).center), 0);
   assert.ok(find(60, 1).center[0] > find(10, 1).center[0] && find(10, 1).center[0] > find(1, 1).center[0]);
   assert.deepEqual(find(60, 1).outside, [16, 19, 27]);
+  const orange = find(60, 1).center; assert.ok(orange[0] > orange[1] * 2 && orange[1] > orange[2] && orange[0] < 100, 'dim deep orange at maximum density');
+  for (const p of result.phases) {
+    if (p.phase === 'night') { assert.ok(p.glowNight > 0 && p.changed > 20, JSON.stringify(p)); }
+    else { assert.equal(p.glowNight, 0, JSON.stringify(p)); assert.equal(p.changed, 0, JSON.stringify(p)); }
+  }
   for (const row of result.frames) {
     assert.ok(row.protectedPixels > 10, JSON.stringify(row)); assert.equal(row.changedActor, 0, JSON.stringify(row));
     assert.ok(row.worldChanged > 100 && row.maxChromaDrop > 10, JSON.stringify(row));

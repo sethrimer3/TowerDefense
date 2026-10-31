@@ -28,7 +28,7 @@ Add Defend items here in the form: **What** (one line), **Why**, **Files**, **Te
 
 - [x] Inventory all Ambush levels/waves and Defend wave families as outdated; maintain the per-wave [migration tracker](../design/ENEMY_MIGRATION.md).
 - [x] Update only Defend wave 1: 30 one-pixel Mini Darklings and five 2 × 2 Darklings, splitting into two minis each.
-- [x] Add low-cost radial color drain around dense Dark One crowds, starting near ten neighbors, fully grayscale with 30% lower contrast at maximum density.
+- [x] Add low-cost radial color drain around dense Dark One crowds, starting near ten neighbors, fully grayscale with preserved tonal contrast at maximum density.
 - [x] Update Defend waves 2–5 with the requested Darkling counts and 3 × 3 Large Darklings splitting into two Darklings; log exact compositions and both offspring generations.
 - [x] Close contact attackers to the painted structure perimeter before damage; make stone-wall rims half an art pixel so they meet the enemy rim without empty ground. Share the approach gate with Ambush routes, boat rams and ice-cube strikes.
 - [x] Deepen Darkling crimson; add a shared crowd-strength night halo; strengthen color-drain onset and protect unit bodies/shots while washing surrounding scenery.
@@ -50,3 +50,5 @@ Add Defend items here in the form: **What** (one line), **Why**, **Files**, **Te
 - [x] Add black square Blight walking fortresses: small energy cannon, small piercing laser, and medium dual-turret variants, with the shared noise perimeter and fixed orange orthogonal particles with fading tails and edge replacement. Native destructible parts; catalog/journal/art support. `blight-fortress.ts`, `blight-fortress-art.ts`, `blight-fortress-particles.ts`; combat/particle Node tests and desktop/phone browser checks. Authored wave placement remains for a later composition pass.
 
 - [x] Add Blight counterparts of all eight ships, directly reusing native stats, hull geometry, mast/cabin layouts and water/ice/ramming/sinking behavior. Black hulls, orange sails, red features and shared portal contours; journal, exports and Reduce Motion. `catalog.ts`, `boat-art.ts`; Node parity tests and desktop/phone comparison gallery. Wave placement remains pending.
+
+- [x] Retint Blight heat to dim deep neon orange, gate it to actual night (excluding sunset/dusk/twilight/dawn), and remove the grayscale contrast-reduction wash.
