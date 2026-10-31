@@ -18,6 +18,8 @@ export type Setting = Toggle | Choice | Range;
  * setting is one row here. Rows are in saved key order. */
 export const SETTINGS = {
   showHealthbars: { kind: "toggle", default: true, page: { id: "enemy-healthbars", label: "Healthbars for tough enemies" } },
+  dayNightCycle: { kind: "toggle", default: true, page: { id: "day-night-cycle", label: "Day/night cycle" } },
+  timeOfDay: { kind: "choice", default: "day", choices: [["day", "Day"], ["sunset", "Sunset"], ["dusk", "Dusk"], ["twilight", "Twilight"], ["night", "Night"], ["dawn", "Dawn"]], page: { id: "time-of-day", label: "Time of day" } },
   reduceMotion: { kind: "toggle", default: false, page: { id: "motion", label: "Reduce motion" } },
   /** The city's live dressing: wind-blown park grass, and drips, ripples
    * and reflections on the ponds. */

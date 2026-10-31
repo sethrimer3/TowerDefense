@@ -1,3 +1,4 @@
+import { worldSky } from "../daylight.ts";
 import {t,getLanguage,translateWithin} from "../i18n/index.ts";
 /** The Mine tab: the mine's view, the crew's tally, hiring miners, the
  * crew's list (each miner by name, dragged between the three trades: the
@@ -566,8 +567,8 @@ export class MinePage {
     if (!this.built) return;
     const sim = this.sim, price = sim.price, full = sim.miners.length >= sim.crewCap;
     const afford = this.host.free() || canAffordMetals(this.host.metals(), price);
-    const crew = sim.miners.length, sky = sim.sky, lost = sim.lostTotal;
-    const hour = sky.daylight > 0.6 ? "☀ Day" : sky.daylight > 0.05 ? (Math.abs(((sim.tick / DAY_TICKS + 0.1) % 1) - 0.5) < 0.25 ? "◐ Dusk" : "◐ Dawn") : "☾ Night";
+    const crew = sim.miners.length, scene = worldSky(), sky = scene ? { ...sim.sky, daylight: scene.daylight } : sim.sky, lost = sim.lostTotal;
+    const hour = scene ? t(`settings.time.${scene.phase}`) : sky.daylight > 0.6 ? "☀ Day" : sky.daylight > 0.05 ? (Math.abs(((sim.tick / DAY_TICKS + 0.1) % 1) - 0.5) < 0.25 ? "◐ Dusk" : "◐ Dawn") : "☾ Night";
     const latest = [...sim.news].reverse().find((n) => tell(n) && sim.tick - n.tick < 90 * TICK_HZ);
     const news = latest ? tell(latest) : null;
     const ore = metalSum(sim.ore), bars = metalSum(sim.bars);
@@ -633,7 +634,7 @@ export class MinePage {
    * fresh lightning strike's thunder. */
   ambience(): Scene {
     if (!this.sim) return QUIET;
-    const sim = this.sim, sky = sim.sky, day = sky.daylight, storm = sky.weather === "storm";
+    const sim = this.sim, sky = sim.sky, day = worldSky()?.daylight ?? sky.daylight, storm = sky.weather === "storm";
     const deep = this.renderer?.depthInView(sim) ?? 0;
     for (const n of sim.news)
       if (n.kind === "strike" && n.tick > this.thunderTick) {

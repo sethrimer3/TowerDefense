@@ -1,3 +1,4 @@
+import { visualTime, worldSky } from "../daylight.ts";
 /** Draws the Library: a cathedral nave in pixels, one pixel a world unit,
  * scaled up crisp. The stone walls are lit by their torches through a bump
  * map, the technique Defend's flagstones use (`defend/ground-relief.ts`):
@@ -489,6 +490,7 @@ export class LibraryRenderer {
 
   private lightUp(sim: LibrarySim, day: number) {
     const L = this.light, F = this.flat, sx = this.sx, sy = this.sy, relief = this.relief;
+    const warmth = worldSky()?.warmth ?? 0;
     const ar = 0.07 + day * 0.12, ag = 0.07 + day * 0.115, ab = 0.11 + day * 0.11;
     const wx = (WINDOW.x0 + WINDOW.x1) / 2, wy = (WINDOW.top + WINDOW.bottom) / 2;
     for (let y = 0; y < H; y++)
@@ -496,9 +498,9 @@ export class LibraryRenderer {
         const i = y * W + x, dx = x - wx, dy = y - wy;
         // Daylight from the window, strongest near it.
         const near = day * 0.34 * Math.max(0, 1 - Math.sqrt(dx * dx * 1.4 + dy * dy) / 230);
-        F[i * 3] = L[i * 3] = ar + near;
-        F[i * 3 + 1] = L[i * 3 + 1] = ag + near * 0.96;
-        F[i * 3 + 2] = L[i * 3 + 2] = ab + near * 0.9;
+        F[i * 3] = L[i * 3] = ar + near * (1 + warmth * .25);
+        F[i * 3 + 1] = L[i * 3 + 1] = ag + near * (.96 - warmth * .18);
+        F[i * 3 + 2] = L[i * 3 + 2] = ab + near * (.9 - warmth * .5);
       }
     const shine = (lx: number, ly: number, r: number, k: number, cr: number, cg: number, cb: number) => {
       const x0 = Math.max(1, Math.floor(lx - r)), x1 = Math.min(W - 2, Math.ceil(lx + r));
@@ -633,7 +635,9 @@ export class LibraryRenderer {
     }
     this.lightUp(sim, day);
     const px = this.px, S = this.scene, L = this.light, kind = this.kind;
-    const sky: RGB = [8 + day * 120, 14 + day * 150, 40 + day * 170];
+    const scene = worldSky();
+    const baseSky: RGB = [8 + day * 120, 14 + day * 150, 40 + day * 170];
+    const sky: RGB = scene ? baseSky.map((v, k) => v + (scene.rgb[k] - v) * Math.min(.85, scene.tint.strength * 2)) as RGB : baseSky;
     for (let i = 0; i < W * H; i++) {
       const k = kind[i];
       let r: number, g: number, b: number;
@@ -961,7 +965,7 @@ export class LibraryRenderer {
 
   /** Sunbeams from the window, slanting with the hour, and dust in them. */
   private drawRays(now: number, day: number) {
-    const ctx = this.ctx, tilt = Math.sin(((now % DAY_MS) / DAY_MS) * Math.PI * 2 - Math.PI / 2) * 0.55
+    const ctx = this.ctx, tilt = Math.sin((visualTime(now) / DAY_MS) * Math.PI * 2 - Math.PI / 2) * 0.55
       + Math.sin(now / SUNLIGHT.swayMs) * SUNLIGHT.sway;
     ctx.save();
     // The light stays in the nave: never out past its walls or under its floor.

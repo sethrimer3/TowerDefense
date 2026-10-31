@@ -1,3 +1,4 @@
+import { simulationDaylight, worldSky } from "../daylight.ts";
 import {t,getLanguage,translateWithin} from "../i18n/index.ts";
 /** The Library tab: the cathedral's view (panning down to the alchemy lab
  * under it), buying bookshelves and librarians, and the staff's list (each
@@ -12,7 +13,7 @@ import type { Scene } from "../ambience.ts";
 import { countdown, HOUR_MS, IDLE_LEAD, IDLE_SPEED, idleDrain, MAX_AWAY_MS } from "../away.ts";
 import { LAB_MAX_LEVEL, MAX_LIBRARIANS, labPrice, MAX_SHELVES, LibrarySim, ROLES, RETURN_BOOKS, librarianPrice, shelfPrice, type Librarian, type LibrarySave, type Role } from "./sim.ts";
 
-import { LibraryRenderer, daylight } from "./render.ts";
+import { LibraryRenderer } from "./render.ts";
 import { fadeAway } from "../ui/fade-away.ts";
 import { holdToRepeat } from "../ui/hold-repeat.ts";
 
@@ -119,7 +120,7 @@ export class LibraryPage {
     // Keep pace with the mine's idle time (`keepWith`), never more than
     // IDLE_LEAD ahead of it, so both spend it together.
     while (this.owed >= 100 - 1e-6 && spent + 100 <= limit + 1e-6 && this.owed - idleDrain(this.owed, 100) >= keepWith - IDLE_LEAD) {
-      this.sim.night = 1 - daylight(this.day);
+      this.sim.night = 1 - simulationDaylight(this.day);
       const rate = this.sim.rate;
       // Catching up, a step spends (and pays for) ten steps of idle time.
       const drain = Math.min(this.owed, idleDrain(this.owed, 100)), boost = drain / 100;
@@ -406,7 +407,7 @@ export class LibraryPage {
   /** What can be heard in the nave: birdsong by day and crickets by night
    * through the stone, and a fire, when one burns, right there. */
   ambience(): Scene {
-    const night = this.sim.night;
+    const night = worldSky()?.night ?? this.sim.night;
     return { rain: 0, wind: 0.1, howl: 0, sand: 0, thunder: 0, birds: (1 - night) * 0.7, night, drips: 0, fire: this.sim.fire.active ? 1 : 0, muffle: 0.75, mine: 0 };
   }
 

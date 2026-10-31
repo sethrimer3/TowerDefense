@@ -1,3 +1,4 @@
+import type { Sun } from "../daylight.ts";
 import { witheredTreeSprite } from "./blight-art.ts";
 import type { BlightTrail, WitherStage } from "./blight-trail.ts";
 import { ART_NAMES } from "./art-overrides.ts";
@@ -334,7 +335,7 @@ export function floorPixels(plan: ForestPlan, damage: ForestDamage | null, river
  * as the city layer paints it, so its banks lie on the forest's grass. Pixels
  * marked in `covered` (a scenario's buildings, raised after the plan) are left
  * clear, so the city layer's building shows through. */
-export function paintFloor(out: Uint32Array, plan: ForestPlan, damage: ForestDamage | null, box: Box, river: ForestRiver | null = null, covered?: Uint8Array, blight?: BlightTrail) {
+export function paintFloor(out: Uint32Array, plan: ForestPlan, damage: ForestDamage | null, box: Box, river: ForestRiver | null = null, covered?: Uint8Array, blight?: BlightTrail, sun?: Sun) {
   clip = { x0: Math.max(0, box.x0), y0: Math.max(0, box.y0), x1: Math.min(W, box.x1), y1: Math.min(H, box.y1) };
   for (let Y = clip.y0; Y < clip.y1; Y++) out.fill(0, Y * W + clip.x0, Y * W + clip.x1);
   lawnIn(out, plan.open);
@@ -369,10 +370,10 @@ export function paintFloor(out: Uint32Array, plan: ForestPlan, damage: ForestDam
     for (let X = clip.x0, i = Y * W + X; X < clip.x1; X++, i++) turf[i] = out[i] !== 0 && out[i] === lawn[i] ? 1 : 0;
   for (let Y = clip.y0; Y < clip.y1; Y++) shaded.fill(0, Y * W + clip.x0, Y * W + clip.x1);
   for (const t of plan.trees) {
-    if ((damage && !damage.upright(t)) || !nearClip(t.x, t.y, t.r * 2 + 1)) continue;
+    if (sun?.strength === 0 || (damage && !damage.upright(t)) || !nearClip(t.x, t.y, t.r * 2 + 1)) continue;
     const source = treeSprite(t.kind, t.variant, 0, t.size);
     const s = outlinedScenery(witheredTreeSprite(source, blight?.treeStage(t.x, t.y, t.r) ?? 0, t.r, t.variant)), R = t.r * ART, runs = runsOf(s);
-    const x0 = Math.round(t.x * ART) - s.ox + Math.round(R * 0.35) + 1, y0 = Math.round(t.y * ART) - s.oy + Math.round(R * 0.5) + 1;
+    const x0 = Math.round(t.x * ART) - s.ox + Math.round(R * (sun?.x ?? .7) * .5) + 1, y0 = Math.round(t.y * ART) - s.oy + Math.round(R * (sun?.y ?? 1) * .5) + 1;
     for (let k = 0; k < runs.length; k += 3) {
       const Y = y0 + runs[k];
       if (Y < clip.y0 || Y >= clip.y1) continue;
@@ -380,7 +381,7 @@ export function paintFloor(out: Uint32Array, plan: ForestPlan, damage: ForestDam
         const i = Y * W + X;
         if (shaded[i]) continue;
         shaded[i] = 1;
-        out[i] = darken(out[i]);
+        out[i] = darken(out[i], sun ? Math.min(1, sun.strength / .27) : 1);
       }
     }
   }
@@ -408,9 +409,10 @@ function lawnIn(out: Uint32Array, open: Uint8Array) {
 }
 
 /** A pixel in shadow: a solid one darkened, a clear one made a dim shade. */
-function darken(p: number) {
-  if (!(p >>> 24)) return rgba(0x060a05, 92);
-  const r = (p & 0xff) * 0.6, g = ((p >> 8) & 0xff) * 0.6, b = ((p >> 16) & 0xff) * 0.6;
+function darken(p: number, strength = 1) {
+  if (!(p >>> 24)) return rgba(0x060a05, Math.round(92 * strength));
+  const k = 1 - .4 * strength;
+  const r = (p & 0xff) * k, g = ((p >> 8) & 0xff) * k, b = ((p >> 16) & 0xff) * k;
   return ((255 << 24) | (Math.round(b) << 16) | (Math.round(g) << 8) | Math.round(r)) >>> 0;
 }
 
@@ -815,6 +817,14 @@ export class ForestArt {
   private witherStages = new Uint8Array(0);
   /** Invalidates overlays when damage or a thinning crown changes the floor. */
   floorVersion = 0;
+  private sun: Sun | undefined;
+  private sunKey = "";
+  setSun(sun?: Sun) {
+    const key = sun ? `${Math.round(sun.x * 8)}:${Math.round(sun.y * 8)}:${Math.round(sun.strength / .27 * 4)}` : "";
+    if (key === this.sunKey) return;
+    this.sunKey = key; this.sun = sun ? { x: Math.round(sun.x * 8) / 8, y: Math.round(sun.y * 8) / 8, strength: Math.round(sun.strength / .27 * 4) / 4 * .27 } : undefined;
+    this.floorStale = [WHOLE];
+  }
   private fading = false;
   /** Bucketed beneath-the-trees lists, reused each frame. */
   private head = new Int32Array(CELL_COUNT);
@@ -1206,7 +1216,7 @@ export class ForestArt {
     this.floorStale = [];
     if (boxes.length) this.floorVersion++;
     for (const box of boxes) {
-      paintFloor(this.floor.px, this.plan, this.damage, box, this.river, this.covered, blight);
+      paintFloor(this.floor.px, this.plan, this.damage, box, this.river, this.covered, blight, this.sun);
       const x0 = Math.max(0, box.x0), y0 = Math.max(0, box.y0);
       this.floor.cv.getContext("2d")!.putImageData(this.floor.img, 0, 0, x0, y0, Math.min(W, box.x1) - x0, Math.min(H, box.y1) - y0);
     }

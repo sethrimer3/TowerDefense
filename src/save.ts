@@ -68,6 +68,8 @@ export type Save = {
   mine: MineSave | null;
   /** The library's shelves, books, ladders and librarians (null until it first shows). */
   library: LibrarySave | null;
+  /** Foreground scenery time only; never includes time away. */
+  dayClock?: number;
   settings: Settings;
 };
 
@@ -122,6 +124,7 @@ export function decode(raw: string | null): Save {
     d.smithy.silver += int(s.silver ?? s.steelBar, 0);
   }
   d.knowledge = num(s.knowledge ?? s.valor, 0);
+  if (typeof s.dayClock === "number" && Number.isFinite(s.dayClock) && s.dayClock >= 0) d.dayClock = s.dayClock % 300000;
   for (const id of SKILL_IDS) d.skills[id] = int(s.skills?.[id], 0, 0, SKILLS[id].max);
   // Outlying districts was a skill before city tiles could stand anywhere:
   // its Knowledge comes back, whether learned or still being researched.

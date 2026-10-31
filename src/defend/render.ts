@@ -1,3 +1,5 @@
+import { worldSky } from "../daylight.ts";
+import { SunShadows } from "./sun-shadows.ts";
 import { BlightGround } from "./blight-art.ts";
 import { CellType } from "./citygen.ts";
 import { bareAt, groundArt, turfAt as parkTurfAt } from "./ground-art.ts";
@@ -148,6 +150,8 @@ export class DefendRenderer {
   private readonly sky = new SkyPalaceArt();
   readonly atmosphere = new AtmosphereArt();
   private readonly darkDrain = new DarkDrain();
+  private readonly sunlight = new SunShadows();
+  private worldLighting = false;
   private readonly deadPark = new BlightGround();
   private readonly deadForest = new BlightGround();
   private deadParkMap: CityMap | null = null;
@@ -322,6 +326,9 @@ export class DefendRenderer {
   }
 
   draw(map: CityMap, sim: DefendSim | null, overlay: Overlay | null, opts: DrawOptions) {
+    const sky = worldSky();
+    this.worldLighting = !!sky;
+    if (sky) opts = { ...opts, sun: sky.sun, tint: sky.tint, night: sky.night, weather: opts.weather ?? { rain: false, clear: true } };
     this.lit = false;
     if (sim && opts.collapsed) sim = this.collapse.view(sim,map,opts.collapsed);
     const start = opts.timings ? performance.now() : 0;
@@ -370,6 +377,14 @@ export class DefendRenderer {
     opts.scenery?.(this.ctx, this.px);
     this.drawTrees(map, sim, opts, dt);
     this.drawForest(sim, opts, dt);
+    if (!sim && sky) {
+      this.ctx.save();
+      const warm = sky.warmth;
+      this.ctx.fillStyle = `rgba(${Math.round(8 + warm * 62)},${Math.round(14 + warm * 20)},${Math.round(38 - warm * 22)},${sky.night * (.72 - warm * .22)})`;
+      this.ctx.fillRect(0, 0, this.board.W, this.board.H);
+      this.ctx.globalCompositeOperation = "soft-light"; this.ctx.globalAlpha = sky.tint.strength; this.ctx.fillStyle = sky.tint.color;
+      this.ctx.fillRect(0, 0, this.board.W, this.board.H); this.ctx.restore();
+    }
     this.ghosts.watch(sim, opts.now / 1000);
     this.ghosts.draw(this.ctx, this.px, opts.now / 1000, opts.reduceMotion);
     if (opts.effects ?? true) this.drawSmoke(map, sim, opts);
@@ -428,6 +443,7 @@ export class DefendRenderer {
     // The forest's grass, dirt, rocks and shadows outside the walls, and
     // the grass's live blades.
     this.forest.sync(map, sim);
+    this.forest.setSun(this.worldLighting ? opts.sun : undefined);
     this.forest.drawFloor(ctx, this.px, this.forestShare());
     this.forest.drawWater(ctx, this.px, opts.now, this.forestShare(), opts.reduceMotion);
     if (sim && this.forestShare() > 0) {
@@ -462,6 +478,7 @@ export class DefendRenderer {
     this.fences.sync(map);
     if (sim) this.fences.update(sim);
     this.fences.draw(ctx, this.px);
+    if (this.worldLighting && opts.sun) this.sunlight.draw(ctx, this.px, map, sim, opts.sun, opts.looks);
     // Magic boats' water over the ground, sinking what it reaches.
     if (sim) this.floods.draw({ c: ctx, px: this.px, sim, area: this.area, rain: !!opts.weather?.rain, reduceMotion: opts.reduceMotion, reflections: opts.effects ?? true, layer: this.layer, layerScale: this.layerScale });
   }
@@ -716,13 +733,13 @@ export class DefendRenderer {
     while (k > 1 && W * H * k * k > 18e6) k--;
     this.layerScale = k;
     // Every building's damage stage is painted into the layer too.
-    const key = `${W}:${k}:${this.area}:${pixelKey()}:${sim ? `${sim.mapVersion}:${damageKey(sim)}` : -1}:${looks ? Object.entries(looks).join(",") : ""}`;
+    const key = `${W}:${k}:${this.area}:${pixelKey()}:${this.worldLighting}:${sim ? `${sim.mapVersion}:${damageKey(sim)}` : -1}:${looks ? Object.entries(looks).join(",") : ""}`;
     if (this.previousArea && (key !== this.previousKey || !this.layerKey)) {
       this.previousLayer ??= document.createElement("canvas");
       this.previousLayer.width = W * k;
       this.previousLayer.height = H * k;
       this.lighting.setMap(map);
-      paintCityLayer(this.previousLayer.getContext("2d")!, this.px * k, { map, sim, area: this.previousArea, lights: this.lighting.lights, stones: this.lighting.roadStones, looks });
+      paintCityLayer(this.previousLayer.getContext("2d")!, this.px * k, { map, sim, area: this.previousArea, lights: this.lighting.lights, stones: this.lighting.roadStones, looks, omitSunShadows: this.worldLighting });
       this.previousKey = key;
     }
     if (map === this.map && key === this.layerKey) return;
@@ -731,7 +748,7 @@ export class DefendRenderer {
     this.lighting.setMap(map);
     this.layer.width = W * k;
     this.layer.height = H * k;
-    paintCityLayer(this.lctx, this.px * k, { map, sim, area: this.area, lights: this.lighting.lights, stones: this.lighting.roadStones, looks });
+    paintCityLayer(this.lctx, this.px * k, { map, sim, area: this.area, lights: this.lighting.lights, stones: this.lighting.roadStones, looks, omitSunShadows: this.worldLighting });
     this.paintMasks(map, sim, looks);
     this.faces = hangingFaces(map, sim);
     this.faced.fill(0);
