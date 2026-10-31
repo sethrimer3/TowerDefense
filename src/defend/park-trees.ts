@@ -1,4 +1,7 @@
-import { drawSprite } from "./damage-art.ts";
+import type { Sprite } from "./forest-art.ts";
+import { witheredTreeSprite } from "./blight-art.ts";
+import type { BlightTrail } from "./blight-trail.ts";
+import { drawSprite, spriteCanvas } from "./damage-art.ts";
 /** The parks' trees, standing over everyone below them: drawn after the
  * units from the sprites `park-art.ts` bakes, each fading to half opacity
  * while anyone (an enemy, soldier or civilian) is under its canopy, so
@@ -7,7 +10,7 @@ import { drawSprite } from "./damage-art.ts";
 import { drawPixel, pixelKey } from "./pixel-sprites.ts";
 import { hash01 } from "./grid.ts";
 import type { CityMap } from "./citygen.ts";
-import { ART, parkArt, type TreeSprite } from "./park-art.ts";
+import { ART, parkArt, parkTreeSource, type TreeSprite } from "./park-art.ts";
 
 /** A tree's opacity while someone is under it. */
 export const UNDER_ALPHA = 0.5;
@@ -27,6 +30,8 @@ export class ParkTrees {
   private map: CityMap | null = null;
   private artKey = "";
   private trees: TreeSprite[] = [];
+  private sources: Sprite[] = [];
+  private deadCanvases = new WeakMap<Sprite, HTMLCanvasElement>();
   /** Each tree's opacity, easing toward 1 or `UNDER_ALPHA`. */
   readonly alpha: number[] = [];
   private off: HTMLCanvasElement | null = null;
@@ -37,6 +42,11 @@ export class ParkTrees {
     this.artKey = key;
     this.map = map;
     this.trees = parkArt(map).trees;
+    this.sources = this.trees.map(t => {
+      const p = parkTreeSource(Math.floor(t.cx), Math.floor(t.cy));
+      return { px: p.data, w: p.w, h: p.h, ox: Math.round(t.cx * ART) - p.x, oy: Math.round(t.cy * ART) - p.y };
+    });
+    this.deadCanvases = new WeakMap();
     this.alpha.length = 0;
     for (let k = 0; k < this.trees.length; k++) this.alpha.push(1);
   }
@@ -59,7 +69,7 @@ export class ParkTrees {
   /** Draws the trees onto `c` (the camera applied), `px` canvas pixels a
    * cell. With `shade`, they are drawn apart first and `shade` darkens them
    * (drawing source-atop) as the battle's light darkens the city below. */
-  draw(c: CanvasRenderingContext2D, px: number, shade?: (o: CanvasRenderingContext2D) => void) {
+  draw(c: CanvasRenderingContext2D, px: number, shade?: (o: CanvasRenderingContext2D) => void, blight?: BlightTrail) {
     if (!this.trees.length) return;
     const k = px / ART;
     let target = c;
@@ -86,6 +96,14 @@ export class ParkTrees {
       target.globalAlpha = this.alpha[i];
       // Pixel Art's oak or pine over the canopy's disc (the pine where the canopy is dark).
       const pine = hash01(Math.floor(t.cx), Math.floor(t.cy), 22) < 0.5;
+      const stage = blight?.treeStage(t.cx, t.cy, t.r) ?? 0;
+      if (stage) {
+        const sprite = witheredTreeSprite(this.sources[i], stage, t.r, Math.floor(t.cx + t.cy));
+        let canvas = this.deadCanvases.get(sprite);
+        if (!canvas) { canvas = spriteCanvas(sprite.px, sprite.w, sprite.h); this.deadCanvases.set(sprite, canvas); }
+        drawSprite(target, canvas, t.x * k, t.y * k, t.w * k, t.h * k);
+        return;
+      }
       if (drawPixel(target, pine ? "city-pine" : "city-oak", (t.cx - t.r) * px, (t.cy - t.r) * px, t.r * 2 * px)) return;
       drawSprite(target,t.canvas, t.x * k, t.y * k, t.w * k, t.h * k);
     });

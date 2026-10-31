@@ -9,6 +9,8 @@
  * most 30 times a second and drawn scaled up; the blades no one stirs are
  * swayed from sines of their own phases baked once (`Swaying`), so tens of
  * thousands cost no trigonometry a frame. Presentation only. */
+import { BLIGHT_TRAIL } from "./blight-trail.ts";
+import { DEAD_PALETTE32 } from "./park-grass.ts";
 import { CELLS_H, CELLS_W, cellIndex, hash01 } from "./grid.ts";
 import type { ForestDamage, ForestPlan } from "./forest.ts";
 import { lakeDepth, shadedAt, turfAt } from "./forest-art.ts";
@@ -197,9 +199,10 @@ export class ForestGrass {
 
   private paint(px: Uint32Array, f: ForestGrassFrame) {
     px.fill(0);
+    let palette = PALETTE32;
     const put = (color: number, x: number, y: number, h: number) => {
       if (x < 0 || x >= W) return;
-      for (let yy = Math.max(0, y), end = Math.min(H, y + h); yy < end; yy++) px[yy * W + x] = PALETTE32[color];
+      for (let yy = Math.max(0, y), end = Math.min(H, y + h); yy < end; yy++) px[yy * W + x] = palette[color];
     };
     const near = this.bucket(f.walkers), slots = this.slots, all = f.walkers;
     const group: Walker[] = [];
@@ -218,6 +221,7 @@ export class ForestGrass {
         if ((b.under >= 0 && (!f.damage || f.damage.upright(trees[b.under]))) || !turfAt(gx, gy)) continue;
         if (f.faced?.[i] && gy % ART < (f.hangRows ?? 0)) continue;
         const shade = shadedAt(gx, gy) ? SHADOW : 0;
+        palette = (f.blight?.at(gx / ART, gy / ART) ?? 0) >= BLIGHT_TRAIL.grass ? DEAD_PALETTE32 : PALETTE32;
         // Held still: the parks' own way.
         if (f.reduceMotion) {
           paintBlade(put, b, gx, gy, t, wind, stir, walkers, true, shade);
@@ -245,7 +249,7 @@ export class ForestGrass {
           const bx = q === h ? -1 : gx + Math.round(lean * curve[q]);
           if (q !== h && bx === lastX) continue;
           if (lastX >= 0 && lastX < W) {
-            const colour = PALETTE32[shade + (start === 0 ? b.color % 2 : q >= h - 1 ? b.color + 2 : b.color + 1)];
+            const colour = palette[shade + (start === 0 ? b.color % 2 : q >= h - 1 ? b.color + 2 : b.color + 1)];
             for (let y = Math.max(0, gy - q + 1), end = Math.min(H, gy - start + 1); y < end; y++) px[y * W + lastX] = colour;
           }
           start = q;

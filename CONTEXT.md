@@ -749,3 +749,7 @@ A very slow flying Blight shaped like a black equilateral triangle with nested s
 
 **Greater Blight Prism**:
 A larger, tougher and slower Blight Prism with four nested spinning triangles. Releases the same three Blight Darts when destroyed.
+
+
+**Blight trail**:
+Dead grass and withered vegetation left where the Blight has walked. Repeated passage and stronger Blight kill larger plants; the damage lasts for the current battle run.

@@ -1,3 +1,8 @@
+import { BlightGround } from "./blight-art.ts";
+import { CellType } from "./citygen.ts";
+import { bareAt, groundArt, turfAt as parkTurfAt } from "./ground-art.ts";
+import { pondDisc, pondField } from "./park-geometry.ts";
+import { shadedAt, turfAt as forestTurfAt } from "./forest-art.ts";
 import { CollapseView } from "./collapse-view.ts";
 import type { GridColor } from "../settings.ts";
 import type { Flag } from "../profile/model.ts";
@@ -143,6 +148,10 @@ export class DefendRenderer {
   private readonly sky = new SkyPalaceArt();
   readonly atmosphere = new AtmosphereArt();
   private readonly darkDrain = new DarkDrain();
+  private readonly deadPark = new BlightGround();
+  private readonly deadForest = new BlightGround();
+  private deadParkMap: CityMap | null = null;
+  private deadParkWater: { x: number; y: number; r: number }[] = [];
   readonly forest = new ForestArt();
   readonly forestGrass = new ForestGrass();
   /** The battle time the wizard art last advanced to. */
@@ -421,6 +430,11 @@ export class DefendRenderer {
     this.forest.sync(map, sim);
     this.forest.drawFloor(ctx, this.px, this.forestShare());
     this.forest.drawWater(ctx, this.px, opts.now, this.forestShare(), opts.reduceMotion);
+    if (sim && this.forestShare() > 0) {
+      ctx.save(); ctx.globalAlpha *= this.forestShare();
+      this.deadForest.draw(ctx, this.px, sim.blight, sim.time, forestTurfAt, shadedAt, this.forest.floorVersion);
+      ctx.restore();
+    }
     this.river.sync(map);
     this.river.draw({
       c: ctx, px: this.px, now: opts.now, dt, rain: !!(sim && opts.weather?.rain), cold: sim?.cold ?? !!opts.weather?.snow, thawed: sim?.thawedPonds,
@@ -433,7 +447,7 @@ export class DefendRenderer {
     if ((opts.effects ?? true) && this.forestShare() > 0) {
       this.forestGrass.sync(this.forest.forestPlan!);
       this.forestGrass.draw({
-        damage: this.forest.damage,
+        damage: this.forest.damage, blight: sim?.blight,
         c: ctx, px: this.px, now: opts.now, dt, reduceMotion: opts.reduceMotion, alpha: this.forestShare(),
         wind: sim && opts.weather?.rain ? "rain" : opts.weather ? "cloud" : "calm",
         walkers: feet,
@@ -503,12 +517,24 @@ export class DefendRenderer {
     this.water.sync(map);
     const feet = sim ? walkers(sim) : [];
     if (sim?.cold || opts.weather?.snow || (opts.effects ?? true)) this.water.draw({ c: this.ctx, px: this.px, now: opts.now, rain, cold: sim?.cold ?? !!opts.weather?.snow, thawedPonds: sim?.thawedPonds, night: opts.night, walkers: feet, reduceMotion: opts.reduceMotion, layer: this.layer, layerScale: this.layerScale });
+    if (sim) {
+      if (map !== this.deadParkMap) {
+        this.deadParkMap = map; this.deadParkWater = [];
+        for (let i = 0; i < map.type.length; i++) if (map.type[i] === CellType.WATER) this.deadParkWater.push(pondDisc(i % CELLS_W, Math.floor(i / CELLS_W), 1));
+      }
+      const ground = groundArt(map);
+      this.deadPark.draw(this.ctx, this.px, sim.blight, sim.time, (x, y) => {
+        const cx = Math.floor(x / ART), cy = Math.floor(y / ART);
+        return (map.type[cellIndex(cx, cy)] === CellType.PARK || parkTurfAt(ground, x, y))
+          && !bareAt(ground, x, y) && pondField(this.deadParkWater, (x + .5) / ART, (y + .5) / ART) < -.04;
+      }, undefined, sim.mapVersion);
+    }
     if (!(opts.effects ?? true)) return feet;
     this.grass.sync(map);
     this.grass.draw({
       c: this.ctx, px: this.px, now: opts.now, dt, reduceMotion: opts.reduceMotion,
       wind: rain ? "rain" : opts.weather ? "cloud" : "calm",
-      walkers: feet,
+      walkers: feet, blight: sim?.blight,
     });
     return feet;
   }
@@ -607,7 +633,7 @@ export class DefendRenderer {
       o.fillRect(0, 0, this.board.W, this.board.H);
       this.lighting.darken(o);
     } : undefined;
-    this.trees.draw(this.ctx, this.px, dim);
+    this.trees.draw(this.ctx, this.px, dim, sim?.blight);
   }
 
   /** How much of the forest shows: all of it in an area with one, fading
