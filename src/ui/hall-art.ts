@@ -11,7 +11,6 @@ import { PILLAR_OUTLINE, ashlar, facing, h01, pillarShade } from "../library/ash
 import { getTorchFlicker, getTorchSway } from "../lighting.ts";
 import { DAY_MS } from "../daylight.ts";
 import { FLAME, OUTLINE, puff } from "../defend/pixel-fx.ts";
-import { pixelArtOn } from "../defend/pixel-sprites.ts";
 import { SoftSunlight, SUNLIGHT, windowSunlight } from "../soft-sunlight.ts";
 
 type RGB = [number, number, number];
@@ -62,7 +61,7 @@ export class HallBackdrop {
   /** Bakes the wall when the canvas's size changed. */
   private fit(now: number) {
     const w = Math.max(8, Math.ceil(this.canvas.clientWidth / ART)), h = Math.max(8, Math.ceil(this.canvas.clientHeight / ART));
-    const detailed = this.look === "keep" && pixelArtOn(), rose = detailed ? roseOn(now) : this.rose;
+    const detailed = this.look === "keep" && !legacyGraphics(), rose = detailed ? roseOn(now) : this.rose;
     if (w === this.w && h === this.h && this.detailed === detailed && this.rose === rose) return false;
     this.detailed = detailed;
     const pierW = pierWidth(w);
@@ -367,10 +366,10 @@ const CAME = -1;
 
 type Pane = { id: number; tint: number };
 
-/** The rose's glazings. Usually the flower, but now and then, from one
- * midnight to the next, the glaziers have set another: diamond quarries, a
- * winged sword, the sun between two moons and the stars, an abstract of
- * cells, or interlocking triangles. */
+/** The rose's glazings. From one midnight to the next the glaziers set one
+ * of the specials: diamond quarries, a winged sword, the sun between two
+ * moons and the stars, an abstract of cells, or interlocking triangles. The
+ * flower stays only for the console's `tilesRose("flower")`. */
 export const ROSES = ["flower", "diamonds", "sword", "sky", "cells", "triangles"] as const;
 export type Rose = (typeof ROSES)[number];
 let roseOverride: Rose | null = null;
@@ -378,12 +377,17 @@ let roseOverride: Rose | null = null;
 export function setRose(rose: Rose | null) {
   roseOverride = rose;
 }
+/** Show legacy graphics (the root's `.legacy-graphics`) brings back the
+ * original clear four-lobed window. */
+const legacyGraphics = () => typeof document !== "undefined" && document.documentElement.classList.contains("legacy-graphics");
+/** The specials the window cycles through (never the flower). */
+const CYCLE = ROSES.filter(r => r !== "flower");
 /** The glazing for wall-clock `now`: one a day, changed at midnight (a
- * quarter `DAY_MS` before the day's turn), the flower about half the time. */
+ * quarter `DAY_MS` before the day's turn), each special equally often. */
 export function roseOn(now: number): Rose {
   if (roseOverride) return roseOverride;
   const night = Math.floor((now + DAY_MS / 4) / DAY_MS), roll = h01(night, 3, 97);
-  return roll < 0.45 ? "flower" : ROSES[1 + Math.min(ROSES.length - 2, Math.floor((roll - 0.45) / 0.55 * (ROSES.length - 1)))];
+  return CYCLE[Math.min(CYCLE.length - 1, Math.floor(roll * CYCLE.length))];
 }
 
 /** Each glazing as panes over the rose's disc of radius `rr`, in `X = |dx|`
