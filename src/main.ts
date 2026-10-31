@@ -1,3 +1,4 @@
+import { DayClock, useDayClock } from "./daylight.ts";
 import { ProfileEditor } from "./profile/editor.ts";
 import { loadArtOverrides } from "./defend/art-overrides.ts";
 import { defaults, load, persist, type Save } from "./save.ts";
@@ -58,6 +59,8 @@ onPixelArt(() => {
 let tab: Tab = "defend";
 let combatMode: CombatMode = "defend";
 const clock = () => Date.now();
+const dayClock = new DayClock(save.dayClock);
+useDayClock(dayClock, () => save.settings);
 const modal = el("modal") as HTMLDialogElement;
 const ctx: AppContext = {
   save: () => save,
@@ -91,6 +94,7 @@ const ctx: AppContext = {
   addIdle,
   eraseAll: () => {
     save = defaults();
+    dayClock.elapsed = 0; dayClock.reset();
     awayMs = 0;
     minePage.load(null, clock());
     libraryPage.load(null, clock());
@@ -253,6 +257,7 @@ document.addEventListener("click", (e) => {
 });
 
 function store() {
+  save.dayClock = dayClock.elapsed;
   save.mine = minePage.snapshot(clock());
   save.library = libraryPage.snapshot(clock());
   mineDirty = false;
@@ -356,6 +361,7 @@ function idleTimers() {
  * mine's and the library's work, saved every half minute they pay. */
 let lastTick = 0, lastMineSave = 0;
 function frame(time: number) {
+  dayClock.advance(time, !document.hidden, save.settings.dayNightCycle);
   minePage.advance(clock(), libraryPage.owedMs);
   libraryPage.advance(clock(), minePage.owedMs);
   idleTimers();
@@ -397,8 +403,9 @@ function frame(time: number) {
   }
   requestAnimationFrame(frame);
 }
-document.addEventListener("visibilitychange", store);
-window.addEventListener("pagehide", store);
+document.addEventListener("visibilitychange", () => { dayClock.reset(); store(); });
+window.addEventListener("pagehide", () => { dayClock.reset(); store(); });
+window.addEventListener("pageshow", () => dayClock.reset());
 
 // Console helper: fast-forward a running defense, optionally forcing the weather.
 (globalThis as { defendDebug?: unknown }).defendDebug = (seconds = 30, weather?: Weather) => defendPage.fastForward(seconds, weather);

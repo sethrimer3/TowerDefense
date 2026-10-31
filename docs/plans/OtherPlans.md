@@ -85,3 +85,12 @@ Suggested order: 1 (fences) and 2 (strike quick bar) first, since Ambush's outpo
 - [x] Draw bright crimson contours around Dark One units and dark blue around player units in Defend, Ambush and Siege.
 - [x] Use combined outer silhouettes with no overlap seams, including Simple units and translucent cloaks; retain visibility colors through the color-drain wash.
 - [x] Verify native pixels, camera transforms, cropping, all troop families, phone/desktop settings, combat-cache behavior and bounded 5,000-unit crowd work.
+
+
+## Play-time day/night cycle (2026-10-31)
+
+- [x] Share a five-minute visible cycle across the game, advancing only during foreground play and saving its phase without offline catch-up.
+- [x] Add persistent cycle on/off and fixed Day/Sunset/Dusk/Twilight/Night/Dawn settings, translated in all languages.
+- [x] Add warm sunset light, distinct dusk/twilight/night, a sun moving across the Mine sky and changing city/forest shadows using existing pixel art and cached height maps.
+- [x] Keep offline production, worker schedules, battle RNG and replay fixtures unchanged.
+- [x] Verify pure timing/visibility, sky phases, save decoding, directional shadows, and actual desktop/phone controls, phase colors, persistence and hidden-tab pause.

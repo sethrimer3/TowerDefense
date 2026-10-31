@@ -1,3 +1,4 @@
+import { visualTime, worldSky } from "../daylight.ts";
 /** The walls behind the in-world menus, as lit pixel art: the Smithy's worn
  * oak boards, the Study's vault stone and the keep's hall with its great
  * window. Each wall is baked once a size (colour and a height map, at `ART`
@@ -228,7 +229,7 @@ export class HallBackdrop {
       return { x: t.x / ART + sway.x * 35 * (k ? -1 : 1), y: t.y / ART, r: Math.min(w, h) * 0.5 + 40 * f, k: 1.25 * f, rgb: [1, 0.62, 0.3] as RGB };
     });
     const amb: RGB = this.look === "planks" ? [0.2, 0.15, 0.12] : this.look === "vault" ? [0.25, 0.21, 0.32] : [0.16 + day * 0.14, 0.16 + day * 0.15, 0.2 + day * 0.15];
-    const sky = skyColours(day), win = this.win, sun = keep ? day : 0;
+    const sky = skyColours(day), win = this.win, sun = keep ? day : 0, warmth = worldSky()?.warmth ?? 0;
     const lit = Math.max(0, Math.min(1, (0.55 - day) / 0.35));
     const exterior = this.outside.map((l) => ({ ...l, f: getTorchFlicker({ x: l.seed, y: 9 }, now, reduced) * lit }));
     for (let y = 0; y < h; y++)
@@ -274,9 +275,9 @@ export class HallBackdrop {
           // separate soft density fields, never hard wall-coloured stripes.
           const mx = (win.x0 + win.x1) / 2, my = (win.y0 + win.y1) / 2, dx = mx - x, dy = my - y, d = Math.hypot(dx, dy);
           const glow = Math.max(0, 1 - d / ((win.x1 - win.x0) * 1.3)) ** 2 * 0.55 * sun * facing(sx[i], sy[i], dx, dy, d);
-          lr += glow;
-          lg += glow * 0.93;
-          lb += glow * 0.78;
+          lr += glow * (1 + warmth * .25);
+          lg += glow * (.93 - warmth * .18);
+          lb += glow * (.78 - warmth * .4);
         }
         out[o] = Math.min(255, albedo[i * 3] * lr * 1.5);
         out[o + 1] = Math.min(255, albedo[i * 3 + 1] * lg * 1.5);
@@ -322,7 +323,7 @@ export class HallBackdrop {
     if (this.look !== "keep" || day <= 0.02 || !cw || !ch) return;
     this.sunlight ??= new SoftSunlight(SUNLIGHT.hallDensity, SUNLIGHT.hallFade);
     const { win, h } = this, clock = reduced ? 0 : now, span = win.x1 - win.x0 - 8;
-    const tilt = reduced ? 0.2 : Math.sin(((now % DAY_MS) / DAY_MS) * Math.PI * 2 - Math.PI / 2) * 0.55
+    const tilt = reduced ? 0.2 : Math.sin((visualTime(now) / DAY_MS) * Math.PI * 2 - Math.PI / 2) * 0.55
       + Math.sin(now / SUNLIGHT.swayMs) * SUNLIGHT.sway + Math.sin(now / SUNLIGHT.hallSwayMs) * SUNLIGHT.hallSway;
     const beams = 5, width = span / beams, top = win.y0 + (win.y1 - win.y0) * 0.6, length = h - top;
     ctx.save();
@@ -556,7 +557,8 @@ function skyColours(day: number) {
   const night = { top: [10, 16, 38] as RGB, low: [28, 36, 70] as RGB, hill: [14, 18, 26] as RGB, roofs: [10, 11, 16] as RGB, wall: [16, 16, 20] as RGB };
   const noon = { top: [86, 150, 214] as RGB, low: [196, 226, 238] as RGB, hill: [70, 104, 66] as RGB, roofs: [104, 66, 52] as RGB, wall: [118, 112, 102] as RGB };
   const at = (k: keyof typeof noon) => mix(night[k], noon[k], day);
-  const low = mix(at("low"), [236, 150, 96], dusk * 0.7);
+  const scene = worldSky();
+  const low = scene ? mix(at("low"), [...scene.rgb], Math.min(.85, scene.tint.strength * 2)) : mix(at("low"), [236, 150, 96], dusk * 0.7);
   return { top: at("top"), low, hill: at("hill"), roofs: at("roofs"), wall: at("wall") };
 }
 

@@ -1,5 +1,15 @@
 import type {TranslationRow} from "./languages.ts";
 export const SETTINGS_TEXT = [
+ ["setting.dayNightCycle", "Day/night cycle", "Ciclo de día y noche", "Cycle jour/nuit", "Tag-Nacht-Zyklus", "Ciclo de dia e noite", "Ciclo giorno/notte", "昼夜サイクル", "낮과 밤 주기", "昼夜循环"],
+ ["setting.timeOfDay", "Time of day", "Hora del día", "Moment de la journée", "Tageszeit", "Hora do dia", "Momento della giornata", "時間帯", "시간대", "时段"],
+ ["settings.time.day", "Day", "Día", "Jour", "Tag", "Dia", "Giorno", "昼", "낮", "白天"],
+ ["settings.time.sunset", "Sunset", "Atardecer", "Coucher du soleil", "Sonnenuntergang", "Pôr do sol", "Tramonto", "夕焼け", "일몰", "日落"],
+ ["settings.time.dusk", "Dusk", "Anochecer", "Crépuscule", "Abenddämmerung", "Anoitecer", "Imbrunire", "夕暮れ", "해질녘", "黄昏"],
+ ["settings.time.twilight", "Twilight", "Crepúsculo", "Heure bleue", "Blaue Stunde", "Crepúsculo", "Ora blu", "薄明", "박명", "暮光"],
+ ["settings.time.night", "Night", "Noche", "Nuit", "Nacht", "Noite", "Notte", "夜", "밤", "夜晚"],
+ ["settings.time.dawn", "Dawn", "Amanecer", "Aube", "Morgendämmerung", "Amanhecer", "Alba", "夜明け", "새벽", "黎明"],
+ ["settings.dayCycleHint", "One full cycle takes 5 minutes of play. Pauses while the game is hidden. Turn it off to choose a fixed time of day.", "Un ciclo completo dura 5 minutos de juego. Se pausa al ocultar el juego. Desactívalo para fijar la hora.", "Un cycle dure 5 minutes de jeu et se met en pause quand le jeu est masqué. Désactivez-le pour fixer le moment de la journée.", "Ein Zyklus dauert 5 Minuten Spielzeit und pausiert bei verborgenem Spiel. Ausschalten, um eine Tageszeit festzulegen.", "Um ciclo dura 5 minutos de jogo e pausa quando o jogo está oculto. Desative para fixar a hora do dia.", "Un ciclo dura 5 minuti di gioco e si ferma quando il gioco è nascosto. Disattivalo per fissare un momento della giornata.", "1周期はプレイ時間5分です。ゲームが非表示の間は停止します。無効にすると時間帯を固定できます。", "한 주기는 플레이 시간 5분입니다. 게임이 숨겨지면 멈춥니다. 끄면 시간대를 고정할 수 있습니다.", "一个完整循环需要5分钟游玩时间。游戏隐藏时暂停。关闭循环即可固定时段。"],
+
  ["setting.gridColor","Grid line color","Color de la cuadrícula","Couleur de la grille","Rasterlinienfarbe","Cor da grade","Colore della griglia","グリッド線の色","격자선 색상","网格线颜色"],
  ["settings.gridColor.white","White","Blanco","Blanc","Weiß","Branco","Bianco","白","흰색","白色"],
  ["settings.gridColor.brown","Brown","Marrón","Marron","Braun","Marrom","Marrone","茶色","갈색","棕色"],

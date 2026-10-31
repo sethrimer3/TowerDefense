@@ -1,3 +1,4 @@
+import { worldSky, type DaySky } from "../daylight.ts";
 /** Draws the Mine: the grid two pixels a cell each way into an offscreen
  * image (the same size as the miners' pixels), each cell's four pixels
  * detailed by its material and the open air beside it, lit by daylight
@@ -123,6 +124,8 @@ export class MineRenderer {
   private newsTick = -1;
   private bolts: Bolt[] = [];
   private flashUntil = 0;
+  private dayScene: DaySky | null = null;
+  private paintedSky = "";
   private skyNow: Sky = { weather: "clear", daylight: 1, clouds: 0, rain: 0 };
   /** How far each building's front wall has faded (1: see-through). */
   private open: Record<BuildingId, number> = { shaft: 0, barracks: 0, warehouse: 0, forge: 0, smithy: 0 };
@@ -284,6 +287,9 @@ export class MineRenderer {
     const cells = sim.world.cells, water = sim.world.water, burn = sim.burn, px = this.pixels, sky = this.sky, warm = this.warm, shade = this.shade, grain = this.grain, bump = this.bump;
     const { surface, stoneTop } = sim.strata;
     const { daylight, clouds } = this.skyNow, night = 1 - daylight, starlight = night * (1 - clouds), open = this.skyLight();
+    const scene = this.dayScene, warmth = scene?.warmth ?? 0;
+    const sunX = scene ? this.camX + (this.size.w / this.size.scale) * (.1 + (scene.sunX + 1) * .4) : 0;
+    const sunY = scene ? surface[Math.min(W - 1, Math.max(0, Math.floor(sunX)))] - 6 - Math.max(0, scene.altitude) * 26 : 0;
     const flicker = Math.floor(time / 110), W2 = W * 2, lr = this.lr, lg = this.lg, lb = this.lb;
     const builtGround = new Uint8Array(W);
     for (const id of BUILDINGS) {
@@ -294,6 +300,7 @@ export class MineRenderer {
       const t = Math.min(1, Math.max(0, y / 50));
       let skyRgb = mix(mix(NIGHT_TOP, NIGHT_LOW, t), mix(SKY_TOP, SKY_LOW, t * t), daylight);
       skyRgb = mix(skyRgb, mix(NIGHT_TOP, OVERCAST, daylight), clouds * 0.65);
+      if (scene) skyRgb = mix(skyRgb, [...scene.rgb], scene.tint.strength * (.5 + t));
       const skyPx = pack(skyRgb, 1), up = y > 0 ? -W : 0, down = y < H - 1 ? W : 0;
       for (let x = 0; x < W; x++) {
         const i = idx(x, y), m = cells[i] === GRASS && builtGround[x] ? DIRT : cells[i], o = 2 * y * W2 + 2 * x, g4 = 4 * i;
@@ -305,7 +312,8 @@ export class MineRenderer {
         }
         const passable = isPassable(m), inSky = passable && y < surface[x];
         if (inSky && m === AIR) {
-          let c = skyPx;
+          const sunDistance = scene && scene.altitude > 0 ? (x - sunX) ** 2 + (y - sunY) ** 2 : Infinity;
+          let c = sunDistance < 10 ? pack(scene!.warmth > .1 ? [255, 204, 122] : [255, 244, 198], 1) : sunDistance < 36 ? pack(mix(skyRgb, [255, 199, 119], (1 - sunDistance / 36) * .3), 1) : skyPx;
           if (water[i]) {
             const rgb = mix(WATER_RGB, skyRgb, 0.3).map((v) => v * (0.35 + 0.65 * open)) as RGB;
             c = pack(rgb, 1);
@@ -336,9 +344,9 @@ export class MineRenderer {
         for (let q = 0; q < 4; q++) {
           const h = q & 1 ? r : l, v = q >> 1 ? down : up;
           const s = Math.max(si * 0.5 + (q & 1 ? sr : sl) * 0.25 + (q >> 1 ? sd : su) * 0.25, near), w = warm[i] * 0.5 + warm[i + h] * 0.25 + warm[i + v] * 0.25;
-          lr[q] = s * 0.98 + w * 1.15 + 0.025;
-          lg[q] = s * 0.96 + w * 0.8 + 0.025;
-          lb[q] = s * 0.94 + w * 0.5 + 0.03;
+          lr[q] = s * (.98 + warmth * .28) + w * 1.15 + 0.025;
+          lg[q] = s * (.96 - warmth * .2) + w * 0.8 + 0.025;
+          lb[q] = s * (.94 - warmth * .55) + w * 0.5 + 0.03;
         }
         const back: RGB = inSky ? skyRgb : y < stoneTop[x] ? DIRT_BACK : STONE_BACK;
         if (water[i]) {
@@ -513,7 +521,10 @@ export class MineRenderer {
     const y0 = Math.max(0, Math.floor(this.camY)), y1 = Math.min(H, Math.ceil(this.camY + h / scale) + 1);
     // The sky changes every frame, smoothly, however fast the mine runs;
     // the light's spread through the workings is refreshed now and then.
-    this.skyNow = sim.sky;
+    this.dayScene = worldSky();
+    this.skyNow = this.dayScene ? { ...sim.sky, daylight: this.dayScene.daylight } : sim.sky;
+    const skyKey = this.dayScene ? `${this.dayScene.rgb.join()}:${Math.round(this.dayScene.sunX * 50)}:${Math.round(this.dayScene.altitude * 50)}:${Math.round(this.camX)}:${this.size.w}:${this.size.scale}` : "";
+    const skyChanged = skyKey !== this.paintedSky;
     const relight = time - this.litAt > 120;
     if (relight) {
       this.light(sim);
@@ -529,11 +540,12 @@ export class MineRenderer {
     const rows = `${y0}:${y1}`;
     // The world changes most frames while the crew works: repaint for it at
     // most every 60 ms (each cell is four pixels now).
-    if (relight || turned || rows !== this.paintedRows || (sim.world.version !== this.paintedVersion && time - this.paintedAt > 60)) {
+    if (relight || turned || skyChanged || rows !== this.paintedRows || (sim.world.version !== this.paintedVersion && time - this.paintedAt > 60)) {
       this.paint(sim, y0, y1, time);
       this.paintedAt = time;
       this.paintedOpen = open;
       this.paintedDay = this.skyNow.daylight;
+      this.paintedSky = skyKey;
       this.paintedVersion = sim.world.version;
       this.paintedRows = rows;
     }

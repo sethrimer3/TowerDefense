@@ -82,6 +82,8 @@ const WALL = "#8e897c";
 
 /** What the city layer is painted from. `px` is canvas pixels per cell. */
 export type CityScene = {
+  /** Moving sunlight is composited separately from the cached buildings. */
+  omitSunShadows?: boolean;
   area?: AreaId;
   map: CityMap;
   /** The battle, if one is on: buildings it knocked down show as rubble. */
@@ -125,7 +127,7 @@ export function paintCityLayer(c: CanvasRenderingContext2D, px: number, scene: C
   for (const b of map.buildings) if (b.kind === "wall") paintBuilding(p, b);
   paintFences(c, px, map, sim);
   for (const b of map.buildings) if (b.kind !== "wall") paintBuilding(p, b);
-  paintShadows(c, cityShadows(map, sim, scene.looks), px);
+  if (!scene.omitSunShadows) paintShadows(c, cityShadows(map, sim, scene.looks), px);
   paintLanternBrackets(p, scene.lights);
 }
 

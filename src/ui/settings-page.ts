@@ -1,3 +1,4 @@
+import type { TimeOfDay } from "../daylight.ts";
 import { HOUR_MS } from "../away.ts";
 import { UNLOCK_WAVES, unlockWaves, waveReach } from "../defend/progress.ts";
 import { DEV_OPTIONS, SETTINGS, type GridColor, type SettingKey } from "../settings.ts";
@@ -8,7 +9,7 @@ import { LANGUAGES, isLanguage, t } from "../i18n/index.ts";
 /** The settings on the page, in order; each control comes from its row in SETTINGS. */
 /** Gameplay settings, under their own heading first. */
 const GAMEPLAY = ["showEmpty", "raiseDrag", "magnifier", "tripleTapFlag"] as const satisfies readonly SettingKey[];
-const PAGE = ["pixelArt", "legacyGraphics", "reduceMotion", "effectsOff", "simpleEnemies", "simpleTroops", "mergedOutlines", "crispZoom", "tileGrid", "soundOff", "ambienceOff", "pixelFont"] as const satisfies readonly SettingKey[];
+const PAGE = ["pixelArt", "legacyGraphics", "dayNightCycle", "reduceMotion", "effectsOff", "simpleEnemies", "simpleTroops", "mergedOutlines", "crispZoom", "tileGrid", "soundOff", "ambienceOff", "pixelFont"] as const satisfies readonly SettingKey[];
 /** The dev options, under ALL ON. */
 const DEV = ["devMode", "devTowers", "devJournal", "instantResearch"] as const satisfies readonly SettingKey[];
 /** All research unlocked: the Smithy's rows and each skill tree. */
@@ -36,6 +37,14 @@ function gridControls(ctx: AppContext): string {
     color.choices.map(([value]) => `<option value="${value}" ${settings.gridColor === value ? "selected" : ""}>${t(`settings.gridColor.${value}`)}</option>`).join("") + `</select></label>`;
 }
 
+/** Disabling the cycle uses the selected, persistent time of day. */
+function daylightControls(ctx: AppContext) {
+  const settings = ctx.save().settings;
+  return `<label class="setting setting-grid" id="time-of-day-row">${t("setting.timeOfDay")}<select id="time-of-day" ${settings.dayNightCycle ? "disabled" : ""}>` +
+    SETTINGS.timeOfDay.choices.map(([value]) => `<option value="${value}" ${settings.timeOfDay === value ? "selected" : ""}>${t(`settings.time.${value}`)}</option>`).join("") + `</select></label>` +
+    `<p class="hint">${t("settings.dayCycleHint")}</p>`;
+}
+
 /** The Settings page: display and dev options, and erasing progress. */
 export function renderSettingsPage(ctx: AppContext) {
   const settings = ctx.save().settings, allOn = ALL_DEV.every((k) => settings[k]);
@@ -45,7 +54,7 @@ export function renderSettingsPage(ctx: AppContext) {
     `<h3 class="settings-group">${t("settings.gameplay")}</h3>` +
     GAMEPLAY.map((key) => control(key, ctx)).join("") +
     `<h3 class="settings-group">${t("settings.display")}</h3>` +
-    PAGE.map((key) => control(key, ctx) + (key === "tileGrid" ? gridControls(ctx) : "")).join("") +
+    PAGE.map((key) => control(key, ctx) + (key === "tileGrid" ? gridControls(ctx) : key === "dayNightCycle" ? daylightControls(ctx) : "")).join("") +
     control("developerMode", ctx) +
     (settings.developerMode ? `<h3 class="settings-group">${t("settings.dev")}</h3>` +
     `<label class="setting setting-all">${t("settings.allOn")}<input type="checkbox" id="dev-all" ${allOn ? "checked" : ""}></label>` +
@@ -69,6 +78,7 @@ export function renderSettingsPage(ctx: AppContext) {
       settings[key] = "invert" in row.page ? !input.checked : input.checked;
       if ((ALL_DEV as readonly SettingKey[]).includes(key)) ctx.devChanged();
       else ctx.update();
+      if (key === "dayNightCycle") (el("time-of-day") as HTMLSelectElement).disabled = input.checked;
       if (key === "tileGrid") {
         el("grid-opacity-row").hidden = !input.checked;
         el("grid-color-row").hidden = !input.checked;
@@ -77,6 +87,10 @@ export function renderSettingsPage(ctx: AppContext) {
       if (all) all.checked = ALL_DEV.every((k) => settings[k]);
     };
   }
+  (el("time-of-day") as HTMLSelectElement).onchange = event => {
+    settings.timeOfDay = (event.target as HTMLSelectElement).value as TimeOfDay;
+    ctx.update();
+  };
   const opacity = el(SETTINGS.gridOpacity.page.id) as HTMLInputElement;
   opacity.oninput = () => {
     settings.gridOpacity = Number(opacity.value);

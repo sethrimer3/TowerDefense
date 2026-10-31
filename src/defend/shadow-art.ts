@@ -191,6 +191,33 @@ export function shadowMask(h: Float32Array): Uint8Array {
   return out;
 }
 
+/** A directional height-map sweep. The dominant axis advances one whole
+ * pixel, so both upstream samples have already been visited. Linear work
+ * over the board; no per-pixel ray marches or scene readbacks. */
+export function sunShadowMask(h: Float32Array, dx: number, dy: number): Uint8Array {
+  const out = new Uint8Array(W * H), ray = new Float32Array(W * H);
+  const length = Math.max(Math.abs(dx), Math.abs(dy));
+  if (!(length > .01) || !Number.isFinite(length)) return out;
+  dx /= length; dy /= length;
+  const drop = 1 / length, horizontal = Math.abs(dx) >= Math.abs(dy);
+  const sample = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H ? Math.max(h[y * W + x], ray[y * W + x]) : 0;
+  const write = (x: number, y: number) => {
+    const u = horizontal ? y - dy : x - dx, low = Math.floor(u), part = u - low;
+    const a = horizontal ? sample(x - dx, low) : sample(low, y - dy);
+    const b = horizontal ? sample(x - dx, low + 1) : sample(low + 1, y - dy);
+    const i = y * W + x, r = ray[i] = Math.max(0, a + (b - a) * part - drop), over = r - h[i];
+    if (over > 0) out[i] = over > .5 ? 1 : 2;
+  };
+  if (horizontal) {
+    const step = dx >= 0 ? 1 : -1;
+    for (let x = step > 0 ? 0 : W - 1; x >= 0 && x < W; x += step) for (let y = 0; y < H; y++) write(x, y);
+  } else {
+    const step = dy >= 0 ? 1 : -1;
+    for (let y = step > 0 ? 0 : H - 1; y >= 0 && y < H; y += step) for (let x = 0; x < W; x++) write(x, y);
+  }
+  return out;
+}
+
 /** Paints the mask in translucent black onto `c` at `px` canvas pixels a
  * cell, each art pixel's edges rounded to whole canvas pixels the way the
  * buildings' cells are (`Math.round(cx * px)`), so a shadow starts right

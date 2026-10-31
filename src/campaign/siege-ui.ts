@@ -1,3 +1,4 @@
+import { worldSky } from "../daylight.ts";
 import { SquadBar } from "./siege-squad-bar.ts";
 import { SiegeSquads } from "./siege-squads.ts";
 import { SiegeVictory } from "./siege-victory.ts";
@@ -313,7 +314,7 @@ export class SiegePage {
     const status = this.root.querySelector('.campaign-status')!, clock = status.querySelector('time')!;
     clock.hidden = s.phase !== 'battle' || !!this.notice;
     clock.textContent = t('siege.timeLeft', { seconds: Math.max(0, SIEGE_SECONDS - Math.floor(s.elapsed)) });
-    clock.dataset.sky = siegeSky(SIEGE_SECONDS - s.elapsed).phase;
+    clock.dataset.sky = (worldSky() ?? siegeSky(SIEGE_SECONDS - s.elapsed)).phase;
     status.querySelector('span')!.textContent =
       this.notice ||
       (s.phase === "build"
@@ -381,7 +382,7 @@ export class SiegePage {
       }
     }
     const owner = this.inspection !== undefined && this.sim.raid.field.defenderIds.has(this.inspection) ? this.sim.raid.defense : this.sim.engine;
-    const sky = siegeSky(SIEGE_SECONDS - this.sim.elapsed);
+    const sky = worldSky() ?? siegeSky(SIEGE_SECONDS - this.sim.elapsed);
     const face=this.host.save().siege!.raid.castle.owner.flag ?? botFlag(this.host.save().siege!.raid.castle.seed);
     if (this.flagsSim !== this.sim) { this.flagsSim=this.sim;this.flags=new SiegeFlags(this.sim.map,this.host.save().siege!.raid.castle.seed,face); }
     this.flags!.update(sim);
