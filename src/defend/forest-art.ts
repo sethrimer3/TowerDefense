@@ -808,6 +808,8 @@ export class ForestArt {
   private floorStale: Box[] = [WHOLE];
   /** The trees' pixels, composed afresh at most every `REDRAW_MS`. */
   private crowns: { px: Uint32Array; img: ImageData; cv: HTMLCanvasElement } | null = null;
+  /** Keep cached crowns unlit: the solar light changes even in still air. */
+  private shadedCrowns: HTMLCanvasElement | null = null;
   /** The next band of rows to compose, and whether all are due, or a fade
    * needs them in still air. */
   private band = 0;
@@ -1285,21 +1287,24 @@ export class ForestArt {
       const y0 = Math.floor((k * H) / BANDS), y1 = Math.floor(((k + 1) * H) / BANDS);
       composeCrowns(this.crowns.px, plan, this.damage, this.alpha, t, o.wind, y0, y1, blight);
       cc.putImageData(this.crowns.img, 0, 0, 0, y0, W, y1 - y0);
-      if (o.shade) {
-        cc.save();
-        cc.beginPath();
-        cc.rect(0, y0, W, y1 - y0);
-        cc.clip();
-        cc.setTransform(ART / px, 0, 0, ART / px, 0, 0);
-        cc.globalCompositeOperation = "source-atop";
-        o.shade(cc);
-        cc.restore();
-      }
+    }
+    let crowns = this.crowns.cv;
+    if (o.shade) {
+      this.shadedCrowns ??= Object.assign(document.createElement("canvas"), { width: W, height: H });
+      const shaded = this.shadedCrowns.getContext("2d")!;
+      shaded.clearRect(0, 0, W, H);
+      shaded.drawImage(crowns, 0, 0);
+      shaded.save();
+      shaded.setTransform(ART / px, 0, 0, ART / px, 0, 0);
+      shaded.globalCompositeOperation = "source-atop";
+      o.shade(shaded);
+      shaded.restore();
+      crowns = this.shadedCrowns;
     }
     c.save();
     c.imageSmoothingEnabled = false;
     c.globalAlpha = o.alpha;
-    c.drawImage(this.crowns.cv, 0, 0, CELLS_W * px, CELLS_H * px);
+    c.drawImage(crowns, 0, 0, CELLS_W * px, CELLS_H * px);
     this.drawBurning(c, px, o.still ? 0 : o.now);
     this.drawDebris(c, px);
     this.birds.draw(c, px);

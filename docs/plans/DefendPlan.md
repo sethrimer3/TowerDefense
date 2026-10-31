@@ -19,6 +19,8 @@ Follow the architecture guidelines in [AmbushPlan.md](AmbushPlan.md#architecture
 
 ## Backlog
 
+- [x] Stagger city torches by ±5 seconds around fading sunset shadows; light the exterior walls and terrain. Add cosmetic townsfolk errands and gate-aware night watchmen with hand-torches and threat retreats. Match keep sunlight/torch occlusion to its native rounded silhouette. `city-torches.ts`, `city-life.ts`, `city-life-art.ts`, `lighting.ts`, `shadow-art.ts`, `render.ts`; no simulation/save changes, tested in Node and desktop/phone native scenes.
+
 Add Defend items here in the form: **What** (one line), **Why**, **Files**, **Tests**, **Status**.
 
 

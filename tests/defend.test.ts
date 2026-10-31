@@ -391,7 +391,7 @@ test('city lights: tower fires with corner pillars, lanterns hung on houses', as
   const archer = lights.find((x) => x.kind === 'archerTower')!;
   assert.equal(archer.pillars.length, 4, 'four corner pillars');
   assert.ok(archer.inside, 'the tower does not shadow its own fire');
-  const lanterns = lights.filter((x) => x.kind === 'lantern');
+  const lanterns = lights.filter((x) => x.kind === 'lantern' && map.buildings[x.owner].kind === 'house');
   assert.ok(lanterns.length >= 4);
   for (const a of lanterns) {
     assert.equal(map.buildings[a.owner].kind, 'house');
