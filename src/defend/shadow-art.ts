@@ -59,7 +59,22 @@ export function heights(map: CityMap, standing: (b: Building) => boolean, footpr
     if (b.fence) fence(b, raise);
     else if (b.kind === "wall") wall(map, b, raise, standing);
     else if (b.kind === "house") house(b, raise);
-    else if (b.kind === "keep") keep(b, raise);
+    else if (b.kind === "keep") {
+      const f = footprint?.(b);
+      if (!f) keep(b, raise);
+      else {
+        // The sprite's padded outline includes the round turret edges that
+        // the old rectangular model clipped off, leaving detached shadows.
+        keep(b, (x, y, v) => {
+          const X = x - f.x0, Y = y - f.y0;
+          if (X >= 0 && Y >= 0 && X < f.w && Y < f.h && f.mask[Y * f.w + X]) raise(x, y, v);
+        });
+        for (let y = 0; y < f.h; y++) for (let x = 0; x < f.w; x++) {
+          const X = f.x0 + x, Y = f.y0 + y;
+          if (f.mask[y * f.w + x] && X >= 0 && Y >= 0 && X < W && Y < H && !h[Y * W + X]) raise(X, Y, HEIGHT.keep.curtain);
+        }
+      }
+    }
     else if (b.kind === "gate") gate(b, raise);
     else {
       const v = b.kind === "wallBallista" ? HEIGHT.wall : b.kind.endsWith("Tower") ? HEIGHT.tower : HEIGHT.hall;
