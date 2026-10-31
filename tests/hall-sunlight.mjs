@@ -72,6 +72,15 @@ try {
       }
       setRose(null);
       const nights = new Set(Array.from({ length: 40 }, (_, n) => roseOn(n * 480000)));
+      // While the room stays in view the glazing holds across the day's turn;
+      // after a gap (the tab hidden) it takes the new day's.
+      const turn = [...Array(40).keys()].map(n => (n + 1) * 300000 - 75000).find(t => roseOn(t - 1) !== roseOn(t + 1));
+      room.draw(turn - 5000, [], 1, true); const held = room.rose;
+      for (let t = turn - 4100; t < turn + 5000; t += 900) room.draw(t, [], 1, true);
+      const stays = room.rose === held;
+      room.draw(turn + 9000, [], 1, true);
+      const changesAway = room.rose === roseOn(turn + 9000) && room.rose !== held;
+      const holdsInView = turn > 0 && stays && changesAway;
       setRose('flower'); room.draw(140000, [], 1, false);
       const distinctRoses = new Set(Object.values(roseLead)).size === ROSES.length && nights.size >= 4 && !nights.has('flower');
       const probe = document.createElement('canvas'); probe.width = 240; probe.height = 240;
@@ -85,7 +94,7 @@ try {
       samples.sort((a,b) => a-b);
       const same = (a,b) => a.every((v,i) => v === b[i]);
       const dark = night.every((v, i) => i % 4 !== 3 || v === 0);
-      return { shaft, dark, moved: !same(first,moved), still: same(still,stillLater), night: same(night,nightLater), gated: !same(stillWall,legacy), restored: same(stillWall,restored), legacy: same(legacy,legacyAgain), asymmetric, distinctRoses, maxStep, shades: shades.size, p95: samples[Math.floor(samples.length * .95)] };
+      return { shaft, dark, moved: !same(first,moved), still: same(still,stillLater), night: same(night,nightLater), gated: !same(stillWall,legacy), restored: same(stillWall,restored), legacy: same(legacy,legacyAgain), asymmetric, distinctRoses, holdsInView, maxStep, shades: shades.size, p95: samples[Math.floor(samples.length * .95)] };
     });
     assert.equal(checks.moved, true, 'sunlight/dust move over time');
     assert.equal(checks.still, true, 'Reduce Motion freezes decorative movement');
@@ -94,6 +103,7 @@ try {
     assert.equal(checks.gated && checks.restored && checks.legacy, true, 'window art toggles/rebakes without resizing');
     assert.equal(checks.asymmetric, 0, 'leadwork stays symmetric on the native grid, every rose glazing');
     assert.equal(checks.distinctRoses, true, 'each rose glazing has its own leadwork and the nights change it');
+    assert.equal(checks.holdsInView, true, 'the rose holds while in view and changes only after the room was hidden');
     assert.ok(checks.maxStep <= 4 && checks.shades >= 16, 'light edges feather smoothly to transparent');
     const clip = await page.locator('body > canvas').first().boundingBox();
     await page.screenshot({ path: `test-results/tiles-window-detail-${width}.png`, clip });
