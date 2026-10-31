@@ -103,17 +103,17 @@ export class CityLife {
       if(reduced) continue;
       p.wait-=dt;
       if(p.mode==='gone') {
-        if(!this.enemyPresent && night && p.wait<=0 && this.doors.length) {
+        if(!this.enemyPresent && p.wait<=0 && this.doors.length) {
           const d=this.doors[p.id%this.doors.length];p.x=d.x;p.y=d.y;p.mode='indoors';p.wait=2;
         }
         continue;
       }
       if(p.hidden) {
-        if(p.wait>0 || (p.role==='townsfolk'?this.enemyPresent:!night) || this.danger(p)) continue;
+        if(p.wait>0 || (p.role==='townsfolk'&&this.enemyPresent) || this.danger(p)) continue;
         if(this.pick(p,night)) p.hidden=false;
         continue;
       }
-      if(p.role==='watchman'&&!night&&p.mode==='walk' && !this.shelter(p)) continue;
+      if(p.role==='watchman'&&!night&&outside&&p.mode==='walk' && !this.shelter(p)) continue;
       this.walk(p,dt);
       if(p.path.length) continue;
       if(p.mode==='escape'&&p.exit) {

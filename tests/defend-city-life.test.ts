@@ -56,7 +56,9 @@ test('townsfolk make safe errands, watchmen use gates only at night, and handhel
     const before=life.people.map(p=>[p.x,p.y]);
     tick(life,35,false);
     assert.ok(life.people.some((p,i)=>p.role==='townsfolk'&&Math.hypot(p.x-before[i][0],p.y-before[i][1])>1));
-    assert.ok(life.people.filter(p=>p.role==='watchman').every(p=>p.hidden));
+    const guards=life.visible.filter(p=>p.role==='watchman');
+    assert.ok(guards.length>0,'watchmen also patrol inside during the day');
+    assert.ok(guards.every(p=>map.city[cellAt(p.x,p.y)]),'day patrols stay inside');
     let outside=false;
     for(let i=0;i<180*30;i++) {
       life.update(1/30,220000,true,false,[]);
