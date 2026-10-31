@@ -56,6 +56,8 @@ Each new furthest wave reached automatically selects the preceding wave for your
 
 ## How it's built
 
+The Mine sun keeps a fixed circular silhouette on the native pixel grid as it moves. Stars render behind its opaque disc and soft halo, while terrain and foreground scenery stay in front.
+
 City torches ignite individually as the last sunlight shadows fade, with stable timing offsets of up to five seconds either side of dusk. Exterior wall sconces light the surrounding terrain. Cosmetic townsfolk make building-to-building errands while the city is safe; watchmen patrol inside the walls and can go outside at night through a stone gate. Nearby monsters send watchmen to shelter inside the walls or fleeing offscreen outside. Their hand-torches have half the strength of the keep's braziers. `defend/city-life.ts`, `city-life-art.ts` and `city-torches.ts` keep this scenery separate from combat, saves and battle randomness. Keep shadows and torch occlusion follow actual sprite outlines, including rounded corners.
 
 The visible day/night cycle takes five minutes of play and pauses while the game is hidden or closed. Settings can disable it and hold Day, warm Sunset, Dusk, Twilight, Night or Dawn. All views share the saved cycle; the Mine sun crosses the visible sky, window light warms at sunset, and city/forest shadows change direction and length. Window rays follow that same sun position. The Faster sun during catch-up setting (on by default) runs the shared cycle at 5x while the Mine or Library processes idle time; switch it off to keep normal speed. Offline production and worker schedules keep their own simulation clocks.
