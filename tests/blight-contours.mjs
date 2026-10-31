@@ -22,13 +22,34 @@ try {
     const pixel = (c, x, y) => [...c.getImageData(x, y, 1, 1).data];
     const gallery = document.querySelector('canvas'); gallery.width = 1000; gallery.height = 850;
     gallery.style.cssText = 'width:1000px;height:850px'; const gc = gallery.getContext('2d');
-    const samples = [], categories = [], portraits = [];
+    const samples = [], categories = [], portraits = [], widths = [];
     for (const def of Object.values(ENEMIES).filter(d => d.faction === 'darkOne')) {
       const cv = canvas(); paintPortrait(cv, def.kind);
       const d = cv.getContext('2d').getImageData(12, 12, 56, 56).data;
       let fire = 0;
       for (let i = 0; i < d.length; i += 4) if (d[i] > 110 && d[i + 1] > 30 && d[i] > d[i + 1] * 1.2 && d[i + 1] > d[i + 2] * 1.5) fire++;
       portraits.push({ kind: def.kind, fire });
+    }
+    for (const simple of [false, true]) for (const scale of [1, 1.25, 2]) {
+      const s = make();
+      for (const [i, kind] of ['miniDarkling', 'darkling', 'largeDarkling'].entries()) s.spawnAuxiliary(kind, 1 + i, 1);
+      const cv = canvas(600, 250), c = cv.getContext('2d'), outline = new UnitOutline(); c.scale(scale, scale);
+      drawUnits({ c, px: 64 }, s, null, false, undefined, { enemies: simple }, outline, undefined, { defer: true });
+      const ring = outline.contours.channels.get(PORTAL_UNIT_INK).c;
+      for (const [i, artWidth] of [.5, .75, 1].entries()) {
+        const left = (1 + i) * 64 * scale - (i + 1) * 4 * scale, row = ring.getImageData(left - 20, 64 * scale, 20, 1).data;
+        let coverage = 0; for (let a = 3; a < row.length; a += 4) coverage += row[a] / 255;
+        widths.push({ simple, scale, side: i + 1, coverage, expected: artWidth * 8 * scale });
+      }
+    }
+    // An artist-replaced tiny body must receive the same fractional rim.
+    for (const side of [1, 2]) {
+      const cv = canvas(), c = cv.getContext('2d'), outline = new UnitOutline(), l = outline.begin(c, true, 4);
+      const sprite = canvas(side, side), sc = sprite.getContext('2d'); sc.fillStyle = '#000'; sc.fillRect(0, 0, side, side);
+      outline.ink(PORTAL_UNIT_INK); outline.mergePixelGaps(); l.units.drawImage(sprite, 40, 40, side * 8, side * 8); outline.mergePixelGaps(false); outline.end(c, true);
+      const row = outline.contours.channels.get(PORTAL_UNIT_INK).c.getImageData(20, 44, 20, 1).data;
+      let coverage = 0; for (let a = 3; a < row.length; a += 4) coverage += row[a] / 255;
+      widths.push({ artist: true, side, coverage, expected: side === 1 ? 4 : 6 });
     }
     for (const simple of [false, true]) {
       // Check every dark faction member, including complex sprites, in isolation.
@@ -110,6 +131,14 @@ try {
       rounds.sort((a, b) => a - b); timings.push({ n, allocations, reads, medianMs: rounds[7], p95Ms: rounds[14] });
       if (n === 5000) gc.drawImage(cv, 0, 0, 720, 1040, 10, 725, 180, 120);
     }
+    // Visible size comparison beside the stress thumbnail.
+    const sizes = make();
+    for (const [i, kind] of ['miniDarkling', 'darkling', 'largeDarkling'].entries()) sizes.spawnAuxiliary(kind, 1 + i * 1.7, 1.3);
+    for (let y = 0; y < 4; y++) for (let x = 0; x < 8; x++) sizes.spawnAuxiliary(x % 2 ? 'darkling' : 'miniDarkling', 7 + x * .2, .8 + y * .2);
+    const comparison = canvas(780, 130), comp = comparison.getContext('2d'), rim = new UnitOutline();
+    drawUnits({ c: comp, px: 64 }, sizes, null, false, undefined, {}, rim, undefined, { defer: true }); rim.drawContours(comp, 2.5);
+    gc.drawImage(comparison, 200, 720); gc.fillStyle = '#f2dcc5'; gc.font = '15px monospace';
+    gc.fillText('Mini: 0.5        Darkling: 0.75      Large: 1 art px       Mixed pack', 215, 745);
     // Previews alternating with a battle must keep their own warmed patterns.
     const contexts = [canvas().getContext('2d'), canvas().getContext('2d')];
     const box = { x: 0, y: 0, w: 300, h: 200 };
@@ -118,10 +147,11 @@ try {
     document.createElement = function(name, ...args) { if (name === 'canvas') alternatingCanvases++; return create(name, ...args); };
     try { for (let i = 0; i < 10; i++) paintPortal(contexts[i % 2], box, i / 10); }
     finally { document.createElement = create; }
-    return { categories, samples, portraits, ally, timings, alternatingCanvases };
+    return { categories, samples, portraits, widths, ally, timings, alternatingCanvases };
   });
   mkdirSync('test-results', { recursive: true }); writeFileSync('test-results/blight-contours.json', JSON.stringify(result, null, 2));
   await page.screenshot({ path: 'test-results/blight-contours.png' });
+  for (const w of result.widths) assert.ok(Math.abs(w.coverage - w.expected) < .02, JSON.stringify(w));
   assert.ok(result.portraits.every(p => p.fire > 0), JSON.stringify(result.portraits));
   assert.ok(result.categories.every(r => r.portal && !r.crimson), JSON.stringify(result.categories));
   assert.ok(result.categories.filter(r => r.kind === 'complex mask').every(r => r.pixelBounds === null));

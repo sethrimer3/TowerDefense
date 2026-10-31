@@ -45,3 +45,5 @@ Add Defend items here in the form: **What** (one line), **Why**, **Files**, **Te
 - [x] Introduce flying escorts in Mossbound waves 15–19: 3/4/5/6/7 Blight Darts respectively, plus one Blight Prism in wave 19. Retain ground rosters, interleave releases, reserve all offspring below the 5000 cap and keep escalating total HP. Greater Blight Prism remains unplaced.
 
 - [x] Add a 2 × 1 Repair shop and replace automatic builders with its workers; innate Carpentry, repair unlocks, larger crews, critical priorities, retreating bow, percentage repair and Smithy stats. `repair-upgrades.ts`, `civilians.ts`, catalogs and tree UI; focused behavior and desktop/phone checks.
+
+- [x] Thin the Mini Darkling portal rim to 0.5 art pixel and the 2 × 2 Darkling rim to 0.75, retaining a shared noise/infill union in normal/Simple art and portraits.
