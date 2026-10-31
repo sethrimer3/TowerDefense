@@ -1,3 +1,5 @@
+import { fortressAreaTargets } from "./fortress.ts";
+import { groundMeleeTarget } from "./catalog.ts";
 import {chargeIdle} from "./chrono.ts";
 import { bannerFor, deployment, postPath, strollStreets, within } from "./deployment.ts";
 import { bannerDamage } from "./war-banner.ts";
@@ -53,7 +55,7 @@ export function charge(sim: DefendSim, s: Soldier, e: Enemy, reach: number) {
   const len = runOut(sim, s.x, s.y, ux, uy, reach);
   const x0 = s.x, y0 = s.y, x1 = s.x + ux * len, y1 = s.y + uy * len;
   const hits: { x: number; y: number }[] = [];
-  for (const foe of sim.enemiesNear((x0 + x1) / 2, (y0 + y1) / 2, len / 2 + 1.5)) {
+  for (const foe of fortressAreaTargets(sim.enemiesNear((x0 + x1) / 2, (y0 + y1) / 2, len / 2 + 1.5))) {
     const w = STAB_WIDTH + enemySize(foe) / 2;
     // The nearest point of the line to the enemy, by projection.
     const t = Math.max(0, Math.min(len, (foe.x - x0) * ux + (foe.y - y0) * uy));
@@ -88,7 +90,7 @@ export function seek(sim: DefendSim, s: Soldier) {
   s.thinkT = 0.5;
   const inCity = (e: Enemy) => sim.map.city[cellAt(e.x, e.y)] === 1, bounds = deployment(sim, s);
   const prey = sim.enemies
-    .filter((e) => !e.untargetable && e.hp > 0 && inCity(e) && within(bounds, e))
+    .filter((e) => !e.untargetable && (s.kind !== "hero" && s.kind !== "shade" || groundMeleeTarget(e)) && e.hp > 0 && inCity(e) && within(bounds, e))
     .sort((a, b) => sq(a.x - s.x) + sq(a.y - s.y) - (sq(b.x - s.x) + sq(b.y - s.y)))
     .slice(0, 3);
   for (const e of prey) {

@@ -1,4 +1,4 @@
-import { stepFortress } from "./fortress.ts";
+import { stepFortress, fortressLegs } from "./fortress.ts";
 import { dist, sq } from "../exact.ts";
 import { ENEMIES } from "./catalog.ts";
 import { cellCenter, center, nearestPoint, blocked } from "./pathing.ts";
@@ -12,13 +12,13 @@ export function bannerBonus(sim: DefendSim, e: Enemy) {
 export const enemyDamage = (sim: DefendSim, e: Enemy) => (e.raisedDamage ?? ENEMIES[e.kind].damage) * (bannerBonus(sim, e) ? 1.3 : 1);
 export const enemySpeed = (sim: DefendSim, e: Enemy) => {
   const legs = e.fortressParts?.filter(p => p.fortressPart?.role === "leg");
-  const multiplier = legs?.length ? .25 + .75 * legs.filter(p => p.hp > 0).length / legs.length : 1;
+  const multiplier = legs?.length ? fortressLegs(e) / legs.length : 1;
   return ENEMIES[e.kind].speed * multiplier * (bannerBonus(sim, e) ? 1.25 : 1);
 };
 
 export function damageModifier(sim: DefendSim, e: Enemy, origin: (Point & { attacker?: number; building?: number }) | undefined, source: string, projectile: boolean) {
   if (e.kind === "blightWorm" && (e.burrow || e.untargetable)) return 0;
-  if (e.fortressParts?.some(p => p.hp > 0 && p.fortressPart?.role === "armor")) return 0;
+  if (e.walker && e.walker.phase !== "grounded" || e.fortressPart?.role === "armor") return 0;
   if (e.kind === "burrowingMole" && (e.burrow ?? 1) > 0) return 0;
   if (e.kind !== "siegeBeetle" || !origin) return 1;
   const facing = e.facing ?? { x: 0, y: 1 };

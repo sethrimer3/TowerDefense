@@ -6,7 +6,7 @@ import { generateCity } from '../src/defend/citygen.ts';
 import { ENEMIES, UPGRADES, type EnemyKind } from '../src/defend/catalog.ts';
 import { enemySpeed } from '../src/defend/enemy-abilities.ts';
 import { stepEnemy } from '../src/defend/enemies.ts';
-import { syncFortress } from '../src/defend/fortress.ts';
+import { syncFortress, stepFortressCore, FORTRESS_FALL } from '../src/defend/fortress.ts';
 import { stepSiegeShots } from '../src/defend/siege.ts';
 import { laserCrossesRect, stepBlightLasers } from '../src/defend/blight-fortress.ts';
 import { createTronField, stepTronField, TRON } from '../src/defend/blight-fortress-particles.ts';
@@ -39,7 +39,7 @@ test('three black square Dark One walkers assemble the requested independent wea
     assert.equal(sim.hurtEnemy(core, 10), false);
     const base = enemySpeed(sim, core);
     for (const p of core.fortressParts!) if (p.fortressPart!.role === 'leg' || p.fortressPart!.role === 'armor') p.hp = 0;
-    assert.equal(enemySpeed(sim, core), base * .25); assert.equal(sim.hurtEnemy(core, 10), true);
+    assert.equal(enemySpeed(sim, core), 0); stepFortressCore(sim, core, FORTRESS_FALL); assert.equal(sim.hurtEnemy(core, 10), true);
     const save = defaultDefendSave(); save.discovered = [kind];
     assert.deepEqual(decodeDefendSave(save).discovered, [kind]);
     assert.match(journalHTML([kind]), new RegExp(def.name));
@@ -89,8 +89,7 @@ test('dual turrets fire independently, stay attached and clean up with exactly o
   assert.equal(sim.siegeShots.length, 0); assert.equal(sim.blightLasers.length, 1);
   core.x += 1; syncFortress(core);
   for (const p of core.fortressParts!) assert.equal(p.x, core.x + p.fortressPart!.dx);
-  for (const p of core.fortressParts!) if (p.fortressPart!.role === 'armor') p.hp = 0;
-  sim.hurtEnemy(core, 1e9, true, 'melee'); (sim as any).sweepAway();
+  for (const p of turrets) if (p.hp > 0) sim.hurtEnemy(p, 1e9, true, 'ranged'); (sim as any).sweepAway();
   assert.equal(sim.enemies.length, 0); assert.equal(sim.slain.blightFortress, 1);
 });
 

@@ -1,3 +1,4 @@
+import { fortressAreaTargets } from "./fortress.ts";
 import {chargeIdle} from "./chrono.ts";
 import { mageChillSpeed } from "./mage-attunements.ts";
 import { buildingPaths } from "../specializations.ts";
@@ -183,7 +184,7 @@ export function stepFlames(sim: DefendSim, wizards: Wizards, dt: number) {
     const reach = f.range * Math.min(1, f.t / 0.25);
     meltIceCone(sim, f.x, f.y, f.dx, f.dy, reach, FLAME_SPREAD);
     const dps = flameDps(sim.levels.wizardFlame ?? 0) * sim.bonuses.towerDamage * PYRO.damage[paths(sim, sim.map.buildings[f.tower]).pyro];
-    for (const e of sim.enemiesNear(f.x, f.y, reach)) if (inFan(e, f.x, f.y, f.dx, f.dy, FLAME_SPREAD, reach) && !sheltered(sim, e.x, e.y)) sim.hurtEnemy(e, dps * dt, true, "ranged", f, false, "fire");
+    for (const e of fortressAreaTargets(sim.enemiesNear(f.x, f.y, reach))) if (inFan(e, f.x, f.y, f.dx, f.dy, FLAME_SPREAD, reach) && !sheltered(sim, e.x, e.y)) sim.hurtEnemy(e, dps * dt, true, "ranged", f, false, "fire");
     if (f.t >= f.dur) wizards.ended(f.tower);
   }
   sim.flames = sim.flames.filter((f) => f.t < f.dur);
@@ -198,7 +199,7 @@ export function stepFrosts(sim: DefendSim, dt: number) {
     w.t += dt;
     if (w.r >= w.range) continue;
     w.r = Math.min(w.range, w.r + ICE_SPEED * dt);
-    for (const e of sim.enemiesNear(w.x, w.y, w.r)) {
+    for (const e of fortressAreaTargets(sim.enemiesNear(w.x, w.y, w.r))) {
       if (w.hit.includes(e.id) || !inFan(e, w.x, w.y, w.dx, w.dy, w.spread, w.r)) continue;
       w.hit.push(e.id);
       if (sim.hurtEnemy(e, damage, true, "ranged", w) && (!ENEMIES[e.kind].unyielding || e.kind === "blightWorm")) {

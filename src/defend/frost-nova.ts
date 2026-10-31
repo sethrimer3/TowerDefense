@@ -1,3 +1,4 @@
+import { fortressAreaTargets } from "./fortress.ts";
 /** DEFEND's Frost nova, a strike spell: cast from the Skills palette onto
  * the board, ice bursts out where it is let go, freezing every enemy within
  * `FROST_NOVA.radius` cells solid (not the unyielding), and leaves a patch
@@ -120,7 +121,7 @@ export function stepFrostNova(sim: DefendSim, dt: number) {
       b.t += dt;
       if (b.hit) continue;
       b.hit = true;
-      for (const e of sim.enemiesNear(b.x, b.y, b.r)) {
+      for (const e of fortressAreaTargets(sim.enemiesNear(b.x, b.y, b.r))) {
         if (e.hp <= 0 || dist(e.x - b.x, e.y - b.y) > b.r) continue;
         if (b.nova) {
           freeze(sim, e, b.freeze);
@@ -150,7 +151,7 @@ export function stepFrostNova(sim: DefendSim, dt: number) {
     if (blizzard) hunt(sim, f, BLIZZARD.speed[blizzard] * dt);
     const pulse = blizzard >= 2 && (f.pulse -= dt) <= 0;
     if (pulse) f.pulse += BLIZZARD.pulse;
-    for (const e of sim.enemiesNear(f.x, f.y, f.r)) {
+    for (const e of fortressAreaTargets(sim.enemiesNear(f.x, f.y, f.r))) {
       if (e.hp <= 0 || dist(e.x - f.x, e.y - f.y) > f.r) continue;
       if (!ENEMIES[e.kind].unyielding || e.kind === "blightWorm") e.chill = Math.max(e.chill ?? 0, FROST_NOVA.chill);
       sim.hurtEnemy(e, bite * dt, false);

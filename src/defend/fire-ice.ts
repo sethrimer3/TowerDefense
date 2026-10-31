@@ -1,3 +1,4 @@
+import { enemyFlying } from "./catalog.ts";
 /** DEFEND's fire and ice cancel each other out.
  *
  * On the ground: where burning ground (`sim.blazes`: a mage's fireball, a
@@ -26,7 +27,7 @@ export function quench(sim: DefendSim) {
   if (sim.blazes.length && sim.rime.length) quenchGround(sim);
   for (const b of sim.blazes)
     for (const e of sim.enemiesNear(b.x, b.y, b.r))
-      if ((e.chill !== undefined || e.freeze !== undefined || e.mageChills !== undefined) && !ENEMIES[e.kind].flying && dist(e.x - b.x, e.y - b.y) <= b.r && !sheltered(sim, e.x, e.y)) thaw(sim, e);
+      if ((e.chill !== undefined || e.freeze !== undefined || e.mageChills !== undefined) && !enemyFlying(e) && dist(e.x - b.x, e.y - b.y) <= b.r && !sheltered(sim, e.x, e.y)) thaw(sim, e);
   for (const f of sim.rime)
     for (const e of sim.enemiesNear(f.x, f.y, f.r))
       if (e.burn !== undefined && dist(e.x - f.x, e.y - f.y) <= f.r) douse(sim, e);

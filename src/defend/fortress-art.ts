@@ -1,27 +1,9 @@
+import { drawFortressLegs, drawFortressGun, fortressBodyY } from "./fortress-motion-art.ts";
 import { ART_NAMES } from "./art-overrides.ts";
 import { sourcePixels, type ArtPiece } from "./sprite-source.ts";
-/** The walking fortresses as they are drawn, in the city's pixel art at 8
- * sprite pixels a cell, inside crisp black outlines and lit from the upper
- * left:
- *
- * - **The walker:** a castle seen from above with its front face below:
- *   crenellated walls of ashlar round a courtyard (timber decking for the
- *   Bastion, flagstones for the Fortress and Citadel, an iron grate over
- *   embers for the Colossus), a raised central tower holding the core (an
- *   iron hatch while any armor stands, a pulsing red heart once bared),
- *   a pennant in each tier's colour, arrow slits and a portcullis in the
- *   front face, moss on the older stone, cracks and soot once it is hurt,
- *   and iron spikes and glowing runes on the Colossus.
- * - **Legs:** jointed iron limbs with stone feet and claws, striding in
- *   turn as it walks (and the walker bobbing with them).
- * - **Armor plates:** riveted iron strips down the side walls, dented when hurt.
- * - **Turrets:** round crenellated gun towers whose barrels swing to what
- *   they last shot at, with a muzzle flash as they fire.
- * - **Lost parts:** charred sockets (and broken stumps for legs) trailing
- *   smoke.
- *
- * Presentation only: sprites are baked once per look; the stride, aim and
- * smoke read the sim and battle time and never draw from a random stream. */
+/** Overhead fortress decks at eight art pixels per cell. Motion, jointed
+ * legs and aiming weapons live in fortress-motion-art.ts. Legacy component
+ * source names remain available to artists; no simulation RNG is consumed. */
 import { ENEMIES } from "./catalog.ts";
 import type { Brush } from "./battle-art.ts";
 import { hash01 } from "./grid.ts";
@@ -55,7 +37,6 @@ const LOOKS: readonly Look[] = [
   { stone: [0x18131c, 0x2c2432, 0x443a4c, 0x62566c], deck: "grate", deckTones: [0x120e14, 0x2a2430, 0xff5a1e, 0xffb04a], accent: 0xe8402a, moss: false, runes: true },
 ];
 
-const lookOf = (e: Enemy) => LOOKS[ENEMIES[e.kind].fortress!.tier - 1];
 
 /** A filled rectangle of one colour. */
 function box(p: Pix, x: number, y: number, w: number, h: number, c: number) {
@@ -76,16 +57,6 @@ function ashlar(p: Pix, x: number, y: number, w: number, h: number, tones: reado
       p.set(x + i, y + j, top ? (k % bw === 0 ? tones[3] : shade(base, 1.12)) : base);
     }
   }
-}
-
-/** A ring of crenels along a rectangle's edge: merlons lit, gaps dark. */
-function crenels(p: Pix, x: number, y: number, w: number, h: number, tones: readonly number[], spike: boolean) {
-  const at = (i: number, j: number, n: number) => {
-    const merlon = n % 4 < 2;
-    p.set(i, j, merlon ? (spike ? (n % 4 === 0 ? IRON[3] : IRON[2]) : n % 4 === 0 ? tones[3] : tones[2]) : tones[0]);
-  };
-  for (let i = 0; i < w; i++) { at(x + i, y, i); at(x + i, y + h - 1, i + 1); }
-  for (let j = 1; j < h - 1; j++) { at(x, y + j, j); at(x + w - 1, y + j, j + 1); }
 }
 
 /** The courtyard floor. */
@@ -112,134 +83,31 @@ function deck(p: Pix, x: number, y: number, w: number, h: number, look: Look, se
   }
 }
 
-/** Small walkers have a compact courtyard and tower drawn at their native
- * size, so their hatch, pennant and gate survive even on the watchpost. */
-function compactBody(w: number, h: number, armored: boolean, hurt: boolean, flag: number, seed: number): Uint32Array {
-  const out = new Uint32Array(w * h), p = pixels(out, w, h);
-  const look = LOOKS[0], s = look.stone, face = h - 3;
-  ashlar(p, 1, 2, w - 2, h - 3, s, seed, 3);
-  crenels(p, 1, 1, w - 2, face - 1, s, false);
-  deck(p, 2, 3, w - 4, face - 4, look, seed);
-  const k = w < 12 ? 2 : 4, x = Math.floor((w - k) / 2), y = Math.floor((face - k) / 2) + 1;
-  box(p, x - 1, y - 1, k + 2, k + 2, s[3]);
-  box(p, x, y, k, k, OUTLINE);
-  box(p, x, y, k - 1, k - 1, armored ? IRON[2] : 0xc8242c);
-  p.set(x, y, armored ? IRON[4] : 0xffe2d8);
-  p.set(w - 3, 0, 0x3a2a1c);
-  p.set(w - 2, flag, look.accent);
-  for (let i = 1; i < w - 1; i++) p.set(i, face, s[3]);
-  const gate = Math.floor(w / 2);
-  box(p, gate - 1, face + 1, 2, 2, OUTLINE);
-  p.set(gate - 1, face + 1, IRON[2]);
-  if (hurt) {
-    for (let j = 2; j < h - 1; j++) for (let i = 1; i < w - 1; i++) {
-      if (hash01(seed, i, j) < .15) p.set(i, j, shade(p.get(i, j), .6));
-    }
-    p.set(1, face - 1, OUTLINE);
-    p.set(2, face - 2, OUTLINE);
-  }
-  return out;
-}
-
 /** The walker's body, `w` × `h` sprite pixels (the core's footprint). */
 function drawnFortressBodyPixels(tier: number, w: number, h: number, armored: boolean, hurt: boolean, flag: number, seed: number): Uint32Array {
-  if (w < 20) return compactBody(w, h, armored, hurt, flag, seed);
-  const out = new Uint32Array(w * h);
-  const p = pixels(out, w, h);
-  const look = LOOKS[tier - 1], s = look.stone;
-  const face = 4 + (tier > 2 ? 1 : 0);
-  const top = h - face;
-  // The walls seen from above, a crenellated ring round the courtyard.
-  ashlar(p, 1, 1, w - 2, top - 1, [s[1], s[2], s[2], s[3]], seed * 7 + 1, 5);
-  crenels(p, 1, 1, w - 2, top - 1, s, look.runes);
-  // The courtyard, in the shadow of the walls along its top and left.
-  const cx = 4, cy = 4, cw = w - 8, ch = top - 7;
-  box(p, cx - 1, cy - 1, cw + 2, ch + 2, s[0]);
-  deck(p, cx, cy, cw, ch, look, seed);
-  for (let i = 0; i < cw; i++) p.set(cx + i, cy, shade(p.get(cx + i, cy), 0.6));
-  for (let j = 1; j < ch; j++) p.set(cx, cy + j, shade(p.get(cx, cy + j), 0.6));
-  // Corner bastions: round towers at the four corners of the wall.
-  for (const [bx, by] of [[1, 1], [w - 6, 1], [1, top - 5], [w - 6, top - 5]]) {
-    for (let j = 0; j < 5; j++) for (let i = 0; i < 5; i++) {
-      const edge = (i === 0 || i === 4) && (j === 0 || j === 4);
-      if (edge) continue;
-      const rim = i === 0 || i === 4 || j === 0 || j === 4;
-      p.set(bx + i, by + j, rim ? ((i + j) % 2 ? s[0] : look.runes ? IRON[3] : s[3]) : i + j < 4 ? s[2] : s[1]);
-    }
-    p.set(bx + 2, by + 2, s[0]);
+  const out = new Uint32Array(w * h), p = pixels(out, w, h);
+  const look = LOOKS[tier - 1], tones = look.stone;
+  // A strict overhead stone platform: symmetric parapets, no hanging front face.
+  box(p, 0, 0, w, h, tones[1]);
+  ashlar(p, 1, 1, w - 2, h - 2, tones, seed, 4);
+  const rim = w < 16 ? 2 : 3;
+  box(p, rim, rim, w - rim * 2, h - rim * 2, tones[0]);
+  deck(p, rim + 1, rim + 1, w - rim * 2 - 2, h - rim * 2 - 2, look, seed);
+  for (let x = 0; x < w; x++) {
+    p.set(x, 0, x % 4 < 2 ? tones[3] : tones[0]);
+    p.set(x, h - 1, x % 4 < 2 ? tones[2] : tones[0]);
   }
-  // The central tower over the core, casting its shadow down and right.
-  const k = 8 + 2 * Math.min(2, tier - 1);
-  const kx = Math.round((w - k) / 2), ky = Math.round((top - k) / 2);
-  for (let j = 1; j <= 2; j++) for (let i = 0; i < k; i++) {
-    p.set(kx + i + j, ky + k - 1 + j, shade(p.get(kx + i + j, ky + k - 1 + j), 0.55));
-    p.set(kx + k - 1 + j, ky + i + j - 1, shade(p.get(kx + k - 1 + j, ky + i + j - 1), 0.55));
+  for (let y = 1; y < h - 1; y++) {
+    p.set(0, y, y % 4 < 2 ? tones[3] : tones[0]);
+    p.set(w - 1, y, y % 4 < 2 ? tones[2] : tones[0]);
   }
-  box(p, kx - 1, ky - 1, k + 2, k + 2, OUTLINE);
-  ashlar(p, kx, ky, k, k, s.map(c => shade(c, 1.1)), seed * 7 + 3, 3);
-  crenels(p, kx, ky, k, k, s.map(c => shade(c, 1.1)), look.runes);
-  box(p, kx + 2, ky + 2, k - 4, k - 4, OUTLINE);
-  const hx = kx + 3, hy = ky + 3, hk = k - 6;
-  if (armored) {
-    // An iron hatch, banded across, riveted at the corners.
-    box(p, hx, hy, hk, hk, IRON[2]);
-    for (let i = 0; i < hk; i++) { p.set(hx + i, hy, IRON[3]); p.set(hx + i, hy + hk - 1, IRON[1]); p.set(hx + hk - 1, hy + i, IRON[1]); }
-    const mid = hx + (hk >> 1);
-    for (let j = 0; j < hk; j++) p.set(mid, hy + j, IRON[1]);
-    for (const [i, j] of [[0, 0], [hk - 1, 0], [0, hk - 1], [hk - 1, hk - 1]]) p.set(hx + i, hy + j, IRON[4]);
-  } else {
-    // The bared heart: a red crystal with a white glint.
-    box(p, hx, hy, hk, hk, 0x2a0608);
-    const c = (hk - 1) / 2;
-    for (let j = 0; j < hk; j++) for (let i = 0; i < hk; i++) {
-      const d = Math.abs(i - c) + Math.abs(j - c);
-      if (d > c + 0.5) continue;
-      p.set(hx + i, hy + j, d > c - 0.5 ? 0x7a1018 : i + j < hk - 1 ? 0xff6a5e : 0xc8242c);
-    }
-    p.set(hx + Math.floor(c) - 1 + (hk > 4 ? 0 : 1), hy + Math.floor(c) - 1 + (hk > 4 ? 0 : 1), 0xffe2d8);
-  }
-  // A pennant on the tower's corner, waving between two frames.
-  const px0 = kx + k - 1, py0 = ky - 1;
-  for (let j = 0; j < 4; j++) p.set(px0, py0 - j + 1, 0x3a2a1c);
-  for (let j = 0; j < 2; j++) for (let i = 1; i <= 3; i++) {
-    const dy = flag && i === 3 ? 1 : 0;
-    p.set(px0 + i, py0 - 2 + j + dy, j === 0 ? shade(look.accent, 1.2) : look.accent);
-  }
-  // The front face: ashlar courses with arrow slits and a portcullis.
-  ashlar(p, 1, top, w - 2, face - 1, s, seed * 7 + 5, 4);
-  for (let i = 1; i < w - 1; i++) p.set(i, top, s[3]);
-  for (let i = 1; i < w - 1; i++) p.set(i, h - 2, shade(p.get(i, h - 2), 0.7));
-  const gw = 4 + (tier > 2 ? 2 : 0), gx = Math.round((w - gw) / 2);
-  box(p, gx - 1, top + 1, gw + 2, face - 1, OUTLINE);
-  for (let j = top + 2; j < h - 1; j++) for (let i = 0; i < gw; i++) p.set(gx + i, j, i % 2 ? 0x1a1418 : IRON[2]);
-  for (let i = 0; i < gw; i++) p.set(gx + i, top + 2, IRON[3]);
-  for (let x = 4; x < w - 4; x += 5) {
-    if (x + 1 >= gx - 2 && x <= gx + gw + 1) continue;
-    p.set(x, top + 1, OUTLINE); p.set(x, top + 2, look.runes ? look.accent : OUTLINE);
-  }
-  if (look.runes) {
-    // Runes cut in the face and the wall, glowing.
-    for (let i = 3; i < w - 3; i += 3) if (hash01(seed, i, 9) < 0.5 && (i < gx - 1 || i > gx + gw)) p.set(i, h - 3, i % 2 ? 0xff7a3a : 0xffb04a);
-  }
-  // Moss on the older stone.
-  if (look.moss) for (let j = 1; j < h - 1; j++) for (let i = 1; i < w - 1; i++) {
-    const c = p.get(i, j);
-    if ((c === s[1] || c === s[2] || c === s[0]) && hash01(seed, i, j, 3) < 0.07) p.set(i, j, hash01(i, j, seed) < 0.5 ? 0x4f6a2e : 0x6d8a3a);
-  }
-  // Cracks and soot once hurt.
-  if (hurt) {
-    for (let n = 0; n < 3 + tier; n++) {
-      let x = 2 + Math.floor(hash01(seed, n, 11) * (w - 4)), y = 2 + Math.floor(hash01(seed, n, 12) * (h - 4));
-      for (let step = 0; step < 4 + tier; step++) {
-        p.set(x, y, OUTLINE);
-        x += hash01(seed, n, step) < 0.5 ? 1 : -1;
-        y += hash01(seed, step, n) < 0.6 ? 1 : 0;
-        if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) break;
-      }
-    }
-    for (let j = 1; j < h - 1; j++) for (let i = 1; i < w - 1; i++)
-      if (hash01(seed, i, j, 5) < 0.12) p.set(i, j, shade(p.get(i, j), 0.65));
-  }
+  // A bolted central deck plate, not an independently vulnerable heart.
+  const plate = Math.max(2, Math.floor(Math.min(w, h) / 3)), cx = Math.floor((w - plate) / 2), cy = Math.floor((h - plate) / 2);
+  box(p, cx, cy, plate, plate, IRON[1]);
+  for (let n = 0; n < plate; n++) { p.set(cx + n, cy, IRON[2]); p.set(cx, cy + n, IRON[2]); }
+  p.set(cx + 1, cy + 1, look.accent);
+  if (hurt) for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++)
+    if (hash01(seed, x, y) < .09) p.set(x, y, shade(p.get(x, y), .55));
   return out;
 }
 
@@ -336,146 +204,34 @@ export function fortressPieces(): ArtPiece[] {
   return out;
 }
 
-/** What the renderer remembers of each walker and turret. */
-const walked = new WeakMap<Enemy, { x: number; y: number; d: number }>();
-const aims = new WeakMap<Enemy, { x: number; y: number }>();
-
 function draw(c: CanvasRenderingContext2D, cv: HTMLCanvasElement | null, x: number, y: number, s: number) {
   if (cv) c.drawImage(cv, Math.round(x), Math.round(y), Math.round(cv.width * s), Math.round(cv.height * s));
 }
 
-function flashOver(c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, f: number) {
-  if (f <= 0) return;
-  c.fillStyle = `rgba(255,244,224,${Math.min(0.75, f * 6)})`;
-  c.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
-}
-
-/** Smoke curling up from a lost part. */
-function smoke(c: CanvasRenderingContext2D, x: number, y: number, s: number, t: number, id: number) {
-  for (let k = 0; k < 3; k++) {
-    const age = (t * 0.6 + k / 3 + hash01(id, k)) % 1;
-    const sx = x + Math.sin(t * 2 + k * 2.1 + id) * s * 1.5 * age, sy = y - age * s * 10;
-    const r = Math.max(1, Math.round(s * (1 + age * 1.5)));
-    c.fillStyle = `rgba(${age < 0.2 ? "70,58,52" : "120,112,108"},${(1 - age) * 0.5})`;
-    c.fillRect(Math.round(sx - r / 2), Math.round(sy - r / 2), r, r);
-  }
-}
-
 /** Draws a walking fortress and all its parts (the parts' own turns draw
  * nothing). */
-export function drawFortress({ c, px }: Brush, e: Enemy, sim: DefendSim) {
+export function drawFortress({ c, px }: Brush, e: Enemy, _sim?: DefendSim, reduceMotion = false) {
   if (e.fortressPart) return;
-  const def = ENEMIES[e.kind], fort = def.fortress!, look = lookOf(e);
-  const s = px / ART, t = sim.time, ps = s * (fort.partScale ?? 1);
+  const def = ENEMIES[e.kind], fort = def.fortress!;
+  const s = px / ART, scale = px * (fort.partScale ?? 1);
   const w = Math.round(def.size * ART), h = Math.round(fort.height * ART);
-  const seed = e.id % 4;
-  // How far it has walked, which drives the stride.
-  let m = walked.get(e);
-  if (!m) walked.set(e, (m = { x: e.x, y: e.y, d: 0 }));
-  m.d += Math.sqrt((e.x - m.x) * (e.x - m.x) + (e.y - m.y) * (e.y - m.y));
-  m.x = e.x; m.y = e.y;
-  const phase = m.d * 4;
-  const bob = Math.sin(phase * 2) > 0.6 ? s : 0;
-  const parts = e.fortressParts ?? [];
-  const legs = parts.filter(q => q.fortressPart!.role === "leg");
-  const x0 = e.x * px - (w * s) / 2, y0 = e.y * px - (h * s) / 2 + bob;
-  c.imageSmoothingEnabled = false;
-
-  // Legs first, so the body stands over their hips.
-  legs.forEach((leg, n) => {
-    const left = leg.fortressPart!.dx < 0;
-    const ly = (e.y + leg.fortressPart!.dy) * px - 4 * ps;
-    const lx = left ? x0 - 8 * ps : x0 + w * s - 3 * ps;
-    if (leg.hp <= 0) {
-      // A broken stump under a wisp of smoke.
-      c.fillStyle = "#120e12";
-      c.fillRect(Math.round(left ? x0 - 3 * ps : x0 + w * s), Math.round(ly + 2 * ps), Math.round(3 * ps), Math.round(3 * ps));
-      c.fillStyle = "#4c4a58";
-      c.fillRect(Math.round(left ? x0 - 2 * ps : x0 + w * s), Math.round(ly + 3 * ps), Math.round(2 * ps), Math.round(ps));
-      return;
-    }
-    const lifted = Math.sin(phase + (n % 2) * Math.PI + Math.floor(n / 2) * 0.9) > 0.35;
-    draw(c, sprite(`fl:${fort.tier}:${lifted ? 1 : 0}:${left ? 1 : 0}`, 11, 8, () => legPixels(fort.tier, lifted, left), false), lx, ly, ps);
-    flashOver(c, lx, ly, 11 * ps, 8 * ps, leg.flash);
-  });
-
-  // The body.
-  const armored = parts.some(q => q.hp > 0 && q.fortressPart!.role === "armor");
-  const hurt = e.hp / e.maxHp < 0.5;
-  const flag = Math.floor(t * 3 + e.id) % 2;
-  draw(c, sprite(`fb:${fort.tier}:${w}:${h}:${armored ? 1 : 0}:${hurt ? 1 : 0}:${flag}:${seed}`, w, h, () => fortressBodyPixels(fort.tier, w, h, armored, hurt, flag, seed), false), x0, y0, s);
-  if (!armored) {
-    // The bared heart throbs.
-    const a = 0.25 + 0.2 * Math.sin(t * 6 + e.id);
-    const r = (4 + fort.tier) * ps;
-    const top = h - (4 + (fort.tier > 2 ? 1 : 0));
-    const hy = y0 + (top / 2) * s;
-    c.fillStyle = `rgba(255,70,60,${a})`;
-    // A stepped diamond of light round it.
-    for (let k = 0; k < 3; k++) {
-      const rw = r * (1 - k * 0.3), rh = r * (0.4 + k * 0.3);
-      c.fillRect(Math.round(e.x * px - rw), Math.round(hy - rh), Math.round(rw * 2), Math.round(rh * 2));
+  const bodyY = fortressBodyY(e, px, reduceMotion), x0 = e.x * px - w * s / 2, y0 = bodyY - h * s / 2;
+  c.save(); c.fillStyle = "rgba(0,0,0,.28)";
+  // Shadow is translucent and stays beneath the articulated legs.
+  CanvasRenderingContext2D.prototype.fillRect.call(c, x0 + scale * .1, e.y * px - h * s / 2 + scale * .15, w * s, h * s);
+  drawFortressLegs({ c, px }, e, reduceMotion);
+  const hurt = e.hp / e.maxHp < .5, seed = e.id % 4;
+  draw(c, sprite(`fb:${fort.tier}:${w}:${h}:1:${hurt ? 1 : 0}:0:${seed}`, w, h,
+    () => fortressBodyPixels(fort.tier, w, h, true, hurt, 0, seed), false), x0, y0, s);
+  for (const part of e.fortressParts ?? []) if (part.fortressPart?.role === "turret") {
+    if (part.hp > 0) drawFortressGun({ c, px }, part, scale);
+    else {
+      c.fillStyle = "#27242a"; c.fillRect(part.x * px - scale * .19, part.y * px - scale * .19, scale * .38, scale * .38);
     }
   }
-  flashOver(c, x0, y0, w * s, h * s, e.flash);
-
-  // Armor on the walls, then the turrets.
-  const order = [...parts.filter(q => q.fortressPart!.role === "armor"), ...parts.filter(q => q.fortressPart!.role === "turret")];
-  for (const q of order) {
-    const role = q.fortressPart!.role;
-    const qx = (e.x + q.fortressPart!.dx) * px, qy = (e.y + q.fortressPart!.dy) * px + bob;
-    if (q.hp <= 0) {
-      // A charred socket with a broken bolt or two.
-      const r = 2 * ps;
-      c.fillStyle = "#120e12";
-      c.fillRect(Math.round(qx - r), Math.round(qy - r), Math.round(r * 2), Math.round(r * 2));
-      c.fillStyle = "#2a2028";
-      c.fillRect(Math.round(qx - r + ps), Math.round(qy - r + ps), Math.round(r * 2 - 2 * ps), Math.round(r * 2 - 2 * ps));
-      c.fillStyle = "#76748a";
-      c.fillRect(Math.round(qx - r), Math.round(qy - r), Math.round(ps), Math.round(ps));
-      c.fillRect(Math.round(qx + r - ps), Math.round(qy + r - ps), Math.round(ps), Math.round(ps));
-      if (Math.sin(t * 5 + q.id) > 0) {
-        c.fillStyle = "#ff8a3a";
-        c.fillRect(Math.round(qx - ps), Math.round(qy), Math.round(ps), Math.round(ps));
-      }
-      smoke(c, qx, qy - r, ps, t, q.id);
-      continue;
-    }
-    const qhurt = q.hp / q.maxHp < 0.5;
-    if (role === "armor") {
-      const ax = qx - 2 * ps, ay = qy - 5 * ps;
-      draw(c, sprite(`fa:${fort.tier}:${qhurt ? 1 : 0}:${q.id % 3}`, 4, 10, () => armorPixels(fort.tier, qhurt, q.id % 3), false), ax, ay, ps);
-      flashOver(c, ax, ay, 4 * ps, 10 * ps, q.flash);
-      continue;
-    }
-    const tx = qx - 3.5 * ps, ty = qy - 3.5 * ps;
-    draw(c, sprite(`ft:${fort.tier}:${qhurt ? 1 : 0}:${q.id % 3}`, 7, 7, () => turretPixels(fort.tier, qhurt, q.id % 3), false), tx, ty, ps);
-    // The barrel swings to whatever it last shot at.
-    let aim = aims.get(q);
-    if (q.cd > 1.5) {
-      for (let i = sim.effects.length - 1; i >= 0; i--) {
-        const fx = sim.effects[i];
-        if (fx.kind !== "boom" || fx.seed !== q.id) continue;
-        const dx = fx.x - q.x, dy = fx.y - q.y, d = Math.sqrt(dx * dx + dy * dy) || 1;
-        aims.set(q, (aim = { x: dx / d, y: dy / d }));
-        break;
-      }
-    }
-    const ax = aim?.x ?? 0, ay = aim?.y ?? 1;
-    const recoil = q.cd > 1.85 ? 1 : 0;
-    const cx = tx + 3 * ps, cy = ty + 3 * ps;
-    const dot = (i: number, grow: number, color: string) => {
-      c.fillStyle = color;
-      c.fillRect(Math.round(cx + Math.round(ax * i) * ps - grow * ps), Math.round(cy + Math.round(ay * i) * ps - grow * ps), Math.round(ps * (1 + grow * 2)), Math.round(ps * (1 + grow * 2)));
-    };
-    for (let i = 1; i <= 4 - recoil; i++) dot(i, 0.5, "#120e12");
-    for (let i = 1; i <= 3 - recoil; i++) dot(i, 0, i === 1 ? "#b4b2c4" : "#4c4a58");
-    if (q.cd > 1.75) {
-      dot(5, 0.5, "#ffb357");
-      dot(5, 0, "#fff0cf");
-      dot(6, 0, "#ff7a2a");
-    }
-    flashOver(c, tx, ty, 7 * ps, 7 * ps, q.flash);
+  if (e.flash > 0) {
+    c.fillStyle = `rgba(255,238,211,${Math.min(.18, e.flash * 1.5)})`;
+    c.fillRect(x0, y0, w * s, h * s);
   }
-  if (hurt) smoke(c, x0 + w * s * 0.3, y0 + s * 3, s, t, e.id);
+  c.restore();
 }

@@ -1,3 +1,4 @@
+import { groundMeleeTarget } from "./catalog.ts";
 import {chargeIdle} from "./chrono.ts";
 /** DEFEND's Hero, the swordsmen's ultimate, trained one at a time at the
  * Hero's hall (a Barracks become one with Knowledge). It hunts the nearest
@@ -49,7 +50,7 @@ export function heroPaths(sim: DefendSim, home: number) {
 /** The Hero's HP as a share of its own, by its hall's Legend rank. */
 export const heroHp = (sim: DefendSim, home: number) => LEGEND.hp[heroPaths(sim, home).legend];
 
-const inReach = (s: Soldier, e: Enemy, r: number) => e.hp > 0 && dist(e.x - s.x, e.y - s.y) <= r + enemySize(e) / 2;
+const inReach = (s: Soldier, e: Enemy, r: number) => e.hp > 0 && groundMeleeTarget(e) && dist(e.x - s.x, e.y - s.y) <= r + enemySize(e) / 2;
 
 export function stepHero(sim: DefendSim, s: Soldier, dt: number) {
   s.cd -= dt;
@@ -88,7 +89,7 @@ export function combo(sim: DefendSim, s: Soldier, e: Enemy) {
       const k = slash(sim, s, target, base, done + n);
       slain += k;
       if (p.dance >= 3 && k) limit = Math.min(BLADE_DANCE.most, limit + k);
-      target = done + 1 < limit ? nearest(sim.enemiesNear(s.x, s.y, BLADE_DANCE.jump).filter((o) => o.hp > 0 && !struck.has(o.id)), s, sq(BLADE_DANCE.jump), false, true) : null;
+      target = done + 1 < limit ? nearest(sim.enemiesNear(s.x, s.y, BLADE_DANCE.jump).filter((o) => groundMeleeTarget(o) && o.hp > 0 && !struck.has(o.id)), s, sq(BLADE_DANCE.jump), false, true) : null;
     }
   }
   // Bloodied blade: each kill heals it.

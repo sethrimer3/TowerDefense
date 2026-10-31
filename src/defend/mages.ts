@@ -1,3 +1,5 @@
+import { fortressAreaTargets } from "./fortress.ts";
+import { enemyFlying } from "./catalog.ts";
 import {chargeIdle} from "./chrono.ts";
 import { bannerFor, postPath, strollStreets } from "./deployment.ts";
 import { castStorm, chillByMage, mageAttunement } from "./mage-attunements.ts";
@@ -81,7 +83,7 @@ export function stepFireballs(sim: DefendSim, dt: number) {
     f.t += dt;
     if (f.t < f.dur) continue;
     if (f.frost) {
-      for (const e of sim.enemiesNear(f.x1, f.y1, f.r)) {
+      for (const e of fortressAreaTargets(sim.enemiesNear(f.x1, f.y1, f.r))) {
         const d = dist(e.x - f.x1, e.y - f.y1);
         if (e.hp <= 0 || d > f.r || sheltered(sim, e.x, e.y)) continue;
         const hit = sim.hurtEnemy(e, f.damage * (1 - .6 * d / f.r), true, "ranged", f.origin);
@@ -96,7 +98,7 @@ export function stepFireballs(sim: DefendSim, dt: number) {
     const seed = sim.explode(f.x1, f.y1, { r: f.r, damage: f.damage, friendlyFire: false, origin: f.origin });
     const level = sim.levels.mageEmbers ?? 0;
     const life = f.fire?.life ?? emberSeconds(level), dps = f.fire?.dps ?? emberDps(level) * sim.bonuses.troopDamage;
-    if (f.fire) for (const e of sim.enemiesNear(f.x1, f.y1, f.r))
+    if (f.fire) for (const e of fortressAreaTargets(sim.enemiesNear(f.x1, f.y1, f.r)))
       if (e.hp > 0 && dist(e.x - f.x1, e.y - f.y1) <= f.r && !sheltered(sim, e.x, e.y)) ignite(e, dps, f.fire.cling, sim.tallyOrigin(f.origin));
     sim.blazes.push({ x: f.x1, y: f.y1, r: f.r * (f.fire ? 1 : EMBER_SHARE), t: 0, life, dps, seed,
       ...(f.fire ? { clingFor: f.fire.cling, origin: f.origin } : sim.tally && f.origin ? { credit: sim.tallyOrigin(f.origin) } : {}) });
@@ -108,8 +110,8 @@ export function stepFireballs(sim: DefendSim, dt: number) {
 export function stepBlazes(sim: DefendSim, dt: number) {
   for (const b of sim.blazes) {
     b.t += dt;
-    for (const e of sim.enemiesNear(b.x, b.y, b.r)) {
-      if (ENEMIES[e.kind].flying || sheltered(sim, e.x, e.y)) continue;
+    for (const e of fortressAreaTargets(sim.enemiesNear(b.x, b.y, b.r))) {
+      if (enemyFlying(e) || sheltered(sim, e.x, e.y)) continue;
       sim.hurtEnemy(e, b.dps * dt, false, "ranged", b.origin ?? b, false, "fire", 0, b.credit);
       // Clinging fire: it keeps burning after it walks out.
       if (b.clingFor || b.cling) ignite(e, b.dps, b.clingFor ?? 2, sim.tallyOrigin(b.credit ?? b.origin));

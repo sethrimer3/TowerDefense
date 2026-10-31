@@ -1,3 +1,4 @@
+import { enemyFlying } from "./catalog.ts";
 import {captureShot,shotField,chronoTarget,stepChrono,sweptEnemies,chargeIdle} from "./chrono.ts";
 import { fireMine, landMine, mineRange } from "./mines.ts";
 import { sheltered } from "./boats.ts";
@@ -126,7 +127,7 @@ export class Towers {
     if (!oil || (this.oil -= dt) > 0) return;
     const r = b.rect, reach = BOILING_OIL.reach[oil];
     const scalded = sim.enemiesNear(c.x, c.y, (r.w + r.h) / 2 + reach).filter((e) => {
-      if (ENEMIES[e.kind].flying) return false;
+      if (enemyFlying(e)) return false;
       const dx = Math.max(r.x - e.x, 0, e.x - (r.x + r.w)), dy = Math.max(r.y - e.y, 0, e.y - (r.y + r.h));
       return dx * dx + dy * dy <= reach * reach;
     });
@@ -210,7 +211,7 @@ export class Towers {
     const c = center(b.rect), { gunnery, siege, battery, mortar } = paths(sim, b);
     const range = cannonTowerRange(sim, b);
     const ground = sim.enemiesNear(c.x, c.y, range).filter(
-      (e) => !ENEMIES[e.kind].flying && sq(e.x - c.x) + sq(e.y - c.y) > CANNON_MIN * CANNON_MIN,
+      (e) => !enemyFlying(e) && sq(e.x - c.x) + sq(e.y - c.y) > CANNON_MIN * CANNON_MIN,
     );
     const target = nearest(ground, c) ?? chronoTarget(sim,c,range,true,b.id,CANNON_MIN);
     if (!target) return this.cooldown.set(b.id, 0);
@@ -306,12 +307,12 @@ export function stepShells(sim: DefendSim, dt: number) {
     if(s.chronoAim!==undefined&&!s.chronoReleased)continue;
     if (s.mine) { landMine(sim, s); continue; }
     const friendlyFire = !sim.levels.cannonSafe;
-    const seed = sim.explode(s.x1, s.y1, { r: s.r, damage: s.damage, friendlyFire, origin: s.origin });
+    const seed = sim.explode(s.x1, s.y1, { r: s.r, damage: s.damage, friendlyFire, origin: s.origin, groundOnly: true });
     if (s.mortar && !sheltered(sim, s.x1, s.y1)) sim.blazes.push({ x: s.x1, y: s.y1, r: s.r, t: 0, life: s.mortar.life, dps: s.mortar.dps, seed, mortar: true, origin: s.origin });
     // Grapeshot: smaller bursts round the landing, one each way.
     if (s.grape)
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]])
-        sim.explode(s.x1 + dx * s.r * 0.8, s.y1 + dy * s.r * 0.8, { r: s.r * GUNNERY.grapeR, damage: s.damage * GUNNERY.grapeShare, friendlyFire, origin: s.origin });
+        sim.explode(s.x1 + dx * s.r * 0.8, s.y1 + dy * s.r * 0.8, { r: s.r * GUNNERY.grapeR, damage: s.damage * GUNNERY.grapeShare, friendlyFire, origin: s.origin, groundOnly: true });
   }
   sim.shells = sim.shells.filter((s) => s.t < s.dur);
 }

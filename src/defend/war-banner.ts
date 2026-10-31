@@ -1,3 +1,5 @@
+import { groundMeleeTarget } from "./catalog.ts";
+import { isMelee } from "./melee-facing.ts";
 /** DEFEND's war banner: a consumable the player plants anywhere on the
  * board mid-defense to rally every mobile troop (swordsmen, archers, fire
  * mages, valkyries and the dark wizard). While it stands, a troop with
@@ -111,11 +113,12 @@ export class WarBanner {
    * it has reached the banner's ground, the nearest within `RALLY_REACH` of
    * the banner. */
   foe(sim: DefendSim, s: Soldier, sight: number): Enemy | null {
-    const close = sight > 0 ? nearest(sim.enemiesNear(s.x, s.y, sight), s, sight * sight, true) : null;
+    const eligible = (e: Enemy) => s.kind === "valkyrie" || !isMelee(s) || groundMeleeTarget(e);
+    const close = sight > 0 ? nearest(sim.enemiesNear(s.x, s.y, sight).filter(eligible), s, sight * sight, true) : null;
     if (close) return close;
     const reach = this.reach(sim);
     if (sq(s.x - this.x) + sq(s.y - this.y) > sq(reach)) return null;
-    return nearest(sim.enemiesNear(this.x, this.y, reach), s, Infinity, true);
+    return nearest(sim.enemiesNear(this.x, this.y, reach).filter(eligible), s, Infinity, true);
   }
 }
 
@@ -123,7 +126,7 @@ export class WarBanner {
  * reach: twice a second it picks the enemy to close on (see `foe`), routing
  * to it, or else the next leg toward the banner; between times it walks. */
 export function answerBanner(sim: DefendSim, banner: WarBanner, s: Soldier, speed: number, dt: number, sight = 0) {
-  let foe = sim.enemies.find((e) => !e.untargetable && e.id === s.target && e.hp > 0) ?? null;
+  let foe = sim.enemies.find((e) => !e.untargetable && (s.kind === "valkyrie" || !isMelee(s) || groundMeleeTarget(e)) && e.id === s.target && e.hp > 0) ?? null;
   if (s.thinkT <= 0) {
     s.thinkT = 0.5;
     foe = banner.foe(sim, s, sight);
