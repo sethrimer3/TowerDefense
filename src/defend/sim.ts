@@ -1125,6 +1125,21 @@ export class DefendSim {
     this.blastIndexReady = this.stationaryAttacks;
   }
 
+  /** nearest(enemiesNear(...)) in one pass. Cell/list order and inclusive
+   * range edges match that shortlist; callers choose which tied target wins. */
+  nearestEnemy(x: number, y: number, r: number, lastWins = true): Enemy | null {
+    let best: Enemy | null = null, bd = r * r;
+    const x0 = Math.max(0, Math.floor(x - r)), x1 = Math.min(CELLS_W - 1, Math.floor(x + r));
+    const y0 = Math.max(0, Math.floor(y - r)), y1 = Math.min(CELLS_H - 1, Math.floor(y + r));
+    for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++)
+      for (const e of this.grid[cellIndex(cx, cy)]) {
+        if (!(e.hp > 0) || e.fortressPart?.role === "armor" || e.untargetable) continue;
+        const d = sq(e.x - x) + sq(e.y - y);
+        if (d <= bd && (lastWins || d < (best ? bd : Infinity))) { best = e; bd = d; }
+      }
+    return best;
+  }
+
   /** Enemies within `r` of a point (uses the cell index). */
   enemiesNear(x: number, y: number, r: number): Enemy[] {
     const out: Enemy[] = [];

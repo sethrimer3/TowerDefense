@@ -49,7 +49,7 @@ import {
 } from "./catalog.ts";
 import type { Building } from "./citygen.ts";
 import { CELLS_W, CELLS_H, CELL_COUNT, cellX, cellY } from "./grid.ts";
-import { cellAt, cellCenter, center, findPath, nearest, type PathLimits, type Point } from "./pathing.ts";
+import { cellAt, cellCenter, center, findPath, firstSorted, nearest, type PathLimits, type Point } from "./pathing.ts";
 import type { DefendSim, Enemy, Soldier } from "./sim.ts";
 import { answerBanner, MARCH_SIGHT, type WarBanner } from "./war-banner.ts";
 import { bannerFor, deployment, postOf, postPath, strollStreets, TRAINS, within } from "./deployment.ts";
@@ -204,7 +204,7 @@ class Patrol {
   candidates(s: Soldier) {
     const near = this.citywide ? this.sim.enemies.filter((e) => this.covers(e)) : this.sim.enemiesNear(this.hc.x, this.hc.y, this.leash);
     const all = (this.bounds && !this.citywide ? near.filter((e) => within(this.bounds, e, 1)) : near).filter(groundMeleeTarget);
-    return all.sort(this.toughest ? toughestFirst(s) : byDistanceFrom(s)).slice(0, 3);
+    return firstSorted(all, this.toughest ? toughestFirst(s) : byDistanceFrom(s), 3);
   }
 
   get limits(): PathLimits {
@@ -320,7 +320,10 @@ export function stepArcher(sim: DefendSim, s: Soldier, dt: number) {
   if (close) return thrust(sim, s, close, bannerDamage(sim, s));
   const charge = charges(sim, s);
   // Big game: the toughest in reach rather than the nearest.
-  const pick = (pool?: Enemy[]) => bigGame(sim, s, range, pool) ?? toughestInReach(sim, s, range, pool) ?? nearest(pool ?? (skyranger && s.kind === "archer" ? sim.enemies : sim.enemiesNear(s.x, s.y, range)), s, range * range, true);
+  const pick = (pool?: Enemy[]) => bigGame(sim, s, range, pool) ?? toughestInReach(sim, s, range, pool)
+    ?? (pool || skyranger && s.kind === "archer"
+      ? nearest(pool ?? sim.enemies, s, range * range, true)
+      : sim.nearestEnemy(s.x, s.y, range));
   // The gunner line shoots flat: only at an enemy in clear sight.
   const flat = shootsFlat(s.kind);
   const { near, pool } = flat ? lookOut(sim, s, range, pick) : { near: pick(), pool: undefined };
@@ -412,7 +415,7 @@ function shoot(sim: DefendSim, s: Soldier, e: Enemy, range: number, pool?: Enemy
 function hunt(sim: DefendSim, s: Soldier) {
   s.thinkT = 0.6;
   const bounds = deployment(sim, s);
-  const prey = sim.enemies.filter((e) => !e.untargetable && e.hp > 0 && inCity(sim, e) && within(bounds, e)).sort(byDistanceFrom(s)).slice(0, 3);
+  const prey = firstSorted(sim.enemies.filter((e) => !e.untargetable && e.hp > 0 && inCity(sim, e) && within(bounds, e)), byDistanceFrom(s), 3);
   const e = pathToFirst(sim, s, prey, CITYWIDE);
   if (e) s.target = e.id;
 }
