@@ -87,6 +87,38 @@ test("worm crowds use one phase lookup and preserve linear-lookup motion, cuts a
   assert.equal(fast.livingEnemy(replacement.id), undefined);
 });
 
+test("indexed worm contacts preserve full-scan damage order, hidden bodies and live deaths", () => {
+  const make = () => {
+    const sim = fixture();
+    sim.scenario!.soldierDt = () => 0;
+    sim.releaseEnemy('blightWorm',{x:20.5,y:40});
+    sim.soldiers = Array.from({length:80},(_,i) => ({ id:90000+i,kind:i%3?'sword':'hero',home:sim.keepId,x:20.5+(i%8-4)*.18,y:39.9+Math.floor(i/8)*.23,
+      hp:i%4?100:2,maxHp:100,damage:0,cd:99,target:-1,path:[],thinkT:99,flash:0,
+      ...(i%5?{}:{cloak:0}),...(i%7?{}:{perch:{up:true,tower:sim.keepId}}) })) as Soldier[];
+    sim.civilians = [{ id:99999,x:20.5,y:40,hp:100,maxHp:100 }] as Civilian[];
+    return sim;
+  };
+  const fast=make(), reference=make(), fastHits:number[]=[], referenceHits:number[]=[];
+  reference.contactDefenders = () => [...reference.soldiers,...reference.civilians];
+  for(const [sim,hits] of [[fast,fastHits],[reference,referenceHits]] as const) {
+    const hurt=sim.hurtDefender.bind(sim);
+    sim.hurtDefender=(u,n) => { hits.push(u.id); return hurt(u,n); };
+  }
+  let indexedCalls=0; const query=fast.contactDefenders.bind(fast);
+  fast.contactDefenders=(...args) => { indexedCalls++; assert.equal((fast as any).defenderIndexActive,true); return query(...args); };
+  for(let i=0;i<90;i++) {
+    for(const sim of [fast,reference]) { sim.time+=1/30; (sim as any).stepUnits(1/30); }
+    assert.deepEqual(fast.enemies,reference.enemies);
+    assert.deepEqual(fast.soldiers,reference.soldiers); assert.deepEqual(fast.civilians,reference.civilians);
+  }
+  assert.ok(indexedCalls>1000); assert.ok(fastHits.length>0); assert.deepEqual(fastHits,referenceHits);
+  assert.ok(fast.soldiers.some(s=>s.hp<=0));
+  assert.equal(fast.rand(),reference.rand());
+  fast.contactDefenders=query;
+  fast.soldiers[0].x=60;
+  assert.ok(fast.contactDefenders(60,40,0).includes(fast.soldiers[0]),'out-of-phase calls see current arrays');
+});
+
 test("Significant Darkling is five art pixels, releases two majors and descends through exactly 45 bodies", () => {
   const sim = fixture(), def = ENEMIES.significantDarkling;
   assert.deepEqual(def.splits, { into: "majorDarkling", count: 2 });

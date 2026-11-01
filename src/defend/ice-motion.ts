@@ -4,6 +4,7 @@ import { dist } from "../exact.ts";
 import { ENEMIES } from "./catalog.ts";
 import { iceAt } from "./boats.ts";
 import { blocked, type Point } from "./pathing.ts";
+import { groundBody } from "./enemy-crowd.ts";
 import type { DefendSim, Enemy } from "./sim.ts";
 
 type Motion = { x: number; y: number; moved: boolean; own: boolean };
@@ -58,6 +59,18 @@ export class IceMotion {
     const solid = own ? sim.ownSolid : sim.foeSolid;
     const n = this.velocity.has(u) ? Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / .2)) : 1;
     for (let i = 0; i < n; i++) {
+      if (!own && sim.crowd.has(u as Enemy) && groundBody(u as Enemy)) {
+        const sx = dx / n, sy = dy / n, openX = !blocked(solid, u.x + sx, u.y, radius);
+        if (!openX && blocked(solid, u.x, u.y + sy, radius)) continue;
+        let xAxis = openX && sx !== 0;
+        // One body-index update for both axes. Preserve the native full-step
+        // wall tests: Y is checked only after crowd-clamped X has completed.
+        sim.crowd.move(u as Enemy, openX ? sx : 0, sy, () => {
+          if (xAxis) { xAxis = false; return true; }
+          return !blocked(solid, u.x, u.y + sy, radius);
+        });
+        continue;
+      }
       if (!blocked(solid, u.x + dx / n, u.y, radius)) {
         if (!own && sim.crowd.has(u as Enemy)) sim.crowd.move(u as Enemy, dx / n, 0);
         else u.x += dx / n;
