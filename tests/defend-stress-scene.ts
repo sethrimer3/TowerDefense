@@ -6,7 +6,7 @@ import { generateCity } from "../src/defend/citygen.ts";
 import { UPGRADES, type EnemyKind } from "../src/defend/catalog.ts";
 import { CELLS_W } from "../src/defend/grid.ts";
 
-export function stressScene(count = 2500, heavy = false) {
+export function stressScene(count = 2500, heavy = false, Sim: typeof DefendSim = DefendSim) {
   let layout = defaultLayout();
   layout.compact = ["darkKeep", "valkyriePalace"];
   for (let y = 5; y <= 11; y++) for (let x = 1; x <= 7; x++)
@@ -22,7 +22,7 @@ export function stressScene(count = 2500, heavy = false) {
   const fit = fitLayout(layout);
   if (!fit.ok) throw new Error(fit.reason);
   const map = generateCity(fit, 5);
-  const sim = new DefendSim(map, Object.fromEntries(UPGRADES.map(u => [u.id, u.maxLevel])) as DefendSim["levels"], 42);
+  const sim = new Sim(map, Object.fromEntries(UPGRADES.map(u => [u.id, u.maxLevel])) as DefendSim["levels"], 42);
   sim.wave = 5;
   sim.hp.fill(1e9); sim.maxHp.fill(1e9);
   // Fill real garrisons via the normal training mechanism before enemies arrive.

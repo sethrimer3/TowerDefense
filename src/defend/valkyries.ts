@@ -14,7 +14,7 @@ import { enemySize } from "./catalog.ts";
 import { dist, sq } from "../exact.ts";
 import { ENEMIES, STAB_GUARD, STAB_WIDTH, VALKYRIE, stabLength } from "./catalog.ts";
 import { CELL_COUNT } from "./grid.ts";
-import { blocked, cellAt, cellCenter, findPath, nearest, type PathLimits } from "./pathing.ts";
+import { blocked, cellAt, cellCenter, findPath, firstSorted, type PathLimits } from "./pathing.ts";
 import type { DefendSim, Enemy, Soldier } from "./sim.ts";
 import { answerBanner } from "./war-banner.ts";
 
@@ -33,7 +33,7 @@ export function stepValkyrie(sim: DefendSim, s: Soldier, dt: number) {
   s.cd -= dt;
   s.thinkT -= dt;
   const reach = stabLength(sim.levels.valkyrieReach ?? 0);
-  const near = nearest(sim.enemiesNear(s.x, s.y, reach), s, reach * reach, true);
+  const near = sim.nearestEnemy(s.x, s.y, reach);
   if (near) {
     // In reach: she holds her ground until her spear is ready.
     if (s.cd <= 0) charge(sim, s, near, reach);
@@ -89,10 +89,9 @@ function runOut(sim: DefendSim, x: number, y: number, ux: number, uy: number, re
 export function seek(sim: DefendSim, s: Soldier) {
   s.thinkT = 0.5;
   const inCity = (e: Enemy) => sim.map.city[cellAt(e.x, e.y)] === 1, bounds = deployment(sim, s);
-  const prey = sim.enemies
-    .filter((e) => !e.untargetable && (s.kind !== "hero" && s.kind !== "shade" || groundMeleeTarget(e)) && e.hp > 0 && inCity(e) && within(bounds, e))
-    .sort((a, b) => sq(a.x - s.x) + sq(a.y - s.y) - (sq(b.x - s.x) + sq(b.y - s.y)))
-    .slice(0, 3);
+  const prey = firstSorted(sim.enemies
+    .filter((e) => !e.untargetable && (s.kind !== "hero" && s.kind !== "shade" || groundMeleeTarget(e)) && e.hp > 0 && inCity(e) && within(bounds, e)),
+    (a, b) => sq(a.x - s.x) + sq(a.y - s.y) - (sq(b.x - s.x) + sq(b.y - s.y)), 3);
   for (const e of prey) {
     const path = findPath(sim.ownSolid, s, e, CITYWIDE);
     if (!path) continue;

@@ -19,6 +19,8 @@ Follow the architecture guidelines in [AmbushPlan.md](AmbushPlan.md#architecture
 
 ## Backlog
 
+- [x] Profile remaining target/movement costs; replace single-target shortlist allocations with ordered grid queries, full crowd sorts with stable best-three selection and terrain corner arrays with direct checks. `sim.ts`, `pathing.ts`, `troops.ts`, `mages.ts`, `valkyries.ts`, `towers.ts`; query/tie/live-state/boundary tests and frozen-source active-combat state/RNG comparisons. Full suite/build, native browser stress and unchanged replay fixtures. [Measurements](../SIMULATION_PERFORMANCE.md).
+
 - [x] Profile simulation separately from rendering; combine native ground-body axis updates, index worm/defender body contacts and skip redundant living-worm cleanup. `ice-motion.ts`, `defender-index.ts`, `blight-worm.ts`, `sim.ts`; frozen-reference complete-step state/RNG comparisons, bucket/attack-order and contact-boundary checks, native replay/ice/crowd/worm/brood/archer tests and crowd/brood browser checks. [Measurements](../SIMULATION_PERFORMANCE.md). No combat/save/golden changes.
 
 - [x] Remove redundant forest mountain generation, static building light-mask expansion/tinting and board/viewport scratch resizes; keep native occlusion masks across zoom-only city-layer repaints. `forest-art.ts`, `lighting.ts`, `render.ts`; exact frozen-reference pixels, cache invalidation/allocation checks, Node forest input/art tests and existing forest/city-night-life/Blight-trail/cache checks. See [measurements](../SCENERY_PERFORMANCE.md). No combat/save/replay changes.

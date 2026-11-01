@@ -41,3 +41,37 @@ The worm-contact scenario is about 9.8 times faster, while the 5k moving crowd g
 - Existing ice, archer displacement, crowd/contact and worm/brood tests plus native crowd/brood browser checks and full suite/build apply. No replay fixtures are re-recorded.
 
 The full 146-file suite and production build passed. Final targeted checks passed for replay, ice, archer displacement, tactical enemies, crowd order, worm contacts and defender indexing. Native crowd and desktop/phone worm-brood browser checks also passed.
+
+## Targeting and terrain follow-up
+
+A fresh simulation-only CPU profile of 1,500 mixed enemies and 243 native troops still placed `enemiesNear` first among game-code self samples (740), with another 183 in `nearest`. A separate 5,000-Darkling profile attributed 382 self samples to `blocked`. These are sampled hotspot indicators, not exact wall-time percentages; initialization and GC are also in the profiles.
+
+- `nearestEnemy` combines range shortlisting and nearest selection into one native grid traversal. It keeps cell/list order, live HP, armor/untargetable exclusions, inclusive range boundaries and the caller's first/last tie rule. Mages, Valkyries, ordinary ranged troops and non-volley archer towers use it. Flat-shot explicit pools, Sky Archers' global enemy ordering, specialized targeting and area/volley queries retain their native behavior.
+- Patrols and citywide hunts previously sorted every eligible enemy before retaining three possible path goals. A stable bounded selection retains only those three while scanning. Equal distance/HP candidates retain input order, including at the cutoff, so path attempts and their subsequent RNG remain ordered identically.
+- `blocked` formerly constructed five arrays per check (one list plus four corner pairs). Direct short-circuit corner tests retain the exact corner order, bounds checks and flooring, without those allocations.
+
+Reproduce with:
+
+```sh
+node --experimental-transform-types --import ./tests/pin-random.ts tests/simulation-targeting-performance.ts
+```
+
+This benchmark freezes the **entire** `src/` directory at `6707b9f445a7454f4b1a70e243bd80e00b83feda` in an ignored reference directory. Both constructors run the existing native stress fixture with ordinary training, movement, towers, projectiles, effects and damage enabled. It compares exact combat/unit/projectile/effect/terrain/statistics state and tower/recruitment cooldown maps after every paired batch, plus the next simulation RNG draw. Structured clones normalize reference-class prototypes while retaining typed arrays, Maps and non-finite values. Nine alternating warm batches report median timings without speed assertions. Separate query/selection/terrain component timings must not be read as whole-battle speedups. Results go to `test-results/simulation-targeting-performance.json`.
+
+Regression checks compare the direct query with `nearest(enemiesNear(...))` across dense and off-board fields, hidden/armor enemies, first/last ties, range edges, zero/infinite/negative radii, deaths and moved/reindexed enemies. Bounded selection is compared with native stable sorting for distance and HP priority; terrain checks match the original four corners at cell/board edges and non-finite inputs. Native replay fixtures are unchanged.
+
+### Recorded follow-up results
+
+2026-11-01, Node 24.19.0, after the full suite and browser checks finished so they no longer competed for CPU. Median milliseconds; component rows measure the named batch rather than a simulation step:
+
+| Workload | Reference | Optimized |
+| --- | ---: | ---: |
+| Complete fixed step: 1,500 mixed enemies, 243 troops | 14.1270 | 13.2514 |
+| Complete fixed step: 1,000 siege-heavy enemies, 243 troops | 11.5607 | 10.9121 |
+| 243 nearest-target queries, radius 12 | 8.2788 | 4.8202 |
+| Choose three from 5,000 candidates | 0.6404 | 0.0417 |
+| 100,000 terrain checks | 7.5099 | 2.4493 |
+
+Complete simulation time fell 6.2% and 5.6% in these two active battles. Isolated nearest-target work fell 42%; selecting three candidates was about 15 times faster and terrain checks about three times faster. These component gains do not translate directly into frame/FPS gains. Timings vary with workload and CPU contention; all state, cooldown and next-RNG comparisons matched in every paired run.
+
+The full 146-file suite and production build passed. The focused replay/troop/query/boundary checks passed without golden updates. A native Chromium stress run completed 60 measured frames with 1,500 enemies, 243 troops, towers, projectiles, fire, ice and drawing active. The follow-up CPU profile still shows substantial work in crowd maintenance/movement and active blaze damage.

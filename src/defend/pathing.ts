@@ -49,21 +49,32 @@ export function nearest<T extends Point>(items: Iterable<T>, p: Point, within = 
   return best;
 }
 
+/** The first `count` items of a stable sort, without sorting the entire crowd.
+ * Equal comparisons keep input order, including which tied items make the cut. */
+export function firstSorted<T>(items: Iterable<T>, compare: (a: T, b: T) => number, count: number): T[] {
+  const best: T[] = [];
+  if (count <= 0) return best;
+  for (const item of items) {
+    let i = best.length;
+    while (i > 0 && compare(item, best[i - 1]) < 0) i--;
+    if (i >= count) continue;
+    best.splice(i, 0, item);
+    if (best.length > count) best.pop();
+  }
+  return best;
+}
+
 /** A diagonal step from (x, y) would squeeze between two solid corners. */
 const cutsCorner = (solid: Uint8Array, x: number, y: number, dx: number, dy: number) =>
   dx !== 0 && dy !== 0 && (solid[cellIndex(x + dx, y)] === 1 || solid[cellIndex(x, y + dy)] === 1);
 
 /** A small body centred at (x, y) would overlap a solid cell or leave the board. */
 export function blocked(solid: Uint8Array, x: number, y: number, r = 0.18): boolean {
-  for (const [px, py] of [
-    [x - r, y - r],
-    [x + r, y - r],
-    [x - r, y + r],
-    [x + r, y + r],
-  ]) {
-    if (!cellInBounds(px, py) || solid[cellIndex(Math.floor(px), Math.floor(py))]) return true;
-  }
-  return false;
+  const x0 = x - r, x1 = x + r, y0 = y - r, y1 = y + r;
+  return !cellInBounds(x0, y0) || !!solid[cellIndex(Math.floor(x0), Math.floor(y0))]
+    || !cellInBounds(x1, y0) || !!solid[cellIndex(Math.floor(x1), Math.floor(y0))]
+    || !cellInBounds(x0, y1) || !!solid[cellIndex(Math.floor(x0), Math.floor(y1))]
+    || !cellInBounds(x1, y1) || !!solid[cellIndex(Math.floor(x1), Math.floor(y1))];
 }
 
 /** The open cell around cell (cx, cy) whose centre is nearest `from`, as

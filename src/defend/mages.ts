@@ -13,7 +13,7 @@ import { bannerDamage } from "./war-banner.ts";
  * Fliers pass over the flames. */
 import { dist } from "../exact.ts";
 import { EMBER_SHARE, ENEMIES, FIRE_MAGE, FIREBALL_SPEED, emberDps, emberSeconds, fireballSplash } from "./catalog.ts";
-import { cellCenter, findPath, nearest } from "./pathing.ts";
+import { cellCenter, findPath } from "./pathing.ts";
 import type { DamageOrigin, DefendSim, Soldier, Arrow } from "./sim.ts";
 import { answerBanner } from "./war-banner.ts";
 import { CELL_COUNT } from "./grid.ts";
@@ -34,7 +34,7 @@ export function stepMage(sim: DefendSim, s: Soldier, dt: number) {
   s.cd -= dt;
   s.thinkT -= dt;
   const attuned = mageAttunement(sim, s.home), range = attuned.range;
-  const near = nearest(sim.enemiesNear(s.x, s.y, range), s, range * range, true);
+  const near = sim.nearestEnemy(s.x, s.y, range);
   if (near) {
     if (attuned.family !== "plain") s.target = near.id;
     if (s.cd <= 0) {
