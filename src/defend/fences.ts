@@ -1,6 +1,6 @@
 import { enemyFlying } from "./catalog.ts";
 import { enemySize } from "./catalog.ts";
-/** Thin wooden fences along the street sides of some parks. Purely
+/** Thin wooden fences ringing some parks. Purely
  * decorative — nothing is blocked by them — but enemies that walk across a
  * section (or a blast next to it) snap it: it splinters into pieces that
  * scatter, settle on the ground and fade away after 5–10 seconds. Fences
@@ -17,7 +17,7 @@ export type FenceSection = { x1: number; y1: number; x2: number; y2: number; bro
 type Splinter = { x: number; y: number; vx: number; vy: number; rot: number; vr: number; len: number; age: number; life: number; shade: number };
 
 /** How far inside the park edge the fence runs (cells). */
-const INSET = 0.12;
+const INSET = 0.125;
 /** Share of parks that are fenced. */
 const FENCED = 0.6;
 /** Blasts remembered so each breaks fences once; forgotten past this many. */
@@ -40,9 +40,11 @@ export function parkFences(map: CityMap): FenceSection[] {
     if (!isPark(map, start) || flooded[start]) continue;
     const cells = floodPark(map, start, flooded);
     if (cells.length < 4 || hash01(start, 91) > FENCED) continue;
-    const sections = cells.flatMap((c) => streetEdges(map, c));
-    // Leave one section open as a gate.
-    if (sections.length > 2) sections.splice(Math.floor(hash01(start, 92) * sections.length), 1);
+    const sections = cells.flatMap((c) => perimeterEdges(map, c));
+    // Leave one straight section open as a gate (never a corner, so the
+    // corners all keep their posts).
+    const straight = sections.filter((s) => (s.x1 === s.x2 ? Math.abs(s.y2 - s.y1) : Math.abs(s.x2 - s.x1)) === 1);
+    if (straight.length > 2) sections.splice(sections.indexOf(straight[Math.floor(hash01(start, 92) * straight.length)]), 1);
     out.push(...sections);
   }
   return out;
@@ -61,24 +63,37 @@ function floodPark(map: CityMap, start: number, flooded: Uint8Array): number[] {
   return cells;
 }
 
-/** A fence section on each street-facing edge of grass cell `c`. */
-function streetEdges(map: CityMap, c: number): FenceSection[] {
-  if (map.type[c] !== CellType.PARK) return [];
+/** Whether (x, y) is a park cell (off the board is not). */
+const parkAt = (map: CityMap, x: number, y: number) => cellInBounds(x, y) && isPark(map, cellIndex(x, y));
+
+/** A fence section on each edge of park cell `c` that is the park's outer
+ * edge, so each fenced park is ringed all round. Sections run `INSET` in
+ * from the edge, and at each end are trimmed (a convex corner) or carried
+ * on (a concave one) by `INSET` so the ring's sides meet exactly. */
+function perimeterEdges(map: CityMap, c: number): FenceSection[] {
   const x = c % CELLS_W,
     y = (c - x) / CELLS_W;
   const out: FenceSection[] = [];
-  for (const [n, dx, dy] of neighbours(c)) if (map.type[n] === CellType.ROAD) out.push(edgeSection(x, y, dx, dy));
+  for (const [dx, dy] of ORTHO) if (!parkAt(map, x + dx, y + dy)) out.push(edgeSection(map, x, y, dx, dy));
   return out;
 }
 
+/** How far the fence along cell (x, y)'s edge facing (dx, dy) carries past
+ * the edge's end toward (sx, sy): -INSET where the ring turns outward
+ * (convex), +INSET where it turns inward (concave), 0 running straight. */
+function endShift(map: CityMap, x: number, y: number, dx: number, dy: number, sx: number, sy: number) {
+  if (!parkAt(map, x + sx, y + sy)) return -INSET;
+  return parkAt(map, x + sx + dx, y + sy + dy) ? INSET : 0;
+}
+
 /** The fence just inside cell (x, y)'s edge facing (dx, dy). */
-function edgeSection(x: number, y: number, dx: number, dy: number): FenceSection {
+function edgeSection(map: CityMap, x: number, y: number, dx: number, dy: number): FenceSection {
   if (dy !== 0) {
     const fy = dy < 0 ? y + INSET : y + 1 - INSET;
-    return { x1: x, y1: fy, x2: x + 1, y2: fy, broken: false };
+    return { x1: x - endShift(map, x, y, dx, dy, -1, 0), y1: fy, x2: x + 1 + endShift(map, x, y, dx, dy, 1, 0), y2: fy, broken: false };
   }
   const fx = dx < 0 ? x + INSET : x + 1 - INSET;
-  return { x1: fx, y1: y, x2: fx, y2: y + 1, broken: false };
+  return { x1: fx, y1: y - endShift(map, x, y, dx, dy, 0, -1), x2: fx, y2: y + 1 + endShift(map, x, y, dx, dy, 0, 1), broken: false };
 }
 
 /** The in-bounds cells of the 3×3 block around a section's midpoint. */
@@ -258,36 +273,44 @@ export function drawFenceSections(c: CanvasRenderingContext2D, px: number, secti
   }
   c.restore();
 }
-/** Rails: a dark outline with a lighter wooden top. */
+/** Rails: a dark outline with a lighter wooden core, filled on whole
+ * device pixels about the same centres as the posts so every side is even
+ * and meets its corners exactly. */
 function drawRails(c: CanvasRenderingContext2D, px: number, sections: FenceSection[]) {
-  c.lineCap = "butt";
   const dark = Math.max(1, Math.round(px * 0.13)),
     light = Math.max(1, Math.round(px * 0.06));
   for (const [w, color] of [
     [dark, OUTLINE],
     [light, "#9a7648"],
   ] as const) {
-    c.strokeStyle = color;
-    c.lineWidth = w;
-    c.beginPath();
+    c.fillStyle = color;
     for (const s of sections) {
-      c.moveTo(s.x1 * px, s.y1 * px);
-      c.lineTo(s.x2 * px, s.y2 * px);
+      const a0 = Math.round(Math.min(s.x1, s.x2) * px),
+        a1 = Math.round(Math.max(s.x1, s.x2) * px),
+        b0 = Math.round(Math.min(s.y1, s.y2) * px),
+        b1 = Math.round(Math.max(s.y1, s.y2) * px);
+      const off = Math.floor(w / 2);
+      if (s.y1 === s.y2) c.fillRect(a0, b0 - off, a1 - a0, w);
+      else c.fillRect(a0 - off, b0, w, b1 - b0);
     }
-    c.stroke();
   }
 }
 
-/** Posts at each end of an intact section. */
+/** Posts at each end of an intact section (one where sections meet). */
 function drawPosts(c: CanvasRenderingContext2D, px: number, sections: FenceSection[]) {
-  const post = Math.max(2, Math.round(px * 0.2));
+  const post = Math.max(2, Math.round(px * 0.2)),
+    off = Math.floor(post / 2);
+  const done = new Set<number>();
   for (const s of sections)
     for (const [x, y] of [
       [s.x1, s.y1],
       [s.x2, s.y2],
     ]) {
-      const X = Math.round(x * px - post / 2),
-        Y = Math.round(y * px - post / 2);
+      const X = Math.round(x * px) - off,
+        Y = Math.round(y * px) - off;
+      const key = X * 65536 + Y;
+      if (done.has(key)) continue;
+      done.add(key);
       c.fillStyle = OUTLINE;
       c.fillRect(X, Y, post, post);
       c.fillStyle = "#7a5a34";
