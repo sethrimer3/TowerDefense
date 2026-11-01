@@ -619,7 +619,14 @@ export function waterGlints(plan: ForestPlan) {
 /** A small mountain: a heap of cells raised into a rocky hill seen from
  * above, its ridges lit from the upper left, scree at its ragged foot, moss
  * on its gentler slopes, a long shadow to the lower right. */
-export function mountainSource(b: Boulder) {
+type MountainSource = Sprite & { x: number; y: number; name: string; crags: { x: number; y: number; deep: number; seed: number }[] };
+let mountains = new WeakMap<Boulder, { key: string; source: MountainSource }>();
+export function mountainSource(b: Boulder): MountainSource {
+  // The native plan is stable, but keep direct/export callers correct when
+  // cells, seed or replacement art change. A distant floor patch must not
+  // regenerate every mountain's noise, height field and distance transform.
+  const key = `${pixelKey()}:${b.seed}:${b.cells.join(',')}`, cached = mountains.get(b);
+  if (cached?.key === key) return cached.source;
   const rock = new Set(b.cells);
   let cx0 = Infinity, cy0 = Infinity, cx1 = -Infinity, cy1 = -Infinity;
   for (const c of b.cells) {
@@ -678,7 +685,9 @@ export function mountainSource(b: Boulder) {
     .filter((g) => g.deep > 5 && hash01(g.seed, 514) < 0.55)
     .sort((a, c) => a.y - c.y);
   const name=ART_NAMES.scenery(`mountain-${w}x${h}-${b.seed%16}`);
-  return {px:sourcePixels(name,w,h,()=>source),w,h,ox:0,oy:0,x:X0,y:Y0,name,crags};
+  const made = {px:sourcePixels(name,w,h,()=>source),w,h,ox:0,oy:0,x:X0,y:Y0,name,crags};
+  mountains.set(b, { key, source: made });
+  return made;
 }
 function mountain(out:Uint32Array,b:Boulder) {
   const s=mountainSource(b);
@@ -1495,4 +1504,4 @@ export function forestPieces(): ArtPiece[] {
   }
   return pieces;
 }
-onPixelArt(()=>{sprites.length=0;rocks.clear();stumps.clear();charred.clear();});
+onPixelArt(()=>{sprites.length=0;rocks.clear();stumps.clear();charred.clear();mountains=new WeakMap();});

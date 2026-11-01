@@ -212,8 +212,8 @@ export class DefendRenderer {
     this.ctx = canvas.getContext("2d", { alpha: false })!;
     this.layer = document.createElement("canvas");
     this.lctx = this.layer.getContext("2d")!;
-    onCityArtLoaded(() => (this.layerKey = ""));
-    onPixelArt(() => (this.layerKey = ""));
+    onCityArtLoaded(() => { this.layerKey = this.maskKey = ""; });
+    onPixelArt(() => { this.layerKey = this.maskKey = ""; });
   }
 
   /** Matches the canvas to its box, which fills the view. The board's scale
@@ -747,7 +747,8 @@ export class DefendRenderer {
     while (k > 1 && W * H * k * k > 18e6) k--;
     this.layerScale = k;
     // Every building's damage stage is painted into the layer too.
-    const key = `${W}:${k}:${this.area}:${pixelKey()}:${this.worldLighting}:${sim ? `${sim.mapVersion}:${damageKey(sim)}` : -1}:${looks ? Object.entries(looks).join(",") : ""}`;
+    const maskKey = `${this.area}:${pixelKey()}:${sim ? `${sim.mapVersion}:${damageKey(sim)}` : -1}:${looks ? Object.entries(looks).join(",") : ""}`;
+    const key = `${W}:${k}:${this.worldLighting}:${maskKey}`;
     if (this.previousArea && (key !== this.previousKey || !this.layerKey)) {
       this.previousLayer ??= document.createElement("canvas");
       this.previousLayer.width = W * k;
@@ -763,7 +764,12 @@ export class DefendRenderer {
     this.layer.width = W * k;
     this.layer.height = H * k;
     paintCityLayer(this.lctx, this.px * k, { map, sim, area: this.area, lights: this.lighting.lights, stones: this.lighting.roadStones, looks, omitSunShadows: this.worldLighting });
-    this.paintMasks(map, sim, looks);
+    // Native-resolution occlusion masks do not depend on camera zoom, board
+    // pixel size or whether sunlight is composited outside the city layer.
+    if (map !== this.maskMap || maskKey !== this.maskKey) {
+      this.maskMap = map; this.maskKey = maskKey;
+      this.paintMasks(map, sim, looks);
+    }
     this.faces = hangingFaces(map, sim);
     this.faced.fill(0);
     for (const f of this.faces) for (let x = f.x0; x < f.x1; x++) this.faced[cellIndex(x, f.y)] = 1;
@@ -785,6 +791,8 @@ export class DefendRenderer {
   private lit = false;
   private bodyMask = document.createElement("canvas");
   private rimMask = document.createElement("canvas");
+  private maskMap: CityMap | null = null;
+  private maskKey = "";
 
   /** Folds fallen and rebuilt buildings into the lighting, then draws what
    * lies on the ground: building damage, and (in weather) unit shadows. */

@@ -19,6 +19,8 @@ Follow the architecture guidelines in [AmbushPlan.md](AmbushPlan.md#architecture
 
 ## Backlog
 
+- [x] Remove redundant forest mountain generation, static building light-mask expansion/tinting and board/viewport scratch resizes; keep native occlusion masks across zoom-only city-layer repaints. `forest-art.ts`, `lighting.ts`, `render.ts`; exact frozen-reference pixels, cache invalidation/allocation checks, Node forest input/art tests and existing forest/city-night-life/Blight-trail/cache checks. See [measurements](../SCENERY_PERFORMANCE.md). No combat/save/replay changes.
+
 - [x] Investigate Blight lag: remove per-segment linear leader searches, crop complex portal fire to conservative screen bounds, merge exact packed-pixel row intervals and skip invisible contour rectangles. `sim.ts`, `enemies.ts`, `blight-worm.ts`, `unit-contours.ts`; paired lookup/raster/crowd benchmark, all-species pixel parity, native cut/motion/RNG equivalence and existing crowd/aura/cache checks. See [measurements](../BLIGHT_PERFORMANCE.md). Combat/save/replay unchanged.
 
 - [x] Fix triangular fortress contour spikes from acute knee joins; broaden and extend all fortress legs, lengthen planted stances and add a small landing settle with tiny ground dust puffs. `fortress-motion-art.ts`, `fortress-footfall-art.ts`, `battle-art.ts`; full-cycle contour masks across sizes/headings/Simple art, footfall timing/lifetime/Reduce Motion tests and desktop/phone galleries. Cosmetic only; combat, saves and replay fixtures unchanged.
