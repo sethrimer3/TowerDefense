@@ -1157,3 +1157,14 @@ Merge one fully ranked Fire, Hawk and Wisp tower into the Ultimate Archer Tower,
 When an enemy is in range, the stored arsenal releases one shot every 0.04 seconds in a committed 45° fan. Cheap focus upgrades narrow this to 20° and 0°. Divine Arrow separately stores incompatible attack damage (including idle melee and magical attacks), with a 50-hit unlock and capacity upgrades to 100, 150, 200 and 250. It fires a fast, piercing golden ray to the map edge and resets its hit/damage reserve on launch. An independent expensive branch applies a total 2×, 5× or 10× multiplier to its stored damage. All four branches can coexist and share upgrades across copies, as with the other shared ultimate trees.
 
 Reserves belong to individual towers and disappear on destruction or a fresh battle. Upgrade ranks persist; ammo does not. [Specification, costs and assumptions](upgrades/ULTIMATE_ARCHER_TOWER.md).
+
+
+### Blight Plasma Fortress
+
+The large Blight Plasma Fortress has a 4.5-cell square body, twelve evenly spaced legs and one centered air-only turret. Its turret is its entire 4000-HP life pool. Native leg collapse, grounded body hits, dragging and death rules apply. The body retains its black material, portal-noise perimeter and orange orthogonal particle trails.
+
+When a target enters its fourteen-cell reach, it locks an aim and charges for fifteen battle seconds. The orange sphere grows from a small spark to a diameter of 75% of the body's width. It then flies in a high arc; after three seconds of recovery, the turret can start another charge. Destroying the turret interrupts a charge, but fired shots continue.
+
+Impact creates a 6.5-cell-radius sphere lasting six seconds, dealing twelve pulses half a second apart. Pulses hit troops, civilians, enemies (including Blight) and structures, through native damage/guard/shield/immunity and water rules. A grounded fortress and its mounts cannot take duplicate damage from the same pulse. The shattered ground uses cannon/meteor scorch art with three times the main arms, extra branches, a wider reach and a 24-second cooling lifetime.
+
+Available in the developer unit tester and enemy journal; authored wave placement remains pending.

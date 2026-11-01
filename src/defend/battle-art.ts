@@ -1,3 +1,4 @@
+import { drawPlasma } from "./blight-plasma-art.ts";
 import { drawFortressRubble } from "./fortress-motion-art.ts";
 import { drawBlightFortress, drawBlightLasers } from "./blight-fortress-art.ts";
 import { isBlightFlier } from "./blight-fliers.ts";
@@ -203,6 +204,7 @@ export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, hea
   drawShells(b.c, b.px, sim);
   drawSiegeShots(b, sim);
   drawBlightLasers(b, sim);
+  drawPlasma(b, sim, simple.reduceMotion);
   drawFireballs(b.c, b.px, sim, simple.reduceMotion);
   drawMageBolts(b.c, b.px, sim, simple.reduceMotion);
   drawStabs(b.c, b.px, sim);

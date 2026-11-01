@@ -1,3 +1,4 @@
+import { stepPlasmaTurret } from "./blight-plasma.ts";
 import { fireBlightTurret } from "./blight-fortress.ts";
 import { dist } from "../exact.ts";
 import { ENEMIES } from "./catalog.ts";
@@ -28,6 +29,7 @@ export function assembleFortress(sim: DefendSim, core: Enemy) {
         dy = legSide === 1 ? -fort.height / 2 - .2 * scale : legSide === 3 ? fort.height / 2 + .2 * scale : along * fort.height;
       }
       if (def.blightFortress && role === "turret") dy = -fort.height / 2 + .12 * scale;
+      if (def.blightFortress === "plasma" && role === "turret") dy = 0;
       const part = sim.spawnAuxiliary(core.kind, core.x + dx, core.y + dy);
       if (!part) continue;
       part.fortressPart = { core: core.id, role, dx, dy, ...(legSide !== undefined ? { side: legSide } : {}) };
@@ -51,12 +53,13 @@ export function syncFortress(core: Enemy) {
   }
 }
 
-export function stepFortress(sim: DefendSim, part: Enemy, _dt: number): boolean {
+export function stepFortress(sim: DefendSim, part: Enemy, dt: number): boolean {
   const data = part.fortressPart!;
   const core = sim.livingEnemy(data.core);
   if (!core) { part.hp = 0; return true; }
   part.x = core.x + data.dx; part.y = core.y + data.dy - (data.role === "turret" ? fortressLift(core) : 0);
   if (data.role !== "turret") return true;
+  if (data.weapon === "plasma") return stepPlasmaTurret(sim, part, dt);
   const range = 4 + ENEMIES[core.kind].fortress!.tier;
   const foe = sim.nearestDefender(part.x, part.y, range);
   const building = sim.map.buildings.find(b => sim.intact(b) && rectDist(b.rect, part.x, part.y) <= range);
