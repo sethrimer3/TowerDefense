@@ -4,6 +4,9 @@ import { fortressLift, FORTRESS_FALL } from "./fortress.ts";
 import type { Enemy } from "./sim.ts";
 import type { Brush } from "./battle-art.ts";
 
+export const FORTRESS_GAIT = { stride: .65, stance: .74, reach: .22, dustLife: .4 } as const;
+const legBank = (local: number, side: number) => (local + (side === 1 || side === 2 ? 1 : 0)) % 2;
+
 export function fortressBodyY(core: Enemy, px: number, reduced = false) {
   const state = core.walker;
   // Reduce Motion snaps the drop while retaining the correct gameplay state.
@@ -12,12 +15,12 @@ export function fortressBodyY(core: Enemy, px: number, reduced = false) {
 
 /** Diagonal banks alternate; stance exactly cancels chassis travel. */
 export function fortressFootStride(walk: number, stride: number, local: number, side: number) {
-  const bank = (local + (side === 1 || side === 2 ? 1 : 0)) % 2;
-  const cycle = (walk / stride + bank * .5) % 1, stance = .68;
+  const bank = legBank(local, side);
+  const cycle = (walk / stride + bank * .5) % 1, stance = FORTRESS_GAIT.stance;
   const swing = cycle < stance ? 0 : (cycle - stance) / (1 - stance);
   const forward = cycle < stance ? (.5 * stance - cycle) * stride
     : (-.5 + swing * swing * (3 - 2 * swing)) * stance * stride;
-  return { forward, lift: Math.sin(swing * Math.PI) };
+  return { forward, lift: Math.sin(swing * Math.PI), settle: Math.max(0, 1 - cycle / .12) };
 }
 
 export function drawFortressLegs({ c, px }: Brush, core: Enemy, reduced = false, blight = false) {
@@ -29,8 +32,10 @@ export function drawFortressLegs({ c, px }: Brush, core: Enemy, reduced = false,
   const facing = core.facing ?? { x: 0, y: 1 };
   const length = Math.hypot(facing.x, facing.y) || 1;
   const ux = facing.x / length, uy = facing.y / length;
-  const stride = .65 * (def.fortress!.partScale ?? 1);
-  c.save(); c.lineCap = "square"; c.lineJoin = "miter";
+  const stride = FORTRESS_GAIT.stride * (def.fortress!.partScale ?? 1);
+  // A folded knee can almost double back on itself. A miter on the expanded
+  // contour would turn that acute corner into a long, animated triangle.
+  c.save(); c.lineCap = "round"; c.lineJoin = "round";
   const sideCounts = [0, 0, 0, 0];
   for (const leg of core.fortressParts ?? []) {
     if (leg.fortressPart?.role !== "leg") continue;
@@ -45,19 +50,20 @@ export function drawFortressLegs({ c, px }: Brush, core: Enemy, reduced = false,
       continue;
     }
     const step = fortressFootStride(walk, stride, local, side);
-    const forward = step.forward, lift = step.lift * scale * .09;
-    const footX = leg.x * px + ux * forward * px + nx * scale * (.13 + k * .16);
-    const footY = leg.y * px + uy * forward * px + ny * scale * (.13 + k * .16) - lift;
-    const kneeX = (hipX + footX) / 2 + nx * scale * .18;
-    const kneeY = (hipY + footY) / 2 + ny * scale * .18;
+    const forward = step.forward, lift = step.lift * scale * .13;
+    const footX = leg.x * px + ux * forward * px + nx * scale * (FORTRESS_GAIT.reach + k * .16);
+    const footY = leg.y * px + uy * forward * px + ny * scale * (FORTRESS_GAIT.reach + k * .16) - lift;
+    const bend = .22 + (reduced ? 0 : step.settle * .035);
+    const kneeX = (hipX + footX) / 2 + nx * scale * bend;
+    const kneeY = (hipY + footY) / 2 + ny * scale * bend;
     const limb = (width: number, color: string) => {
       c.strokeStyle = color; c.lineWidth = scale * width;
       c.beginPath(); c.moveTo(hipX, hipY); c.lineTo(kneeX, kneeY); c.lineTo(footX, footY); c.stroke();
     };
-    limb(.17, blight ? "#000000" : "#292830");
-    if (!blight) limb(.08, "#838390");
+    limb(.22, blight ? "#000000" : "#292830");
+    if (!blight) limb(.11, "#838390");
     c.fillStyle = blight ? "#000000" : "#575664";
-    c.fillRect(footX - scale * .13, footY - scale * .11, scale * .26, scale * .22);
+    c.fillRect(footX - scale * .16, footY - scale * .14, scale * .32, scale * .28);
     if (!blight) {
       c.fillStyle = "#bab6b7"; c.fillRect(kneeX - scale * .06, kneeY - scale * .06, scale * .12, scale * .12);
     }

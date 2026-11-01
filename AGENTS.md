@@ -283,6 +283,8 @@ Window sunlight in the Library and Tiles uses `src/soft-sunlight.ts` (`SoftSunli
 - Goldens (`tests/fixtures/*.golden.json`) pin current output; an intended change to city generation, the battle, fences or saves fails them until re-recorded with `UPDATE_GOLDEN=1`. Re-record as part of that change and say which and why in the commit message. A refactor re-records nothing.
 - Run the area's tests while iterating (`tests/defend*.test.ts` for Defend, `tests/mine.test.ts` for the Mine, `tests/library.test.ts` for the Library, `tests/progression.test.ts tests/settings.test.ts` for progression and saves), then `npm test` and `npm run build` before committing.
 
+**Fortress stride polish.** `fortress-motion-art.ts` uses round limb caps/joins so the contour's wider stroke cannot grow acute knee miters into triangular spikes. Keep round joints when changing the gait. Legs have broader struts/feet, a longer reach and a 74% planted stance with a short knee settle. `fortress-footfall-art.ts` keeps cosmetic landing puffs in a bounded per-core WeakMap, detecting stride-boundary crossings from actual walk distance, interpolating ground contacts and expiring on battle time. It draws before silhouette capture, consumes no RNG and never changes simulation state. Lost legs/falling bodies do not emit; idle dust expires, pause holds it, Reduce Motion clears it, and preview resets/teleports/offscreen gaps do not burst stale steps. Tests: `tests/defend-fortress-footfalls.test.ts`, `node tests/fortress-stride.mjs` (full-cycle native contour bounds, six fortress types, headings, Simple art, visible dust and desktop/phone gallery), plus `tests/fortress-collapse.mjs`. No combat/save/replay changes.
+
 ## Agent skills
 
 ### Adding an upgrade
