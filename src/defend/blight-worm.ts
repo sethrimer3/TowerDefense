@@ -283,7 +283,7 @@ export function stepBlightWorm(sim: DefendSim, e: Enemy, dt: number) {
   if (!e.worm) initWorm(sim, [e]);
   const w = e.worm!, tuning = wormTuning(e.kind), HALF = tuning.spacing / 2;
   if (e.leader !== undefined) {
-    const leader = sim.enemies.find(o => o.id === e.leader && o.hp > 0);
+    const leader = sim.livingEnemy(e.leader);
     if (leader?.worm) {
       w.trail = leader.worm.trail;
       const target = leader.worm.s - tuning.spacing;
