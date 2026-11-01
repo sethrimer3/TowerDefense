@@ -1,5 +1,6 @@
 import { drawPlasma } from "./blight-plasma-art.ts";
 import { drawFortressRubble } from "./fortress-motion-art.ts";
+import { drawFortressFootfalls } from "./fortress-footfall-art.ts";
 import { drawBlightFortress, drawBlightLasers } from "./blight-fortress-art.ts";
 import { isBlightFlier } from "./blight-fliers.ts";
 import { drawBlightFlier } from "./blight-flier-art.ts";
@@ -127,6 +128,7 @@ export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, hea
   // Track the wave peak even when the setting is off.
   if (!healthbars) trackHealthbarPeak(sim);
   drawFortressRubble(b, sim);
+  drawFortressFootfalls(b, sim, simple.reduceMotion);
   for (const e of sim.enemies) drawWormShadow(b, e, sim.time, simple.effects !== false, simple.reduceMotion);
   drawBlackHoles(b, sim);
   drawPoisonClouds(b, sim);
