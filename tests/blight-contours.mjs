@@ -22,7 +22,30 @@ try {
     const pixel = (c, x, y) => [...c.getImageData(x, y, 1, 1).data];
     const gallery = document.querySelector('canvas'); gallery.width = 1000; gallery.height = 850;
     gallery.style.cssText = 'width:1000px;height:850px'; const gc = gallery.getContext('2d');
-    const samples = [], categories = [], portraits = [], widths = [];
+    const samples = [], categories = [], portraits = [], widths = [], clipped = [];
+    // Cropped portal work must match the full-canvas reference for every
+    // faction shape, including reflected/rotated sprites and live limbs.
+    const compareCrop = (c, outline, label) => {
+      const channels = outline.contours.channels, channel = channels.get(PORTAL_UNIT_INK);
+      const bounded = !channel.unbounded;
+      let differences = 0, maxDifference = 0, alphaDifferences = 0;
+      for (const plain of [false, true]) {
+        c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, c.canvas.width, c.canvas.height);
+        outline.contours.seconds = 2.5; outline.contours.draw(c, plain);
+        const crop = c.getImageData(0, 0, c.canvas.width, c.canvas.height).data;
+        c.clearRect(0, 0, c.canvas.width, c.canvas.height); channel.unbounded = true;
+        outline.contours.draw(c, plain); channel.unbounded = !bounded;
+        const full = c.getImageData(0, 0, c.canvas.width, c.canvas.height).data;
+        for (let i = 0; i < full.length; i++) {
+          const delta = Math.abs(full[i] - crop[i]);
+          maxDifference = Math.max(maxDifference, delta);
+          if (delta > 1) differences++;
+          if (i % 4 === 3 && delta) alphaDifferences++;
+        }
+        c.restore();
+      }
+      clipped.push({ label, bounded, differences, maxDifference, alphaDifferences });
+    };
     for (const def of Object.values(ENEMIES).filter(d => d.faction === 'darkOne')) {
       const cv = canvas(); paintPortrait(cv, def.kind);
       const d = cv.getContext('2d').getImageData(12, 12, 56, 56).data;
@@ -59,6 +82,7 @@ try {
         drawUnits({ c, px: 48 }, s, null, false, undefined, { enemies: simple, reduceMotion: true }, outline, undefined, { defer: true });
         const channels = outline.contours.channels;
         categories.push({ simple, kind: def.kind, portal: channels.has(PORTAL_UNIT_INK), crimson: channels.has(DARK_UNIT_INK) });
+        compareCrop(c, outline, `${def.kind}/${simple}`);
       }
       // A channel containing complex artwork must not black-fill its internals.
       const complex = make(); complex.spawnAuxiliary('necromancer', 2, 2);
@@ -107,6 +131,21 @@ try {
       drawUnits({ c, px: 64 }, single, null, false, undefined, { enemies: simple }, outline, undefined, { defer: true });
       samples.push({ simple, loneOutside: pixel(outline.layer.c, 123, 128), loneInside: pixel(outline.layer.c, 124, 128) });
     }
+    for (const kind of ['curve', 'stroke', 'square cap', 'rotated', 'sprite', 'offscreen', 'external']) {
+      const cv = canvas(), c = cv.getContext('2d'), outline = new UnitOutline();
+      c.translate(kind === 'offscreen' ? 1000 : 140, 100); c.rotate(.37); c.scale(-1, 1);
+      const { units: u } = outline.begin(c, true, 1);
+      outline.ink(PORTAL_UNIT_INK); u.fillStyle = u.strokeStyle = '#000';
+      if (kind === 'external') { const path = new Path2D(); path.rect(-20, -20, 40, 40); u.fill(path); }
+      else if (kind === 'sprite') { const sprite = canvas(12, 12), sc = sprite.getContext('2d'); sc.fillRect(0, 0, 12, 5); sc.fillRect(0, 0, 5, 12); u.drawImage(sprite, -24, -24, 48, 48); }
+      else if (kind === 'rotated' || kind === 'offscreen') u.fillRect(-15, -10, 30, 20);
+      else {
+        u.beginPath(); u.moveTo(-20, 0);
+        if (kind === 'curve') { u.bezierCurveTo(-40, -50, 40, 50, 20, 0); u.quadraticCurveTo(0, -60, -20, 0); u.fill(); }
+        else { u.lineTo(0, -35); u.lineTo(3, 15); u.lineWidth = 4; u.lineJoin = kind === 'square cap' ? 'round' : 'miter'; u.lineCap = kind === 'square cap' ? 'square' : 'butt'; u.miterLimit = 10; u.stroke(); }
+      }
+      outline.end(c, true); compareCrop(c, outline, kind);
+    }
     // An ally already drawn in the neck keeps its own body color and navy rim.
     const cv = canvas(), c = cv.getContext('2d'), o = new UnitOutline(), l = o.begin(c, true, 4);
     o.ink(PLAYER_UNIT_INK); l.units.fillStyle = '#43ba73'; l.units.fillRect(49, 20, 2, 30);
@@ -147,7 +186,7 @@ try {
     document.createElement = function(name, ...args) { if (name === 'canvas') alternatingCanvases++; return create(name, ...args); };
     try { for (let i = 0; i < 10; i++) paintPortal(contexts[i % 2], box, i / 10); }
     finally { document.createElement = create; }
-    return { categories, samples, portraits, widths, ally, timings, alternatingCanvases };
+    return { categories, samples, portraits, widths, ally, timings, alternatingCanvases, clipped };
   });
   mkdirSync('test-results', { recursive: true }); writeFileSync('test-results/blight-contours.json', JSON.stringify(result, null, 2));
   await page.screenshot({ path: 'test-results/blight-contours.png' });
@@ -171,5 +210,12 @@ try {
   assert.deepEqual(result.ally, [67, 186, 115, 255]);
   assert.ok(result.timings.every(r => r.allocations === 0 && r.reads === 0), JSON.stringify(result.timings));
   assert.equal(result.alternatingCanvases, 0, 'alternating renderers retain their pattern tiles');
+  // Local surfaces can round premultiplied fire RGB by two levels at faint
+  // curve edges. Geometry/alpha must remain exact; native species stay within
+  // one RGB level of the original full-screen composition.
+  assert.ok(result.clipped.every(r => r.alphaDifferences === 0 && r.maxDifference <= 2), JSON.stringify(result.clipped));
+  assert.ok(result.clipped.filter(r => r.label.includes('/')).every(r => r.differences === 0), JSON.stringify(result.clipped));
+  assert.ok(result.clipped.filter(r => r.label !== 'external').every(r => r.bounded), 'native geometry must bound portal raster work');
+  assert.equal(result.clipped.find(r => r.label === 'external').bounded, false, 'unknown Path2D retains conservative fallback');
   assert.deepEqual(errors, []); console.log(JSON.stringify(result, null, 2));
 } finally { await browser.close(); }

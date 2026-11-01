@@ -19,6 +19,8 @@ Follow the architecture guidelines in [AmbushPlan.md](AmbushPlan.md#architecture
 
 ## Backlog
 
+- [x] Investigate Blight lag: remove per-segment linear leader searches, crop complex portal fire to conservative screen bounds, merge exact packed-pixel row intervals and skip invisible contour rectangles. `sim.ts`, `enemies.ts`, `blight-worm.ts`, `unit-contours.ts`; paired lookup/raster/crowd benchmark, all-species pixel parity, native cut/motion/RNG equivalence and existing crowd/aura/cache checks. See [measurements](../BLIGHT_PERFORMANCE.md). Combat/save/replay unchanged.
+
 - [x] Fix triangular fortress contour spikes from acute knee joins; broaden and extend all fortress legs, lengthen planted stances and add a small landing settle with tiny ground dust puffs. `fortress-motion-art.ts`, `fortress-footfall-art.ts`, `battle-art.ts`; full-cycle contour masks across sizes/headings/Simple art, footfall timing/lifetime/Reduce Motion tests and desktop/phone galleries. Cosmetic only; combat, saves and replay fixtures unchanged.
 
 - [x] Stagger city torches by ±5 seconds around fading sunset shadows; light the exterior walls and terrain. Add cosmetic townsfolk errands and gate-aware night watchmen with hand-torches and threat retreats. Match keep sunlight/torch occlusion to its native rounded silhouette. `city-torches.ts`, `city-life.ts`, `city-life-art.ts`, `lighting.ts`, `shadow-art.ts`, `render.ts`; no simulation/save changes, tested in Node and desktop/phone native scenes.

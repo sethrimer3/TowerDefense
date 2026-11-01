@@ -57,6 +57,36 @@ const treeHP = (kind: EnemyKind): number => {
   return (d.chainLength ?? 1) * (d.hp + (d.splits ? d.splits.count * treeHP(d.splits.into) : 0));
 };
 
+test("worm crowds use one phase lookup and preserve linear-lookup motion, cuts and randomness", () => {
+  const make = () => {
+    const sim = fixture();
+    for (let i = 0; i < 20; i++) sim.releaseEnemy("blightWorm", { x: 5 + i * 2, y: 40 });
+    return sim;
+  };
+  const fast = make(), reference = make();
+  reference.livingEnemy = id => reference.enemies.find(e => e.id === id && e.hp > 0);
+  const lookup = fast.livingEnemy.bind(fast);
+  let queries = 0, scans = 0;
+  fast.livingEnemy = id => { queries++; assert.equal((fast as any).enemyLookupActive, true); return lookup(id); };
+  const find = fast.enemies.find.bind(fast.enemies);
+  fast.enemies.find = (...args: Parameters<typeof find>) => { scans++; return find(...args); };
+  for (let tick = 0; tick < 8; tick++) {
+    if (tick === 3) { fast.enemies[12].hp = reference.enemies[12].hp = 0; }
+    for (const sim of [fast, reference]) { sim.time += 1 / 60; (sim as any).stepUnits(1 / 60); }
+    assert.deepEqual(Array.from(fast.enemies), Array.from(reference.enemies));
+    assert.equal((fast as any).enemyLookupActive, false);
+    assert.equal((fast as any).enemyLookup.size, 0);
+  }
+  assert.ok(queries > 7000);
+  assert.equal(scans, 0, "followers must not scan the crowd for each leader");
+  assert.equal(fast.rand(), reference.rand());
+  fast.livingEnemy = lookup;
+  const replacement = fast.spawnAuxiliary("miniDarkling", 20, 20)!;
+  assert.equal(fast.livingEnemy(replacement.id), replacement, "direct lookups observe additions after the phase");
+  replacement.hp = 0;
+  assert.equal(fast.livingEnemy(replacement.id), undefined);
+});
+
 test("Significant Darkling is five art pixels, releases two majors and descends through exactly 45 bodies", () => {
   const sim = fixture(), def = ENEMIES.significantDarkling;
   assert.deepEqual(def.splits, { into: "majorDarkling", count: 2 });

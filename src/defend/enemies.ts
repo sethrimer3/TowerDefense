@@ -43,7 +43,7 @@ export function stepEnemy(sim: DefendSim, e: Enemy, dt: number) {
   if (stepAbilities(sim, e, dt)) return;
   if (stepDartBurst(sim, e, dt)) return;
   if (e.leader !== undefined) {
-    const leader = sim.enemies.find(other => other.id === e.leader && other.hp > 0);
+    const leader = sim.livingEnemy(e.leader);
     if (leader) {
       const distance = dist(leader.x - e.x, leader.y - e.y);
       if (distance > 0.3) sim.moveToward(e, leader, { speed: Math.min(enemySpeed(sim, e) * 2, (distance - 0.3) / dt), dt, flying: def.flying });

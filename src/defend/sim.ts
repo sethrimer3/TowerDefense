@@ -742,7 +742,7 @@ export class DefendSim {
     if (this.defenderIndexActive) this.defenders.rebuild(this.soldiers, this.civilians);
     try {
       this.enemyLookup.clear();
-      this.enemyLookupActive = this.enemies.some(e => e.fortressPart);
+      this.enemyLookupActive = this.enemies.some(e => e.fortressPart || e.leader !== undefined);
       if (this.enemyLookupActive) for (const e of this.enemies) this.enemyLookup.set(e.id, e);
       if (!this.scenario?.passiveEnemies) for (const e of this.enemies) if (e.hp > 0) {
         const x = e.x, y = e.y;
