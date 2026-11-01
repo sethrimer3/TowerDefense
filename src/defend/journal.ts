@@ -71,7 +71,7 @@ export function journalHTML(discovered: EnemyKind[]): string {
   const groups = AREAS.map(area => {
     const roster = new Set(AREA_ENEMIES[area.id]);
     // Authored opening enemies do not enter the legacy procedural roster.
-    if (area.id === "moss") { roster.add("darkling"); roster.add("miniDarkling"); roster.add("largeDarkling"); roster.add("majorDarkling"); roster.add("significantDarkling"); roster.add("blightWorm"); roster.add("blightDart"); roster.add("blightPrism"); roster.add("greaterBlightPrism"); roster.add("blightCannon"); roster.add("blightLance"); roster.add("blightFortress"); }
+    if (area.id === "moss") { roster.add("darkling"); roster.add("miniDarkling"); roster.add("largeDarkling"); roster.add("majorDarkling"); roster.add("significantDarkling"); roster.add("blightWorm"); roster.add("blightDart"); roster.add("blightPrism"); roster.add("greaterBlightPrism"); roster.add("blightCannon"); roster.add("blightLance"); roster.add("blightFortress"); roster.add("blightPlasmaFortress"); }
     if (area.id === "moss") for (const kind of Object.keys(BLIGHT_SHIPS) as EnemyKind[]) roster.add(kind);
     // Raised and hatched enemies belong beside their parent species.
     if (roster.has("necromancer")) roster.add("skeleton");

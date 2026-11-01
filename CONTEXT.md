@@ -782,3 +782,7 @@ A medium Blight walker carrying one energy-cannon turret and one piercing-laser 
 
 **Blight ships**:
 The Dark One's counterparts of the eight magic boats: Blight Dinghy, Sailboat, Cutter, Cog, Skiff, Sloop, Galleon and Ark. Their hulls are black, sails orange and rails, runes and bow crystals red. Each retains its original ship's size, strength and water effects.
+
+
+**Blight Plasma Fortress**:
+A large twelve-legged Blight fortress with one centered rooftop plasma turret. It charges an orange ball for fifteen seconds until the ball is three quarters of the body's width, then lobs it in an arc. Impact produces a huge sphere that repeatedly damages units and structures on both sides, and leaves dense glowing cracks that slowly cool. Destroying its turret stops an unfinished charge; a fired ball remains dangerous.

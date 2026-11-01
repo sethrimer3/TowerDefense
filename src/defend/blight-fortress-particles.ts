@@ -1,7 +1,7 @@
 /** Cosmetic, fixed-size particle fields. Never consumes the battle RNG. */
 import { hash01 } from "./grid.ts";
 
-export const TRON = { small: 18, medium: 40, hz: 30, tail: 16, margin: .035 } as const;
+export const TRON = { small: 18, medium: 40, large: 72, hz: 30, tail: 16, margin: .035 } as const;
 type Point = { x: number; y: number };
 export type TronParticle = Point & { direction: number; generation: number; trail: Point[] };
 export type TronField = { seed: number; tick: number; particles: TronParticle[] };

@@ -134,7 +134,7 @@ export function drawScorches(c: Ctx, px: number, scorches: readonly Scorch[]) {
   c.save();
   c.imageSmoothingEnabled = false;
   for (const sc of scorches) {
-    const R = Math.max(3, Math.round(sc.r * ART)), key = `${sc.seed}:${R}`;
+    const R = Math.max(3, Math.round(sc.r * ART)), key = `${sc.seed}:${R}${sc.plasma ? ":plasma" : ""}`;
     let art = scorchArt.get(key);
     if (!art) scorchArt.set(key, (art = bakeScorch(sc, R)));
     art.used = drawn;
@@ -181,17 +181,17 @@ function bakeScorch(sc: Scorch, R: number): ScorchArt {
     const n = Math.max(1, Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) * 2));
     for (let s = 0; s <= n; s++) plot(x0 + ((x1 - x0) * s) / n, y0 + ((y1 - y0) * s) / n, t0 + ((t1 - t0) * s) / n);
   };
-  const arms = 5 + ((hash01(sc.seed, 30) * 3) | 0);
+  const arms = (5 + ((hash01(sc.seed, 30) * 3) | 0)) * (sc.plasma ? 3 : 1);
   for (let i = 0; i < arms; i++) {
     let a = (i / arms) * Math.PI * 2 + hash01(sc.seed, 31, i) * 0.9;
     let x = 0, y = 0;
-    const len = R * (0.5 + hash01(sc.seed, 32, i) * 0.45), steps = 4;
+    const len = R * ((sc.plasma ? .7 : .5) + hash01(sc.seed, 32, i) * (sc.plasma ? .3 : .45)), steps = sc.plasma ? 7 : 4;
     for (let j = 1; j <= steps; j++) {
       a += (hash01(sc.seed, 33, i * 7 + j) - 0.5) * 0.9;
       const nx = x + (Math.cos(a) * len) / steps, ny = y + (Math.sin(a) * len) / steps;
       line(x, y, nx, ny, (j - 1) / steps, j / steps);
       [x, y] = [nx, ny];
-      if (j === 2 && hash01(sc.seed, 34, i) < 0.6) {
+      if ((j === 2 || sc.plasma && j >= 3 && j <= 5) && hash01(sc.seed, 34, sc.plasma ? i * 7 + j : i) < 0.6) {
         const f = a + (hash01(sc.seed, 35, i) < 0.5 ? 0.9 : -0.9);
         line(x, y, x + Math.cos(f) * len * 0.3, y + Math.sin(f) * len * 0.3, 0.5, 0.9);
       }

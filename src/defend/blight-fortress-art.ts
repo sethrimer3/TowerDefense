@@ -1,3 +1,4 @@
+import { drawPlasmaTurret } from "./blight-plasma-art.ts";
 import { drawFortressLegs, drawFortressGun, fortressBodyY } from "./fortress-motion-art.ts";
 /** Solid black walkers; internal light never participates in their contour. */
 import { basicUnitSprite } from "./basic-unit-art.ts";
@@ -16,7 +17,7 @@ function particles(c: CanvasRenderingContext2D, e: Enemy, x: number, y: number, 
   let field = cache.get(e);
   const tick = Math.max(0, Math.floor(seconds * TRON.hz)) + TRON.tail;
   if (!field || field.tick > tick) {
-    field = createTronField(e.id, ENEMIES[e.kind].blightFortress === "dual" ? TRON.medium : TRON.small);
+    field = createTronField(e.id, ENEMIES[e.kind].blightFortress === "plasma" ? TRON.large : ENEMIES[e.kind].blightFortress === "dual" ? TRON.medium : TRON.small);
     cache.set(e, field);
   }
   // Bound catch-up for journal/late-visible bodies; their cosmetic phase may restart.
@@ -50,7 +51,10 @@ export function drawBlightFortress({ c, px }: Brush, e: Enemy, seconds: number, 
   drawSprite(c, basicUnitSprite(e.kind, true), x, y, size, size);
   particles(c, e, x, y, size, t, reduceMotion);
   for (const part of e.fortressParts ?? [])
-    if (part.hp > 0 && part.fortressPart?.role === "turret") drawFortressGun({ c, px }, part, scale, true);
+    if (part.hp > 0 && part.fortressPart?.role === "turret") {
+      if (part.fortressPart.weapon === "plasma") drawPlasmaTurret({ c, px }, part, t, reduceMotion);
+      else drawFortressGun({ c, px }, part, scale, true);
+    }
   if (e.flash > 0) {
     c.fillStyle = `rgba(255,158,75,${Math.min(.15, e.flash * 1.25)})`; c.fillRect(x, y, size, size);
   }
