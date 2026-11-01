@@ -598,7 +598,7 @@ test("Hunter's instinct sends archers toward enemies they can't see yet", () => 
   assert.equal(run(1), true);
 });
 
-test('park fences: street-facing, with a gate; trampled or blasted into fading splinters', async () => {
+test('park fences: ringing each park, with a gate; trampled or blasted into fading splinters', async () => {
   const { parkFences, Fences } = await import('../src/defend/fences.ts');
   // A big city so there are plenty of parks.
   let l = defaultLayout();
@@ -607,10 +607,19 @@ test('park fences: street-facing, with a gate; trampled or blasted into fading s
   for (let seed = 2; !sections.length && seed < 20; seed++) sections = parkFences((map = mapOf(l, seed)));
   assert.ok(sections.length > 0, 'some parks are fenced');
   for (const s of sections) {
-    // Every section runs along a park cell that borders a street.
+    // Every section runs along a park cell on the park's edge.
     const mx = (s.x1 + s.x2) / 2, my = (s.y1 + s.y2) / 2;
-    assert.equal(map.type[cellIndex(Math.floor(mx), Math.floor(my))], CellType.PARK);
+    assert.ok([CellType.PARK, CellType.WATER].includes(map.type[cellIndex(Math.floor(mx), Math.floor(my))]));
   }
+  // The rings close: sides meet end to end at every corner, and the only
+  // loose ends are the two sides of a gate, one cell apart.
+  const ends = new Map<string, number>();
+  const key = (x: number, y: number) => `${Math.round(x * 1000)},${Math.round(y * 1000)}`;
+  for (const s of sections) for (const k of [key(s.x1, s.y1), key(s.x2, s.y2)]) ends.set(k, (ends.get(k) ?? 0) + 1);
+  const loose = [...ends].filter(([, n]) => n === 1).map(([k]) => k.split(',').map((v) => Number(v) / 1000));
+  assert.ok([...ends.values()].every((n) => n <= 2), 'no side overlaps another');
+  for (const [x, y] of loose)
+    assert.ok(loose.some(([u, v]) => Math.abs(Math.abs(u - x) + Math.abs(v - y) - 1) < 1e-6), 'a loose end faces its gate post');
   const fences = new Fences();
   fences.sync(map);
   const s = fences.sections[0];
