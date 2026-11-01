@@ -1,23 +1,28 @@
 /** Ground weather drawn as pixel art beneath every combat silhouette. The
- * desert's dunes are one tiling sprite (`dunePixels`, baked once at `ART`
- * pixels a cell from the height field `duneHeights`, every pixel lit by its
- * slope from the upper left, the city's sun, and dithered between the sand
- * tones) laid over all the open ground outside the city at the field's
- * drift, recomposed only when the drift moves a whole art pixel or the
- * ground changes. Over it `SandMarks` keeps what the battle did to the sand
- * (trails walked into the raised dunes, craters blasted out of it) and the
- * sand spilled over the wall from a dune's tip with its pile inside, and
- * repaints only the small chunks that changed. Sand blown into the city and
- * the Fungal Hollow's mist are painted at `RES` art pixels a cell, the
- * city's only over the cells holding any. Then the tumbleweeds, black-
- * outlined sprites in several sizes, over it. Presentation only: it reads
- * `sim.atmosphere` and changes nothing. */
+ * desert's dunes are one tiling sprite (`dunePixels`, `ART` pixels a cell)
+ * of a few long, gentle swells (`duneHeights`), every pixel shaded by its
+ * slope toward the day's sun (`setDuneLight`: its heading and how strongly
+ * it shades, from the shared sky) in a handful of flat sand tones, no
+ * dithering, so it reads as simple pixel art. It is drawn with the city's
+ * ground, under the battle's darkness and tint, so night darkens it and the
+ * day's colours wash over it like the rest of the board; the wall's hanging
+ * faces are copied back over it. It is laid over all the open ground
+ * outside the city at the field's drift, recomposed only when the drift
+ * moves a whole art pixel, the light turns or the ground changes. Over it
+ * `SandMarks` keeps what the battle did to the sand (trails walked into the
+ * raised swells, craters blasted out of it) and repaints only the small
+ * chunks that changed. Sand blown into the city and the Fungal Hollow's
+ * mist are painted at `RES` art pixels a cell, the city's only over the
+ * cells holding any. Then the tumbleweeds, black-outlined sprites in
+ * several sizes, over it. Presentation only: it reads `sim.atmosphere` and
+ * changes nothing. */
 import { CELLS_W, CELLS_H, CELL_COUNT, cellIndex, hash } from "./grid.ts";
-import { DUNE_CREST, DUNE_PERIOD, WEED_SIZES, duneAt, periodicNoise, weatherNoise, type Atmosphere } from "./atmosphere.ts";
+import { DUNE_PERIOD, WEED_SIZES, periodicNoise, weatherNoise, type Atmosphere } from "./atmosphere.ts";
 import { ENEMIES } from "./catalog.ts";
 import { ART } from "./park-art.ts";
 import { OUTLINE, artPen, bake, blit } from "./pixel-fx.ts";
 import type { DefendSim, Effect } from "./sim.ts";
+import type { Sun } from "../daylight.ts";
 
 /** Art pixels a cell in the weather image. */
 const RES = 4;
@@ -26,60 +31,99 @@ const W = CELLS_W * RES, H = CELLS_H * RES;
 const BW = CELLS_W * ART, BH = CELLS_H * ART;
 /** A tiling noise texture, so the image never calls the noise per pixel. */
 const TEX = 64;
-/** Ordered dither thresholds, for the thin edges of dunes and mist. */
+/** Ordered dither thresholds, for the mist's thin edges. */
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => (v + .5) / 16);
-/** Sand, shadowed to lit, for the city's drifts. */
-const SAND = [[138, 92, 46], [176, 126, 66], [204, 158, 88], [226, 188, 116], [242, 214, 150]];
-/** The dunes' sand, deep shadow to sunlit, warm in the shade as real sand is. */
-export const DUNE_TONES = [[112, 66, 40], [136, 84, 48], [160, 104, 58], [182, 124, 70], [202, 146, 84], [218, 166, 100], [232, 186, 120], [244, 208, 146], [252, 228, 176]];
-/** Art pixels a full dune stands over its trough: its slip face about the
- * angle of repose, its windward side a gentle rise. */
-export const DUNE_RELIEF = 26;
-/** The sun, low in the upper left (the city's shadows fall the same way). */
-export const SUN = (() => { const x = -1, y = -1, z = .9, l = Math.sqrt(x * x + y * y + z * z); return { x: x / l, y: y / l, z: z / l }; })();
-/** Lambert light of the flattest and steepest faces mapped onto the tones. */
-const LIT_LO = .16, LIT_HI = .7;
-/** Below this share of a dune's height the sand is the floor's flat sheet:
+/** The sand's few flat tones, shade to sunlit; the middle one is flat ground. */
+export const DUNE_TONES = [[150, 98, 54], [184, 130, 72], [212, 160, 96], [232, 188, 124], [246, 212, 154]];
+const MID = 2;
+/** Art pixels the swells stand over their troughs, at their tallest. */
+export const DUNE_RELIEF = 9;
+/** Cells from one swell's crest to the next (two to a field period, so it tiles). */
+export const SWELL = 48;
+/** Cells the crests lean per cell across (a whole number of swells a period). */
+const SWELL_LEAN = .5;
+/** Below this share of a swell's height the sand is the floor's flat sheet:
  * nothing walks a trail into it. */
 export const FLOOR = .12;
+/** The sun the dunes were lit by while there is no shared sky: low in the
+ * upper left, as the city's shadows fall. `x`, `y` point toward it. */
+export const SUN = { x: -Math.SQRT1_2, y: -Math.SQRT1_2 };
 
-/** The light on a surface whose height rises by (gx, gy) art pixels a pixel. */
-export function sunlight(gx: number, gy: number) {
-  return (-gx * SUN.x - gy * SUN.y + SUN.z) / Math.sqrt(gx * gx + gy * gy + 1);
+/** The light the dunes are shaded by: the heading toward the sun across the
+ * ground (`x`, `y`, a unit vector) and how strongly slopes show (`contrast`:
+ * 1 in full sun, low at night when only the dark's flat glow is left). */
+const light = { x: SUN.x, y: SUN.y, contrast: 1, key: "" };
+/** Headings the light snaps to, and contrast steps: the tile is relit only
+ * when the snapped light changes, every several seconds through a day. */
+const HEADINGS = 32, CONTRASTS = 6;
+/** Turn the dunes' light to the shared sky's sun (`sun`, the direction its
+ * shadows fall and their strength), or back to the fixed one without a sky.
+ * Returns whether it changed. */
+export function setDuneLight(sun?: Sun) {
+  let x = SUN.x, y = SUN.y, contrast = 1;
+  if (sun) {
+    const l = Math.sqrt(sun.x * sun.x + sun.y * sun.y);
+    if (l > 1e-6) { x = -sun.x / l; y = -sun.y / l; }
+    contrast = .3 + .7 * Math.min(1, sun.strength / .27);
+  }
+  const step = Math.round(Math.atan2(y, x) / (Math.PI * 2) * HEADINGS), level = Math.round(contrast * CONTRASTS);
+  const key = `${(step + HEADINGS) % HEADINGS}:${level}`;
+  if (key === light.key) return false;
+  const a = step / HEADINGS * Math.PI * 2;
+  light.x = Math.cos(a); light.y = Math.sin(a); light.contrast = level / CONTRASTS; light.key = key;
+  return true;
 }
-/** The tone a pixel takes in that light, dithered by its place on the tile
- * (`tx`, `ty`), with a rare grain a shade off. */
-function duneTone(light: number, tx: number, ty: number) {
-  const f = (light - LIT_LO) / (LIT_HI - LIT_LO) * (DUNE_TONES.length - 1) + BAYER[(ty & 3) * 4 + (tx & 3)] - .5;
-  let t = Math.round(f);
-  const speck = hash(tx, ty, 79) % 37;
-  if (speck === 0) t++; else if (speck === 1) t--;
+setDuneLight();
+/** The current light's key, which changes whenever the dunes relight. */
+export function duneLightKey() { return light.key; }
+
+/** How a surface rising by (gx, gy) art pixels a pixel faces the sun: 1 a
+ * steep face toward it, -1 one turned away, 0 flat, at full contrast. */
+export function sunlight(gx: number, gy: number) {
+  const s = -(gx * light.x + gy * light.y) / slopeScale();
+  return s > 1 ? 1 : s < -1 ? -1 : s;
+}
+/** The tone a pixel takes in that light, with a rare grain a shade off. */
+function duneTone(s: number, tx: number, ty: number) {
+  let t = Math.round(MID + s * light.contrast * 2.3);
+  if (hash(tx, ty, 79) % 293 === 0) t--;
   return DUNE_TONES[t < 0 ? 0 : t >= DUNE_TONES.length ? DUNE_TONES.length - 1 : t];
 }
 
 let heights: Float32Array | null = null;
-/** The dune field's surface over one period, art pixels high at `ART`
- * pixels a cell: the dunes, with wind ripples across their windward sides,
- * bent with the crests and fading at the brink and in the troughs. Tiles. */
+let steepest = 0;
+/** The swells' surface over one field period, art pixels high at `ART`
+ * pixels a cell: long, low, rounded rises and falls running across the
+ * wind, gently bent and a little taller in places. Tiles. */
 export function duneHeights() {
   if (heights) return heights;
-  const n = DUNE_PERIOD * ART;
+  const n = DUNE_PERIOD * ART, p = DUNE_PERIOD;
   heights = new Float32Array(n * n);
   for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
-    const d = duneAt((x + .5) / ART, (y + .5) / ART);
-    let h = d.height * DUNE_RELIEF;
-    if (d.wave < DUNE_CREST) {
-      const s = d.wave / DUNE_CREST, fade = Math.min(1, s * 4, (1 - s) * 6);
-      const wobble = periodicNoise(x / 32, y / 32, n / 32, n / 32, 830) * .7;
-      h += Math.sin((d.phase * 17 + wobble) * Math.PI * 2) * .28 * fade * (.5 + d.amp * .5);
-    }
-    heights[y * n + x] = h;
+    const cx = (x + .5) / ART, cy = (y + .5) / ART;
+    const bend = periodicNoise(cx / 32, cy / 32, p / 32, p / 32, 821) * .45;
+    const amp = .65 + .35 * periodicNoise(cx / 48, cy / 48, p / 48, p / 48, 823);
+    const phase = (cy - cx * SWELL_LEAN) / SWELL + bend;
+    heights[y * n + x] = (.5 - .5 * Math.cos(phase * Math.PI * 2)) * amp * DUNE_RELIEF;
   }
   return heights;
 }
+/** The steepest slope of the swells, which full shade is measured against. */
+function slopeScale() {
+  if (steepest) return steepest;
+  const n = DUNE_PERIOD * ART, h = duneHeights();
+  let most = 1e-3;
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const gx = (h[y * n + (x + 1) % n] - h[y * n + (x + n - 1) % n]) * .5, gy = (h[((y + 1) % n) * n + x] - h[((y + n - 1) % n) * n + x]) * .5;
+    const g = Math.sqrt(gx * gx + gy * gy);
+    if (g > most) most = g;
+  }
+  return steepest = most;
+}
 
 /** The tiling dune sprite, `DUNE_PERIOD * ART` pixels square, RGBA, opaque:
- * every pixel of `duneHeights` lit by its slope. Tiles seamlessly; pure. */
+ * every pixel of `duneHeights` shaded by its slope in the current light.
+ * Tiles seamlessly; pure. */
 export function dunePixels() {
   const n = DUNE_PERIOD * ART, h = duneHeights(), out = new Uint8ClampedArray(n * n * 4);
   for (let y = 0; y < n; y++) {
@@ -94,52 +138,48 @@ export function dunePixels() {
   return { size: n, data: out };
 }
 let duneSprite: HTMLCanvasElement | null = null;
+let duneSpriteKey = "";
 function dunes() {
-  if (duneSprite) return duneSprite;
-  const { size, data } = dunePixels(), cv = document.createElement("canvas");
-  cv.width = cv.height = size;
-  const c = cv.getContext("2d")!, image = c.createImageData(size, size);
+  if (duneSprite && duneSpriteKey === light.key) return duneSprite;
+  const { size, data } = dunePixels();
+  if (!duneSprite) { duneSprite = document.createElement("canvas"); duneSprite.width = duneSprite.height = size; }
+  const c = duneSprite.getContext("2d")!, image = c.createImageData(size, size);
   image.data.set(data);
   c.putImageData(image, 0, 0);
-  return duneSprite = cv;
+  duneSpriteKey = light.key;
+  return duneSprite;
 }
 
 /** Art pixels a side of one of `SandMarks`' chunks. */
 export const CHUNK = 16;
 const CW = BW / CHUNK, CH = BH / CHUNK;
-/** Trails: how deep a footprint presses into a full dune, and the lip it
+/** Trails: how deep a footprint presses into a full swell, and the lip it
  * pushes up either side; how many units print a frame at most. */
-const TRAIL = { depth: 2.2, lip: .9, step: 1.5, perFrame: 500 };
+const TRAIL = { depth: 1.4, lip: .6, step: 1.5, perFrame: 500 };
 /** Craters: depth a cell of blast radius, deepest, and the rim's height. */
-const CRATER = { depth: 4, max: 11, rim: .6, reach: 1.7 };
+const CRATER = { depth: 3, max: 8, rim: .5, reach: 1.7 };
 /** The wind fills marks back in: every `every` seconds of battle a chunk's
  * marks keep `keep` of their depth, and go once shallower than `gone`. */
 const HEAL = { every: 2.5, keep: .9, gone: .25, perFrame: 48 };
 /** Chunks repainted a frame at most; the rest wait their turn. */
 const PAINT_PER_FRAME = 48;
-/** A dune this far up its height at the wall spills over it. */
-export const SPILL = .84;
 
-/** What the battle does to the dunes, and the sand spilled over the wall,
- * as art pixels over the board: an RGBA image of `CHUNK`-square chunks, of
- * which only those holding marks are painted (the rest clear, so the dune
- * tile shows) and only those whose marks, drift or ground changed are
- * repainted (`dirty`, at most `PAINT_PER_FRAME` a frame). Heights are kept
- * as `delta`, art pixels added to the drifting dunes' surface where they
- * lie on the board, so a trail stays put while the dune creeps under it,
- * and the wind smooths them away chunk by chunk. Pure: no canvas. */
+/** What the battle does to the dunes, as art pixels over the board: an
+ * RGBA image of `CHUNK`-square chunks, of which only those holding marks
+ * are painted (the rest clear, so the dune tile shows) and only those whose
+ * marks, drift, light or ground changed are repainted (`dirty`, at most
+ * `PAINT_PER_FRAME` a frame). Heights are kept as `delta`, art pixels added
+ * to the drifting dunes' surface where they lie on the board, so a trail
+ * stays put while the dune creeps under it, and the wind smooths them away
+ * chunk by chunk. Pure: no canvas. */
 export class SandMarks {
   readonly pixels = new Uint8ClampedArray(BW * BH * 4);
   readonly delta = new Float32Array(BW * BH);
-  /** Chunks holding marks or spilled sand, and those to repaint. */
+  /** Chunks holding marks, and those to repaint. */
   readonly active = new Set<number>();
   readonly dirty = new Set<number>();
   /** Chunks painted since the caller last took them, to upload. */
   readonly painted: number[] = [];
-  /** Sand spilled on each wall cell, and the piles inside it (art pixels). */
-  readonly spill = new Float32Array(CELL_COUNT);
-  piles: { x: number; y: number; r: number }[] = [];
-  private spillChunks = new Set<number>();
   private surface = new Float32Array((CHUNK + 2) * (CHUNK + 2));
   private healed = new Float32Array(CW * CH);
   private seen = new WeakSet<Effect>();
@@ -147,9 +187,8 @@ export class SandMarks {
   private cursor = 0;
   private ox = 0;
   private oy = 0;
+  private lightKey = light.key;
   private ground: Uint8Array = new Uint8Array(CELL_COUNT);
-  private city: Uint8Array = new Uint8Array(CELL_COUNT);
-  private solid: Uint8Array = new Uint8Array(CELL_COUNT);
 
   /** The dunes' own height at board art pixel (x, y), under the drift. */
   base(x: number, y: number) {
@@ -157,11 +196,12 @@ export class SandMarks {
     return h[(((y - this.oy) % n + n) % n) * n + (((x - this.ox) % n + n) % n)];
   }
 
-  /** Where the dunes lie and the drift they lie at; a change repaints every mark. */
-  setGround(ground: Uint8Array, city: Uint8Array, solid: Uint8Array, ox: number, oy: number, changed: boolean) {
-    this.ground = ground; this.city = city; this.solid = solid;
-    if (!changed && ox === this.ox && oy === this.oy) return;
-    this.ox = ox; this.oy = oy;
+  /** Where the dunes lie and the drift they lie at; a change (or the light
+   * turning) repaints every mark. */
+  setGround(ground: Uint8Array, ox: number, oy: number, changed: boolean) {
+    this.ground = ground;
+    if (!changed && ox === this.ox && oy === this.oy && this.lightKey === light.key) return;
+    this.ox = ox; this.oy = oy; this.lightKey = light.key;
     for (const k of this.active) this.dirty.add(k);
   }
 
@@ -175,8 +215,8 @@ export class SandMarks {
   }
   private time = 0;
 
-  /** A footprint at board art pixel (x, y), `r` across: pressed into a dune
-   * as deep as the dune stands above the floor's sheet, a lip either side. */
+  /** A footprint at board art pixel (x, y), `r` across: pressed into a
+   * swell as deep as it stands above the floor's sheet, a lip either side. */
   print(x: number, y: number, r: number) {
     const reach = r + 1.6, x0 = Math.max(0, Math.floor(x - reach)), x1 = Math.min(BW - 1, Math.ceil(x + reach));
     const y0 = Math.max(0, Math.floor(y - reach)), y1 = Math.min(BH - 1, Math.ceil(y + reach));
@@ -211,9 +251,9 @@ export class SandMarks {
   }
 
   /** One frame: new craters from the battle's blasts, trails from whoever
-   * walks the dunes, the wind smoothing old marks, the spill over the wall,
-   * then the chunks that changed repainted. */
-  update(sim: DefendSim, env: Atmosphere) {
+   * walks the dunes, the wind smoothing old marks, then the chunks that
+   * changed repainted. */
+  update(sim: DefendSim) {
     this.time = sim.time;
     for (const e of sim.effects) if (e.kind === "boom" && !this.seen.has(e)) {
       this.seen.add(e);
@@ -221,7 +261,6 @@ export class SandMarks {
     }
     this.walk(sim);
     this.heal();
-    this.spillOver(sim, env);
     this.paint();
   }
 
@@ -273,55 +312,6 @@ export class SandMarks {
     }
   }
 
-  private spillClock = -1e9;
-  private spillKey = "";
-  /** Where a dune's tip reaches the city wall, sand blows over the stones
-   * and heaps at the wall's foot inside: worked out every couple of seconds
-   * as the dunes creep. Only for the eye: none of it is the sim's sand, so
-   * nobody sweeps it. */
-  private spillOver(sim: DefendSim, env: Atmosphere) {
-    const key = `${sim.mapVersion}`;
-    if (key === this.spillKey && this.time - this.spillClock < 2) return;
-    this.spillKey = key; this.spillClock = this.time;
-    const spill = this.spill, piles: { x: number; y: number; r: number }[] = [];
-    spill.fill(0);
-    const map = sim.map, steps = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-    for (let i = 0; i < CELL_COUNT; i++) {
-      const id = map.owner[i];
-      if (!sim.solid[i] || !map.wall[i] || id < 0 || map.buildings[id].kind !== "wall") continue;
-      const x = i % CELLS_W, y = Math.floor(i / CELLS_W);
-      for (const [dx, dy] of steps) {
-        const ox = x + dx, oy = y + dy;
-        if (ox < 0 || oy < 0 || ox >= CELLS_W || oy >= CELLS_H || !this.ground[oy * CELLS_W + ox]) continue;
-        const h = duneAt(ox + .5 - env.drift.x, oy + .5 - env.drift.y);
-        const tip = (h.height - SPILL) / (1 - SPILL);
-        if (tip <= 0) continue;
-        // Across the wall's stones, thinning, to the city's ground behind it.
-        let j = i, s = tip;
-        for (let n = 0; n < 4; n++) {
-          const jx = j % CELLS_W - dx, jy = Math.floor(j / CELLS_W) - dy;
-          if (spill[j] < s) spill[j] = s;
-          if (jx < 0 || jy < 0 || jx >= CELLS_W || jy >= CELLS_H) break;
-          j = jy * CELLS_W + jx; s *= .6;
-          if (map.city[j] && !sim.solid[j]) {
-            piles.push({ x: (jx + .5 + dx * .5) * ART, y: (jy + .5 + dy * .5) * ART, r: 4 + tip * 8 });
-            break;
-          }
-          if (!map.wall[j] || !sim.solid[j]) break;
-        }
-      }
-    }
-    const before = this.spillChunks, now = new Set<number>();
-    for (let i = 0; i < CELL_COUNT; i++) if (spill[i] > 0) now.add(Math.floor((i / CELLS_W | 0) * ART / CHUNK) * CW + Math.floor(i % CELLS_W * ART / CHUNK));
-    for (const p of piles) for (let cy = Math.floor((p.y - p.r) / CHUNK); cy <= Math.floor((p.y + p.r) / CHUNK); cy++)
-      for (let cx = Math.floor((p.x - p.r) / CHUNK); cx <= Math.floor((p.x + p.r) / CHUNK); cx++)
-        if (cx >= 0 && cy >= 0 && cx < CW && cy < CH) now.add(cy * CW + cx);
-    for (const k of now) { this.active.add(k); this.dirty.add(k); }
-    for (const k of before) this.dirty.add(k);
-    this.spillChunks = now;
-    this.piles = piles;
-  }
-
   /** Repaint the dirty chunks, a bounded number a frame. */
   private paint() {
     let budget = PAINT_PER_FRAME;
@@ -333,15 +323,13 @@ export class SandMarks {
     }
   }
 
-  /** One chunk: over the dunes their surface with its marks, lit as the tile
-   * is (so an unmarked pixel matches it exactly); on the wall the spilled
-   * sand; inside, the piles; clear elsewhere. A chunk with none of it goes
-   * quiet, left clear. */
+  /** One chunk: over the dunes their surface with its marks, shaded as the
+   * tile is (so an unmarked pixel matches it exactly); clear elsewhere. A
+   * chunk with no marks left goes quiet, left clear. */
   paintChunk(k: number) {
     const x0 = (k % CW) * CHUNK, y0 = Math.floor(k / CW) * CHUNK, out = this.pixels, delta = this.delta;
     const n = DUNE_PERIOD * ART;
-    const near = this.piles.filter(p => p.x + p.r > x0 && p.x - p.r < x0 + CHUNK && p.y + p.r > y0 && p.y - p.r < y0 + CHUNK);
-    let keep = near.length > 0 || this.spillChunks.has(k);
+    let keep = false;
     // The surface over the chunk and a pixel round it, read once.
     const S = CHUNK + 2, surface = this.surface;
     for (let j = 0; j < S; j++) for (let i = 0; i < S; i++) {
@@ -351,48 +339,14 @@ export class SandMarks {
     for (let y = y0; y < y0 + CHUNK; y++) for (let x = x0; x < x0 + CHUNK; x++) {
       const i = y * BW + x, o = i * 4, c = (y >> 3) * CELLS_W + (x >> 3);
       if (delta[i]) keep = true;
-      let col: number[] | null = null;
       if (this.ground[c]) {
         const tx = ((x - this.ox) % n + n) % n, ty = ((y - this.oy) % n + n) % n;
         const m = (y - y0 + 1) * S + x - x0 + 1;
-        col = duneTone(sunlight((surface[m + 1] - surface[m - 1]) * .5, (surface[m + S] - surface[m - S]) * .5), tx, ty);
-      } else if (this.spill[c] > 0) {
-        // Drifted over the stones in soft-edged tongues, thickest where it
-        // came over, catching the sun on its upper left edge.
-        const cover = this.spillCover(x, y);
-        if (cover > 0) {
-          const lit = this.spillCover(x - 1, y - 1) <= 0 ? 2 : this.spillCover(x + 1, y + 1) <= 0 ? -2 : 0;
-          col = duneTone(LIT_LO + (LIT_HI - LIT_LO) * (.55 + Math.min(.25, cover * .5) + lit * .12), x, y);
-        }
-      } else if (near.length && this.city[c] && !this.solid[c]) col = this.pileAt(near, x + .5, y + .5);
-      if (col) { out[o] = col[0]; out[o + 1] = col[1]; out[o + 2] = col[2]; out[o + 3] = 255; }
-      else out[o + 3] = 0;
+        const col = duneTone(sunlight((surface[m + 1] - surface[m - 1]) * .5, (surface[m + S] - surface[m - S]) * .5), tx, ty);
+        out[o] = col[0]; out[o + 1] = col[1]; out[o + 2] = col[2]; out[o + 3] = 255;
+      } else out[o + 3] = 0;
     }
     if (!keep) this.active.delete(k);
-  }
-
-  /** How deep the spilled sand lies at board art pixel (x, y) over the wall:
-   * the cells' spill eased between their centres, broken up by noise into
-   * drifts; 0 or less is bare stone. */
-  private spillCover(x: number, y: number) {
-    const fx = x / ART - .5, fy = y / ART - .5, ix = Math.floor(fx), iy = Math.floor(fy), u = fx - ix, v = fy - iy;
-    const at = (cx: number, cy: number) => cx < 0 || cy < 0 || cx >= CELLS_W || cy >= CELLS_H ? 0 : this.spill[cy * CELLS_W + cx];
-    const s = (at(ix, iy) * (1 - u) + at(ix + 1, iy) * u) * (1 - v) + (at(ix, iy + 1) * (1 - u) + at(ix + 1, iy + 1) * u) * v;
-    return s * 1.6 - .3 + (weatherNoise(x / 3.5, y / 3.5) - .5) * .8;
-  }
-
-  /** A pile's pixel: the tallest of the little cones heaped there, lit by
-   * its slope, its thin edge breaking up. */
-  private pileAt(piles: { x: number; y: number; r: number }[], x: number, y: number) {
-    let best = 0, gx = 0, gy = 0;
-    for (const p of piles) {
-      const dx = x - p.x, dy = y - p.y, d2 = dx * dx + dy * dy, r2 = p.r * p.r;
-      if (d2 >= r2) continue;
-      const v = p.r * .6 * (1 - d2 / r2);
-      if (v > best) { best = v; gx = -1.2 * dx / p.r; gy = -1.2 * dy / p.r; }
-    }
-    if (best <= 0 || best < .9 * BAYER[((y | 0) & 3) * 4 + ((x | 0) & 3)]) return null;
-    return duneTone(sunlight(gx, gy), x | 0, y | 0);
   }
 }
 
@@ -512,20 +466,35 @@ export class AtmosphereArt {
   private mask: HTMLCanvasElement | null = null;
   private ground = new Uint8Array(CELL_COUNT);
 
-  draw(c: CanvasRenderingContext2D, px: number, sim: DefendSim, reduceMotion: boolean, effects: boolean) {
+  /** The desert's ground: the dunes in the day's light, the battle's marks
+   * in them, the sand blown into the city and the tumbleweeds. Drawn with
+   * the city's ground, before the battle's darkness and tint, so they light
+   * and darken with the rest of the board. `sun` is the shared sky's, absent
+   * without one. */
+  drawGround(c: CanvasRenderingContext2D, px: number, sim: DefendSim, reduceMotion: boolean, effects: boolean, sun?: Sun) {
     const env = sim.atmosphere;
-    if (!env) return;
+    if (!env || env.mode !== "sand") return;
+    setDuneLight(sun);
     c.save();
     c.imageSmoothingEnabled = false;
-    if (env.mode === "sand") {
-      c.drawImage(this.composeDunes(env, sim, reduceMotion), 0, 0, CELLS_W * px, CELLS_H * px);
-      const marks = this.drawMarks(env, sim);
-      if (marks) c.drawImage(marks, 0, 0, CELLS_W * px, CELLS_H * px);
-    }
+    c.drawImage(this.composeDunes(env, sim, reduceMotion), 0, 0, CELLS_W * px, CELLS_H * px);
+    const marks = this.drawMarks(sim);
+    if (marks) c.drawImage(marks, 0, 0, CELLS_W * px, CELLS_H * px);
     const layer = this.layer(env, sim, reduceMotion, effects);
     if (layer) c.drawImage(layer, 0, 0, CELLS_W * px, CELLS_H * px);
-    if (env.mode === "sand") this.drawBlowing(c, px, env, reduceMotion);
-    if (effects && env.mode === "mist" && !reduceMotion) this.drawSpores(c, px, env);
+    this.drawBlowing(c, px, env, reduceMotion);
+    c.restore();
+  }
+
+  /** The Fungal Hollow's mist and spores, over the battle's lighting. */
+  draw(c: CanvasRenderingContext2D, px: number, sim: DefendSim, reduceMotion: boolean, effects: boolean) {
+    const env = sim.atmosphere;
+    if (!env || env.mode !== "mist") return;
+    c.save();
+    c.imageSmoothingEnabled = false;
+    const layer = this.layer(env, sim, reduceMotion, effects);
+    if (layer) c.drawImage(layer, 0, 0, CELLS_W * px, CELLS_H * px);
+    if (effects && !reduceMotion) this.drawSpores(c, px, env);
     c.restore();
   }
 
@@ -560,8 +529,8 @@ export class AtmosphereArt {
     }
     const tile = dunes(), size = tile.width;
     const ox = reduceMotion ? 0 : Math.round(env.drift.x * ART), oy = reduceMotion ? 0 : Math.round(env.drift.y * ART);
-    const key = `${ox}:${oy}`;
-    this.marks.setGround(this.ground, sim.map.city, sim.solid, ox, oy, changed);
+    const key = `${ox}:${oy}:${light.key}`;
+    this.marks.setGround(this.ground, ox, oy, changed);
     if (!changed && key === this.duneKey) return this.dunes;
     this.duneKey = key;
     const d = this.dunes.getContext("2d")!;
@@ -578,9 +547,9 @@ export class AtmosphereArt {
 
   /** The marks' image, uploading only the chunks repainted this frame;
    * null while there are none. */
-  private drawMarks(env: Atmosphere, sim: DefendSim) {
+  private drawMarks(sim: DefendSim) {
     const marks = this.marks;
-    marks.update(sim, env);
+    marks.update(sim);
     if (!this.marksCanvas) {
       this.marksCanvas = document.createElement("canvas");
       this.marksCanvas.width = BW; this.marksCanvas.height = BH;
@@ -626,10 +595,10 @@ export class AtmosphereArt {
   }
 
   /** Sand inside the city, a pixel at a time but only over the cells near
-   * any: thin sand breaks up into dithered drifts, deep sand covers the street. */
+   * any: flat drifts in the dunes' tones, a shade darker at their edges and
+   * on the side turned from the wind, lighter where they bank up. */
   private paintCitySand(env: Atmosphere, sim: DefendSim) {
-    const out = this.data!.data, t = noiseTexture(), s = env.sand, slope = this.slope, wind = env.wind;
-    const wl = Math.sqrt(wind.x * wind.x + wind.y * wind.y) || 1, rx = wind.x / wl, ry = wind.y / wl;
+    const out = this.data!.data, t = noiseTexture(), s = env.sand, slope = this.slope;
     const at = (x: number, y: number) => s[cellIndex(Math.max(0, Math.min(CELLS_W - 1, x)), Math.max(0, Math.min(CELLS_H - 1, y)))];
     for (let cy = 0; cy < CELLS_H; cy++) for (let cx = 0; cx < CELLS_W; cx++) {
       const i = cellIndex(cx, cy);
@@ -637,16 +606,11 @@ export class AtmosphereArt {
       if (Math.max(at(cx, cy), at(cx + 1, cy), at(cx - 1, cy), at(cx, cy + 1), at(cx, cy - 1)) <= .06) continue;
       slope[i] = (at(cx + 1, cy) - at(cx - 1, cy) + at(cx, cy + 1) - at(cx, cy - 1)) * .5;
       for (let y = cy * RES; y < cy * RES + RES; y++) for (let x = cx * RES; x < cx * RES + RES; x++) {
-        const depth = sample(s, x, y);
-        if (depth <= .06) continue;
-        const dither = BAYER[(y & 3) * 4 + (x & 3)], grain = tex(t, x, y);
-        const cover = (depth - .12) / .3 + (grain - .5) * .6;
-        if (cover < dither) continue;
-        const ripple = depth > .3 ? (((x * rx + y * ry) * .45 + grain * 2.2) % 3 + 3) % 3 : 1.5;
-        let tone = 2 + Math.round(slope[i] * 6 + (grain - .5) * .8);
-        if (ripple < .7) tone += 1; else if (ripple < 1.2) tone -= 1;
-        if (cover < dither + .15) tone = Math.min(tone, 1);
-        const col = SAND[Math.max(0, Math.min(4, tone))], k = (y * W + x) * 4;
+        const cover = sample(s, x, y) + (tex(t, x, y) - .5) * .12;
+        if (cover < .16) continue;
+        let tone = MID + (slope[i] > .08 ? 1 : slope[i] < -.08 ? -1 : 0);
+        if (cover < .22) tone = MID - 1;
+        const col = DUNE_TONES[Math.max(0, Math.min(DUNE_TONES.length - 1, tone))], k = (y * W + x) * 4;
         out[k] = col[0]; out[k + 1] = col[1]; out[k + 2] = col[2]; out[k + 3] = 255;
         this.painted.push(k);
       }
