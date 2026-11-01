@@ -19,6 +19,8 @@ Follow the architecture guidelines in [AmbushPlan.md](AmbushPlan.md#architecture
 
 ## Backlog
 
+- [x] Profile simulation separately from rendering; combine native ground-body axis updates, index worm/defender body contacts and skip redundant living-worm cleanup. `ice-motion.ts`, `defender-index.ts`, `blight-worm.ts`, `sim.ts`; frozen-reference complete-step state/RNG comparisons, bucket/attack-order and contact-boundary checks, native replay/ice/crowd/worm/brood/archer tests and crowd/brood browser checks. [Measurements](../SIMULATION_PERFORMANCE.md). No combat/save/golden changes.
+
 - [x] Remove redundant forest mountain generation, static building light-mask expansion/tinting and board/viewport scratch resizes; keep native occlusion masks across zoom-only city-layer repaints. `forest-art.ts`, `lighting.ts`, `render.ts`; exact frozen-reference pixels, cache invalidation/allocation checks, Node forest input/art tests and existing forest/city-night-life/Blight-trail/cache checks. See [measurements](../SCENERY_PERFORMANCE.md). No combat/save/replay changes.
 
 - [x] Investigate Blight lag: remove per-segment linear leader searches, crop complex portal fire to conservative screen bounds, merge exact packed-pixel row intervals and skip invisible contour rectangles. `sim.ts`, `enemies.ts`, `blight-worm.ts`, `unit-contours.ts`; paired lookup/raster/crowd benchmark, all-species pixel parity, native cut/motion/RNG equivalence and existing crowd/aura/cache checks. See [measurements](../BLIGHT_PERFORMANCE.md). Combat/save/replay unchanged.

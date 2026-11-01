@@ -739,7 +739,7 @@ export class DefendSim {
     // Defenders do not move or spawn until after all enemies have acted.
     // Outside this phase, direct callers retain the live linear lookup.
     this.defenderIndexActive = this.enemies.length >= 32 && this.soldiers.length + this.civilians.length >= 16;
-    if (this.defenderIndexActive) this.defenders.rebuild(this.soldiers, this.civilians);
+    if (this.defenderIndexActive) this.defenders.rebuild(this.soldiers, this.civilians, this.enemies.some(e => isBlightWorm(e.kind)));
     try {
       this.enemyLookup.clear();
       this.enemyLookupActive = this.enemies.some(e => e.fortressPart || e.leader !== undefined);
@@ -817,10 +817,12 @@ export class DefendSim {
     let pending: boolean;
     do {
       pending = false;
+      let processedDeath = false;
       if (processed) cullShortWorms(this.enemies);
       for (const e of this.enemies) {
         if (e.hp > 0 || processed?.has(e.id)) continue;
         if (e.escaped || e.raidBuilding) continue;
+        processedDeath = true;
         processed?.add(e.id);
         this.scenario?.died?.(e);
         if (!e.fortressPart) {
@@ -839,7 +841,7 @@ export class DefendSim {
         const splits = ENEMIES[e.kind].splits;
         if (splits) for (let n = 0; n < splits.count && this.waveSpawned < waveCap(this.wave); n++, this.waveSpawned++) hatched.push(this.hatch(splits.into, e, n, splits.count));
       }
-      if (processed) {
+      if (processed && processedDeath) {
         cullShortWorms(this.enemies);
         pending = this.enemies.some(e => e.hp <= 0 && !e.escaped && !e.raidBuilding && !processed.has(e.id));
       }
@@ -1166,6 +1168,16 @@ export class DefendSim {
       }
     }
     return best;
+  }
+
+  /** Body contacts include cloaked/perched people, matching worm trampling.
+   * Positions stay fixed during the enemy phase; direct calls remain live. */
+  contactDefenders(x: number, y: number, margin: number): readonly (Soldier | Civilian)[] {
+    if (this.defenderIndexActive && Number.isFinite(x + y + margin)) {
+      const near = this.defenders.contacts(x, y, margin);
+      if (near) return near;
+    }
+    return [...this.soldiers, ...this.civilians];
   }
 
   // ── Damage and rebuilding ─────────────────────────────────────────────

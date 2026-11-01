@@ -53,6 +53,38 @@ test('mixed ground bodies stop flush and cannot tunnel, including at a bucket bo
   s.crowd.end();
 });
 
+test('axis slides retain native bucket order with one body-index rewrite', () => {
+  const { s } = fixture();
+  const es = [s.spawnAuxiliary('miniDarkling',10.08,10.08)!, s.spawnAuxiliary('miniDarkling',10.21,10.21)!, s.spawnAuxiliary('darkling',11,11)!];
+  s.crowd.begin(s);
+  const c = s.crowd as any, remove = c.remove.bind(c), insert = c.insert.bind(c), stride=c.move.bind(c);
+  let removals = 0, insertions = 0, moves=0;
+  c.remove = (...args: any[]) => { removals++; return remove(...args); };
+  c.insert = (...args: any[]) => { insertions++; return insert(...args); };
+  c.move = (...args: any[]) => { moves++; return stride(...args); };
+  const move = (e: Enemy, dx: number, dy: number) => {
+    const body = c.bodies.get(e), before = new Map<number, any[]>(c.used.map((i:number) => [i,[...c.cells[i]]]));
+    const count=moves;
+    s.iceMotion.slide(s,e,dx,dy,false);
+    // The original algorithm removes by swapping with the last occupant,
+    // then appends the moved body. This order governs contact relay ties.
+    if(moves>count) {
+      assert.equal(moves-count,1);
+      for(const list of before.values()) { const i=list.indexOf(body); if(i>=0) { list[i]=list[list.length-1]; list.pop(); } }
+      for(let y=body.y0;y<=body.y1;y++)for(let x=body.x0;x<=body.x1;x++) {
+        const i=y*72*4+x, list=before.get(i)??[]; list.push(body); before.set(i,list);
+      }
+    }
+    for(const i of new Set([...before.keys(),...c.used])) assert.deepEqual(c.cells[i]??[],before.get(i)??[]);
+  };
+  move(es[0],.001,0);
+  assert.equal(moves,1); assert.equal(removals,1); assert.equal(insertions,1);
+  s.foeSolid[cellIndex(10,10)]=1; move(es[0],.001,.001); assert.equal(moves,1,'fully blocked axes keep their original bucket order'); s.foeSolid[cellIndex(10,10)]=0;
+  for(let i=0;i<150;i++)move(es[i%es.length], [0,.001,.13,.31,2,-2][i%6], [0,-.001,-.13,.31,-2,2][(i*7)%6]);
+  assert.ok(removals>0 && insertions>0,'crossing a cell boundary still updates membership');
+  s.crowd.end();
+});
+
 test('a rear Darkling adds its own damage through a touching front without moving through it', () => {
   const { s, b } = fixture(), es = line(s, ['darkling', 'miniDarkling', 'largeDarkling']);
   Object.assign(es[0], buildingContactPoint(s, es[0], b));

@@ -163,7 +163,7 @@ function contact(sim: DefendSim, e: Enemy) {
     }
   }
   if (under) return;
-  for (const u of [...sim.soldiers, ...sim.civilians]) {
+  for (const u of sim.contactDefenders(e.x, e.y, tuning.spacing / 2 + 2 * CONTACT_OUTLINE)) {
     // Unit keys cannot collide with nonnegative building IDs.
     const key = -u.id - 1;
     if (u.hp <= 0 || w.surfaceHits.has(key) || !defenderInContact(e, u)) continue;
