@@ -50,24 +50,26 @@ test('wall sconces stand outside the wall and illuminate open terrain', () => {
   }
 });
 
-test('townsfolk make safe errands, watchmen use gates only at night, and handheld lights are half strength', () => {
+test('townsfolk make safe errands, watchmen patrol day and night (outside only through a gate), and handheld lights are half strength', () => {
   for(const gated of [true,false]) {
     const map=city(gated), life=new CityLife();life.sync(map,null,false);
     const before=life.people.map(p=>[p.x,p.y]);
     tick(life,35,false);
     assert.ok(life.people.some((p,i)=>p.role==='townsfolk'&&Math.hypot(p.x-before[i][0],p.y-before[i][1])>1));
     const guards=life.visible.filter(p=>p.role==='watchman');
-    assert.ok(guards.length>0,'watchmen also patrol inside during the day');
-    assert.ok(guards.every(p=>map.city[cellAt(p.x,p.y)]),'day patrols stay inside');
+    assert.ok(guards.length>0,'watchmen also patrol during the day');
+    if(!gated) assert.ok(guards.every(p=>map.city[cellAt(p.x,p.y)]),'without a gate patrols stay inside');
+    for(const night of [false,true]) {
     let outside=false;
     for(let i=0;i<180*30;i++) {
-      life.update(1/30,220000,true,false,[]);
+      life.update(1/30,220000,night,false,[]);
       for(const p of life.visible) {
         assert.equal(life.solid[cellAt(p.x,p.y)],0,'never walks through buildings');
         if(!map.city[cellAt(p.x,p.y)]) {assert.equal(p.role,'watchman');outside=true;}
       }
     }
-    assert.equal(outside,gated,'outside patrols need a gate');
+    assert.equal(outside,gated,`outside patrols need a gate (${night?'night':'day'})`);
+    }
     const lamps=life.lights(220000);assert.ok(lamps.length>0);
     assert.ok(lamps.every(l=>l.k===PERSON_TORCH_STRENGTH));
     assert.equal(life.lights(60000).length,0);

@@ -110,10 +110,9 @@ export class CityLife {
       }
       if(p.hidden) {
         if(p.wait>0 || (p.role==='townsfolk'&&this.enemyPresent) || this.danger(p)) continue;
-        if(this.pick(p,night)) p.hidden=false;
+        if(this.pick(p)) p.hidden=false;
         continue;
       }
-      if(p.role==='watchman'&&!night&&outside&&p.mode==='walk' && !this.shelter(p)) continue;
       this.walk(p,dt);
       if(p.path.length) continue;
       if(p.mode==='escape'&&p.exit) {
@@ -124,7 +123,7 @@ export class CityLife {
         const door=this.doors.find(d=>d.building.id===p.target);
         if(!door || Math.hypot(door.x-p.x,door.y-p.y)>.7) {this.shelter(p);continue;}
         p.hidden=true;p.mode='indoors';p.wait=2+hash01(p.id,p.turn++,2801)*7;
-      } else if(p.wait<=0) this.pick(p,night);
+      } else if(p.wait<=0) this.pick(p);
     }
   }
 
@@ -134,7 +133,7 @@ export class CityLife {
     if(!path) return false;
     p.path=path;return true;
   }
-  private pick(p: Resident, night: boolean) {
+  private pick(p: Resident) {
     const seed=hash01(p.id,p.turn++,2802);
     if(p.role==='townsfolk') {
       for(let k=0;k<3 && this.doors.length;k++) {
@@ -143,7 +142,8 @@ export class CityLife {
         if(this.route(p,d,this.inside)){p.target=d.building.id;p.mode='walk';p.wait=1;return true;}
       }
     } else {
-      const outside=night&&this.canExit&&this.exterior.length&&seed<.45;
+      // Watchmen patrol day and night alike: inside the walls or, through a gate, round them.
+      const outside=this.canExit&&this.exterior.length&&seed<.45;
       const cells=outside?this.exterior:this.interior;
       for(let k=0;k<3&&cells.length;k++) {
         const i=cells[(Math.floor(seed*cells.length)+k*31)%cells.length], to=cellCenter(i);
