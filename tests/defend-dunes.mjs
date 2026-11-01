@@ -1,6 +1,6 @@
-// The Amber Desert's dunes in a real battle page: the lit dune tile over all
-// the ground, trails walked into the dunes, blast craters, sand spilled over
-// the wall, and tumbleweeds of several sizes, desktop and phone. Isolated
+// The Amber Desert's dunes in a real battle page: the gentle sand swells over
+// all the ground, trails walked into them, blast craters, no sand over the
+// wall, and tumbleweeds of several sizes, desktop and phone. Isolated
 // stress fixture, no player saves. Screenshots go to test-results/.
 import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
@@ -28,16 +28,17 @@ try {
       const p = window.stressPage, env = p.sim.atmosphere, m = p.renderer.atmosphere.marks;
       return {
         mode: env.mode, grains: 'grains' in env, sizes: [...new Set(env.weeds.map(w => w.size))].length,
-        wind: env.wind, active: m.active.size, dug: m.delta.some(v => v < -2), rims: m.delta.some(v => v > .5), spill: m.spill.some(v => v > 0),
+        wind: env.wind, active: m.active.size, dug: m.delta.some(v => v < -1), rims: m.delta.some(v => v > .5), spill: 'spill' in m,
       };
     });
     assert.equal(state.mode, 'sand'); assert.equal(state.grains, false);
     assert.ok(state.sizes > 1, 'tumbleweeds of several sizes');
     assert.ok(state.wind.x < 0 && state.wind.y > 0, 'the wind blows down and to the left');
     assert.ok(state.active > 0 && state.dug && state.rims, 'craters and trails in the sand');
+    assert.equal(state.spill, false, 'no sand drawn over the wall');
     await page.screenshot({ path: `test-results/dunes-${name}.png` });
     assert.deepEqual(errors, []);
     await page.close();
   }
-  console.log('Lit dunes, trails, craters, wall spill and tumbleweeds passed on desktop and phone.');
+  console.log('Gentle dunes, trails, craters, a clear wall and tumbleweeds passed on desktop and phone.');
 } finally { await browser.close(); }

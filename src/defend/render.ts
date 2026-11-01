@@ -470,7 +470,11 @@ export class DefendRenderer {
       c: ctx, px: this.px, now: opts.now, dt, rain: !!(sim && opts.weather?.rain), cold: sim?.cold ?? !!opts.weather?.snow, thawed: sim?.thawedPonds,
       walkers: feet, reduceMotion: opts.reduceMotion || !(opts.effects ?? true),
     });
-    if (this.forestShare() > 0) {
+    // The desert's dunes lie on the ground under the battle's darkness and
+    // tint, so night darkens them and the day's light turns over them.
+    const desert = sim?.atmosphere?.mode === "sand";
+    if (sim && desert) this.atmosphere.drawGround(ctx, this.px, sim, opts.reduceMotion, opts.effects ?? true, this.worldLighting ? opts.sun : undefined);
+    if (this.forestShare() > 0 || desert) {
       this.drawFaces();
       paintSpikePoints(ctx, this.px, map, sim);
     }

@@ -9,7 +9,7 @@ import { CELLS_W, CELLS_H, CELL_COUNT } from '../src/defend/grid.ts';
 import { ART } from '../src/defend/park-art.ts';
 import { SNOW_CAP, STORM_CHANCE, rollWeather, skyLabel, Snow } from '../src/defend/weather.ts';
 import { areaForWave } from '../src/defend/areas.ts';
-import { tumbleweedPixels, dunePixels, duneHeights, SandMarks, CHUNK, DUNE_RELIEF, FLOOR, SUN, sunlight } from '../src/defend/atmosphere-art.ts';
+import { tumbleweedPixels, dunePixels, duneHeights, SandMarks, CHUNK, DUNE_RELIEF, DUNE_TONES, FLOOR, SUN, SWELL, sunlight, setDuneLight, duneLightKey } from '../src/defend/atmosphere-art.ts';
 import { OUTLINE } from '../src/defend/pixel-fx.ts';
 
 function scene(wave = 21, gate = false, repair = false) {
@@ -209,34 +209,61 @@ test('the dunes are large, creep slowly downwind and leave the sand outside sett
   assert.ok(Math.abs(env.sand[i] - env.duneAt(i)) < .3);
 });
 
-test('the dunes cover all the ground, lit from the upper left, slip faces in shade', () => {
+test('the dunes are a few low, gentle swells in a handful of flat sand tones, tiling', () => {
+  setDuneLight();
   const { size, data } = dunePixels(), h = duneHeights();
-  const bright = (i: number) => data[i * 4] + data[i * 4 + 1] + data[i * 4 + 2];
-  let slip = 0, slipN = 0, rise = 0, riseN = 0;
-  const tones = new Set<number>();
+  const tones = new Set<string>();
+  let tallest = 0, steepest = 0;
   for (let i = 0; i < size * size; i++) {
     assert.equal(data[i * 4 + 3], 255, 'no bare floor anywhere');
-    tones.add(bright(i));
-    const x = i % size, y = Math.floor(i / size), d = duneAt((x + .5) / ART, (y + .5) / ART);
-    if (d.amp < .7) continue;
-    if (d.wave > DUNE_CREST + .03 && d.wave < .95) { slip += bright(i); slipN++; }
-    else if (d.wave > .2 && d.wave < DUNE_CREST - .1) { rise += bright(i); riseN++; }
+    tones.add(`${data[i * 4]},${data[i * 4 + 1]},${data[i * 4 + 2]}`);
+    tallest = Math.max(tallest, h[i]);
+    const x = i % size, y = Math.floor(i / size);
+    steepest = Math.max(steepest, Math.abs(h[y * size + (x + 1) % size] - h[i]), Math.abs(h[((y + 1) % size) * size + x] - h[i]));
   }
-  assert.ok(tones.size >= 6, 'shaded through many tones');
-  assert.ok(slip / slipN < rise / riseN - 30, 'slip faces turned from the sun are darker');
-  // The light: a face tilted toward the upper left is brighter than flat, one away darker.
-  assert.ok(sunlight(1, 1) > sunlight(0, 0) && sunlight(0, 0) > sunlight(-1, -1) && SUN.x < 0 && SUN.y < 0);
+  assert.ok(tones.size <= DUNE_TONES.length && tones.size >= 3, `${tones.size} tones`);
+  for (const t of tones) assert.ok(DUNE_TONES.some(c => c.join(',') === t), 'only the sand tones, no dithered blends');
+  assert.ok(tallest <= DUNE_RELIEF + 1e-6 && steepest < .2, `gentle: ${tallest} high, ${steepest} a pixel at most`);
+  // Only a couple of crests across a whole field period down any column.
+  let crests = 0;
+  for (let y = 0; y < size; y++) { const a = h[y * size + 40], b = h[((y + 1) % size) * size + 40], c = h[((y + 2) % size) * size + 40]; if (b > a && b >= c) crests++; }
+  assert.ok(crests <= DUNE_PERIOD / SWELL + 1, `${crests} crests`);
   // The surface tiles: the heights across the seam are as smooth as anywhere.
-  let seam = 0, inner = 0;
-  for (let y = 0; y < size; y++) { seam = Math.max(seam, Math.abs(h[y * size] - h[y * size + size - 1])); inner = Math.max(inner, Math.abs(h[y * size + 1] - h[y * size])); }
-  assert.ok(seam <= inner * 1.5 + .2, `seam ${seam} against ${inner}`);
+  let seam = 0;
+  for (let y = 0; y < size; y++) seam = Math.max(seam, Math.abs(h[y * size] - h[y * size + size - 1]));
+  assert.ok(seam <= steepest * 1.5 + 1e-6, `seam ${seam}`);
+});
+
+test('the dunes turn with the sun: lit faces follow its heading, and night flattens them', () => {
+  setDuneLight();
+  assert.ok(sunlight(1, 1) > sunlight(0, 0) && sunlight(0, 0) > sunlight(-1, -1) && SUN.x < 0 && SUN.y < 0, 'from the upper left without a sky');
+  const bright = (d: Uint8ClampedArray) => { let n = 0; for (let i = 0; i < d.length; i += 4) n += d[i]; return n; };
+  // Morning: shadows fall west, so the sun is in the east and east faces are lit.
+  assert.ok(setDuneLight({ x: -1, y: .3, strength: .27 }));
+  assert.ok(sunlight(-1, 0) > 0 && sunlight(1, 0) < 0, 'faces turned east are lit');
+  const morning = dunePixels().data, key = duneLightKey();
+  assert.ok(!setDuneLight({ x: -1.001, y: .3, strength: .27 }), 'a hair of movement does not relight');
+  // Evening: the sun in the west.
+  assert.ok(setDuneLight({ x: 1, y: .3, strength: .27 }));
+  assert.ok(sunlight(1, 0) > 0 && duneLightKey() !== key);
+  const evening = dunePixels().data;
+  let differ = 0;
+  for (let i = 0; i < morning.length; i += 4) if (morning[i] !== evening[i]) differ++;
+  assert.ok(differ > morning.length / 40, 'the shading moves with the sun');
+  // Night: the sun gone, the swells barely shaded.
+  setDuneLight({ x: 1, y: .3, strength: 0 });
+  const night = new Set<number>(); const d = dunePixels().data;
+  for (let i = 0; i < d.length; i += 4) night.add(d[i]);
+  assert.ok(night.size <= 3, `${night.size} tones by night`);
+  assert.ok(Math.abs(bright(d) - bright(evening)) < bright(evening) * .1, 'its colour comes from the board\'s darkness, not a second dimming');
+  setDuneLight();
 });
 
 /** A SandMarks over open ground everywhere but the city, no drift. */
 function marked(sim = scene()) {
   const marks = new SandMarks(), ground = new Uint8Array(CELL_COUNT);
   for (let i = 0; i < CELL_COUNT; i++) ground[i] = !sim.map.city[i] && !sim.solid[i] ? 1 : 0;
-  marks.setGround(ground, sim.map.city, sim.solid, 0, 0, true);
+  marks.setGround(ground, 0, 0, true);
   return { marks, ground };
 }
 /** An art pixel outside the city on a dune at least `lo` and below `hi` of its height. */
@@ -266,35 +293,28 @@ test('walkers press trails into the raised dunes but not the floor sheet, and th
   // A walker crossing the dune in the sim prints a trail behind it.
   const e = sim.spawnAuxiliary('orc', (dune.x - 12) / ART, dune.y / ART)!;
   marks.delta.fill(0);
-  for (let n = 0; n < 12; n++) { e.x += 2 / ART; marks.update(sim, sim.atmosphere!); }
+  for (let n = 0; n < 12; n++) { e.x += 2 / ART; marks.update(sim); }
   assert.ok(marks.delta.some(v => v < -.5), 'a trail across the dune');
   // The wind smooths it all away, and the chunks go quiet and clear.
-  for (let t = 0; t < 200 && marks.delta.some(v => v); t++) { sim.time += 2.6; e.hp = 0; marks.update(sim, sim.atmosphere!); }
-  for (let t = 0; t < 40; t++) { sim.time += 2.6; marks.update(sim, sim.atmosphere!); }
+  for (let t = 0; t < 200 && marks.delta.some(v => v); t++) { sim.time += 2.6; e.hp = 0; marks.update(sim); }
+  for (let t = 0; t < 40; t++) { sim.time += 2.6; marks.update(sim); }
   assert.ok(marks.delta.every(v => v === 0));
-  // Only chunks holding sand spilled over the wall stay painted.
-  const cw = W / CHUNK;
-  for (const k of marks.active) {
-    const x0 = (k % cw) * CHUNK, y0 = Math.floor(k / cw) * CHUNK;
-    const spilt = marks.piles.some(p => Math.abs(p.x - x0 - CHUNK / 2) < CHUNK / 2 + p.r && Math.abs(p.y - y0 - CHUNK / 2) < CHUNK / 2 + p.r)
-      || [0, 1].some(dy => [0, 1].some(dx => marks.spill[(y0 / ART + dy) * CELLS_W + x0 / ART + dx] > 0));
-    assert.ok(spilt, `chunk ${k} went quiet`);
-  }
+  assert.equal(marks.active.size, 0, 'every chunk went quiet');
 });
 
 test('blasts leave craters with their sand thrown out, repainting only the chunks round them', () => {
   const sim = scene(), { marks, ground } = marked(sim), W = CELLS_W * ART;
   const at = spot(marks, ground, 0, .4);
   sim.effects.push({ kind: 'boom', x: at.x / ART, y: at.y / ART, t: 0, r: 1.5, seed: 1 });
-  marks.update(sim, sim.atmosphere!);
+  marks.update(sim);
   const r = 1.5 * .8 * ART;
   assert.ok(marks.delta[at.y * W + at.x] < -3, 'a bowl blown out');
   assert.ok(marks.delta[at.y * W + at.x + Math.round(r * 1.2)] > 0, 'a rim of the sand it threw out');
   const reach = Math.ceil(r * 1.7 / CHUNK) + 1;
   assert.ok(marks.active.size <= (2 * reach + 1) ** 2, `${marks.active.size} chunks marked`);
-  marks.update(sim, sim.atmosphere!);
+  marks.update(sim);
   // The same blast is not dug twice, and an unmarked painted pixel matches the dune tile.
-  const before = marks.delta.slice(); marks.update(sim, sim.atmosphere!);
+  const before = marks.delta.slice(); marks.update(sim);
   assert.deepEqual(marks.delta, before);
   const { size, data } = dunePixels(), k = [...marks.active][0], cw = W / CHUNK;
   marks.paintChunk(k);
@@ -309,20 +329,18 @@ test('blasts leave craters with their sand thrown out, repainting only the chunk
   assert.equal(same, checked, 'unmarked sand in a marked chunk is the tile exactly');
 });
 
-test('a dune\'s tip at the wall spills sand over the stones and heaps it inside, which nobody sweeps', () => {
-  const sim = scene(), env = sim.atmosphere!, { marks } = marked(sim);
-  let found = false;
-  for (let d = 0; d < DUNE_PERIOD && !found; d += 1.5) {
-    env.drift.x = d; env.drift.y = 0; sim.time += 3;
-    marks.update(sim, env);
-    found = marks.spill.some(v => v > 0) && marks.piles.length > 0;
+test('no sand is drawn over the city wall', () => {
+  const sim = scene(), { marks } = marked(sim);
+  // A blast right on the wall: its crater and rim stop at the open ground.
+  const w = sim.map.wall.findIndex(v => !!v);
+  sim.effects.push({ kind: 'boom', x: w % CELLS_W + .5, y: Math.floor(w / CELLS_W) + .5, t: 0, r: 3, seed: 1 });
+  for (let n = 0; n < 4; n++) marks.update(sim);
+  assert.ok(marks.pixels.some((v, k) => k % 4 === 3 && v > 0), 'the crater was painted');
+  for (let k = 0; k < marks.pixels.length / 4; k++) {
+    if (!marks.pixels[k * 4 + 3]) continue;
+    const c = Math.floor(Math.floor(k / (CELLS_W * ART)) / ART) * CELLS_W + Math.floor(k % (CELLS_W * ART) / ART);
+    assert.ok(!sim.map.wall[c] && !sim.map.city[c], 'marks lie only on open ground');
   }
-  assert.ok(found, 'somewhere along the wall a crest reaches it');
-  for (let i = 0; i < CELL_COUNT; i++) if (marks.spill[i] > 0) assert.ok(sim.map.wall[i], 'spill lies on the wall');
-  for (const p of marks.piles) assert.ok(sim.map.city[Math.floor(p.y / ART) * CELLS_W + Math.floor(p.x / ART)], 'piles lie inside');
-  const before = env.sand.slice(); env.step(sim, .1);
-  assert.equal(inside(sim, env.sand), inside(sim, before), 'none of it is the city\'s sand');
-  assert.equal(env.cleanup.size, 0, 'so the builders leave it');
 });
 
 test('sand banked against a building crushes it, but walls and the keep stand firm', () => {
