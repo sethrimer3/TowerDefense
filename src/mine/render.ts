@@ -1370,7 +1370,7 @@ export class MineRenderer {
   }
 
   /** Ore near the lit workings catching the light now and then: a pixel
-   * star of its own colour, fainter the further it lies from the light. */
+   * of its own colour fading in and out, fainter the further it lies from the light. */
   private drawSparkles(sim: MineSim, time: number, y0: number, y1: number) {
     const { cells: sites, near } = this.sparkles, cells = sim.world.cells, ctx = this.ctx;
     const alpha = ctx.globalAlpha;

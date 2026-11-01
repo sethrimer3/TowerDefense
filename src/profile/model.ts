@@ -18,7 +18,12 @@ export const defaultFlag=():Flag=>({base:12,layers:[]});
 export function cleanName(raw:unknown):string|null {
   if(typeof raw!=='string')return null;
   const name=raw.normalize('NFC').trim().replace(/\s+/gu,' ');
-  return [...name].length>=2&&[...name].length<=24&&/^[\p{L}\p{N}\p{M} ._'’-]+$/u.test(name)&&/[\p{L}\p{N}]/u.test(name)?name:null;
+  return [...name].length>=2&&[...name].length<=24&&/^[\p{L}\p{N}\p{M} ._#'’-]+$/u.test(name)&&/[\p{L}\p{N}]/u.test(name)?name:null;
+}
+/** Generated only when a player submits a blank name; independent of simulation RNG. */
+export function randomPlayerName():string {
+  const value=crypto.getRandomValues(new Uint32Array(1))[0];
+  return `player#${(value%10000).toString().padStart(4,'0')}`;
 }
 const color=(v:unknown):v is number=>Number.isInteger(v)&&Number(v)>=0&&Number(v)<PALETTE.length;
 export function decodeFlag(raw:unknown):Flag|undefined {

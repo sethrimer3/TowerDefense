@@ -1,6 +1,6 @@
 /** Ore glinting: with the Ore sense skill, copper, silver and gold within
  * `SPARKLE.reach` art pixels (two a cell) of a passage the crew has lit now
- * and then catch the light in a small pixel-art star of their own colour;
+ * and then catch the light in a single fading art pixel of their own colour;
  * the ore heaped at the surface glints always (`heapGlint`).
  * Presentation only: the sites are found by a chamfer distance over the grid
  * when the world changes (`sparkleSites`), and each glint's moment is hashed
@@ -18,27 +18,17 @@ export const SPARKLE = {
   /** Share of the ore cells in reach that ever glint. */
   share: 0.3,
   /** Each glinting cell's cycle, ms: a glint every `period` to `period + spread`. */
-  period: 2600,
-  spread: 3400,
+  period: 52000,
+  spread: 68000,
   /** How long each of a glint's frames shows, ms. */
   frame: 110,
 };
 
-/** A glint's frames: a dot, a small cross, a star, a small cross, a dot.
- * Each is a list of art-pixel offsets, the core first. */
-export const FRAMES: [number, number][][] = [
-  [[0, 0]],
-  [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]],
-  [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [2, 0], [-2, 0], [0, 2], [0, -2]],
-  [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]],
-  [[0, 0]],
-];
-
-/** Each ore's glint: a bright arm and a near-white core. */
-export const GLINT: Record<number, { arm: RGB; core: RGB }> = {
-  [COPPER]: { arm: [236, 150, 96], core: [255, 222, 196] },
-  [SILVER]: { arm: [214, 224, 240], core: [255, 255, 255] },
-  [GOLD]: { arm: [255, 214, 96], core: [255, 248, 210] },
+/** Ore-colored pixels, with opacity animated independently of their hue. */
+export const GLINT: Record<number, RGB> = {
+  [COPPER]: [236, 150, 96],
+  [SILVER]: [214, 224, 240],
+  [GOLD]: [255, 214, 96],
 };
 
 export type Sites = { cells: Int32Array; near: Float32Array };
@@ -92,12 +82,12 @@ export function sparkleSites(cells: Uint8Array, warm: Float32Array, surface: Arr
   return { cells: Int32Array.from(found), near: Float32Array.from(near) };
 }
 
-/** Which of `FRAMES` cell (x, y) shows at `time`, or -1 while it rests. */
+/** Continuous animation frame cell (x, y) shows at `time`, or -1 while it rests. */
 export function sparkleFrame(x: number, y: number, seed: number, time: number) {
   const period = SPARKLE.period + hash01(x, y, seed + 92) * SPARKLE.spread;
   const t = (time + hash01(x, y, seed + 93) * period) % period;
-  const f = Math.floor(t / SPARKLE.frame);
-  return f < FRAMES.length ? f : -1;
+  const f = t / SPARKLE.frame;
+  return f < 5 ? f : -1;
 }
 
 /** Draws frame `f` of a glint of ore `m` at art pixel (x, y), its colours
@@ -105,8 +95,10 @@ export function sparkleFrame(x: number, y: number, seed: number, time: number) {
 export function drawGlint(fine: Fine, x: number, y: number, m: number, f: number, k = 1) {
   const glint = GLINT[m];
   if (!glint) return;
-  const rgb = (c: RGB) => `rgb(${(c[0] * k) | 0},${(c[1] * k) | 0},${(c[2] * k) | 0})`, arm = rgb(glint.arm), core = rgb(glint.core);
-  for (const [dx, dy] of FRAMES[f]) fine(x + dx * 0.5, y + dy * 0.5, 0.5, 0.5, dx || dy ? arm : core);
+  if (f < 0 || f >= 5) return;
+  const alpha = Math.sin(Math.PI * f / 5) ** 2;
+  const rgb = glint.map(c => (c * k) | 0);
+  fine(x, y, 0.5, 0.5, `rgba(${rgb.join(',')},${alpha})`);
 }
 
 /** Which frame lump `n` of a heap at column `x` shows at `time`, or -1:

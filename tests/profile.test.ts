@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cleanName, decodeProfile, flagPixels, covers, PATTERNS, MAX_LAYERS, flagSvg, escapeText, PALETTE } from '../src/profile/model.ts';
+import { cleanName, randomPlayerName, decodeProfile, flagPixels, covers, PATTERNS, MAX_LAYERS, flagSvg, escapeText, PALETTE } from '../src/profile/model.ts';
 import { defaults, decode } from '../src/save.ts';
 test('Names are normalized, length bounded, multilingual, and reject markup/control characters',()=>{
  assert.equal(cleanName('  Oak   Warden  '),'Oak Warden');assert.equal(cleanName('Jose\u0301'),'José');assert.equal(cleanName('雪の城'),'雪の城');
@@ -42,4 +42,12 @@ test('Opacity blends layers over the composed flag and preserves old fully opaqu
  assert.equal(flagPixels(mixed)[11*16+7],(155<<16)|(95<<8)|102);
  assert.notDeepEqual(flagPixels(mixed),flagPixels({...mixed,layers:[...mixed.layers].reverse()}));
  for(const opacity of [0,1,33,101,'50',null])assert.equal(decodeProfile({...old,flag:{base:1,layers:[{pattern:'cross',color:7,opacity}]}}),undefined);
+});
+
+test('Random player names have four digits and survive save decoding',()=>{
+ for(let i=0;i<100;i++){
+  const name=randomPlayerName();assert.match(name,/^player#[0-9]{4}$/);
+  const s=defaults();s.profile={name,flag:{base:12,layers:[]}};
+  assert.deepEqual(decode(JSON.stringify(s)).profile,s.profile);
+ }
 });

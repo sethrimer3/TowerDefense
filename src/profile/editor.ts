@@ -1,4 +1,4 @@
-import { PALETTE, OPACITIES, PATTERNS, PATTERN_NAMES, MAX_LAYERS, defaultFlag, cleanName, drawFlag, type Flag, type Opacity, type Pattern, type PlayerProfile } from './model.ts';
+import { PALETTE, OPACITIES, PATTERNS, PATTERN_NAMES, MAX_LAYERS, defaultFlag, cleanName, randomPlayerName, drawFlag, type Flag, type Opacity, type Pattern, type PlayerProfile } from './model.ts';
 /** Separate from the shared gameplay dialog, so first-entry setup cannot be replaced by idle rewards. */
 export class ProfileEditor {
   private history:Flag[]=[];
@@ -9,7 +9,7 @@ export class ProfileEditor {
     if(this.dialog.open)return;
     const required=!profile;this.history=[];this.flag=profile?structuredClone(profile.flag):defaultFlag();this.picked=-1;
     this.dialog.innerHTML=`<form class="profile-editor"><header><h2 id="profile-editor-title">${required?'Choose your name and banner':'Your name and banner'}</h2><p>Make your mark. Choose colors and stamp patterns over one another to build your flag.</p></header>
-      <label class="profile-name-label">Player name<input name="playerName" autocomplete="nickname" required minlength="2" maxlength="48" aria-describedby="profile-name-help" /></label><small id="profile-name-help">2–24 characters: letters, numbers, spaces, periods, apostrophes, hyphens or underscores. Saved on this device.</small>
+      <label class="profile-name-label">Player name<input name="playerName" autocomplete="nickname" maxlength="48" aria-describedby="profile-name-help" /></label><small id="profile-name-help">2–24 characters: letters, numbers, spaces, periods, apostrophes, hyphens, underscores or #. Leave blank for a random player name. Saved on this device.</small>
       <div class="flag-workbench"><div class="flag-preview"><canvas role="img" aria-label="Your pixel flag preview"></canvas><small>16 × 24 pixels</small></div><div class="flag-tools"><fieldset><legend>1. Choose a color</legend><div class="flag-colors">${PALETTE.map((c,i)=>`<button type="button" data-color="${i}" aria-label="${c.name}" title="${c.name}" style="--swatch:${c.hex}"></button>`).join('')}</div><button type="button" data-action="base">Use color as background</button></fieldset>
       <fieldset><legend>2. Pick a pattern</legend><div class="flag-patterns">${PATTERNS.map(pattern=>`<button type="button" data-pattern="${pattern}"><canvas width="16" height="24" aria-hidden="true"></canvas><span>${PATTERN_NAMES[pattern]}</span></button>`).join('')}</div></fieldset>
       <fieldset><legend>3. Stamp opacity</legend><div class="flag-opacity">${OPACITIES.map(opacity=>`<button type="button" data-opacity="${opacity}" aria-pressed="${opacity===this.chosenOpacity}">${opacity}%</button>`).join('')}</div></fieldset>
@@ -45,7 +45,7 @@ export class ProfileEditor {
     action('remove',()=>{if(this.picked>=0)change(()=>{this.flag.layers.splice(this.picked,1);this.picked=Math.min(this.picked,this.flag.layers.length-1);});});
     if(!required)action('cancel',()=>{this.dialog.close();done();});
     this.dialog.oncancel=e=>{if(required)e.preventDefault();else done();};
-    this.dialog.querySelector('form')!.onsubmit=e=>{e.preventDefault();const name=cleanName(input.value);if(!name){error.textContent='Enter a name of 2–24 characters using the characters listed above.';input.focus();return;}save({name,flag:structuredClone(this.flag)});this.dialog.close();done();};
+    this.dialog.querySelector('form')!.onsubmit=e=>{e.preventDefault();const name=input.value.trim()?cleanName(input.value):randomPlayerName();if(!name){error.textContent='Enter a name of 2–24 characters using the characters listed above.';input.focus();return;}save({name,flag:structuredClone(this.flag)});this.dialog.close();done();};
     refresh();this.dialog.showModal();input.focus();
   }
 }

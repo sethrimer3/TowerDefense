@@ -1,8 +1,8 @@
 // Ore glinting near the Mine's lit workings.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { AIR, CELLS, COPPER, GOLD, STONE, W, idx } from "../src/mine/world.ts";
-import { FRAMES, SPARKLE, sparkleFrame, sparkleSites } from "../src/mine/ore-sparkle.ts";
+import { AIR, CELLS, COPPER, GOLD, SILVER, STONE, W, idx } from "../src/mine/world.ts";
+import { drawGlint, GLINT, SPARKLE, sparkleFrame, sparkleSites } from "../src/mine/ore-sparkle.ts";
 
 /** A slab of stone under a surface at row 10, one lit air cell at (100, 100),
  * and ore everywhere along row 100 and down column 100. */
@@ -43,12 +43,27 @@ test("unlit or surface passages make no ore glint", () => {
 
 test("each glint is a short run of frames between long rests", () => {
   let shown = 0, total = 0;
-  for (let t = 0; t < 60_000; t += 10) {
+  for (let t = 0; t < 1_200_000; t += 10) {
     const f = sparkleFrame(5, 9, 3, t);
-    assert.ok(f >= -1 && f < FRAMES.length);
+    assert.ok(f >= -1 && f < 5);
     if (f >= 0) shown++;
     total++;
   }
   const share = shown / total;
-  assert.ok(share > 0.05 && share < 0.25, `glints gently (${share.toFixed(3)})`);
+  assert.ok(share > 0.0025 && share < 0.0125, `glints gently (${share.toFixed(3)})`);
+});
+
+test("glints draw one ore-colored pixel with a smooth fade", () => {
+  for (const m of [COPPER, SILVER, GOLD]) {
+    const calls: unknown[][] = [];
+    for (const f of [0, 1.25, 2.5, 3.75, 5])
+      drawGlint((...args) => { calls.push(args); }, 10, 20, m, f);
+    assert.equal(calls.length, 4);
+    for (const call of calls) assert.deepEqual(call.slice(0, 4), [10, 20, 0.5, 0.5]);
+    assert.equal(calls[0][4], `rgba(${GLINT[m].join(',')},0)`);
+    assert.equal(calls[2][4], `rgba(${GLINT[m].join(',')},1)`);
+    const alpha = (n: number) => Number(String(calls[n][4]).split(',').at(-1)!.slice(0, -1));
+    assert.ok(Math.abs(alpha(1) - 0.5) < 1e-10);
+    assert.ok(Math.abs(alpha(3) - 0.5) < 1e-10);
+  }
 });

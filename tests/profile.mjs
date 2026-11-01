@@ -46,9 +46,10 @@ try {
   await input.fill('Iron Warden');await dialog.locator('[type="submit"]').click();assert.equal(await siege.locator('.siege-profile-name').innerText(),'Iron Warden');
   save=await page.evaluate(()=>JSON.parse(localStorage.getItem('towerdefense.v1')));assert.equal(JSON.stringify(save.defend.layout),defendBefore);assert.equal(save.siege.mmr,mmrBefore);
   // Existing players without a profile get setup while keeping all progress.
-  await page.addInitScript(()=>{const key='towerdefense.v1',s=JSON.parse(localStorage.getItem(key));if(s){delete s.profile;s.knowledge=123;localStorage.setItem(key,JSON.stringify(s));}});
-  await page.reload();await dialog.waitFor({state:'visible'});await input.fill('Legacy Warden');await dialog.locator('[type="submit"]').click();
-  save=await page.evaluate(()=>JSON.parse(localStorage.getItem('towerdefense.v1')));assert.equal(save.knowledge,123);assert.equal(save.profile.name,'Legacy Warden');
+  await page.addInitScript(()=>{const key='towerdefense.v1',s=JSON.parse(localStorage.getItem(key));if(s&&!sessionStorage.getItem('legacy-profile-tested')){sessionStorage.setItem('legacy-profile-tested','1');delete s.profile;s.knowledge=123;localStorage.setItem(key,JSON.stringify(s));}});
+  await page.reload();await dialog.waitFor({state:'visible'});await input.fill('   ');await dialog.locator('[type="submit"]').click();
+  save=await page.evaluate(()=>JSON.parse(localStorage.getItem('towerdefense.v1')));assert.equal(save.knowledge,123);assert.match(save.profile.name,/^player#[0-9]{4}$/);
+  const generated=save.profile.name;await page.reload();assert.equal(await page.locator('#profile-editor[open]').count(),0);assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('towerdefense.v1')).profile.name),generated);
   assert.deepEqual(errors,[]);await page.close();
  }
  console.log('Profile onboarding, stamp order, undo, recolor, layer cap, cancel, Siege display, legacy saves and reload pass at desktop/phone widths.');
