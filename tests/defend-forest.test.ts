@@ -8,8 +8,10 @@ import { defaultLayout, fitLayout } from "../src/defend/layout.ts";
 import { CellType, generateCity } from "../src/defend/citygen.ts";
 import { CELLS_H, CELLS_W, cellIndex } from "../src/defend/grid.ts";
 import { BOULDERS, BURN, FOREST, FRAIL, ForestDamage, VARIANTS, boulderPlan, clearOf, forestPlan, hasForest } from "../src/defend/forest.ts";
-import { LEAN, ashPile, charPixels, floorPixels, leanOf, rockSprite, stumpSprite, treeSprite, turfAt } from "../src/defend/forest-art.ts";
+import { LEAN, ashPile, charPixels, floorPixels, leanOf, mountainSource, paintFloor, rockSprite, stumpSprite, treeSprite, turfAt } from "../src/defend/forest-art.ts";
 import { forestBlades } from "../src/defend/forest-grass.ts";
+import { bumpPixelArt, setPixelArt } from "../src/defend/pixel-sprites.ts";
+import { setArtOverride } from "../src/defend/art-overrides.ts";
 import { DefendSim } from "../src/defend/sim.ts";
 import { defaultDefendSave } from "../src/defend/progress.ts";
 
@@ -18,6 +20,35 @@ const city = () => {
   assert.ok(fit.ok);
   return generateCity(fit, 7);
 };
+
+test("mountains reuse native geometry, invalidate changed inputs and preserve partial floor updates", () => {
+  const plan = forestPlan(city()), original = plan.boulders.find(b => b.cells.length >= 9)!;
+  const b = { ...original, cells: [...original.cells] }, source = mountainSource(b);
+  assert.equal(mountainSource(b), source);
+  assert.deepEqual(mountainSource({ ...b, cells: [...b.cells] }), source);
+  b.seed++;
+  const seeded = mountainSource(b);
+  assert.notEqual(seeded, source); assert.notDeepEqual(seeded.px, source.px);
+  b.cells[0]++;
+  assert.deepEqual(mountainSource(b), mountainSource({ ...b, cells: [...b.cells] }));
+  assert.notEqual(mountainSource(b), seeded);
+  const before = mountainSource(b); bumpPixelArt();
+  assert.notEqual(mountainSource(b), before);
+  const cached = floorPixels(plan, null), reference = floorPixels({ ...plan, boulders: plan.boulders.map(b => ({ ...b, cells: [...b.cells] })) }, null);
+  assert.deepEqual(cached, reference);
+  const damage = new ForestDamage(plan); damage.clear(10, 20, 1, true);
+  paintFloor(cached, plan, damage, { x0: 64, y0: 144, x1: 112, y1: 176 });
+  paintFloor(reference, { ...plan, boulders: plan.boulders.map(b => ({ ...b, cells: [...b.cells] })) }, damage, { x0: 64, y0: 144, x1: 112, y1: 176 });
+  assert.deepEqual(cached, reference);
+  setPixelArt(true);
+  const named = mountainSource(b), replacement = new Uint32Array(named.w * named.h).fill(0xff123456);
+  try {
+    setArtOverride(named.name, { data: replacement, w: named.w, h: named.h }); bumpPixelArt();
+    assert.deepEqual(mountainSource(b).px, replacement);
+    setPixelArt(false); assert.notDeepEqual(mountainSource(b).px, replacement);
+    setPixelArt(true); assert.deepEqual(mountainSource(b).px, replacement);
+  } finally { setArtOverride(named.name, null); bumpPixelArt(); }
+});
 
 test("only Mossbound Ruins has a forest", () => {
   assert.ok(hasForest("moss"));

@@ -23,6 +23,7 @@ try {
     const fixture = await page.evaluate(async () => {
       const { defaults } = await import('/src/save.ts');
       const s = defaults(); s.settings.soundOff = true; s.settings.ambienceOff = true;
+      s.profile = { name: 'Forest Tester', flag: { base: 3, layers: [] } };
       return s;
     });
     await context.addInitScript(fixture => {

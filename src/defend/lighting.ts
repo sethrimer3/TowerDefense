@@ -223,7 +223,11 @@ export class DefendLighting {
   private bodyUp: HTMLCanvasElement | null = null;
   private rimUp: HTMLCanvasElement | null = null;
   private tint: HTMLCanvasElement | null = null;
+  private tintKey = "";
+  private buildingGrown: HTMLCanvasElement | null = null;
+  private buildingGrownKey = "";
   private rimLit: HTMLCanvasElement | null = null;
+  private buildingRimLit: HTMLCanvasElement | null = null;
   private upKey = "";
   /** How brightly each light still burns, 0 (out) to 1; set each frame
    * while the city's lights are going out, else null (all burning). */
@@ -251,6 +255,7 @@ export class DefendLighting {
   /** Takes what stands from cached building art, including its outline.
    * Occlusion follows native sprite pixels, including padded/rounded edges. */
   setMasks(body: HTMLCanvasElement, rim: HTMLCanvasElement) {
+    this.tintKey = this.buildingGrownKey = "";
     // Read only cached source masks, never a rendered scene. Resolve light
     // occlusion at native art pixels so rounded corners are not whole cells.
     const a = body.getContext("2d", { willReadFrequently: true })!.getImageData(0,0,body.width,body.height).data;
@@ -485,15 +490,22 @@ export class DefendLighting {
   /** Keeps what is on `r` to within `by` pixels of `body` (the body grown
    * by `by` each way): the half of an outline hugging what it rings, so
    * the shine is half the outline's width. */
-  private hug(r: CanvasRenderingContext2D, { body, by }: Inner) {
+  private hug(r: CanvasRenderingContext2D, { body, by }: Inner, fixed = false) {
     const { width, height } = r.canvas;
-    const g = (this.grown = sized(this.grown, width, height)).getContext("2d")!;
-    g.globalCompositeOperation = "source-over";
-    g.clearRect(0, 0, width, height);
-    for (const dy of [-by, 0, by]) for (const dx of [-by, 0, by]) g.drawImage(body, dx, dy);
+    const key = `${width}:${height}:${by}`;
+    let grown: HTMLCanvasElement;
+    if (fixed) grown = this.buildingGrown = sized(this.buildingGrown, width, height);
+    else grown = this.grown = sized(this.grown, width, height);
+    if (!fixed || key !== this.buildingGrownKey) {
+      const g = grown.getContext("2d")!;
+      g.globalCompositeOperation = "source-over";
+      g.clearRect(0, 0, width, height);
+      for (const dy of [-by, 0, by]) for (const dx of [-by, 0, by]) g.drawImage(body, dx, dy);
+      if (fixed) this.buildingGrownKey = key;
+    }
     r.setTransform(1, 0, 0, 1, 0, 0);
     r.globalCompositeOperation = "destination-in";
-    r.drawImage(this.grown, 0, 0);
+    r.drawImage(grown, 0, 0);
   }
   private grown: HTMLCanvasElement | null = null;
 
@@ -519,13 +531,17 @@ export class DefendLighting {
     gl.globalCompositeOperation = "destination-out";
     gl.drawImage(body, 0, 0);
     gl.globalCompositeOperation = "source-over";
-    const t = (this.tint = sized(this.tint, body.width, body.height)).getContext("2d")!;
-    t.globalCompositeOperation = "source-over";
-    t.clearRect(0, 0, body.width, body.height);
-    t.drawImage(body, 0, 0);
-    t.globalCompositeOperation = "source-in";
-    t.fillStyle = ambient.color;
-    t.fillRect(0, 0, body.width, body.height);
+    const key = `${body.width}:${body.height}:${ambient.color}`;
+    if (key !== this.tintKey || !this.tint) {
+      this.tintKey = key;
+      const t = (this.tint = sized(this.tint, body.width, body.height)).getContext("2d")!;
+      t.globalCompositeOperation = "source-over";
+      t.clearRect(0, 0, body.width, body.height);
+      t.drawImage(body, 0, 0);
+      t.globalCompositeOperation = "source-in";
+      t.fillStyle = ambient.color;
+      t.fillRect(0, 0, body.width, body.height);
+    }
     dk.globalCompositeOperation = "destination-out";
     dk.drawImage(body, 0, 0);
     dk.globalCompositeOperation = "source-over";
@@ -537,15 +553,17 @@ export class DefendLighting {
   /** The glow kept to `rim` and added over it, so outlines in torchlight
    * shine warm (board space, like the glow). */
   private shine(c: CanvasRenderingContext2D, rim: HTMLCanvasElement, glow: (r: CanvasRenderingContext2D) => void, inner: Inner) {
-    const r = (this.rimLit = sized(this.rimLit, rim.width, rim.height)).getContext("2d")!;
+    // Building masks are board-sized; unit masks are viewport-sized. Sharing
+    // their scratch canvas reallocates its pixel storage twice every frame.
+    const r = (this.buildingRimLit = sized(this.buildingRimLit, rim.width, rim.height)).getContext("2d")!;
     r.setTransform(1, 0, 0, 1, 0, 0);
     r.globalCompositeOperation = "source-over";
     r.clearRect(0, 0, rim.width, rim.height);
     r.drawImage(rim, 0, 0);
-    this.hug(r, inner);
+    this.hug(r, inner, true);
     r.globalCompositeOperation = "source-in";
     glow(r);
-    shineOnto(c, this.rimLit!);
+    shineOnto(c, this.buildingRimLit!);
   }
 
   /** Lays this frame's darkness (from the last `drawLight`) over what is
