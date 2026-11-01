@@ -1,3 +1,4 @@
+import { isBlightWorm } from "./blight-worm-tuning.ts";
 import { enemySize } from "./catalog.ts";
 import { ENEMIES } from "./catalog.ts";
 import type { DefendSim, Enemy } from "./sim.ts";
@@ -22,10 +23,10 @@ const compare = (a: Enemy, b: Enemy) => ENEMIES[b.kind].cost - ENEMIES[a.kind].c
 /** Keep only the eight displayed enemies, in the same stable priority order. */
 export function healthbarEnemies(sim: DefendSim): Enemy[] {
   const threshold = trackHealthbarPeak(sim), best: Enemy[] = [];
-  let wormShown = false;
+  const wormShown = new Set<string>();
   for (const e of sim.enemies) {
-    if (e.fortressPart || e.hp <= 0 || e.kind === "blightWorm" && e.untargetable || (e.burrow && e.burrow > 0) || e.leader !== undefined || ENEMIES[e.kind].cost < threshold) continue;
-    if (e.kind === "blightWorm") { if (wormShown) continue; wormShown = true; }
+    if (e.fortressPart || e.hp <= 0 || isBlightWorm(e.kind) && e.untargetable || (e.burrow && e.burrow > 0) || e.leader !== undefined || ENEMIES[e.kind].cost < threshold) continue;
+    if (isBlightWorm(e.kind)) { if (wormShown.has(e.kind)) continue; wormShown.add(e.kind); }
     let i = best.length;
     while (i > 0 && compare(e, best[i - 1]) < 0) i--;
     if (i >= MAX_ENEMY_HEALTHBARS) continue;
@@ -41,7 +42,7 @@ export function drawEnemyHealthbars({ c, px }: Brush, sim: DefendSim) {
     const x = Math.round(e.x * px - width / 2);
     const y = Math.round(e.y * px - enemySize(e) * px / 2 - height - 4);
     c.fillStyle = "#170e12"; c.fillRect(x - 1, y - 1, width + 2, height + 2);
-    const segments = e.kind === "blightWorm" ? sim.enemies.filter(o => o.kind === "blightWorm" && o.hp > 0) : [e];
+    const segments = isBlightWorm(e.kind) ? sim.enemies.filter(o => o.kind === e.kind && o.hp > 0) : [e];
     const hp = segments.reduce((sum, o) => sum + o.hp, 0), maxHp = segments.reduce((sum, o) => sum + o.maxHp, 0);
     const ratio = Math.max(0, Math.min(1, hp / maxHp));
     c.fillStyle = ratio > .5 ? "#85bd68" : ratio > .25 ? "#e2b65a" : "#d85b59";

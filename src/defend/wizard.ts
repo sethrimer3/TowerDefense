@@ -1,3 +1,4 @@
+import { isBlightWorm } from "./blight-worm-tuning.ts";
 import { fortressAreaTargets } from "./fortress.ts";
 import {chargeIdle} from "./chrono.ts";
 import { mageChillSpeed } from "./mage-attunements.ts";
@@ -202,7 +203,7 @@ export function stepFrosts(sim: DefendSim, dt: number) {
     for (const e of fortressAreaTargets(sim.enemiesNear(w.x, w.y, w.r))) {
       if (w.hit.includes(e.id) || !inFan(e, w.x, w.y, w.dx, w.dy, w.spread, w.r)) continue;
       w.hit.push(e.id);
-      if (sim.hurtEnemy(e, damage, true, "ranged", w) && (!ENEMIES[e.kind].unyielding || e.kind === "blightWorm")) {
+      if (sim.hurtEnemy(e, damage, true, "ranged", w) && (!ENEMIES[e.kind].unyielding || isBlightWorm(e.kind))) {
         e.chill = Math.max(e.chill ?? 0, chill);
         if (rime >= 3) e.freeze = Math.max(e.freeze ?? 0, RIME.freeze);
       }

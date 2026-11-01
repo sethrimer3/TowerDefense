@@ -18,7 +18,7 @@ export const ART_NAMES = {
   wall: (area:string,cx:number,cy:number,face=false)=>`walls/${area}-${face ? `face-${cx}` : `cap-${cx}-${cy}`}`,
   effect: (kind: string, pose: string | number = "") => `effects/${kind}${pose !== "" ? `-${pose}` : ""}`,
   unit: (frame: string, direction = "") => `units/${frame.replaceAll(":", "-")}${direction ? `-${direction}` : ""}`,
-  // Includes Darkling/Worm squares and blightDart/blightPrism/greaterBlightPrism-body silhouettes; no rim.
+  // Includes 2/3/5-pixel worm and Darkling squares and blightDart/blightPrism/greaterBlightPrism-body silhouettes; no rim.
   enemy: (kind: string, pose = "") => `enemies/${kind}${pose ? `-${pose}` : ""}`,
   projectile: (kind: string, pose: string | number = "") => `projectiles/${kind}${pose !== "" ? `-${pose}` : ""}`,
   scenery: (kind: string, pose: string | number = "") => `scenery/${kind}${pose !== "" ? `-${pose}` : ""}`,

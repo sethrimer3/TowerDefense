@@ -44,9 +44,10 @@ test('every themed zone has at least fifteen species and all native additions ap
       assert.ok(AREA_ENEMIES[area.id].includes(kind));
       assert.ok(AREA_ENEMIES.nadir.includes(kind));
       assert.ok(AREAS.filter(a => a.id !== area.id && a.id !== 'nadir').every(a => !AREA_ENEMIES[a.id].includes(kind)));
-      // Mossbound's first visit is authored Darklings; its legacy native
-      // species return on the first procedural revisit, waves 201–220.
-      const wave = area.id === 'moss' ? 201 : AREAS.indexOf(area) * 20 + 1;
+      // Mossbound and Amber Desert are authored on their first visit; native
+      // species return on their first procedural revisit, waves 201–240.
+      const first = AREAS.indexOf(area) * 20 + 1;
+      const wave = first <= 40 ? first + 200 : first;
       assert.equal(areaForWave(wave).id, area.id);
       assert.ok(ENEMIES[kind].cost <= waveDifficulty(wave));
       let selected = false;

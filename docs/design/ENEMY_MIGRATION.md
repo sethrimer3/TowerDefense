@@ -1,6 +1,6 @@
 # Enemy migration tracker
 
-Started 2026-10-29. This is the working checklist for replacing the old enemy lineups. **Absolute Defend waves 1–20 are updated.** All 30 Ambush levels (600 waves) and Defend waves 21–200 remain **outdated**. Later endless Defend waves remain outdated as well.
+Started 2026-10-29. This is the working checklist for replacing the old enemy lineups. **Absolute Defend waves 1–40 are updated.** All 30 Ambush levels (600 waves) and Defend waves 41–200 remain **outdated**. Later endless Defend waves remain outdated as well.
 
 ## Direction
 
@@ -26,9 +26,42 @@ Started 2026-10-29. This is the working checklist for replacing the old enemy li
 | Defend 19 | Blight Prism | Black equilateral triangle, 12-art-pixel span, three spinning inlaid triangles, flying | 90 | 8 / 1.5 seconds | 0.35 | Three Blight Darts, 120° apart; 4 total bodies |
 | Awaiting wave placement | Greater Blight Prism | Black equilateral triangle, 20-art-pixel span, four spinning inlaid triangles, flying | 270 | 16 / 1.5 seconds | 0.22 | Three Blight Darts, 120° apart; 4 total bodies |
 
+| Defend 21 | Small Blight Worm | Seven touching 2 × 2 art-pixel squares, portal perimeter | 60 each | 1 contact / 0.6 seconds per target; 0.25 underground per building pass | 3 surface / 4 underground | Three Darklings per segment; 70 total bodies; pieces of 3 or fewer die |
+| Defend 21 | Medium Blight Worm | Fourteen touching 3 × 3 art-pixel squares, portal perimeter | 180 each | 2 contact / 0.6 seconds per target; 0.5 underground per building pass | 3 surface / 4 underground | Three Large Darklings per segment; 308 total bodies; pieces of 3 or fewer die |
+
 An art pixel is 1/8 of a board cell and scales with the camera. All five Darkling kinds use solid black square drawing under normal, Pixel Art, Simple enemies and merged-outline settings, without decorative sprites. The stats are initial tuning values.
 
 ## Change log
+
+- **[x] Updated Amber Desert waves 21–40 — worm broods.** Small worms have seven touching 2 × 2 art-pixel segments, Medium worms fourteen 3 × 3 segments. They share the boss's native trail-following, bounce/contact, underground straight rays toward random buildings, angled field-edge bounces, untargetability/immunity, tower-clear surfacing and 4× head weakness. Their surface spells are 40–72 seconds (four times the boss's 10–18), including independent heads after cuts. Small segments release three Darklings; Medium segments release three Large Darklings. The scaled tuning is initial balance data, explicitly retained in the catalog/tuning table.
+
+Every connected piece of one, two or three segments now dies, including the original head piece and fragments of the boss. Four or more survive with their own head and timers. These deaths use native kill credit, burial and splitting exactly once; underground pieces release their young on open ground. This supersedes the earlier one-segment-worm behavior. Full split trees are reserved even when short pieces collapse.
+
+| Wave | Exact initial roster | Full split-tree bodies | Full split-tree HP | Initial cost |
+|---|---|---:|---:|---:|
+| 21 | 10 Small + 2 Medium | 1316 | 14532 | 1540 |
+| 22 | 14 Small + 2 Medium | 1596 | 17052 | 1820 |
+| 23 | 18 Small + 2 Medium | 1876 | 19572 | 2100 |
+| 24 | 22 Small + 2 Medium | 2156 | 22092 | 2380 |
+| 25 | 26 Small + 2 Medium | 2436 | 24612 | 2660 |
+| 26 | 30 Small + 2 Medium | 2716 | 27132 | 2940 |
+| 27 | 26 Small + 3 Medium | 2744 | 28728 | 3080 |
+| 28 | 22 Small + 4 Medium | 2772 | 30324 | 3220 |
+| 29 | 18 Small + 5 Medium | 2800 | 31920 | 3360 |
+| 30 | 14 Small + 6 Medium | 2828 | 33516 | 3500 |
+| 31 | 10 Small + 7 Medium | 2856 | 35112 | 3640 |
+| 32 | 10 Small + 8 Medium | 3164 | 39228 | 4060 |
+| 33 | 10 Small + 9 Medium | 3472 | 43344 | 4480 |
+| 34 | 10 Small + 10 Medium | 3780 | 47460 | 4900 |
+| 35 | 10 Small + 11 Medium | 4088 | 51576 | 5320 |
+| 36 | 10 Small + 12 Medium | 4396 | 55692 | 5740 |
+| 37 | 10 Small + 13 Medium | 4704 | 59808 | 6160 |
+| 38 | 6 Small + 14 Medium | 4732 | 61404 | 6300 |
+| 39 | 2 Small + 15 Medium | 4760 | 63000 | 6440 |
+| 40 | 3 boss Blight Worms (150 segments) | 20400 | 269100 | 4800 |
+
+Every regular wave's HP, reserved bodies and initial cost increase, with the two kinds evenly interleaved and no RNG during wave construction. Wave 40 contains three independent bosses and needs 20400 bodies (150 worms + 450 Significant + 900 Major + 2700 Large + 5400 Darklings + 10800 minis). Its cap is 21000; the wave-20 cap remains 7000 and the global/other-wave cap remains 5000. Authored waves apply to absolute 21–40 only; later procedural waves and all Ambush waves exclude these scripted kinds. Small/Medium portraits and outline-free 2/3-pixel bodies share the existing portal union. No replay, city, fence or save golden should be re-recorded unless verification finds an intentional effect in that fixture.
+
 
 - **2026-10-30 — Flying escorts placed in Defend waves 15–19.** Add 3/4/5/6/7 Blight Darts respectively, plus exactly one Blight Prism in wave 19. All previous ground counts are retained; the authored `mix` evenly spreads the sparse fliers through the five-second release without RNG. The prism adds three further darts on death. All kinds stay scripted-only; Greater Blight Prism is still unplaced, and other authored/procedural/Ambush lineups stay fixed. This supersedes the earlier decision to defer all flying placements.
 
@@ -107,7 +140,7 @@ The underground shadow is slightly more transparent (combined core alpha about 2
 
 ## Color drain and performance rules
 
-Faction is explicit in the enemy catalog; never infer darkness from a sprite's color. Currently tagged: Mini Darkling, Darkling, Large Darkling, Major Darkling, Significant Darkling, Blight Worm, Mother, Broodling, Dark Knight, Void Sparrow, Necromancer, Skeleton, Blink Imp, Crypt Hound and Grave Wisp. Future Dark One enemies must carry the same faction tag. Other species' allegiance is still pending their migration/story review. Friendly dark wizards and shades do not contribute; neither do dead enemies, fortress parts or Siege proxy objects.
+Faction is explicit in the enemy catalog; never infer darkness from a sprite's color. Currently tagged: Mini Darkling, Darkling, Large Darkling, Major Darkling, Significant Darkling, Blight Worm, Small Blight Worm, Medium Blight Worm, Mother, Broodling, Dark Knight, Void Sparrow, Necromancer, Skeleton, Blink Imp, Crypt Hound and Grave Wisp. Future Dark One enemies must carry the same faction tag. Other species' allegiance is still pending their migration/story review. Friendly dark wizards and shades do not contribute; neither do dead enemies, fortress parts or Siege proxy objects.
 
 The estimate uses fixed 4-cell buckets, neighboring buckets for density, and two reusable 144 × 208 alpha fields (drain and night heat), sampled at most ten times per second while simulation time advances. Each occupied bucket emits one smooth radial patch at its centroid; strongest-patch blending keeps overlapping groups from artificially multiplying their strength. There are no pairwise crowd queries. Two canvas blend passes desaturate and wash out the existing detailed world, followed at night by the dark crimson halo without scene copies, full-scene CPU pixel reads, blur or per-enemy filters. The field lookup avoids square roots in its inner loop. Mask memory and patch work are bounded by board size. The world-space mask follows pan and zoom. A reusable combat-art layer and screen mask exclude unit/shot alpha, while visibility contours, HUD and inspection overlays remain readable. Counts and neighborhood boundaries are intentionally approximate.
 
@@ -875,7 +908,7 @@ Each level currently has 20 waves from the existing procedural placeholder lineu
 
 ## Defend — first 200-wave zone cycle
 
-Defend is endless: these are its first ten 20-wave areas, not a finite level list. Only absolute waves 1–20 use the new authored lineups. In later cycles, area-local wave 1 (201, 401, …) still uses the legacy generator.
+Defend is endless: these are its first ten 20-wave areas, not a finite level list. Only absolute waves 1–40 use the new authored lineups. In later cycles, area-local wave 1 (201, 401, …) still uses the legacy generator.
 
 ### Mossbound Ruins — waves 1–20
 
@@ -893,35 +926,35 @@ Defend is endless: these are its first ten 20-wave areas, not a finite level lis
 - [x] Wave 12: **updated** — 20 Significant + 40 Major + 100 Darklings.
 - [x] Wave 13: **updated** — 30 Significant + 40 Major + 60 Large.
 - [x] Wave 14: **updated** — 40 Significant + 40 Major + 200 Darklings.
-- [x] Wave 15: **updated** — 50 Significant + 50 Major.
-- [x] Wave 16: **updated** — 60 Significant + 50 Major + 100 Large.
-- [x] Wave 17: **updated** — 80 Significant + 30 Major + 150 minis.
-- [x] Wave 18: **updated** — 90 Significant + 20 Major + 100 Darklings.
-- [x] Wave 19: **updated** — 100 Significant + 20 Major.
+- [x] Wave 15: **updated** — 50 Significant + 50 Major + 3 Blight Darts.
+- [x] Wave 16: **updated** — 60 Significant + 50 Major + 100 Large + 4 Blight Darts.
+- [x] Wave 17: **updated** — 80 Significant + 30 Major + 150 minis + 5 Blight Darts.
+- [x] Wave 18: **updated** — 90 Significant + 20 Major + 100 Darklings + 6 Blight Darts.
+- [x] Wave 19: **updated** — 100 Significant + 20 Major + 7 Blight Darts + 1 Blight Prism.
 - [x] Wave 20: **updated** — one Blight Worm, 50 segments; 6800 bodies including all offspring.
 
 ### Amber Desert — waves 21–40
 
-- [ ] Wave 21: **outdated**
-- [ ] Wave 22: **outdated**
-- [ ] Wave 23: **outdated**
-- [ ] Wave 24: **outdated**
-- [ ] Wave 25: **outdated**
-- [ ] Wave 26: **outdated**
-- [ ] Wave 27: **outdated**
-- [ ] Wave 28: **outdated**
-- [ ] Wave 29: **outdated**
-- [ ] Wave 30: **outdated**
-- [ ] Wave 31: **outdated**
-- [ ] Wave 32: **outdated**
-- [ ] Wave 33: **outdated**
-- [ ] Wave 34: **outdated**
-- [ ] Wave 35: **outdated**
-- [ ] Wave 36: **outdated**
-- [ ] Wave 37: **outdated**
-- [ ] Wave 38: **outdated**
-- [ ] Wave 39: **outdated**
-- [ ] Wave 40: **outdated**
+- [x] Wave 21: **updated** — 10 Small Blight Worms + 2 Medium Blight Worms; 1316 bodies including splits.
+- [x] Wave 22: **updated** — 14 Small Blight Worms + 2 Medium Blight Worms; 1596 bodies including splits.
+- [x] Wave 23: **updated** — 18 Small Blight Worms + 2 Medium Blight Worms; 1876 bodies including splits.
+- [x] Wave 24: **updated** — 22 Small Blight Worms + 2 Medium Blight Worms; 2156 bodies including splits.
+- [x] Wave 25: **updated** — 26 Small Blight Worms + 2 Medium Blight Worms; 2436 bodies including splits.
+- [x] Wave 26: **updated** — 30 Small Blight Worms + 2 Medium Blight Worms; 2716 bodies including splits.
+- [x] Wave 27: **updated** — 26 Small Blight Worms + 3 Medium Blight Worms; 2744 bodies including splits.
+- [x] Wave 28: **updated** — 22 Small Blight Worms + 4 Medium Blight Worms; 2772 bodies including splits.
+- [x] Wave 29: **updated** — 18 Small Blight Worms + 5 Medium Blight Worms; 2800 bodies including splits.
+- [x] Wave 30: **updated** — 14 Small Blight Worms + 6 Medium Blight Worms; 2828 bodies including splits.
+- [x] Wave 31: **updated** — 10 Small Blight Worms + 7 Medium Blight Worms; 2856 bodies including splits.
+- [x] Wave 32: **updated** — 10 Small Blight Worms + 8 Medium Blight Worms; 3164 bodies including splits.
+- [x] Wave 33: **updated** — 10 Small Blight Worms + 9 Medium Blight Worms; 3472 bodies including splits.
+- [x] Wave 34: **updated** — 10 Small Blight Worms + 10 Medium Blight Worms; 3780 bodies including splits.
+- [x] Wave 35: **updated** — 10 Small Blight Worms + 11 Medium Blight Worms; 4088 bodies including splits.
+- [x] Wave 36: **updated** — 10 Small Blight Worms + 12 Medium Blight Worms; 4396 bodies including splits.
+- [x] Wave 37: **updated** — 10 Small Blight Worms + 13 Medium Blight Worms; 4704 bodies including splits.
+- [x] Wave 38: **updated** — 6 Small Blight Worms + 14 Medium Blight Worms; 4732 bodies including splits.
+- [x] Wave 39: **updated** — 2 Small Blight Worms + 15 Medium Blight Worms; 4760 bodies including splits.
+- [x] Wave 40: **updated** — 3 boss Blight Worms, 150 segments; 20400 bodies including splits (21000 cap).
 
 ### Ember Forge — waves 41–60
 

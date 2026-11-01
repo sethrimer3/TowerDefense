@@ -1,3 +1,4 @@
+import { isBlightWorm } from "./blight-worm-tuning.ts";
 import { stepFortress, fortressLegs } from "./fortress.ts";
 import { dist, sq } from "../exact.ts";
 import { ENEMIES } from "./catalog.ts";
@@ -17,7 +18,7 @@ export const enemySpeed = (sim: DefendSim, e: Enemy) => {
 };
 
 export function damageModifier(sim: DefendSim, e: Enemy, origin: (Point & { attacker?: number; building?: number }) | undefined, source: string, projectile: boolean) {
-  if (e.kind === "blightWorm" && (e.burrow || e.untargetable)) return 0;
+  if (isBlightWorm(e.kind) && (e.burrow || e.untargetable)) return 0;
   if (e.walker && e.walker.phase !== "grounded" || e.fortressPart?.role === "armor") return 0;
   if (e.kind === "burrowingMole" && (e.burrow ?? 1) > 0) return 0;
   if (e.kind !== "siegeBeetle" || !origin) return 1;
