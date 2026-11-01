@@ -1,3 +1,4 @@
+import { isBlightWorm } from "./blight-worm-tuning.ts";
 import { UnitOutline } from "./unit-outline.ts";
 import { ART, UNIT_CONTOUR_ART_PIXELS, PORTAL_UNIT_INK } from "./art-scale.ts";
 import { drawDarklingBodies } from "./simple-units.ts";
@@ -71,7 +72,7 @@ function drawOnScratch(scratch: HTMLCanvasElement, kind: EnemyKind, px: number) 
   } as unknown as DefendSim;
   // A chain shows its head and a few segments trailing up behind it.
   const segments = Math.min(def.chainLength ?? 1, 4);
-  const step = kind === "blightWorm" ? def.size : 0.3;
+  const step = isBlightWorm(kind) ? def.size : 0.3;
   const top = mid + ((segments - 1) * step) / 2;
   for (let n = segments - 1; n >= 0; n--) enemies.push(standIn(kind, mid, top - n * step, ++id));
   const head = enemies[enemies.length - 1];

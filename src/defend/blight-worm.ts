@@ -1,6 +1,6 @@
 /** Kinematic Blight Worms follow arc length, never a flow field or a leader's
- * straight-line shortcut. Only this kind allocates state or draws randomness. */
-import { BLIGHT_WORM as W } from "./blight-worm-tuning.ts";
+ * straight-line shortcut. Only worm kinds allocate this state or draw this randomness. */
+import { BLIGHT_WORM as W, wormTuning, isBlightWorm, MIN_WORM_SEGMENTS } from "./blight-worm-tuning.ts";
 export { BLIGHT_WORM } from "./blight-worm-tuning.ts";
 import { dist, sq } from "../exact.ts";
 import { CELLS_W, CELLS_H, cellIndex } from "./grid.ts";
@@ -12,7 +12,7 @@ import { mageChillSpeed } from "./mage-attunements.ts";
 import type { DefendSim, Enemy } from "./sim.ts";
 
 type TrailPoint = Point & { s: number; under: boolean; pass: number; target?: number; reached?: boolean };
-export type WormTrail = { points: TrailPoint[]; start: number; count: number };
+export type WormTrail = { points: TrailPoint[]; start: number; count: number; length?: number };
 type Head = {
   dx: number; dy: number; surfaceT: number; turnT: number;
   under: boolean; pass: number; outsideT: number; target?: number; reached: boolean;
@@ -23,10 +23,10 @@ export type WormState = {
 };
 const abs = (n: number) => n < 0 ? -n : n;
 const min = (a: number, b: number) => a < b ? a : b;
-const EPS = 1e-8, HALF = W.spacing / 2;
+const EPS = 1e-8;
 const wrap = (i: number) => i >= W.trailCapacity ? i - W.trailCapacity : i;
 const point = (t: WormTrail, n: number) => t.points[wrap(t.start + n)];
-const trail = (): WormTrail => ({ points: [], start: 0, count: 0 });
+const trail = (length = W.trailLength as number): WormTrail => ({ points: [], start: 0, count: 0, length });
 
 function append(t: WormTrail, p: TrailPoint) {
   // Coalesce straight stretches, preserving every turn and phase boundary.
@@ -45,7 +45,7 @@ function append(t: WormTrail, p: TrailPoint) {
   trim(t, p.s);
 }
 function trim(t: WormTrail, s: number) {
-  const cutoff = s - W.trailLength;
+  const cutoff = s - (t.length ?? W.trailLength);
   while (t.count > 2 && point(t, 1).s < cutoff) { t.start = wrap(t.start + 1); t.count--; }
   const a = point(t, 0), b = point(t, 1);
   if (a.s < cutoff && b.s > cutoff) {
@@ -66,9 +66,10 @@ export function wormTrailAt(t: WormTrail, s: number): TrailPoint {
   return { ...point(t, 0), s };
 }
 
-function randomHead(sim: DefendSim, dx: number, dy: number): Head {
+function randomHead(sim: DefendSim, dx: number, dy: number, kind: string): Head {
+  const tuning = wormTuning(kind);
   // Fixed draw order: surface duration, turn interval. Heading has its own draw.
-  return { dx, dy, surfaceT: W.surfaceMin + sim.rand() * W.surfaceRange,
+  return { dx, dy, surfaceT: tuning.surfaceMin + sim.rand() * tuning.surfaceRange,
     turnT: W.turnMin + sim.rand() * W.turnRange, under: false, pass: 0, outsideT: 0, reached: false };
 }
 function randomHeading(sim: DefendSim): Point {
@@ -79,14 +80,14 @@ function randomHeading(sim: DefendSim): Point {
 /** Spawn behind the edge, spaced on a real incoming trail, without clamping
  * the tail onto the first row. Followers become targetable on entering. */
 export function initWorm(sim: DefendSim, segments: Enemy[]) {
-  const first = segments[0], t = trail();
-  append(t, { x: first.x, y: first.y - W.trailLength, s: -W.trailLength, under: false, pass: 0 });
+  const first = segments[0], tuning = wormTuning(first.kind), t = trail(tuning.trailLength);
+  append(t, { x: first.x, y: first.y - tuning.trailLength, s: -tuning.trailLength, under: false, pass: 0 });
   append(t, { x: first.x, y: first.y, s: 0, under: false, pass: 0 });
   for (let n = 0; n < segments.length; n++) {
     const e = segments[n];
-    e.y = first.y - n * W.spacing;
-    e.worm = { trail: t, s: -n * W.spacing, surfaceHits: new Map(), burrowHits: new Set(), pass: 0 };
-    if (n === 0) e.worm.head = randomHead(sim, 0, 1);
+    e.y = first.y - n * tuning.spacing;
+    e.worm = { trail: t, s: -n * tuning.spacing, surfaceHits: new Map(), burrowHits: new Set(), pass: 0 };
+    if (n === 0) e.worm.head = randomHead(sim, 0, 1, first.kind);
     setPhase(e, false);
   }
 }
@@ -103,7 +104,7 @@ export function promoteWorm(sim: DefendSim, e: Enemy) {
   delete e.leader;
   const w = e.worm!;
   if (w.head) return;
-  const t = trail(), at = wormTrailAt(w.trail, w.s), before = wormTrailAt(w.trail, w.s - .01);
+  const t = trail(wormTuning(e.kind).trailLength), at = wormTrailAt(w.trail, w.s), before = wormTrailAt(w.trail, w.s - .01);
   for (let n = 0; n < w.trail.count; n++) {
     const p = point(w.trail, n);
     if (p.s < w.s) append(t, { ...p });
@@ -111,7 +112,7 @@ export function promoteWorm(sim: DefendSim, e: Enemy) {
   append(t, at);
   const d = dist(at.x - before.x, at.y - before.y);
   w.trail = t;
-  w.head = randomHead(sim, d > EPS ? (at.x - before.x) / d : 0, d > EPS ? (at.y - before.y) / d : 1);
+  w.head = randomHead(sim, d > EPS ? (at.x - before.x) / d : 0, d > EPS ? (at.y - before.y) / d : 1, e.kind);
   w.head.pass = at.pass;
   if (at.under) dive(sim, e, at);
 }
@@ -126,19 +127,20 @@ function buildingsAt(sim: DefendSim, p: Point, radius: number, solidOnly = true)
     }
   return [...ids];
 }
-function touching(sim: DefendSim, p: Point, id: number, underground: boolean, epsilon = EPS) {
+function touching(sim: DefendSim, p: Point, id: number, underground: boolean, epsilon = EPS, kind = "blightWorm") {
+  const tuning = wormTuning(kind);
   const b = sim.map.buildings[id];
   const rects = underground ? [b.rect] : b.fence ? fenceContactRects(b) : [structureContactRect(sim, b)];
-  const half = underground ? W.burrowWidth / 2 : HALF + CONTACT_OUTLINE + (b.kind === "wall" && !b.fence ? CONTACT_OUTLINE : 0);
+  const half = underground ? tuning.burrowWidth / 2 : tuning.spacing / 2 + CONTACT_OUTLINE + (b.kind === "wall" && !b.fence ? CONTACT_OUTLINE : 0);
   return rects.some(r => p.x >= r.x - half - epsilon && p.x <= r.x + r.w + half + epsilon &&
     p.y >= r.y - half - epsilon && p.y <= r.y + r.h + half + epsilon);
 }
 
 /** Negative epsilon permits sitting flush at the native contact perimeter. */
-function obstacle(sim: DefendSim, p: Point): { building?: number } | null {
-  const r = HALF + CONTACT_OUTLINE;
+function obstacle(sim: DefendSim, p: Point, kind = "blightWorm"): { building?: number } | null {
+  const r = wormTuning(kind).spacing / 2 + CONTACT_OUTLINE;
   if (!onBoard(p, r)) return {};
-  for (const id of buildingsAt(sim, p, r)) if (touching(sim, p, id, false, -EPS)) return { building: id };
+  for (const id of buildingsAt(sim, p, r)) if (touching(sim, p, id, false, -EPS, kind)) return { building: id };
   for (let y = clampCell(p.y - r, CELLS_H); y <= clampCell(p.y + r, CELLS_H); y++)
     for (let x = clampCell(p.x - r, CELLS_W); x <= clampCell(p.x + r, CELLS_W); x++) {
       const cell = cellIndex(x, y);
@@ -149,15 +151,15 @@ function obstacle(sim: DefendSim, p: Point): { building?: number } | null {
 
 function contact(sim: DefendSim, e: Enemy) {
   if (!onBoard(e)) return;
-  const w = e.worm!, under = !!e.burrow;
+  const w = e.worm!, under = !!e.burrow, tuning = wormTuning(e.kind);
   for (const [id, until] of w.surfaceHits) if (until <= sim.time) w.surfaceHits.delete(id);
-  for (const id of buildingsAt(sim, e, under ? W.burrowWidth / 2 : HALF + 2 * CONTACT_OUTLINE, !under)) {
-    if (!touching(sim, e, id, under)) continue;
+  for (const id of buildingsAt(sim, e, under ? tuning.burrowWidth / 2 : tuning.spacing / 2 + 2 * CONTACT_OUTLINE, !under)) {
+    if (!touching(sim, e, id, under, EPS, e.kind)) continue;
     if (under) {
       if (w.burrowHits.has(id)) continue;
-      w.burrowHits.add(id); sim.damageBuilding(id, W.burrowDamage);
+      w.burrowHits.add(id); sim.damageBuilding(id, tuning.burrowDamage);
     } else if (!w.surfaceHits.has(id)) {
-      w.surfaceHits.set(id, sim.time + W.contactCooldown); sim.damageBuilding(id, W.contactDamage);
+      w.surfaceHits.set(id, sim.time + tuning.contactCooldown); sim.damageBuilding(id, tuning.contactDamage);
     }
   }
   if (under) return;
@@ -165,8 +167,8 @@ function contact(sim: DefendSim, e: Enemy) {
     // Unit keys cannot collide with nonnegative building IDs.
     const key = -u.id - 1;
     if (u.hp <= 0 || w.surfaceHits.has(key) || !defenderInContact(e, u)) continue;
-    w.surfaceHits.set(key, sim.time + W.contactCooldown);
-    sim.hurtDefender(u, W.contactDamage);
+    w.surfaceHits.set(key, sim.time + tuning.contactCooldown);
+    sim.hurtDefender(u, tuning.contactDamage);
   }
 }
 
@@ -185,9 +187,10 @@ function turn(h: Head, cosine: number, sine: number) {
   h.dx = x / d; h.dy = y / d;
 }
 function clearAhead(sim: DefendSim, e: Enemy, dx: number, dy: number) {
+  const HALF = wormTuning(e.kind).spacing / 2;
   for (let s = W.probeStep; s <= W.lookAhead + EPS; s += W.probeStep)
     if (e.worm!.head!.under ? !onBoard({ x: e.x + dx * s, y: e.y + dy * s }, HALF + CONTACT_OUTLINE)
-      : obstacle(sim, { x: e.x + dx * s, y: e.y + dy * s })) return false;
+      : obstacle(sim, { x: e.x + dx * s, y: e.y + dy * s }, e.kind)) return false;
   return true;
 }
 function bounce(sim: DefendSim, e: Enemy) {
@@ -210,8 +213,8 @@ function bounce(sim: DefendSim, e: Enemy) {
 
 /** Placed structure tiles stay reserved even while their building is rubble.
  * Include the keep and troop buildings, and the whole segment/contour body. */
-export function wormOnTowerTile(sim: DefendSim, p: Point): boolean {
-  const r = HALF + 2 * CONTACT_OUTLINE;
+export function wormOnTowerTile(sim: DefendSim, p: Point, kind = "blightWorm"): boolean {
+  const r = wormTuning(kind).spacing / 2 + 2 * CONTACT_OUTLINE;
   // Owner cells persist through collapse, so rubble tiles need no separate
   // index. Probe only cells under the body instead of scanning the city.
   for (let y = clampCell(p.y - r - EPS, CELLS_H); y <= clampCell(p.y + r + EPS, CELLS_H); y++)
@@ -237,7 +240,7 @@ function dive(sim: DefendSim, e: Enemy, continuing?: TrailPoint) {
       const target = targets[i], goal = center(target.rect), d = dist(goal.x - e.x, goal.y - e.y);
       h.target = target.id;
       if (d > EPS) { h.dx = (goal.x - e.x) / d; h.dy = (goal.y - e.y) / d; }
-      h.reached = touching(sim, e, target.id, true);
+      h.reached = touching(sim, e, target.id, true, EPS, e.kind);
     } else { delete h.target; h.reached = true; }
     h.pass++;
   }
@@ -246,44 +249,44 @@ function dive(sim: DefendSim, e: Enemy, continuing?: TrailPoint) {
 }
 
 function burrowStep(sim: DefendSim, e: Enemy, amount: number) {
-  const w = e.worm!, h = w.head!;
-  const wasClear = h.reached && !wormOnTowerTile(sim, e);
+  const w = e.worm!, h = w.head!, tuning = wormTuning(e.kind);
+  const wasClear = h.reached && !wormOnTowerTile(sim, e, e.kind);
   e.x += h.dx * amount; e.y += h.dy * amount; w.s += amount;
-  if (!h.reached && h.target !== undefined && touching(sim, e, h.target, true)) h.reached = true;
+  if (!h.reached && h.target !== undefined && touching(sim, e, h.target, true, EPS, e.kind)) h.reached = true;
   // Count only intervals wholly outside tiles; never surface a substep early.
-  if (!h.reached || !wasClear || wormOnTowerTile(sim, e)) h.outsideT = 0;
-  else h.outsideT += amount / W.burrowSpeed;
+  if (!h.reached || !wasClear || wormOnTowerTile(sim, e, e.kind)) h.outsideT = 0;
+  else h.outsideT += amount / tuning.burrowSpeed;
   record(e); pose(sim, e, point(w.trail, w.trail.count - 1));
-  if (h.outsideT >= W.burrowClearSeconds - EPS && !obstacle(sim, e)) surface(sim, e);
+  if (h.outsideT >= W.burrowClearSeconds - EPS && !obstacle(sim, e, e.kind)) surface(sim, e);
 }
 function surface(sim: DefendSim, e: Enemy) {
-  const h = e.worm!.head!, heading = randomHeading(sim);
+  const h = e.worm!.head!, heading = randomHeading(sim), tuning = wormTuning(e.kind);
   h.under = false; h.dx = heading.x; h.dy = heading.y;
-  h.surfaceT = W.surfaceMin + sim.rand() * W.surfaceRange;
+  h.surfaceT = tuning.surfaceMin + sim.rand() * tuning.surfaceRange;
   h.turnT = W.turnMin + sim.rand() * W.turnRange;
   setPhase(e, false); record(e);
 }
 
 /** Deterministic nearest dry open center for underground offspring.
  * Bounded by the fixed board, no random draws. */
-export function wormOpenPoint(sim: DefendSim, from: Point): Point {
-  if (!obstacle(sim, from)) return { x: from.x, y: from.y };
+export function wormOpenPoint(sim: DefendSim, from: Point, kind = "blightWorm"): Point {
+  if (!obstacle(sim, from, kind)) return { x: from.x, y: from.y };
   let best: Point | undefined, distance = Infinity;
   for (let y = 0; y < CELLS_H; y++) for (let x = 0; x < CELLS_W; x++) {
     const p = { x: x + .5, y: y + .5 }, d = sq(p.x - from.x) + sq(p.y - from.y);
-    if (d < distance && !obstacle(sim, p)) { best = p; distance = d; }
+    if (d < distance && !obstacle(sim, p, kind)) { best = p; distance = d; }
   }
   return best ?? cellCenter(cellAt(from.x, from.y));
 }
 
 export function stepBlightWorm(sim: DefendSim, e: Enemy, dt: number) {
   if (!e.worm) initWorm(sim, [e]);
-  const w = e.worm!;
+  const w = e.worm!, tuning = wormTuning(e.kind), HALF = tuning.spacing / 2;
   if (e.leader !== undefined) {
     const leader = sim.enemies.find(o => o.id === e.leader && o.hp > 0);
     if (leader?.worm) {
       w.trail = leader.worm.trail;
-      const target = leader.worm.s - W.spacing;
+      const target = leader.worm.s - tuning.spacing;
       // Visit crossed vertices exactly, so every follower hits the bounce.
       const stops: number[] = [];
       for (let n = 0; n < w.trail.count; n++) {
@@ -308,7 +311,7 @@ export function stepBlightWorm(sim: DefendSim, e: Enemy, dt: number) {
     }
   }
   const slow = min(e.chill ? CHILL_SPEED : 1, mageChillSpeed(e));
-  let left = (h.under ? W.burrowSpeed : W.surfaceSpeed * slow) * dt;
+  let left = (h.under ? tuning.burrowSpeed : tuning.surfaceSpeed * slow) * dt;
   while (left > EPS) {
     const amount = min(W.probeStep, left);
     const x = e.x + h.dx * amount, y = e.y + h.dy * amount;
@@ -332,12 +335,12 @@ export function stepBlightWorm(sim: DefendSim, e: Enemy, dt: number) {
       // A new head behind a cut can still be unspooling outside the top.
       // Continue its incoming trail until the whole body has entered.
       const entering = e.y < HALF + CONTACT_OUTLINE && h.dy > 0 && e.x > HALF && e.x < CELLS_W - HALF;
-      const hit = entering ? null : obstacle(sim, { x: x + h.dx * EPS * 4, y: y + h.dy * EPS * 4 });
+      const hit = entering ? null : obstacle(sim, { x: x + h.dx * EPS * 4, y: y + h.dy * EPS * 4 }, e.kind);
       if (hit) {
         let lo = 0, hi = amount;
         for (let n = 0; n < 24; n++) {
           const middle = (lo + hi) / 2;
-          if (obstacle(sim, { x: e.x + h.dx * middle, y: e.y + h.dy * middle })) hi = middle; else lo = middle;
+          if (obstacle(sim, { x: e.x + h.dx * middle, y: e.y + h.dy * middle }, e.kind)) hi = middle; else lo = middle;
         }
         e.x += h.dx * lo; e.y += h.dy * lo; w.s += lo; record(e); contact(sim, e);
         bounce(sim, e); break;
@@ -345,5 +348,21 @@ export function stepBlightWorm(sim: DefendSim, e: Enemy, dt: number) {
       e.x = x; e.y = y; w.s += amount; record(e); setPhase(e, false); contact(sim, e);
     }
     left -= amount;
+  }
+}
+
+/** A cut can leave short pieces on either side. Find each living run once,
+ * independent of array order, and let the native death path release its young. */
+export function cullShortWorms(enemies: readonly Enemy[]) {
+  const worms = enemies.filter(e => isBlightWorm(e.kind) && e.worm);
+  const alive = new Map(worms.filter(e => e.hp > 0).map(e => [e.id, e]));
+  const behind = new Map<number, Enemy>();
+  for (const e of alive.values()) if (e.leader !== undefined) behind.set(e.leader, e);
+  for (const head of alive.values()) {
+    if (head.leader !== undefined && alive.has(head.leader)) continue;
+    const run: Enemy[] = [];
+    let e: Enemy | undefined = head;
+    while (e) { run.push(e); e = behind.get(e.id); }
+    if (run.length < MIN_WORM_SEGMENTS) for (const segment of run) segment.hp = 0;
   }
 }

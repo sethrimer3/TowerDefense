@@ -33,7 +33,7 @@ export const extraArtPieces = () => [
   ...skyPalacePieces(),
   ...wallPieces(),
   ...weaponPieces(),
-  ...basicUnitPieces(), // Catalog-driven: Darkling/Worm squares and the three flying Blight silhouettes.
+  ...basicUnitPieces(), // Catalog-driven: all three worm sizes and Darkling squares and the three flying Blight silhouettes.
   ...shadePieces(),
   ...meleeCapePieces(),
   ...heroCapePieces(),

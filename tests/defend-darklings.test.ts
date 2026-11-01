@@ -19,14 +19,14 @@ const fixture = () => {
 const crowd = (n: number, kind: EnemyKind = 'miniDarkling', x = 20, y = 20) => Array.from({ length: n }, (_, id) => ({ kind, x, y, hp: 1, id } as Enemy));
 const at = (d: DarkDensity, x: number, y: number) => d.field[Math.floor(y * 2) * DRAIN_W + Math.floor(x * 2)];
 
-test('authored opening is 30 minis and 5 Darklings, independent of RNG; waves 21 onward retain legacy roster', () => {
+test('authored opening is 30 minis and 5 Darklings, independent of RNG; waves 41 onward retain legacy roster', () => {
   const wave = buildWave(1, () => { throw Error('opening must not roll'); });
   assert.equal(wave.length, 35);
   assert.equal(wave.filter(k => k === 'miniDarkling').length, 30);
   assert.equal(wave.filter(k => k === 'darkling').length, 5);
   assert.equal(wave.reduce((sum, k) => sum + ENEMIES[k].cost, 0), waveDifficulty(1));
   for (let i = 0; i < 5; i++) assert.deepEqual(wave.splice(-7).reverse(), [...Array(6).fill('miniDarkling'), 'darkling']);
-  for (const n of [21, 40, 181, 200, 201, 202, 203, 204, 205, 1000]) assert.ok(buildWave(n, () => .5).every(k => !ENEMIES[k].scriptedOnly));
+  for (const n of [41, 60, 181, 200, 201, 202, 203, 204, 205, 1000]) assert.ok(buildWave(n, () => .5).every(k => !ENEMIES[k].scriptedOnly));
   assert.ok(buildDifficultyWave(100, () => .5).every(k => !ENEMIES[k].scriptedOnly));
 });
 
@@ -62,7 +62,7 @@ test('splitting respects the native hard cap', () => {
 });
 
 test('one to five art-pixel bodies stay plain black in normal and Simple settings, even when struck or marked', () => {
-  for (const [kind, side] of [['miniDarkling', 1], ['darkling', 2], ['largeDarkling', 3], ['majorDarkling', 4], ['significantDarkling', 5], ['blightWorm', 5]] as const) {
+  for (const [kind, side] of [['miniDarkling', 1], ['darkling', 2], ['largeDarkling', 3], ['majorDarkling', 4], ['significantDarkling', 5], ['blightWorm', 5], ['smallBlightWorm', 2], ['mediumBlightWorm', 3]] as const) {
     for (const px of [8, 24]) {
       const boxes: number[][] = [];
       const c = { fillStyle: '', fillRect(...args: number[]) { assert.equal(this.fillStyle, '#000000'); boxes.push(args); }, rect(...args: number[]) { assert.equal(this.fillStyle, '#000000'); boxes.push(args); }, beginPath() {}, fill() {} } as unknown as CanvasRenderingContext2D;

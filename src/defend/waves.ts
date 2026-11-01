@@ -3,7 +3,7 @@ import { areaForWave } from "./areas.ts";
 import { AREA_ENEMIES } from "./area-enemies.ts";
 
 export const MAX_WAVE_ENEMIES = 5000;
-export const waveCap = (wave: number) => wave === 20 ? 7000 : MAX_WAVE_ENEMIES;
+export const waveCap = (wave: number) => wave === 40 ? 21000 : wave === 20 ? 7000 : MAX_WAVE_ENEMIES;
 export const STARTING_DIFFICULTY = 20;
 export const DIFFICULTY_GROWTH = 1.05;
 
@@ -30,6 +30,30 @@ export const DARKLING_WAVES: Readonly<Record<number, readonly (readonly [EnemyKi
   19: [["significantDarkling", 100], ["majorDarkling", 20], ["blightDart", 7], ["blightPrism", 1]],
 };
 
+/** Amber Desert broods: larger worms progressively replace small ones.
+ * Counts reserve every segment and all Darkling descendants. */
+export const WORM_WAVES: Readonly<Record<number, readonly (readonly [EnemyKind, number])[]>> = {
+  21: [["smallBlightWorm", 10], ["mediumBlightWorm", 2]],
+  22: [["smallBlightWorm", 14], ["mediumBlightWorm", 2]],
+  23: [["smallBlightWorm", 18], ["mediumBlightWorm", 2]],
+  24: [["smallBlightWorm", 22], ["mediumBlightWorm", 2]],
+  25: [["smallBlightWorm", 26], ["mediumBlightWorm", 2]],
+  26: [["smallBlightWorm", 30], ["mediumBlightWorm", 2]],
+  27: [["smallBlightWorm", 26], ["mediumBlightWorm", 3]],
+  28: [["smallBlightWorm", 22], ["mediumBlightWorm", 4]],
+  29: [["smallBlightWorm", 18], ["mediumBlightWorm", 5]],
+  30: [["smallBlightWorm", 14], ["mediumBlightWorm", 6]],
+  31: [["smallBlightWorm", 10], ["mediumBlightWorm", 7]],
+  32: [["smallBlightWorm", 10], ["mediumBlightWorm", 8]],
+  33: [["smallBlightWorm", 10], ["mediumBlightWorm", 9]],
+  34: [["smallBlightWorm", 10], ["mediumBlightWorm", 10]],
+  35: [["smallBlightWorm", 10], ["mediumBlightWorm", 11]],
+  36: [["smallBlightWorm", 10], ["mediumBlightWorm", 12]],
+  37: [["smallBlightWorm", 10], ["mediumBlightWorm", 13]],
+  38: [["smallBlightWorm", 6], ["mediumBlightWorm", 14]],
+  39: [["smallBlightWorm", 2], ["mediumBlightWorm", 15]],
+};
+
 /** Absolute waves only; later area cycles and Ambush keep their legacy rosters. */
 const AUTHORED_WAVES: Readonly<Partial<Record<number, readonly EnemyKind[]>>> = {
   1: groups(5, "darkling", "miniDarkling", 6),
@@ -44,6 +68,8 @@ const AUTHORED_WAVES: Readonly<Partial<Record<number, readonly EnemyKind[]>>> = 
   10: Array<EnemyKind>(50).fill("majorDarkling"),
   ...Object.fromEntries(Object.entries(DARKLING_WAVES).map(([wave, roster]) => [wave, mix(roster)])),
   20: ["blightWorm"],
+  ...Object.fromEntries(Object.entries(WORM_WAVES).map(([wave, roster]) => [wave, mix(roster)])),
+  40: ["blightWorm", "blightWorm", "blightWorm"],
 };
 
 /** Bounded arithmetic keeps corrupt or extremely late wave numbers finite.

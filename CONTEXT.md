@@ -732,7 +732,7 @@ A rear Blight member’s own attack reaching the front line’s target through a
 A Dark One enemy consisting of a five-by-five black art-pixel square with a portal contour. Defeating it releases two Major Darklings and forty-four descendant bodies.
 
 **Blight Worm**:
-A Dark One boss of fifty touching five-by-five art-pixel segments. It wanders and bounces on the surface, each segment striking in turn, then burrows as an immune shadow straight toward a random standing building. It bounces at the playing-field edges and emerges after reaching that target and spending one uninterrupted second outside placed building tiles. Dirt sprays heavily from each head and lightly from the body; underground damage is one quarter of its former strength. Heads take four times damage; cuts create independent worms, and each destroyed segment releases three Significant Darklings.
+A Dark One boss of fifty touching five-by-five art-pixel segments. It wanders and bounces on the surface, each segment striking in turn, then burrows as an immune shadow straight toward a random standing building. It bounces at the playing-field edges and emerges after reaching that target and spending one uninterrupted second outside placed building tiles. Dirt sprays heavily from each head and lightly from the body; underground damage is one quarter of its former strength. Heads take four times damage; cuts create independent worms, and each destroyed segment releases three Significant Darklings. Pieces of three segments or fewer die and release their offspring.
 
 **Surface spell**:
 The time a worm head spends wandering above ground before its next dive.
@@ -786,3 +786,12 @@ The Dark One's counterparts of the eight magic boats: Blight Dinghy, Sailboat, C
 
 **Blight Plasma Fortress**:
 A large twelve-legged Blight fortress with one centered rooftop plasma turret. It charges an orange ball for fifteen seconds until the ball is three quarters of the body's width, then lobs it in an arc. Impact produces a huge sphere that repeatedly damages units and structures on both sides, and leaves dense glowing cracks that slowly cool. Destroying its turret stops an unfinished charge; a fired ball remains dangerous.
+
+**Small Blight Worm**:
+A seven-segment Blight Worm made of touching two-by-two art-pixel squares. It wanders, bounces and tunnels like the boss, spending four times as long above ground between dives. Each segment releases three Darklings on death.
+
+**Medium Blight Worm**:
+A fourteen-segment Blight Worm made of touching three-by-three art-pixel squares. It spends four times as long above ground between dives as the boss. Each segment releases three Large Darklings on death.
+
+**Worm piece**:
+A connected run of living worm segments after a cut. A piece needs at least four segments to survive; shorter pieces die and release their young. This applies to every Blight Worm size, including the original head piece.

@@ -2,11 +2,11 @@
  * portal contour remain hidden. This presentation uses no simulation RNG. */
 import { CELLS_H, CELLS_W, hash01 } from "./grid.ts";
 import { ART } from "./art-scale.ts";
-import { BLIGHT_WORM } from "./blight-worm-tuning.ts";
+import { BLIGHT_WORM, isBlightWorm, wormTuning } from "./blight-worm-tuning.ts";
 import type { Enemy } from "./sim.ts";
 import type { Brush } from "./battle-art.ts";
 
-export const wormBodyVisible = (e: Enemy) => e.kind !== "blightWorm" ||
+export const wormBodyVisible = (e: Enemy) => !isBlightWorm(e.kind) ||
   !e.burrow && e.x >= 0 && e.y >= 0 && e.x < CELLS_W && e.y < CELLS_H;
 
 export const WORM_BURROW_ART = {
@@ -31,12 +31,13 @@ function direction(e: Enemy) {
  * Hashed launch phases and a ballistic arc need no particles in battle state. */
 function dirt({ c, px }: Brush, e: Enemy, seconds: number, reduceMotion: boolean) {
   const head = e.leader === undefined, count = head ? WORM_BURROW_ART.headClods : WORM_BURROW_ART.bodyClods;
+  const scale = wormTuning(e.kind).spacing / BLIGHT_WORM.spacing;
   const h = direction(e), clock = reduceMotion ? 0 : seconds, opacity = c.globalAlpha;
   for (let i = 0; i < count; i++) {
     const seed = hash01(e.id, i, 31), spread = hash01(e.id, i, 47) * 2 - 1;
     const t = (clock * (head ? 1.25 : 1) + seed) % 1;
-    const sideways = spread * t * (head ? 1.8 : .65), back = t * (head ? 1 : .4);
-    const height = 4 * t * (1 - t) * (.5 + seed * .6) * (head ? 1 : .4);
+    const sideways = spread * t * (head ? 1.8 : .65) * scale, back = t * (head ? 1 : .4) * scale;
+    const height = 4 * t * (1 - t) * (.5 + seed * .6) * (head ? 1 : .4) * scale;
     const x = e.x - h.y * sideways - h.x * back, y = e.y + h.x * sideways - h.y * back - height;
     const size = head && i % 7 === 0 ? 2 : 1;
     c.globalAlpha = opacity * (head ? .9 : .7) * (1 - t * .65);
@@ -46,8 +47,8 @@ function dirt({ c, px }: Brush, e: Enemy, seconds: number, reduceMotion: boolean
 }
 
 export function drawWormShadow(b: Brush, e: Enemy, seconds = 0, effects = true, reduceMotion = false) {
-  if (e.kind !== "blightWorm" || !e.burrow || e.x < 0 || e.y < 0 || e.x >= CELLS_W || e.y >= CELLS_H) return;
-  const { c, px } = b, x = e.x * px, y = e.y * px, side = px * 5 / 8;
+  if (!isBlightWorm(e.kind) || !e.burrow || e.x < 0 || e.y < 0 || e.x >= CELLS_W || e.y >= CELLS_H) return;
+  const { c, px } = b, x = e.x * px, y = e.y * px, side = px * wormTuning(e.kind).spacing;
   c.save();
   for (const [scale, alpha] of WORM_BURROW_ART.shadow) {
     c.fillStyle = `rgba(12,8,17,${alpha})`;

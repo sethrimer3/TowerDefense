@@ -1,3 +1,4 @@
+import { isBlightWorm } from "./blight-worm-tuning.ts";
 /** Mage Guild battle snapshots and bounded, independent elemental effects. */
 import { CONDUCTION, CRYOMANCY, pathRank } from "../knowledge-paths.ts";
 import { buildingPaths } from "../specializations.ts";
@@ -38,11 +39,11 @@ export function castStorm(sim: DefendSim, s: Soldier, first: Enemy, rank: number
 
 /** Four independently expiring strengths, never one status per attacking mage. */
 export function chillByMage(e: Enemy, speed: number, seconds: number, freeze: number) {
-  if (e.hp <= 0 || ENEMIES[e.kind].unyielding && e.kind !== "blightWorm") return;
+  if (e.hp <= 0 || ENEMIES[e.kind].unyielding && !isBlightWorm(e.kind)) return;
   const chills = e.mageChills ??= [], old = chills.find(c => c.speed === speed);
   if (old) old.left = Math.max(old.left, seconds);
   else chills.push({ speed, left: seconds });
-  if (e.kind !== "blightWorm") e.freeze = Math.max(e.freeze ?? 0, freeze);
+  if (!isBlightWorm(e.kind)) e.freeze = Math.max(e.freeze ?? 0, freeze);
 }
 
 export function mageChillSpeed(e: Enemy): number {

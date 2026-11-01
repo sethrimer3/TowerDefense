@@ -1,3 +1,4 @@
+import { isBlightWorm } from "./blight-worm-tuning.ts";
 import { stepFortressCore } from "./fortress.ts";
 import { isBlightFlier, stepDartBurst } from "./blight-fliers.ts";
 import { stepBlightWorm } from "./blight-worm.ts";
@@ -32,7 +33,7 @@ type Turn = { sim: DefendSim; e: Enemy; def: EnemyDef; reach: number; dt: number
 
 export function stepEnemy(sim: DefendSim, e: Enemy, dt: number) {
   if (e.hp <= 0) return;
-  if (e.kind === "blightWorm") return stepBlightWorm(sim, e, dt);
+  if (isBlightWorm(e.kind)) return stepBlightWorm(sim, e, dt);
   sim.crowd.add(e);
   const def = ENEMIES[e.kind];
   e.cd -= dt;

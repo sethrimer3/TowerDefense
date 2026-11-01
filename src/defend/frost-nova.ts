@@ -1,3 +1,4 @@
+import { isBlightWorm } from "./blight-worm-tuning.ts";
 import { fortressAreaTargets } from "./fortress.ts";
 /** DEFEND's Frost nova, a strike spell: cast from the Skills palette onto
  * the board, ice bursts out where it is let go, freezing every enemy within
@@ -153,7 +154,7 @@ export function stepFrostNova(sim: DefendSim, dt: number) {
     if (pulse) f.pulse += BLIZZARD.pulse;
     for (const e of fortressAreaTargets(sim.enemiesNear(f.x, f.y, f.r))) {
       if (e.hp <= 0 || dist(e.x - f.x, e.y - f.y) > f.r) continue;
-      if (!ENEMIES[e.kind].unyielding || e.kind === "blightWorm") e.chill = Math.max(e.chill ?? 0, FROST_NOVA.chill);
+      if (!ENEMIES[e.kind].unyielding || isBlightWorm(e.kind)) e.chill = Math.max(e.chill ?? 0, FROST_NOVA.chill);
       sim.hurtEnemy(e, bite * dt, false);
       if (pulse) freeze(sim, e, BLIZZARD.pulseFreeze);
     }
