@@ -35,6 +35,9 @@ export type Save = {
   /** One for each new best wave held; banked for what is to come. Saves
    * from before them start with one for each wave of the best. */
   upgradePoints: number;
+  /** Blight Essence ("Essence"): a resource of the Dark Ones, shown on the
+   * currency sign. Nothing earns or spends it yet. */
+  essence: number;
   /** The mine's metal: copper, silver and gold points its smithy has made
    * (every `BARS_PER_POINT` bars of a metal), spent in the Smithy
    * below the Mine and the Tiles shop. A new game starts with `STARTING_METAL`. */
@@ -78,6 +81,7 @@ export function defaults(): Save {
   const save: Save = {
     version: SAVE_VERSION,
     upgradePoints: 0,
+    essence: 0,
     smithy: { ...STARTING_METAL },
     knowledge: 0,
     skills: Object.fromEntries(SKILL_IDS.map((id) => [id, 0])) as Record<SkillId, number>,
@@ -159,6 +163,7 @@ export function decode(raw: string | null): Save {
   else if (s.version < 4) migrateCards(s.defend?.cards, d);
   d.paths = {};
   d.upgradePoints = int(s.upgradePoints, d.defend.bestWave);
+  d.essence = int(s.essence, 0);
   d.mine = decodeMineSave(s.mine);
   d.library = decodeLibrarySave(s.library);
   d.settings = decodeSettings(s.settings);

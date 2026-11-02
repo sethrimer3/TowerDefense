@@ -67,6 +67,8 @@ Suggested order: 1 (fences) and 2 (strike quick bar) first, since Ambush's outpo
 - Keep the "glint on a rising currency" behaviour; when hidden, glints queue nothing.
 - Check `ui/viewport.ts`'s height maths and `tests/phone-viewport.mjs` still fit every tab. Update `node tests/metal-economy.mjs` if it reads the bar on another tab.
 
+- [x] Done 2026-11-02: `.show-currencies`, a `0fr`/`1fr` holder and a `sign-drop` keyframe with a small swing.
+
 ## 5. Better rope graphics
 
 **Brief:** "Improve the graphics on the ropes."
@@ -77,6 +79,8 @@ Suggested order: 1 (fences) and 2 (strike quick bar) first, since Ambush's outpo
 
 - Replace the gradient strips with pixel-art twisted rope: a small tiling image or inline SVG of diagonal strands (two tones of hemp, dark twist lines, black outline), 6 px wide, with a knot or iron ring where it meets the sign, and the top fading into the dark above.
 - Let the ropes swing with the drop-and-bounce of item 4 (rotate the sign a degree or two and settle), off under Reduce Motion.
+
+- [x] Done 2026-11-02: pixel-art hemp and knot from `ui/currency-icons.ts`, with pixel-art currency icons and the new Blight Essence.
 
 
 ## 6. Half-art-pixel visibility contours (2026-10-29)

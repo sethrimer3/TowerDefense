@@ -13,6 +13,7 @@ export const CORE = [
  ["currency.silver","SILVER","PLATA","ARGENT","SILBER","PRATA","ARGENTO","銀","은","银"],
  ["currency.gold","GOLD","ORO","OR","GOLD","OURO","ORO","金","금","金"],
  ["currency.knowledge","KNOWLEDGE","SABER","SAVOIR","WISSEN","CONHECIMENTO","SAPERE","知識","지식","知识"],
+ ["currency.essence","ESSENCE","ESENCIA","ESSENCE","ESSENZ","ESSÊNCIA","ESSENZA","精髄","정수","精华"],
  ["currency.upgrade","UPGRADE","MEJORAS","AMÉLIORATION","AUFWERTUNG","MELHORIA","MIGLIORIA","強化","강화","升级"],
  ["common.close","Close","Cerrar","Fermer","Schließen","Fechar","Chiudi","閉じる","닫기","关闭"],
  ["common.cancel","Cancel","Cancelar","Annuler","Abbrechen","Cancelar","Annulla","キャンセル","취소","取消"],

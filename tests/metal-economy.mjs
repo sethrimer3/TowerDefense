@@ -12,7 +12,7 @@ mkdirSync('test-results', { recursive: true });
 async function app(viewport, smithy, free = false) {
   const context = await browser.newContext({ viewport });
   await context.addInitScript(({ smithy, free }) => {
-    localStorage.setItem('towerdefense.v1', JSON.stringify({ version: 2, smithy,
+    localStorage.setItem('towerdefense.v1', JSON.stringify({ version: 2, smithy, profile: { name: 'Coin Warden', flag: { base: 3, layers: [] } },
       settings: { devMode: free, soundOff: true, ambienceOff: true, reduceMotion: true } }));
   }, { smithy, free });
   const page = await context.newPage(), errors = [];
@@ -32,10 +32,14 @@ try {
   for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 }, { width: 360, height: 640 }]) {
     const { context, page, errors } = await app(viewport, { copper: 10, silver: 0, gold: 22 });
     assert.equal(await page.locator('.currency').count(), 6);
-    assert.deepEqual(await page.locator('.currency small').allTextContents(), ['COPPER', 'SILVER', 'GOLD', 'KNOWLEDGE', 'UPGRADE', '???']);
+    // The sign hangs over the Mine, Library and Tiles only.
+    assert.equal(await page.locator('#currencies').isVisible(), false);
+    await tab(page, 'tiles');
+    await page.locator('#currencies').waitFor({ state: 'visible' });
+    assert.deepEqual(await page.locator('.currency small').allTextContents(), ['COPPER', 'SILVER', 'GOLD', 'KNOWLEDGE', 'UPGRADE', 'ESSENCE']);
     assert.equal(await page.locator('#gold').textContent(), '22');
-    assert.equal(await page.locator('.gold-currency .bar-icon.gold').count(), 1);
-    assert.equal(await page.locator('.currency img[src$="gold.png"]').count(), 0);
+    assert.equal(await page.locator('.gold-currency canvas[data-currency-icon="gold"]').count(), 1);
+    assert.equal(await page.locator('.currency img').count(), 0);
     assert.equal(await page.evaluate(() => [...document.querySelectorAll('.currency')].every(el => {
       const r = el.getBoundingClientRect(); return r.x >= 0 && r.right <= innerWidth && r.width > 0;
     })), true);
