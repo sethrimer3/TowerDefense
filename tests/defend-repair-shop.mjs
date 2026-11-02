@@ -26,19 +26,19 @@ try {
    dp.openTree({uid:game.defend.layout.structures.find(s=>s.kind==='repairShop').uid});
   });
   const panel = page.locator('#defend-specialty'); await panel.waitFor({state:'visible'});
-  await page.locator('[data-node="repair:carpentry"]').click(); assert.match(await panel.locator('.ug-card').innerText(), /Initial skill/);
-  await page.locator('[data-node="q:advancedCarpentry:1"]').click();
-  await panel.locator('[data-ug-buy="q:advancedCarpentry:1"]').click();
-  assert.equal(await page.evaluate(()=>window.repairGame.defend.repairRanks.advancedCarpentry),1);
+  await page.locator('[data-node="repair:mending"]').click(); assert.match(await panel.locator('.ug-card').innerText(), /Initial skill/);
+  await page.locator('[data-node="q:masonry:1"]').click();
+  await panel.locator('[data-ug-buy="q:masonry:1"]').click();
+  assert.equal(await page.evaluate(()=>window.repairGame.defend.repairRanks.masonry),1);
   assert.ok(Number((await panel.locator('.ug-alloc b').innerText()).replace(/[^0-9]/g,''))>0);
   await page.locator('[data-node="q:crew:1"]').click(); await panel.locator('[data-ug-buy="q:crew:1"]').click();
   await page.screenshot({path:`test-results/repair-shop/tree-${width}.png`});
   await panel.locator('[data-ug-respec]').click();
   assert.equal(await page.evaluate(()=>window.repairGame.defend.repairRanks),undefined);
-  assert.equal(await page.locator('[data-node="repair:carpentry"].owned').count(),1);
+  assert.equal(await page.locator('[data-node="repair:mending"].owned').count(),1);
   await panel.locator('[data-specialty-close]').click();
   await page.screenshot({path:`test-results/repair-shop/city-${width}.png`});
-  assert.deepEqual(errors,[]); console.log(`${width}: tree purchase, initial Carpentry, respec, rendering passed`);
+  assert.deepEqual(errors,[]); console.log(`${width}: tree purchase, initial Mending, respec, rendering passed`);
   await page.close();
  }
 } finally { await browser.close(); }

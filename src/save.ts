@@ -5,6 +5,7 @@ import { decodeCampaigns, emptyCampaigns, type CampaignSave } from "./campaign/s
  * from the same site never shares it). Loading is defensive: `defaults()`
  * defines every field, and `decode()` keeps only what is well formed. */
 import { decodeDefendSave, defaultDefendSave, type DefendSave } from "./defend/progress.ts";
+import { RETIRED_REPAIR_KNOWLEDGE } from "./repair-upgrades.ts";
 import { STARTING_METAL, TRAINING, TRAINING_IDS, type TrainingId } from "./progression.ts";
 import { SKILLS, SKILL_IDS, type SkillId } from "./skill-trees.ts";
 import { decodePaths, decodePathResearch, decodeSpellPaths, isSpell, PATHS, type PathId, type PathResearch, type PathChoices, type SpellId } from "./knowledge-paths.ts";
@@ -137,6 +138,9 @@ export function decode(raw: string | null): Save {
   d.trainingJobs = decodeJobs(s.trainingJobs, d.training);
   d.trainingClock = num(s.trainingClock, 0);
   d.defend = decodeDefendSave(s.defend);
+  // Advanced carpentry was a Repair shop skill before masons mended every
+  // building and tower from the start: its Knowledge comes back.
+  if (s.defend?.repairRanks?.advancedCarpentry === 1) d.knowledge += RETIRED_REPAIR_KNOWLEDGE;
   const profile = decodeProfile(s.profile);
   if (profile) d.profile = profile;
   if (s.campaigns !== undefined) d.campaigns = decodeCampaigns(s.campaigns);

@@ -43,7 +43,7 @@ export function defeatHTML({ wave, best, record, stats }: DefeatSummary): string
       tile("damage taken", short(t.city + t.keep)),
       tile("troops lost", short(t.troopsLost)),
       tile("buildings fell", short(t.fell)),
-      tile("civilians lost", short(t.civiliansLost)),
+      tile("masons lost", short(t.civiliansLost)),
       tile("time", clock(t.seconds)),
     ].join("")}</div>${charts}</div>
     <div class="defeat-actions"><button type="button" data-defeat-close>Close</button></div>`;

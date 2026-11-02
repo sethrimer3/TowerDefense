@@ -41,7 +41,7 @@ export const SKILLS: Record<SkillId, Skill> = {
   bannerRegen: { id: "bannerRegen", name: "Restoring standard", icon: "♥", max: 1, base: 12, effect: { target: "bannerRegen", per: 5 }, text: "Living units within banner influence regenerate 5% of maximum life per second" },
   masonry: { id: "masonry", name: "Masonry", icon: "▦", max: 3, base: 1, effect: { target: "wallHp", per: 10 }, text: "+10% wall HP a rank" },
   bastions: { id: "bastions", name: "Bastions", icon: "♜", max: 3, base: 2, effect: { target: "keepHp", per: 10 }, text: "+10% keep HP a rank" },
-  guilds: { id: "guilds", name: "Builders' guilds", icon: "⚒", max: 3, base: 2, effect: { target: "rebuild", per: 10 }, text: "Civilians rebuild 10% faster a rank" },
+  guilds: { id: "guilds", name: "Builders' guilds", icon: "⚒", max: 3, base: 2, effect: { target: "rebuild", per: 10 }, text: "Masons rebuild 10% faster a rank" },
   scholars: { id: "scholars", name: "Smiths' guild", icon: "✦", max: 3, base: 2, effect: { target: "smithing", per: 15 }, text: "The Smithy's upgrades are worked 15% faster a rank" },
   tactician: { id: "tactician", name: "Master smith", icon: "⚒", max: 1, base: 6, effect: { target: "smiths", per: 1 }, text: "Room for one more smith in the mine's smithy" },
   fireproofWood: { id: "fireproofWood", name: "Fireproof wood", icon: "▤", max: 10, base: 5, effect: { target: "fireproof", per: 1 }, text: "The library's tables catch fire 10% less often a rank (1% a minute to start, then 0.9%, 0.81%…)" },

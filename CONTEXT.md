@@ -765,10 +765,13 @@ Dead grass and withered vegetation left where the Blight has walked. Repeated pa
 The shared visible day and night, turning once in five minutes of foreground play. It pauses while the game is hidden or closed and can be fixed to Day, Sunset, Dusk, Twilight, Night or Dawn. Faster sun during catch-up optionally runs this shared cycle at five times normal speed while the Mine or Library processes queued idle work.
 
 ### Repair shop
-A workshop whose carpenters leave to repair the city. It begins with two workers and Carpentry; its skills teach combat-building repairs, masonry, larger crews, critical-job priorities and retreating bow shots.
+A workshop whose masons leave to repair the city. It begins with two masons and Mending; its skills teach wall masonry, larger crews, critical-job priorities and retreating bow shots.
 
-### Carpentry
-The Repair shop's initial skill: rebuilding destroyed houses and service buildings. Advanced carpentry extends repairs to infantry buildings and towers.
+### Mason
+A Repair shop's worker. Masons repair damaged buildings and towers and rebuild destroyed ones; Wall masonry lets them mend walls, gates and wall ballistas.
+
+### Mending
+The Repair shop's initial skill: masons repair and rebuild every building and tower, and repair the keep while it stands. It replaced Carpentry and Advanced carpentry.
 
 **Blight Cannon**:
 A small solid-black walking fortress with a burning noise perimeter, orange right-angle particle trails inside its square body, and a turret firing orange energy cannonballs.

@@ -7,7 +7,7 @@ import { defaultLayout, fitLayout, placeCityTile, placeStructure } from '../src/
 import { DefendSim, type Levels } from '../src/defend/sim.ts';
 import { Builders, atHome, canRepair } from '../src/defend/civilians.ts';
 import { cellCenter, rectDist } from '../src/defend/pathing.ts';
-import { REPAIR, REPAIR_PATHS, decodeRepairRanks, repairCrew, respecRepair, undoRepair, upgradeRepair } from '../src/repair-upgrades.ts';
+import { REPAIR, REPAIR_PATHS, RETIRED_REPAIR_KNOWLEDGE, decodeRepairRanks, repairCrew, respecRepair, undoRepair, upgradeRepair } from '../src/repair-upgrades.ts';
 import { defaults, decode } from '../src/save.ts';
 import { bonuses } from '../src/progression.ts';
 import { buildingSheet, graftedGraph, treeCardHtml, REPAIR_UI } from '../src/ui/specialty.ts';
@@ -31,7 +31,7 @@ function tick(s: ReturnType<typeof scene>, dt = .1) { s.builders.step(s.sim, dt)
 function ruins(s: ReturnType<typeof scene>, count = 8) { for (const b of s.houses.slice(0, count)) s.sim.damageBuilding(b.id, 1e9); }
 function placeAtWork(s: ReturnType<typeof scene>, c = s.sim.civilians[0]) { Object.assign(c, cellCenter(c.stand ?? c.job)); c.path = []; c.state = 'working'; return c; }
 
-test('Repair shop is a purchasable 2 by 1 quarter-grid building; a city without it never recruits repair workers', () => {
+test('Repair shop is a purchasable 2 by 1 quarter-grid building; a city without it never recruits masons', () => {
   assert.equal(STRUCTURES.repairShop.w, 4); assert.equal(STRUCTURES.repairShop.h, 2);
   const save = defaults(); save.settings.devMode = true;
   assert.ok(!('reason' in shopOffer(save, 'repairShop'))); assert.ok(buyTile(save, 'repairShop'));
@@ -40,7 +40,7 @@ test('Repair shop is a purchasable 2 by 1 quarter-grid building; a city without 
   assert.equal(s.sim.civilians.length, 0); assert.equal(s.sim.hp[s.houses[0].id], 0);
 });
 
-test('two workers per intact shop emerge from its door; crew skills raise that to three and four per shop', () => {
+test('two masons per intact shop emerge from its door; crew skills raise that to three and four per shop', () => {
   for (const crew of [0, 1, 2]) {
     const s = scene({ repair: { crew } }, 2); ruins(s, 12); tick(s);
     assert.equal(s.sim.civilians.length, (2 + crew) * 2);
@@ -48,29 +48,38 @@ test('two workers per intact shop emerge from its door; crew skills raise that t
   }
 });
 
-test('Carpentry is innate, Advanced carpentry unlocks damaged and destroyed combat buildings, Masonry unlocks walls and gates', () => {
+test('masons mend every building and tower from the start, the keep while it stands; Wall masonry unlocks walls and gates', () => {
   const s = scene();
   for (const b of s.sim.map.buildings) s.sim.hp[b.id] /= 2;
-  assert.ok(canRepair(s.sim, s.houses[0])); assert.ok(canRepair(s.sim, s.shops[0]));
-  assert.equal(canRepair(s.sim, s.of('archerTower')), false); assert.equal(canRepair(s.sim, s.of('barracks')), false); assert.equal(canRepair(s.sim, s.of('wall')), false);
-  s.sim.bonuses.repair = { advancedCarpentry: 1, masonry: 1 };
-  for (const kind of ['archerTower', 'barracks', 'wall'] as const) { assert.ok(canRepair(s.sim, s.of(kind))); s.sim.damageBuilding(s.of(kind).id, 1e9); assert.ok(canRepair(s.sim, s.of(kind))); }
+  for (const b of [s.houses[0], s.shops[0], s.of('archerTower'), s.of('barracks'), s.of('keep')]) assert.ok(canRepair(s.sim, b), b.kind);
+  for (const kind of ['archerTower', 'barracks'] as const) { s.sim.damageBuilding(s.of(kind).id, 1e9); assert.ok(canRepair(s.sim, s.of(kind))); }
+  assert.equal(canRepair(s.sim, s.of('wall')), false);
+  s.sim.bonuses.repair = { masonry: 1 };
+  assert.ok(canRepair(s.sim, s.of('wall'))); s.sim.damageBuilding(s.of('wall').id, 1e9); assert.ok(canRepair(s.sim, s.of('wall')));
+});
+
+test('a save with the retired Advanced carpentry gets its Knowledge back once and keeps its other repair skills', () => {
+  const save = defaults(); save.knowledge = 10;
+  const raw = JSON.parse(JSON.stringify(save)); raw.defend.repairRanks = { advancedCarpentry: 1, crew: 1 };
+  const loaded = decode(JSON.stringify(raw));
+  assert.equal(loaded.knowledge, 10 + RETIRED_REPAIR_KNOWLEDGE); assert.deepEqual(loaded.defend.repairRanks, { crew: 1 });
+  assert.equal(decode(JSON.stringify(loaded)).knowledge, 10 + RETIRED_REPAIR_KNOWLEDGE);
 });
 
 test('repairs restore the same HP percentage at different maximum HP and Smithy speeds apply', () => {
   for (const hp of [1, 4]) {
-    const s = scene({ repair: { advancedCarpentry: 1 }, towerHp: hp }); const b = s.of('archerTower');
+    const s = scene({ towerHp: hp }); const b = s.of('archerTower');
     s.sim.hp[b.id] = s.sim.maxHp[b.id] / 2; tick(s, 0); placeAtWork(s); tick(s, 3);
     assert.ok(Math.abs(s.sim.hp[b.id] / s.sim.maxHp[b.id] - .6) < 1e-9);
   }
-  const s = scene({ repair: { advancedCarpentry: 1 }, rebuild: .5 }); const b = s.of('barracks');
+  const s = scene({ rebuild: .5 }); const b = s.of('barracks');
   s.sim.hp[b.id] /= 2; tick(s, 0); placeAtWork(s); tick(s, 3);
   assert.ok(Math.abs(s.sim.hp[b.id] / s.sim.maxHp[b.id] - .7) < 1e-9);
 });
 
 test('destroyed buildings return cell by cell and become functional after thirty seconds of work regardless of footprint', () => {
   for (const kind of ['archerTower', 'barracks'] as const) {
-    const s = scene({ repair: { advancedCarpentry: 1 } }); const b = s.of(kind); s.sim.damageBuilding(b.id, 1e9); tick(s, 0);
+    const s = scene(); const b = s.of(kind); s.sim.damageBuilding(b.id, 1e9); tick(s, 0);
     const c = placeAtWork(s); tick(s, 15); assert.ok(s.sim.built[b.id] > 0 && s.sim.built[b.id] < b.cells.length);
     Object.assign(c, cellCenter(c.stand!)); tick(s, 15); assert.ok(s.sim.intact(b)); assert.equal(s.sim.hp[b.id], s.sim.maxHp[b.id]);
   }
@@ -91,7 +100,7 @@ test('critical repair skill prioritizes a distant breach over a nearby ruined ho
   assert.equal(plain.sim.map.owner[plain.sim.civilians[0].job], house.id, 'untrained workers choose the nearer house');
 });
 
-test('workers shoot weak arrows while retreating; Smithy HP/damage apply, and the bow requires its skill', () => {
+test('masons shoot weak arrows while retreating; Smithy HP/damage apply, and the bow requires its skill', () => {
   for (const bow of [0, 1]) {
     const s = scene({ repair: { retreatBow: bow }, repairHp: 2, repairDamage: 3 }); ruins(s); tick(s, 0);
     const c = placeAtWork(s); assert.equal(c.hp, 2 * 8);
@@ -102,7 +111,7 @@ test('workers shoot weak arrows while retreating; Smithy HP/damage apply, and th
   }
 });
 
-test('fallen shops stop recruitment, surviving workers can rebuild the shop, and dead slots wait before replacement', () => {
+test('fallen shops stop recruitment, surviving masons can rebuild the shop, and dead slots wait before replacement', () => {
   const s = scene(); ruins(s); tick(s, 0); const c = s.sim.civilians[0];
   c.hp = 0; tick(s); assert.equal(s.sim.civilians.length, 1);
   tick(s, 5); assert.equal(s.sim.civilians.length, 1);
@@ -111,10 +120,10 @@ test('fallen shops stop recruitment, surviving workers can rebuild the shop, and
   assert.ok(canRepair(s.sim, s.shops[0]));
 });
 
-test('repair tree has free innate Carpentry, independent paid branches, refunds, bounded decoding and saved battle snapshots', () => {
+test('repair tree has free innate Mending, independent paid branches, refunds, bounded decoding and saved battle snapshots', () => {
   const save = defaults(); save.knowledge = 1e9;
-  const graph = graftedGraph(save, 'repairShop'); assert.equal(graph.find(n => n.id === 'repair:carpentry')?.state, 'owned');
-  assert.match(treeCardHtml(save, 'repairShop', undefined, 'repair:carpentry'), /Initial skill/);
+  const graph = graftedGraph(save, 'repairShop'); assert.equal(graph.find(n => n.id === 'repair:mending')?.state, 'owned');
+  assert.match(treeCardHtml(save, 'repairShop', undefined, 'repair:mending'), /Initial skill/);
   for (const p of REPAIR_PATHS) assert.ok(upgradeRepair(save, p.id).ok);
   assert.ok(upgradeRepair(save, 'crew').ok); assert.equal(repairCrew(save.defend.repairRanks), 4);
   const clone = decode(JSON.stringify(save)); assert.deepEqual(clone.defend.repairRanks, save.defend.repairRanks);
@@ -128,7 +137,7 @@ test('repair tree has free innate Carpentry, independent paid branches, refunds,
 });
 
 
-test('surviving carpenters rebuild their fallen shop and normal recruitment resumes', () => {
+test('surviving masons rebuild their fallen shop and normal recruitment resumes', () => {
   const s = scene(); ruins(s, 1); tick(s, 0);
   const c = s.sim.civilians[0];
   s.sim.rebuildCell(s.houses[0].cells[0]);
