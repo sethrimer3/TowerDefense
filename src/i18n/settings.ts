@@ -41,6 +41,7 @@ export const SETTINGS_TEXT = [
  ["settings.opacityAria","Tile grid line opacity, percent","Opacidad de la cuadrícula, porcentaje","Opacité de la grille, pourcentage","Rasterdeckkraft in Prozent","Opacidade da grade, porcentagem","Opacità della griglia, percentuale","タイルのグリッド線の不透明度、パーセント","타일 격자선 불투명도, 백분율","地块网格线不透明度，百分比"],
  ["setting.soundOff","Sound","Sonido","Son","Ton","Som","Audio","効果音","소리","音效"],
  ["setting.ambienceOff","Ambient sound","Sonido ambiental","Ambiance sonore","Umgebungsgeräusche","Som ambiente","Suoni ambientali","環境音","환경음","环境音"],
+ ["setting.pixelPortals","Pixel art perlin noise outlines","Contornos de ruido Perlin en pixel art","Contours en bruit de Perlin pixel art","Perlin-Rauschumrisse als Pixelkunst","Contornos de ruído Perlin em pixel art","Contorni a rumore Perlin in pixel art","ピクセルアートのパーリンノイズ輪郭","픽셀 아트 펄린 노이즈 윤곽선","像素风柏林噪声轮廓"],
  ["setting.hdSand","HD Sand","Arena HD","Sable HD","HD-Sand","Areia HD","Sabbia HD","HDの砂","HD 모래","高清沙地"],
  ["setting.resolution","Board resolution","Resolución del tablero","Résolution du plateau","Spielfeldauflösung","Resolução do tabuleiro","Risoluzione del tabellone","盤面の解像度","보드 해상도","棋盘分辨率"],
  ["settings.resolution.0","Full","Completa","Complète","Voll","Completa","Piena","最大","최대","完整"],

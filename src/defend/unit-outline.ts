@@ -278,8 +278,9 @@ export class UnitOutline {
   mergePixelGaps(active = true) { if (this.thin) this.contours.mergePixelGaps(active); }
 
   /** Visibility colors stay above the world color drain, using cached geometry. */
-  drawContours(c: Ctx, seconds?: number) {
+  drawContours(c: Ctx, seconds?: number, pixelPortals = false) {
     if (seconds !== undefined) this.contours.seconds = seconds;
+    this.contours.pixelPortals = pixelPortals;
     if (this.thin) this.contours.draw(c);
   }
   /** The contours again, lit by the torchlight's glow where it reaches. */

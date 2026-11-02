@@ -144,6 +144,7 @@ const defendPage = new DefendPage(el("defend"), {
   simpleTroops: () => save.settings.simpleTroops,
   mergedOutlines: () => save.settings.mergedOutlines,
   hdSand: () => save.settings.hdSand,
+  pixelPortals: () => save.settings.pixelPortals,
   resolution: () => save.settings.resolution,
   ultraGraphics: () => save.settings.ultraGraphics,
   setHealthbars: (value) => { save.settings.showHealthbars = value; store(); },

@@ -101,6 +101,8 @@ export type DrawOptions = {
   mergedOutlines?: boolean;
   /** The desert's detailed dunes rather than its simple ones. */
   hdSand?: boolean;
+  /** Portal contours drawn as pixel art, half an art pixel a pixel. */
+  pixelPortals?: boolean;
   /** Torchlight sheen on building rims and unit contours (Settings' Ultra
    * graphics). Absent counts as on, so fixtures keep the full drawing. */
   sheen?: boolean;
@@ -439,7 +441,7 @@ export class DefendRenderer {
     }
     this.ctx.restore();
     this.darkDrain.draw(this.ctx, this.px, sim, opts.now, blightNight, this.protectCombat ? this.actors : null);
-    if (sim) this.outline?.drawContours(this.ctx, opts.reduceMotion ? 0 : opts.now / 1000);
+    if (sim) this.outline?.drawContours(this.ctx, opts.reduceMotion ? 0 : opts.now / 1000, !!opts.pixelPortals);
     if (sim && this.lit && opts.sheen !== false) this.outline?.shineContours(this.ctx, this.lighting);
     opts.markers?.(this.ctx,this.px);
     this.rallyFlag.draw(this.ctx, this.px, sim, sim?.warBanner?.flag && !opts.hideBanner ? sim.warBanner : null, opts);
