@@ -1,7 +1,7 @@
 /** The keep's own upgrade tree. Unlike every other building, whose paths
  * are a choice of one, the keep climbs each of its branches on its own:
- * Bastions (its HP), Arrow loops (it shoots) and Boiling oil (it scalds
- * what reaches its walls). Each rank is paid with Knowledge, and a respec
+ * Bastions (its HP), Arrow loops (it shoots), Boiling oil (it scalds
+ * what reaches its walls) and City watch (its guards). Each rank is paid with Knowledge, and a respec
  * gives it all back, free. The ranks are saved on the Defend
  * save (`DefendSave.keepRanks`, absent while it has none: there is only
  * ever one keep, and it never leaves the city) and snapshotted into
@@ -10,7 +10,7 @@ import { studyPathCost } from "./economy.ts";
 import type { Save } from "./save.ts";
 import { buySide, decodeSideRanks, respecSide, sideAllocated, sideRank, undoSide, type SidePath, type SideRanks, type SideResult } from "./side-ranks.ts";
 
-export type KeepPathId = "bastions" | "arrowLoops" | "boilingOil";
+export type KeepPathId = "bastions" | "arrowLoops" | "boilingOil" | "watch";
 /** How far the keep has climbed each branch (absent: not at all). */
 export type KeepRanks = SideRanks<KeepPathId>;
 
@@ -26,6 +26,13 @@ export const ARROW_LOOPS = { range: [0, 5, 6.5, 6.5], reload: [0, 1.6, 1.1, 1.1]
  * `reach[rank]` cells of the keep's walls is scalded for `damage[rank]`;
  * from II it keeps burning `burn[rank]` seconds at `dps[rank]` a second. */
 export const BOILING_OIL = { reach: [0, 1.5, 2, 2.5], every: [0, 3, 2.5, 2], damage: [0, 25, 40, 60], burn: [0, 0, 3, 4], dps: [0, 0, 10, 20] };
+
+/** City watch: the keep's guards, who patrol the streets with spears and,
+ * in a Defend battle, fight what gets into the city (`defend/city-watch.ts`).
+ * `guards[rank]` of them, trained back one every `drill[rank]` seconds while
+ * the keep stands, their HP and damage times `hp[rank]` and `damage[rank]`,
+ * their spears `reach[rank]` cells long. */
+export const CITY_WATCH = { guards: [4, 4, 4, 8], drill: [15, 15, 15, 7.5], hp: [1, 1.6, 1.6, 1.6], damage: [1, 1, 1.5, 1.5], reach: [0.85, 0.85, 1.1, 1.1] };
 
 export const KEEP_PATHS: SidePath<KeepPathId>[] = [
   {
@@ -52,7 +59,22 @@ export const KEEP_PATHS: SidePath<KeepPathId>[] = [
       { name: "Murder holes", icon: "fireball", cost: studyPathCost(4, 2), text: "Every 2 seconds, 2.5 cells out, for 60, and they burn twice as hot" },
     ],
   },
+  {
+    id: "watch", name: "City watch", motto: "Guards who fight for the streets", hue: "steel",
+    ranks: [
+      { name: "Mail shirts", icon: "mail", cost: studyPathCost(4, 0), text: "The keep's 4 guards have 60% more HP" },
+      { name: "Spear drill", icon: "stake", cost: studyPathCost(4, 1), text: "Guards strike 50% harder with longer spears" },
+      { name: "Muster roll", icon: "helm", cost: studyPathCost(4, 2), text: "8 guards instead of 4, and the keep trains them twice as fast" },
+    ],
+  },
 ];
+
+/** What the keep's guards fight with at `ranks` (for `Bonuses.watch`). */
+export function cityWatch(ranks: KeepRanks | undefined) {
+  const r = sideRank(ranks, "watch");
+  return { guards: CITY_WATCH.guards[r], drill: CITY_WATCH.drill[r], hp: CITY_WATCH.hp[r], damage: CITY_WATCH.damage[r], reach: CITY_WATCH.reach[r] };
+}
+export type CityWatch = ReturnType<typeof cityWatch>;
 
 export const keepRank = (ranks: KeepRanks | undefined, id: KeepPathId) => sideRank(ranks, id);
 /** The Knowledge allocated to the keep: every rank bought, at today's prices

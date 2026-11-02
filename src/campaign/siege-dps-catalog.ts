@@ -16,7 +16,8 @@ export type DefenderKind = StructureKind | "wall" | "gate" | "wallBallista";
 export type DpsProfile = { key: string; kind: DefenderKind; path?: PathId; rank?: number; sideKey?: SideKey; side?: Record<string, number> };
 export const FORGE_BANDS = [0, 0.25, 0.5, 0.75, 1] as const;
 export const SIDE_GROUPS: { kind: DefenderKind; key: SideKey; paths: SidePath<string>[] }[] = [
-  { kind: "keep", key: "keepRanks", paths: KEEP_PATHS },
+  // The City watch fights only in Defend, so Siege castles never buy it.
+  { kind: "keep", key: "keepRanks", paths: KEEP_PATHS.filter((p) => p.id !== "watch") },
   { kind: "wall", key: "wallRanks", paths: WALL_PATHS },
   { kind: "gate", key: "gateRanks", paths: GATE_PATHS },
   { kind: "wallBallista", key: "ballistaRanks", paths: BALLISTA_PATHS },

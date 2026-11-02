@@ -60,7 +60,7 @@ test("the keep's branches are climbed side by side, paid in Knowledge, and respe
   assert.equal(keepAllocated(s.defend.keepRanks), 0);
   for (const p of KEEP_PATHS) assert.ok(upgradeKeep(s, p.id).ok, p.id);
   assert.ok(upgradeKeep(s, "bastions").ok);
-  assert.deepEqual(s.defend.keepRanks, { bastions: 2, arrowLoops: 1, boilingOil: 1 }, "every branch at once");
+  assert.deepEqual(s.defend.keepRanks, { bastions: 2, arrowLoops: 1, boilingOil: 1, watch: 1 }, "every branch at once");
   const spent = KEEP_PATHS.reduce((n, p) => n + p.ranks[0].cost, 0) + KEEP_PATHS[0].ranks[1].cost;
   assert.equal(s.knowledge, 1e6 - spent);
   assert.equal(keepAllocated(s.defend.keepRanks), spent);

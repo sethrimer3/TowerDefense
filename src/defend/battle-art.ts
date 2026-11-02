@@ -21,7 +21,8 @@ import { boatLights, drawBoat } from "./boat-art.ts";
  * damaged buildings, blast scorches, then the units, projectiles and effects.
  * Every painter takes a `Brush`: the board's context and its pixels per cell. */
 import { hash01 } from "./grid.ts";
-import { HOPLITE, JAVELINEER, LANCER, SPEARMAN, ARCHER_UNIT, ASSASSIN_UNIT, BRAWLER, CIVILIAN, DARK_WIZARD, ENEMIES, FIRE_MAGE, GATLING_GUNNER, GUNNER, MACHINE_GUNNER, MUSKETEER, RAIL_SNIPER, ROCKETEER, SLINGER, SNIPER, SOLDIER, VALKYRIE, watchRadius, type EnemyDef } from "./catalog.ts";
+import { HOPLITE, JAVELINEER, LANCER, SPEARMAN, ARCHER_UNIT, ASSASSIN_UNIT, BRAWLER, CIVILIAN, DARK_WIZARD, ENEMIES, FIRE_MAGE, GATLING_GUNNER, GUNNER, MACHINE_GUNNER, MUSKETEER, RAIL_SNIPER, ROCKETEER, SLINGER, SNIPER, SOLDIER, VALKYRIE, WATCHMAN, watchRadius, type EnemyDef } from "./catalog.ts";
+import { drawWatchman } from "./city-life-art.ts";
 import type { Building } from "./citygen.ts";
 import { center } from "./pathing.ts";
 import { paintKeepFlash } from "./structure-art.ts";
@@ -285,6 +286,17 @@ function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null, reduced
       const a=px/8;
       c.fillStyle="#c5a46d";c.fillRect(u.x*px-a,u.y*px-3*a,2*a,3*a);
       c.fillStyle="#eed7ac";c.fillRect(u.x*px-a,u.y*px-4*a,2*a,a);
+      continue;
+    }
+    if (u.kind === "watchman") {
+      // The keep's guards: the build phase's watchmen, their spears levelled
+      // and jabbed at whatever they strike; drawn on whole canvas pixels so they glide.
+      const foe = u.target >= 0 ? sim.enemies.find((e) => e.id === u.target) : undefined;
+      const since = WATCHMAN.cooldown - u.cd, d = foe ? Math.hypot(foe.x - u.x, foe.y - u.y) : 0;
+      const thrust = foe && d > 0 && d < 2.5 ? { x: (foe.x - u.x) / d, y: (foe.y - u.y) / d } : undefined;
+      const jab = thrust && since >= 0 && since < 0.2 ? Math.sin((since / 0.2) * Math.PI) : 0;
+      drawWatchman(c, Math.round(u.x * px), Math.round(u.y * px), px / ART, { flash: u.flash > 0, thrust, jab });
+      if (torches) drawHandTorch(b, { x: u.x - 2.5 / ART, y: u.y, id: u.id }, sim.time, torches(u.x, u.y, u.id));
       continue;
     }
     if (u.kind === "mage") {

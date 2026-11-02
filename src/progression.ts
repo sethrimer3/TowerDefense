@@ -200,7 +200,7 @@ export function multiplier(save: Save, target: BonusTarget) {
 /** What the next defense fights with. */
 export function bonuses(save: Save): Bonuses {
   const out = { ...NO_BONUSES } as Bonuses;
-  for (const k of Object.keys(out) as Exclude<keyof Bonuses, "paths" | "banner" | "structurePaths" | "spikePaths" | "keep" | "walls" | "gate" | "ballista" | "revolutionary" | "shadow" | "nano" | "chrono" | "repair" | "necromancy" | "meteor" | "frostNova" | "reinforcements">[]) out[k] = multiplier(save, k);
+  for (const k of Object.keys(out) as Exclude<keyof Bonuses, "paths" | "banner" | "structurePaths" | "spikePaths" | "keep" | "walls" | "gate" | "ballista" | "revolutionary" | "shadow" | "nano" | "chrono" | "repair" | "necromancy" | "meteor" | "frostNova" | "reinforcements" | "watch">[]) out[k] = multiplier(save, k);
   if (SKILL_IDS.some(id => id.startsWith("banner") && skillRank(save, id) > 0)) out.banner = { cooldown: 10 - skillTotal(save, "bannerCooldown"), defense: skillTotal(save, "bannerDefense") / 100, reach: 5 + skillTotal(save, "bannerReach"), damage: 1 + skillTotal(save, "bannerDamage") / 100, march: 1 + skillTotal(save, "bannerMarch") / 100, life: 1 + skillTotal(save, "bannerLife") / 100, regen: skillTotal(save, "bannerRegen") / 100 };
   Object.assign(out, placedBattlePaths(save));
   if (save.defend.keepRanks) out.keep = { ...save.defend.keepRanks };

@@ -1,5 +1,5 @@
 /** Canonical defender body envelopes, shared by contact combat and painters. */
-import { FLAG_BEARER, HERO, SHADE, HOPLITE, JAVELINEER, LANCER, SPEARMAN, ARCHER_UNIT, ASSASSIN_UNIT, BRAWLER, DARK_WIZARD, FIRE_MAGE, GATLING_GUNNER, GUNNER, MACHINE_GUNNER, MUSKETEER, RAIL_SNIPER, ROCKETEER, SLINGER, SNIPER, SOLDIER, VALKYRIE } from "./catalog.ts";
+import { FLAG_BEARER, HERO, SHADE, HOPLITE, JAVELINEER, LANCER, SPEARMAN, ARCHER_UNIT, ASSASSIN_UNIT, BRAWLER, DARK_WIZARD, FIRE_MAGE, GATLING_GUNNER, GUNNER, MACHINE_GUNNER, MUSKETEER, RAIL_SNIPER, ROCKETEER, SLINGER, SNIPER, SOLDIER, VALKYRIE, WATCHMAN } from "./catalog.ts";
 import type { Soldier, Civilian } from "./sim.ts";
 import { CIVILIAN } from "./catalog.ts";
 
@@ -29,6 +29,7 @@ export const TROOPS: Record<Soldier["kind"], { size: number; color: string }> = 
   shade: SHADE,
   flagBearer: FLAG_BEARER,
   assassin: ASSASSIN_UNIT,
+  watchman: WATCHMAN,
 };
 
 export const defenderSize = (u: Soldier | Civilian) => "kind" in u ? TROOPS[u.kind].size : CIVILIAN.size;
