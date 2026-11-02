@@ -35,6 +35,7 @@ import { ROSES, setRose, type Rose } from "./ui/hall-art.ts";
 import { fitViewport } from "./ui/viewport.ts";
 import { setLanguage, translateWithin } from "./i18n/index.ts";
 import { installSeal } from "./ui/seal-art.ts";
+import { installScrollArrows } from "./ui/scroll-arrows.ts";
 
 // Wires the pages together: builds the shell, loads the save, and routes
 // navigation, the currency bar and the frame loop between the pages.
@@ -44,6 +45,7 @@ setLanguage(save.settings.language);
 fitViewport();
 installSeal();
 buildShell(document.querySelector<HTMLDivElement>("#app")!, save.settings.legacyGraphics);
+installScrollArrows();
 let shownLegacyGraphics = save.settings.legacyGraphics;
 document.querySelectorAll<HTMLCanvasElement>("nav canvas[data-icon]").forEach((c) => paintIcon(c, "cityTile"));
 // Refresh icons after the visual setting changes, once a frame at most.

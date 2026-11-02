@@ -838,6 +838,103 @@ span.training-timer {
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
+/* Each major section folds under its heading: the heading is a bare toggle
+   (no oak board) with a pixel brass arrow that turns as the body eases shut. */
+/* Menus that scroll show pixel arrows (ui/scroll-arrows.ts) instead of scrollbars. */
+:root {
+  --pixel-arrow: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 6' shape-rendering='crispEdges'><path fill='%23120c06' d='M1 0h7v1h1v1h-1v1h-1v1h-1v1h-1v1h-1v-1h-1v-1h-1v-1h-1v-1h-1v-1h1z'/><path fill='%23e8c46a' d='M1 1h7v1h-1v1h-1v1h-1v1h-1v-1h-1v-1h-1v-1h-1z'/><path fill='%23fff0b8' d='M1 1h7v1h-7z' opacity='.5'/></svg>");
+}
+#settings,
+#defend-palette,
+.ambush-side-content,
+.siege-squads {
+  scrollbar-width: none;
+}
+#settings::-webkit-scrollbar,
+#defend-palette::-webkit-scrollbar,
+.ambush-side-content::-webkit-scrollbar,
+.siege-squads::-webkit-scrollbar {
+  display: none;
+}
+.scroll-arrow {
+  position: absolute;
+  z-index: 4;
+  width: 18px;
+  height: 12px;
+  background: var(--pixel-arrow) center / 100% 100% no-repeat;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 0 2px #000);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.scroll-arrow.show {
+  opacity: 1;
+}
+.scroll-arrow-up { transform: translate(-50%, 0) rotate(180deg); }
+.scroll-arrow-down { transform: translate(-50%, -100%); }
+.scroll-arrow-left { transform: translate(-3px, -50%) rotate(90deg); }
+.scroll-arrow-right { transform: translate(calc(-100% + 3px), -50%) rotate(-90deg); }
+.settings-group .settings-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 4px 2px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.settings-group .settings-toggle:hover {
+  color: #ffe4a8;
+  box-shadow: none;
+  text-shadow: 0 1px 0 #000, 0 0 6px #ffae5580;
+}
+.settings-group .settings-toggle:active:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+}
+.settings-chevron {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 12px;
+  background: var(--pixel-arrow) center / 100% 100% no-repeat;
+  image-rendering: pixelated;
+  transition: transform 0.28s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+.settings-section.folded .settings-chevron {
+  transform: rotate(-90deg);
+}
+.settings-body {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 0.32s ease, opacity 0.32s ease;
+}
+.settings-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+.settings-section.folded .settings-body {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+:root.reduce-motion .settings-body,
+:root.reduce-motion .settings-chevron {
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .settings-body,
+  .settings-chevron {
+    transition: none;
+  }
+}
 .setting-all {
   color: #f2d48a;
   font-weight: 700;
