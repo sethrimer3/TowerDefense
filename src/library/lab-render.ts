@@ -47,8 +47,13 @@ const annexCeiling = (x: number, a: { x0: number; x1: number }) => {
  * pilasters from the annexes' vaults down, the floor running on under them. */
 const DOORS = { west: { x0: ANNEXES.west.x1, x1: ROOM.x0 }, east: { x0: ROOM.x1, x1: ANNEXES.east.x0 } };
 const DOOR_TOP = ANNEX_TOP + 16;
-/** The row the ladder comes down through the vault from. */
-export const HATCH_Y = Math.ceil(ceiling(STAIR_X));
+/** The vault's rib, 3 pixels deep, stands in front of whatever rises behind
+ * it (the ladder, the athanor's chimney): true for a pixel in it or above. */
+const RIB = 3;
+const behindRib = (x: number, y: number) => y < ceiling(x) + RIB;
+/** The row the ladder shows from, under the vault's rib (it comes down
+ * through a hatch behind it). */
+export const HATCH_Y = Math.ceil(Math.max(ceiling(STAIR_X - 2), ceiling(STAIR_X + 1)) + RIB);
 const open = (side: "west" | "east", level: number) => level >= ANNEXES[side].level;
 function inRoom(x: number, y: number, level = 1) {
   if (y >= LAB_FLOOR) return false;
@@ -62,6 +67,9 @@ function inRoom(x: number, y: number, level = 1) {
   return false;
 }
 
+/** The spider: how long a spell lasts, the share of spells it comes down
+ * in, and how long (seconds) a visit takes, down and back up. */
+const SPIDER = { every: 120, chance: 0.35, visit: 18 };
 /** Where things stand in the lab (world pixels). */
 const F = LAB_FLOOR;
 const ATHANOR = { x0: 64, x1: 81, mouth: { x0: 69, x1: 76, top: F - 8 }, egg: { x: 72, y: F - 27 } };
@@ -174,6 +182,13 @@ export class LabRenderer {
     this.kind[i] = kind;
     this.relief[i] = 0;
   }
+  /** Gives the pixel at (x, y) a height in the bump map. */
+  private bump(x: number, y: number, hgt: number) {
+    const i = (Math.round(y) - H) * LW + Math.round(x) + HALL;
+    if (i < 0 || i >= LW * LH) return;
+    this.relief[i] = 1;
+    this.height[i] = hgt;
+  }
   private rect(x: number, y: number, w: number, h: number, c: RGB | ((x: number, y: number) => RGB), kind = Px.Room) {
     for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) this.put(xx, yy, typeof c === "function" ? c(xx, yy) : c, kind);
   }
@@ -266,11 +281,11 @@ export class LabRenderer {
   /** The ladder down through the hatch in the vault (the shaft above it,
    * under the nave's floor, is out of sight), and a barrel beside its foot. */
   private bakeStair() {
-    this.rect(STAIR_X - 4, HATCH_Y - 1, 9, 2, (x) => (x === STAIR_X - 4 || x === STAIR_X + 4 ? [74, 72, 78] : [8, 6, 6]));
-    for (let y = HATCH_Y - 1; y < F; y++) {
-      this.put(STAIR_X - 2, y, [150, 106, 58]);
-      this.put(STAIR_X + 1, y, [118, 82, 44]);
-      if (y % 3 === 0) for (let x = STAIR_X - 1; x <= STAIR_X; x++) this.put(x, y, [124, 86, 46]);
+    const behind = (x: number, y: number, c: RGB) => behindRib(x, y) || this.put(x, y, c);
+    for (let y = Math.floor(ceiling(STAIR_X)); y < F; y++) {
+      behind(STAIR_X - 2, y, [150, 106, 58]);
+      behind(STAIR_X + 1, y, [118, 82, 44]);
+      if (y % 3 === 0) for (let x = STAIR_X - 1; x <= STAIR_X; x++) behind(x, y, [124, 86, 46]);
     }
     // A barrel of salts, iron-hooped.
     this.rect(6, F - 9, 8, 9, (x, y) => (y === F - 9 ? [150, 146, 140] : y === F - 7 || y === F - 2 ? [70, 70, 76] : x === 6 || x === 13 ? [70, 44, 24] : [118 - Math.abs(x - 9.5) * 6, 78, 42]));
@@ -383,8 +398,11 @@ export class LabRenderer {
     // The athanor: a brick tower to the vault, its arched mouth at the foot,
     // the philosophers' egg's window halfway up, bellows on its flank.
     const A = ATHANOR;
-    for (let y = Math.ceil(ceiling(72)); y < F; y++)
+    // Bricks bevelled into the bump map like the walls' blocks, the chimney
+    // rising behind the vault's rib.
+    for (let y = LAB_TOP; y < F; y++)
       for (let x = A.x0; x < A.x1; x++) {
+        if (behindRib(x, y)) continue;
         const base = y >= F - 7, chimney = y < F - 40;
         if (chimney && (x < A.x0 + 3 || x >= A.x1 - 3)) continue;
         if (!base && !chimney && (x < A.x0 + 1 || x >= A.x1 - 1)) continue;
@@ -392,6 +410,8 @@ export class LabRenderer {
         const t = 0.75 + h01((x + off) >> 3, course, 31) * 0.3;
         const edge = x === A.x0 || x === A.x1 - 1 || (chimney && (x === A.x0 + 3 || x === A.x1 - 4)) || (!base && !chimney && (x === A.x0 + 1 || x === A.x1 - 2));
         this.put(x, y, edge ? [36, 26, 22] : mortar ? [70, 52, 40] : [172 * t, 128 * t, 92 * t]);
+        const bx = (x + off) % 6, by = (F - y) % 3;
+        this.bump(x, y, edge || mortar ? 0 : Math.min(1, Math.min(bx, 6 - bx, by, 3 - by) / 1.5));
       }
     this.rect(A.x0 - 1, F - 7, A.x1 - A.x0 + 2, 1, [80, 74, 70]);
     for (let y = A.mouth.top; y < F - 1; y++)
@@ -805,14 +825,21 @@ export class LabRenderer {
       // Motes of the brew rising off the cauldron.
       if (this.fx() < 0.05) this.spark(CAULDRON.x0 + 3 + this.fx() * 10, CAULDRON.top - 1, ELIXIRS[lab.brew], 1);
     }
-    // A spider letting itself down from its web, and climbing back.
-    const sp = Math.max(0, Math.sin(time * 0.21)), sy = Math.round(ceiling(8) + 4 + sp * sp * 26);
-    ctx.globalAlpha = 0.5;
-    dot(8, Math.round(ceiling(8)) + 3, "#9a9aa0", 1, sy - Math.round(ceiling(8)) - 3);
-    ctx.globalAlpha = 1;
-    dot(7, sy, "#141014", 3, 2);
-    if (Math.floor(time * 4) % 2) dot(6, sy + 1, "#141014");
-    else dot(10, sy + 1, "#141014");
+    // Now and then (in about one of every three two-minute spells) a spider
+    // lets itself down from behind the vault's rib on its thread, hangs a
+    // while and climbs back out of sight.
+    const spell = Math.floor(time / SPIDER.every), from = h01(spell, 1, 75) * (SPIDER.every - SPIDER.visit), u = (time - spell * SPIDER.every - from) / SPIDER.visit;
+    if (h01(spell, 2, 75) < SPIDER.chance && u > 0 && u < 1) {
+      const rib = Math.round(ceiling(8)) + RIB, sp = Math.sin(Math.PI * u), sy = Math.round(rib - 3 + Math.min(1, sp * 1.6) * 29);
+      if (sy >= rib) {
+        ctx.globalAlpha = 0.5;
+        dot(8, rib, "#9a9aa0", 1, sy - rib);
+        ctx.globalAlpha = 1;
+        dot(7, sy, "#141014", 3, 2);
+        if (Math.floor(time * 4) % 2) dot(6, sy + 1, "#141014");
+        else dot(10, sy + 1, "#141014");
+      }
+    }
     // A drop off the vault now and then, splashing on the flags.
     const dp = (time * 0.37) % 1, dx = 150 + Math.round(h01(Math.floor(time * 0.37), 1, 73) * 30), top = ceiling(dx) + 3;
     if (dp < 0.6) dot(dx, Math.round(top + Math.min(1, (dp / 0.6) * (dp / 0.6)) * (F - 1 - top)), "#8ab8d8");

@@ -38,6 +38,7 @@ import {
   TABLES, TABLE_TOP, UNIT_H, W,
 } from "./geometry.ts";
 import { labErrand, leaveLab, newLab, stepLab } from "./lab.ts";
+import { DAY_MS, dayTime } from "../daylight.ts";
 
 export * from "./geometry.ts";
 
@@ -137,7 +138,24 @@ export type Librarian = {
   home: boolean;
   /** Who they are talking with (0 nobody). */
   with: number;
+  /** A lantern in the other hand, being carried in, up or out. */
+  lantern: Lantern | null;
 };
+
+/** A lantern with a candle in it, set on top of a bay's shelves for the
+ * night: waiting outside (`store`), in someone's hand, or standing `up` on
+ * shelf unit `unit` of bay `bay`. Its candle may gutter out before dawn
+ * (`outAt` seconds of the day before it, 0 never). */
+export type Lantern = { bay: number; unit: number; state: "store" | "carried" | "up"; by: number; lit: boolean; outAt: number };
+/** When the lanterns go up and come down, as shares of the day (`daylight.ts`'s
+ * sky): up as dusk falls, down as the sky starts to lighten. */
+export const LANTERN_DUSK = 0.46, LANTERN_DAWN = 0.83;
+/** Seconds of the day left before dawn while it is lantern time, else null,
+ * for a moment `ms` of the day clock. */
+export function lanternClock(ms: number): number | null {
+  const p = dayTime(ms) / DAY_MS;
+  return p >= LANTERN_DUSK && p < LANTERN_DAWN ? (LANTERN_DAWN - p) * DAY_MS / 1000 : null;
+}
 
 /** Where a librarian died: drawn as ash for a while. */
 export type Remains = { x: number; at: number; mourners: number[] };
@@ -166,6 +184,9 @@ export type LibrarySave = {
   enchanted?: string;
   /** Knowledge enchanted books have given, all told. */
   runesRead?: number;
+  /** The night's lanterns (optional): `up` on top of the shelves, else
+   * waiting to be fetched. */
+  lanterns?: { bay: number; unit: number; up: boolean; lit: boolean; outAt: number }[];
   butts?: number[];
   looseBooks?: number[];
   burntLoose?: { color: number; x: number }[];
@@ -349,6 +370,11 @@ export class LibrarySim {
   /** Fires so far, and where the dead fell. */
   fires = 0;
   remains: Remains[] = [];
+  /** The night's lanterns, and seconds of the day left before dawn while
+   * they are wanted, else null (the page keeps it current, `lanternClock`). */
+  lanterns: Lantern[] = [];
+  toDawn: number | null = null;
+  private lastToDawn: number | null = null;
   /** How dark it is outside (0 day, 1 night; the page keeps it current). */
   night = 0;
   /** Buckets in each water butt. */
@@ -423,6 +449,7 @@ export class LibrarySim {
     if (saved.enchanted) this.enchanted.set(decodeGrid(saved.enchanted, SLOTS, 2)!);
     for (let s = 0; s < SLOTS; s++) if (!this.slots[s]) this.enchanted[s] = 0;
     this.runesRead = saved.runesRead ?? 0;
+    this.lanterns = (saved.lanterns ?? []).map((n) => ({ bay: n.bay, unit: n.unit, state: n.up ? "up" : "store", by: 0, lit: n.lit, outAt: n.outAt }));
     if (saved.butts) saved.butts.forEach((v, i) => this.butts[i] = v);
     if (saved.counters) Object.assign(this, saved.counters);
     saved.crewState?.forEach((c, i) => Object.assign(this.librarians[i], c));
@@ -534,7 +561,7 @@ export class LibrarySim {
       id, name: name ?? librarianName(this.hires++, this.seed, this.librarians.map((o) => o.name)), hat: HATS[0], tint: tints[Math.floor(r() * tints.length)],
       role, x, y: FLOOR, facing: 1, carrying: 0, spent: false, rune: false, burntFrom: -1, hand: "", vial: 0, soot: 0, water: 0, pushing: null, away: false,
       mode: "work", scorched: 0, action: "idle", steps: [], seat: -1, reading: 0, held: [], site: "", plankClaim: false, bookClaim: false,
-      energy: 0.6 + r() * 0.4, home: false, with: 0,
+      energy: 0.6 + r() * 0.4, home: false, with: 0, lantern: null,
     };
     this.dress(l);
     this.librarians.push(l);
@@ -925,6 +952,10 @@ export class LibrarySim {
       return;
     }
     if (l.hand === "plank" || l.hand === "flask") l.hand = "";
+    if (l.lantern) {
+      l.steps = this.lanternJob(l);
+      return;
+    }
     if (l.role === "researcher") {
       // Down the stair to the lab.
       l.steps = [{ kind: "walk", x: STAIR_X }, { kind: "climb", y: LAB_FLOOR }];
@@ -935,6 +966,12 @@ export class LibrarySim {
       return;
     }
     const shelving = this.shelving(l);
+    // Lanterns up as night falls and down as day breaks, before anything else.
+    const lantern = shelving ? (this.fetchLantern(l) ?? this.lowerLantern(l)) : null;
+    if (lantern) {
+      l.steps = lantern;
+      return;
+    }
     const routine = this.goHome(l) ?? this.rest(l) ?? this.mourn(l) ?? (shelving ? (this.refill(l) ?? this.sweep(l)) : null);
     if (routine) {
       l.steps = routine;
@@ -978,6 +1015,109 @@ export class LibrarySim {
     // window while it is light, or wander the nave.
     l.steps = this.chat(l) ?? (this.night < 0.5 && r() < 0.35 ? this.gaze(l)
       : [{ kind: "walk", x: 10 + r() * (W - 20) }, { kind: "work", t: 3 + r() * 5, action: "idle" }]);
+  }
+
+  // ── Lanterns ────────────────────────────────────────────────────────
+
+  /** The night's lanterns: as dusk falls, 2 to 4 for the tops of different
+   * bays (each with a ladder up to it), each candle with an even chance of
+   * guttering out 1 to 60 seconds before dawn; candles going out; and any
+   * lantern whose shelf has gone falls with it. */
+  private stepLanterns() {
+    const now = this.toDawn, before = this.lastToDawn;
+    this.lastToDawn = now;
+    for (const n of this.lanterns)
+      if (n.lit && n.outAt > 0 && before !== null && before > n.outAt && (now === null || now <= n.outAt)) n.lit = false;
+    if (this.lanterns.some((n) => n.state === "up" && !this.isBuilt(n.bay, n.unit))) this.lanterns = this.lanterns.filter((n) => n.state !== "up" || this.isBuilt(n.bay, n.unit));
+    if (now === null) {
+      // Daylight: none still waiting outside are wanted.
+      if (this.lanterns.some((n) => n.state === "store")) this.lanterns = this.lanterns.filter((n) => n.state !== "store");
+      return;
+    }
+    if (this.lanterns.length || this.fire.active) return;
+    const bays: number[] = [];
+    for (let b = 0; b < BAYS; b++) {
+      const h = this.bayComplete(b);
+      if (h > 0 && this.bayHeight(b) === h && this.ladders[b] >= h) bays.push(b);
+    }
+    if (!bays.length) return;
+    const r = this.rng, count = Math.min(bays.length, 2 + Math.floor(r() * 3));
+    for (let k = 0; k < count; k++) {
+      const bay = bays.splice(Math.floor(r() * bays.length), 1)[0];
+      this.lanterns.push({ bay, unit: this.bayComplete(bay) - 1, state: "store", by: 0, lit: true, outAt: r() < 0.5 ? 1 + r() * 59 : 0 });
+    }
+  }
+  /** Whether a lantern can be set on (or taken from) the top of its shelf:
+   * the unit standing whole, a ladder up to it. */
+  private lanternReach(n: Lantern) {
+    return this.isBuilt(n.bay, n.unit) && this.ladders[n.bay] >= n.unit + 1;
+  }
+  /** Climbing to the top of a lantern's shelf, and back down after `work`. */
+  private lanternClimb(n: Lantern, work: Step): Step[] {
+    return [{ kind: "walk", x: ladderX(n.bay) }, { kind: "climb", y: unitTop(n.unit) + 6 }, work, this.down()];
+  }
+  /** Out down the hallway nearest its bay for a lantern, lit, to bring in. */
+  private fetchLantern(l: Librarian): Step[] | null {
+    if (this.toDawn === null || this.fire.active) return null;
+    const n = this.lanterns.find((o) => o.state === "store" && !o.by && this.lanternReach(o));
+    if (!n) return null;
+    n.by = l.id;
+    const side = sideOf(ladderX(n.bay));
+    return [{ kind: "walk", x: EXITS[side] }, {
+      kind: "away", t: 1.5 + this.rng() * 2, done: () => {
+        if (n.by !== l.id || !this.lanterns.includes(n) || n.state !== "store") return;
+        n.state = "carried";
+        l.lantern = n;
+      },
+    }];
+  }
+  /** By day, up a ladder for a lantern left on the shelves. */
+  private lowerLantern(l: Librarian): Step[] | null {
+    if (this.toDawn !== null || this.fire.active) return null;
+    const n = this.lanterns.find((o) => o.state === "up" && !o.by && this.lanternReach(o));
+    if (!n) return null;
+    n.by = l.id;
+    return this.lanternClimb(n, {
+      kind: "work", t: 0.8, action: "grab", done: () => {
+        if (n.by !== l.id || n.state !== "up" || !this.lanterns.includes(n)) return;
+        n.state = "carried";
+        l.lantern = n;
+      },
+    });
+  }
+  /** A lantern in hand: up onto its shelf by night, out down a hallway by day. */
+  private lanternJob(l: Librarian): Step[] {
+    const n = l.lantern!;
+    if (!this.lanterns.includes(n)) {
+      l.lantern = null;
+      return [{ kind: "work", t: 0.1, action: "idle" }];
+    }
+    if (this.toDawn !== null && this.lanternReach(n) && !this.lanterns.some((o) => o !== n && o.state === "up" && o.bay === n.bay)) {
+      return this.lanternClimb(n, {
+        kind: "work", t: 0.8, action: "place", done: () => {
+          if (l.lantern !== n) return;
+          n.state = "up";
+          n.by = 0;
+          l.lantern = null;
+        },
+      });
+    }
+    const side = sideOf(l.x);
+    return [{ kind: "walk", x: EXITS[side] }, {
+      kind: "away", t: 1.5 + this.rng() * 2, done: () => {
+        this.lanterns = this.lanterns.filter((o) => o !== n);
+        l.lantern = null;
+      },
+    }, { kind: "walk", x: side ? W - 8 : 8 }];
+  }
+  /** Where a lantern stands (its base's middle), or null while its carrier
+   * is out of sight or it waits outside. */
+  lanternAt(n: Lantern): { x: number; y: number } | null {
+    if (n.state === "up") return { x: bayX(n.bay) + 6, y: unitTop(n.unit) };
+    if (n.state !== "carried") return null;
+    const l = this.librarians.find((o) => o.lantern === n);
+    if (!l || l.away) return null;
+    return { x: Math.round(l.x) + (l.facing > 0 ? 2 : -2), y: Math.round(l.y) - 1 };
   }
 
   /** Remove individual charred books before stocking their gaps. */
@@ -1308,6 +1448,9 @@ export class LibrarySim {
     }
     if (l.hand === "cup" || l.hand === "broom" || l.hand === "flask") l.hand = "";
     l.pushing = null;
+    // A lantern still to be fetched or taken down is free for someone else;
+    // one in hand stays there.
+    for (const n of this.lanterns) if (n.by === l.id && n !== l.lantern) n.by = 0;
     l.steps = [];
   }
 
@@ -1538,6 +1681,7 @@ export class LibrarySim {
       }
     }
     this.remains = this.remains.filter((r) => this.time - r.at < 600);
+    this.stepLanterns();
   }
 
   /** Heat on a librarian's body; returns true if it killed them. */
@@ -1550,6 +1694,8 @@ export class LibrarySim {
     if (l.scorched < SCORCH) return false;
     this.interrupt(l);
     this.librarians = this.librarians.filter((o) => o !== l);
+    // A lantern in hand is lost with them.
+    if (l.lantern) this.lanterns = this.lanterns.filter((n) => n !== l.lantern);
     this.deaths++;
     this.booksBurnt += (l.carrying && l.burntFrom < 0 ? 1 : 0) + (l.reading ? 1 : 0);
     this.remains.push({ x: l.x, at: this.time, mourners: [] });
@@ -1675,6 +1821,7 @@ export class LibrarySim {
       rngState: this.rngState, minute: this.minute, firedAt: this.firedAt,
       damaged: [...this.damaged], burntSlots: encodeGrid(burnt), butts: [...this.butts],
       enchanted: encodeGrid(enchanted), runesRead: this.runesRead,
+      lanterns: this.lanterns.map((n) => ({ bay: n.bay, unit: n.unit, up: n.state === "up", lit: n.lit, outAt: n.outAt })),
       looseBooks: loose, burntLoose: debris, returnPlanks: this.returnPlanks,
       exportedBooks,
       crewState: this.librarians.map((l) => ({ x: l.x, y: l.y, scorched: l.scorched, energy: l.energy })),
@@ -1738,6 +1885,8 @@ export function decodeLibrarySave(s: any): LibrarySave | null {
   if (decodeGrid(s.enchanted, SLOTS, 2)) out.enchanted = s.enchanted;
   if (Number.isFinite(s.runesRead) && s.runesRead >= 0) out.runesRead = s.runesRead;
   if (int(s.returnPlanks, 0, TABLE_PLANKS)) out.returnPlanks = s.returnPlanks;
+  if (Array.isArray(s.lanterns) && s.lanterns.length <= BAYS && s.lanterns.every((n: any) => n && int(n.bay, 0, BAYS - 1) && int(n.unit, 0, MAX_UNITS - 1) && typeof n.up === "boolean" && typeof n.lit === "boolean" && Number.isFinite(n.outAt) && n.outAt >= 0 && n.outAt <= 60))
+    out.lanterns = s.lanterns.map((n: any) => ({ bay: n.bay, unit: n.unit, up: n.up, lit: n.lit, outAt: n.outAt }));
   if (Array.isArray(s.looseBooks) && s.looseBooks.length <= SLOTS && s.looseBooks.every((c: unknown) => int(c, 1, BOOK_COLORS.length - 1))) out.looseBooks = [...s.looseBooks];
   if (Array.isArray(s.exportedBooks) && s.exportedBooks.length <= CART_BOOKS + MAX_LIBRARIANS && s.exportedBooks.every((c: unknown) => int(c, 1, BOOK_COLORS.length - 1))) out.exportedBooks = [...s.exportedBooks];
   if (Array.isArray(s.burntLoose) && s.burntLoose.length <= SLOTS && s.burntLoose.every((b: any) => b && int(b.color, 1, BOOK_COLORS.length - 1) && Number.isFinite(b.x) && b.x >= 0 && b.x < W)) out.burntLoose = s.burntLoose.map((b: any) => ({ color: b.color, x: b.x }));

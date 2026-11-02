@@ -11,7 +11,7 @@ import { canAffordMetals, metalPriceText, type MetalHost, type MetalPrice } from
 import { play } from "../sound.ts";
 import type { Scene } from "../ambience.ts";
 import { countdown, HOUR_MS, IDLE_LEAD, IDLE_SPEED, idleDrain, MAX_AWAY_MS } from "../away.ts";
-import { LAB_MAX_LEVEL, MAX_LIBRARIANS, labPrice, MAX_SHELVES, LibrarySim, ROLES, RETURN_BOOKS, librarianPrice, shelfPrice, type Librarian, type LibrarySave, type Role } from "./sim.ts";
+import { LAB_MAX_LEVEL, MAX_LIBRARIANS, labPrice, lanternClock, MAX_SHELVES, LibrarySim, ROLES, RETURN_BOOKS, librarianPrice, shelfPrice, type Librarian, type LibrarySave, type Role } from "./sim.ts";
 
 import { LibraryRenderer } from "./render.ts";
 import { fadeAway } from "../ui/fade-away.ts";
@@ -121,6 +121,8 @@ export class LibraryPage {
     // IDLE_LEAD ahead of it, so both spend it together.
     while (this.owed >= 100 - 1e-6 && spent + 100 <= limit + 1e-6 && this.owed - idleDrain(this.owed, 100) >= keepWith - IDLE_LEAD) {
       this.sim.night = 1 - simulationDaylight(this.day);
+      // The lanterns follow the sky as it is shown.
+      this.sim.toDawn = lanternClock(worldSky()?.time ?? this.day);
       const rate = this.sim.rate;
       // Catching up, a step spends (and pays for) ten steps of idle time.
       const drain = Math.min(this.owed, idleDrain(this.owed, 100)), boost = drain / 100;
