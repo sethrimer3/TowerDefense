@@ -99,6 +99,8 @@ export type DrawOptions = {
   simpleTroops?: boolean;
   /** Units outlined together, round their combined shape (`unit-outline.ts`). */
   mergedOutlines?: boolean;
+  /** The desert's detailed dunes rather than its simple ones. */
+  hdSand?: boolean;
   sides?: UnitInks;
   keepFlag?: Flag | null;
   collapsed?: ReadonlySet<number>;
@@ -473,7 +475,7 @@ export class DefendRenderer {
     // The desert's dunes lie on the ground under the battle's darkness and
     // tint, so night darkens them and the day's light turns over them.
     const desert = sim?.atmosphere?.mode === "sand";
-    if (sim && desert) this.atmosphere.drawGround(ctx, this.px, sim, opts.reduceMotion, opts.effects ?? true, this.worldLighting ? opts.sun : undefined);
+    if (sim && desert) this.atmosphere.drawGround(ctx, this.px, sim, opts.reduceMotion, opts.effects ?? true, this.worldLighting ? opts.sun : undefined, !!opts.hdSand);
     if (this.forestShare() > 0 || desert) {
       this.drawFaces();
       paintSpikePoints(ctx, this.px, map, sim);
@@ -732,8 +734,9 @@ export class DefendRenderer {
       if (b > 0) moving.push({ x: u.x, y: u.y, r: 2.2, k: 0.45 * b, color: "#ffc68a" });
     }
     const out = this.lighting.lights.filter((l) => this.lighting.burn(l) <= 0).length;
-    // The forest's grass hides the flagstones.
-    const bare = 1 - Math.min(1, this.forestShare());
+    // The forest's grass and the desert's dunes hide the flagstones (their
+    // light, drawn over the dunes, read as squares at night).
+    const bare = sim.atmosphere?.mode === "sand" ? 0 : 1 - Math.min(1, this.forestShare());
     if (bare > 0) this.relief.draw(this.ctx, this.px, { version: `${sim.mapVersion}:${out}`, lights: fixed }, moving, (0.6 + opts.night * 0.4) * bare);
   }
 

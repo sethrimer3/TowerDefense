@@ -35,6 +35,9 @@ export const SETTINGS = {
   /** The Defend board's zoom steps so every art pixel covers the same
    * whole number of screen pixels: outlines keep one width at every zoom. */
   crispZoom: { kind: "toggle", default: true, page: { id: "crisp-zoom", label: "Crisp pixel zoom" } },
+  /** The Amber Desert's detailed dunes: rippled, in dithered sand tones,
+   * instead of one sand colour shaped only by light and shadow. */
+  hdSand: { kind: "toggle", default: false, page: { id: "hd-sand", label: "HD Sand" } },
   /** The Defend palette lists items the player has none of (greyed); off, only those owned. */
   showEmpty: { kind: "toggle", default: false, page: { id: "show-empty", label: "Show items you have none of" } },
   /** Items dragged on the Defend board ride a few blocks above the pointer,

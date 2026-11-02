@@ -529,6 +529,7 @@ export class AmbushBattlePage {
       simpleEnemies: settings.simpleEnemies,
       simpleTroops: settings.simpleTroops,
       mergedOutlines: settings.mergedOutlines,
+      hdSand: settings.hdSand,
       looks,
       ...(this.picked !== undefined
         ? { inspect: { id: this.picked, armed: s.engine, ...(this.aimPreview?.id === this.picked ? { aim: this.aimPreview } : {}) } }

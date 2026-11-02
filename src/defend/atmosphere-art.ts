@@ -1,23 +1,28 @@
 /** Ground weather drawn as pixel art beneath every combat silhouette. The
  * desert's dunes are one tiling sprite (`dunePixels`, `ART` pixels a cell)
- * of a few long, gentle swells (`duneHeights`), every pixel shaded by its
- * slope toward the day's sun (`setDuneLight`: its heading and how strongly
- * it shades, from the shared sky) in a handful of flat sand tones, no
- * dithering, so it reads as simple pixel art. It is drawn with the city's
- * ground, under the battle's darkness and tint, so night darkens it and the
- * day's colours wash over it like the rest of the board; the wall's hanging
- * faces are copied back over it. It is laid over all the open ground
- * outside the city at the field's drift, recomposed only when the drift
- * moves a whole art pixel, the light turns or the ground changes. Over it
- * `SandMarks` keeps what the battle did to the sand (trails walked into the
- * raised swells, craters blasted out of it) and repaints only the small
- * chunks that changed. Sand blown into the city and the Fungal Hollow's
- * mist are painted at `RES` art pixels a cell, the city's only over the
- * cells holding any. Then the tumbleweeds, black-outlined sprites in
- * several sizes, over it. Presentation only: it reads `sim.atmosphere` and
- * changes nothing. */
+ * of a few long, gentle swells (`duneHeights`), all one sand colour
+ * (`SAND_COLOR`) made lighter or darker only by the day's sun: each pixel's
+ * slope, lit `BUMP` times as steep as it stands, and the shadows the swells
+ * cast when the sun is low (`castShadows`). The light follows the shared sky
+ * (`easeDuneLight`: its heading, height and strength, snapped, the next
+ * light's shadows swept a few hundred lines a frame so a relight never
+ * stalls); a shading table per slope bin keeps the tile cheap to relight.
+ * The HD Sand setting (`setDuneStyle`) swaps in the older detailed dunes:
+ * the sim's own dune shapes with wind ripples, dithered in `HD_TONES`. It is
+ * drawn with the city's ground, under the battle's darkness and tint, so
+ * night darkens it and the day's colours wash over it like the rest of the
+ * board; the wall's hanging faces are copied back over it. It is laid over
+ * all the open ground outside the city at the field's drift, recomposed only
+ * when the drift moves a whole art pixel, the light turns or the ground
+ * changes. Over it `SandMarks` keeps what the battle did to the sand (trails
+ * walked into the raised swells, craters blasted out of it) and repaints
+ * only the marked pixels of the small chunks that changed. Sand blown into
+ * the city and the Fungal Hollow's mist are painted at `RES` art pixels a
+ * cell, the city's only over the cells holding any. Then the tumbleweeds,
+ * black-outlined sprites in several sizes, over it. Presentation only: it
+ * reads `sim.atmosphere` and changes nothing. */
 import { CELLS_W, CELLS_H, CELL_COUNT, cellIndex, hash } from "./grid.ts";
-import { DUNE_PERIOD, WEED_SIZES, periodicNoise, weatherNoise, type Atmosphere } from "./atmosphere.ts";
+import { DUNE_CREST, DUNE_PERIOD, WEED_SIZES, duneAt, periodicNoise, weatherNoise, type Atmosphere } from "./atmosphere.ts";
 import { ENEMIES } from "./catalog.ts";
 import { ART } from "./park-art.ts";
 import { OUTLINE, artPen, bake, blit } from "./pixel-fx.ts";
@@ -31,110 +36,315 @@ const W = CELLS_W * RES, H = CELLS_H * RES;
 const BW = CELLS_W * ART, BH = CELLS_H * ART;
 /** A tiling noise texture, so the image never calls the noise per pixel. */
 const TEX = 64;
-/** Ordered dither thresholds, for the mist's thin edges. */
-const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => (v + .5) / 16);
-/** The sand's few flat tones, shade to sunlit; the middle one is flat ground. */
-export const DUNE_TONES = [[150, 98, 54], [184, 130, 72], [212, 160, 96], [232, 188, 124], [246, 212, 154]];
-const MID = 2;
+/** The sand's one colour: flat ground in full light. Every dune pixel is
+ * this colour made lighter or darker by its light, nothing else. */
+export const SAND_COLOR = [212, 160, 96] as const;
+/** The high-definition dunes' tones (HD Sand), deep shadow to sunlit, warm
+ * in the shade as real sand is. */
+export const HD_TONES = [[112, 66, 40], [136, 84, 48], [160, 104, 58], [182, 124, 70], [202, 146, 84], [218, 166, 100], [232, 186, 120], [244, 208, 146], [252, 228, 176]];
 /** Art pixels the swells stand over their troughs, at their tallest. */
 export const DUNE_RELIEF = 9;
+/** The HD dunes' height: a slip face about the angle of repose. */
+export const HD_RELIEF = 26;
 /** Cells from one swell's crest to the next (two to a field period, so it tiles). */
 export const SWELL = 48;
 /** Cells the crests lean per cell across (a whole number of swells a period). */
 const SWELL_LEAN = .5;
-/** Below this share of a swell's height the sand is the floor's flat sheet:
+/** Below this share of a dune's height the sand is the floor's flat sheet:
  * nothing walks a trail into it. */
 export const FLOOR = .12;
-/** The sun the dunes were lit by while there is no shared sky: low in the
+/** The sun the dunes were lit by while there is no shared sky: in the
  * upper left, as the city's shadows fall. `x`, `y` point toward it. */
 export const SUN = { x: -Math.SQRT1_2, y: -Math.SQRT1_2 };
+/** How much steeper the swells are lit and shadowed than they stand, so
+ * their low rises read in the light; how far a slope brightens or darkens
+ * the sand, and how much a cast shadow takes off. */
+export const BUMP = 8, GAIN = .75, SHADE = .26;
+/** Brightness steps the sand is snapped to (a little banding, pixel art). */
+const LEVELS = 40;
+/** The HD dunes' Lambert light: the sun's share across the ground and up,
+ * low in the sky (the old fixed sun's). */
+const HD_ACROSS = Math.SQRT2 / Math.sqrt(2.81), HD_UP = .9 / Math.sqrt(2.81);
+const HD_LO = .16, HD_HI = .7;
+/** Ordered dither thresholds, for the HD dunes' tones and the mist's thin edges. */
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => (v + .5) / 16);
 
+/** The city's drifts' brightness: their thin edges, banks turned to the
+ * wind and lee sides, the same sand as the dunes. */
+const CITY_SAND = { edge: .86, bank: 1.08, lee: .92 };
+
+/** Which dunes are drawn: "simple", one sand colour shaped only by light and
+ * shadow; "hd", the detailed rippled dunes in their dithered tones. */
+export type DuneStyle = "simple" | "hd";
+let style: DuneStyle = "simple";
 /** The light the dunes are shaded by: the heading toward the sun across the
- * ground (`x`, `y`, a unit vector) and how strongly slopes show (`contrast`:
- * 1 in full sun, low at night when only the dark's flat glow is left). */
-const light = { x: SUN.x, y: SUN.y, contrast: 1, key: "" };
-/** Headings the light snaps to, and contrast steps: the tile is relit only
- * when the snapped light changes, every several seconds through a day. */
-const HEADINGS = 32, CONTRASTS = 6;
-/** Turn the dunes' light to the shared sky's sun (`sun`, the direction its
- * shadows fall and their strength), or back to the fixed one without a sky.
- * Returns whether it changed. */
-export function setDuneLight(sun?: Sun) {
-  let x = SUN.x, y = SUN.y, contrast = 1;
+ * ground (`x`, `y`, a unit vector), how high it stands (`rise`, the tangent
+ * of its height, kept between `RISE`'s bounds; `across` and `up` its unit
+ * vector's parts), and how strongly slopes show (`contrast`: 1 in full sun,
+ * low at night). `key` names it, and the style. */
+type Light = { x: number; y: number; rise: number; contrast: number; across: number; up: number; key: string };
+/** Headings the light snaps to, the sun's height and contrast steps: the
+ * tile is relit only when the snapped light changes, every few seconds
+ * through a day. */
+const HEADINGS = 32, RISES = 20, CONTRASTS = 6;
+const RISE = { lo: .25, hi: 1 };
+/** Below this contrast the sun is down: no cast shadows. */
+const SHADOWS_FROM = .5;
+/** The light for the shared sky's sun (`sun`, the direction its shadows
+ * fall, as long as they are a unit of height, and their strength), or the
+ * fixed one without a sky, snapped. */
+function lightFor(sun?: Sun): Light {
+  let x = SUN.x, y = SUN.y, contrast = 1, rise = .7;
   if (sun) {
     const l = Math.sqrt(sun.x * sun.x + sun.y * sun.y);
-    if (l > 1e-6) { x = -sun.x / l; y = -sun.y / l; }
+    if (l > 1e-6) { x = -sun.x / l; y = -sun.y / l; rise = 1 / l; }
     contrast = .3 + .7 * Math.min(1, sun.strength / .27);
   }
+  rise = Math.max(RISE.lo, Math.min(RISE.hi, rise));
   const step = Math.round(Math.atan2(y, x) / (Math.PI * 2) * HEADINGS), level = Math.round(contrast * CONTRASTS);
-  const key = `${(step + HEADINGS) % HEADINGS}:${level}`;
-  if (key === light.key) return false;
-  const a = step / HEADINGS * Math.PI * 2;
-  light.x = Math.cos(a); light.y = Math.sin(a); light.contrast = level / CONTRASTS; light.key = key;
+  const r = Math.round((rise - RISE.lo) / (RISE.hi - RISE.lo) * RISES);
+  const a = step / HEADINGS * Math.PI * 2, snapped = RISE.lo + r / RISES * (RISE.hi - RISE.lo), across = 1 / Math.sqrt(1 + snapped * snapped);
+  return { x: Math.cos(a), y: Math.sin(a), rise: snapped, contrast: level / CONTRASTS, across, up: snapped * across,
+    key: `${style}:${(step + HEADINGS) % HEADINGS}:${r}:${level}` };
+}
+/** The light the dunes are drawn in now. */
+const light: Light = lightFor();
+let lastSun: Sun | undefined;
+/** The current light's cast shadows, and its shading table; null until read. */
+let shadows: Uint8Array | null = null;
+let table: Float32Array | null = null;
+/** A relight under way (`easeDuneLight`): the next light's shadows, swept a
+ * few hundred lines a frame. */
+let job: ShadowJob | null = null;
+function show(next: Light, cast: Uint8Array | null) {
+  Object.assign(light, next);
+  shadows = cast; table = null; job = null;
+}
+/** Turn the dunes' light to the shared sky's sun at once, or back to the
+ * fixed one without a sky. Returns whether it changed. */
+export function setDuneLight(sun?: Sun) {
+  lastSun = sun;
+  const next = lightFor(sun);
+  if (next.key === light.key) return false;
+  show(next, null);
   return true;
 }
-setDuneLight();
+/** Turn the dunes' light toward the sky's sun a little a frame: the next
+ * light's shadows are swept within `budget` ms a frame, and it is shown only
+ * once they are done, so a relight never stalls a frame. Returns whether the
+ * light shown changed. */
+export function easeDuneLight(sun?: Sun, budget = 3) {
+  lastSun = sun;
+  const next = lightFor(sun);
+  if (next.key === light.key) { job = null; return false; }
+  if (style === "hd" || next.contrast < SHADOWS_FROM) { show(next, null); return true; }
+  if (!job || job.light.key !== next.key) job = shadowJob(next);
+  const end = performance.now() + budget;
+  while (sweep(job, 32) && performance.now() < end);
+  if (job.pass < job.passes) return false;
+  show(job.light, shadowMask(job));
+  return true;
+}
+/** Draw the simple dunes or the HD ones (the HD Sand setting), relit at
+ * once. Returns whether it changed. */
+export function setDuneStyle(hd: boolean) {
+  const next: DuneStyle = hd ? "hd" : "simple";
+  if (next === style) return false;
+  style = next; light.key = ""; setDuneLight(lastSun);
+  return true;
+}
+export function duneStyle() { return style; }
 /** The current light's key, which changes whenever the dunes relight. */
 export function duneLightKey() { return light.key; }
+/** How tall the current dunes stand, in art pixels. */
+export function duneRelief() { return style === "hd" ? HD_RELIEF : DUNE_RELIEF; }
 
-/** How a surface rising by (gx, gy) art pixels a pixel faces the sun: 1 a
- * steep face toward it, -1 one turned away, 0 flat, at full contrast. */
-export function sunlight(gx: number, gy: number) {
-  const s = -(gx * light.x + gy * light.y) / slopeScale();
-  return s > 1 ? 1 : s < -1 ? -1 : s;
+/** How bright the simple sand is on a surface rising by (gx, gy) art pixels
+ * a pixel, in or out of a cast shadow, in the current light: 1 on flat
+ * ground, more on a face turned to the sun, less on one turned away. */
+export function duneShade(gx: number, gy: number, shadowed = false) {
+  const nx = -gx * BUMP, ny = -gy * BUMP;
+  const dot = ((nx * light.x + ny * light.y) * light.across + light.up) / Math.sqrt(nx * nx + ny * ny + 1);
+  let b = 1 + (dot - light.up) * GAIN * light.contrast;
+  if (shadowed) b -= SHADE * light.contrast;
+  return b;
 }
-/** The tone a pixel takes in that light, with a rare grain a shade off. */
-function duneTone(s: number, tx: number, ty: number) {
-  let t = Math.round(MID + s * light.contrast * 2.3);
-  if (hash(tx, ty, 79) % 293 === 0) t--;
-  return DUNE_TONES[t < 0 ? 0 : t >= DUNE_TONES.length ? DUNE_TONES.length - 1 : t];
+/** The HD light on a surface rising by (gx, gy) art pixels a pixel: its
+ * place between the darkest and lightest tones, before dithering. */
+export function hdLight(gx: number, gy: number) {
+  const l = (-(gx * light.x + gy * light.y) * HD_ACROSS + HD_UP) / Math.sqrt(gx * gx + gy * gy + 1);
+  return (l - HD_LO) / (HD_HI - HD_LO) * (HD_TONES.length - 1);
+}
+const sandCache = new Map<number, number[]>();
+/** The simple sand's colour at brightness `b`, snapped to `LEVELS` steps. */
+function sandAt(b: number) {
+  const step = Math.round(b * LEVELS);
+  let col = sandCache.get(step);
+  if (!col) {
+    const k = step / LEVELS;
+    col = [Math.min(255, Math.round(SAND_COLOR[0] * k)), Math.min(255, Math.round(SAND_COLOR[1] * k)), Math.min(255, Math.round(SAND_COLOR[2] * k))];
+    sandCache.set(step, col);
+  }
+  return col;
+}
+/** The HD tone at light `f` for tile pixel (tx, ty): dithered, with a rare
+ * grain a shade off. */
+function hdTone(f: number, tx: number, ty: number) {
+  let t = Math.round(f + BAYER[(ty & 3) * 4 + (tx & 3)] - .5);
+  const speck = hash(tx, ty, 79) % 37;
+  if (speck === 0) t++; else if (speck === 1) t--;
+  return HD_TONES[t < 0 ? 0 : t >= HD_TONES.length ? HD_TONES.length - 1 : t];
 }
 
-let heights: Float32Array | null = null;
-let steepest = 0;
-/** The swells' surface over one field period, art pixels high at `ART`
- * pixels a cell: long, low, rounded rises and falls running across the
- * wind, gently bent and a little taller in places. Tiles. */
+/** Slope bins a side in the shading table: every slope on the tile falls in
+ * one, so a pixel's shade is a lookup, and the trails' unmarked pixels look
+ * theirs up the same way to match the tile exactly. */
+const BINS = 256;
+/** The current light's shade of each slope bin: simple sand's brightness,
+ * out of shadow then in it; HD's tone place. */
+function shadeTable() {
+  if (table) return table;
+  const { range } = slopes(), t = new Float32Array(BINS * BINS * 2);
+  for (let by = 0; by < BINS; by++) for (let bx = 0; bx < BINS; bx++) {
+    const gx = ((bx + .5) / BINS * 2 - 1) * range, gy = ((by + .5) / BINS * 2 - 1) * range, i = by * BINS + bx;
+    if (style === "hd") t[i] = hdLight(gx, gy);
+    else { t[i] = duneShade(gx, gy); t[BINS * BINS + i] = duneShade(gx, gy, true); }
+  }
+  return table = t;
+}
+/** The shading table's bin for slope (gx, gy) of the current dunes, -1 off it. */
+function binOf(gx: number, gy: number, range: number) {
+  if (gx < -range || gx > range || gy < -range || gy > range) return -1;
+  const bx = Math.min(BINS - 1, Math.floor((gx / range + 1) * .5 * BINS)), by = Math.min(BINS - 1, Math.floor((gy / range + 1) * .5 * BINS));
+  return by * BINS + bx;
+}
+/** A dune pixel's colour from its surface's slope (gx, gy) at tile pixel
+ * (tx, ty), in the current style and light. */
+function duneColor(gx: number, gy: number, tx: number, ty: number) {
+  const range = slopes().range, bin = binOf(gx, gy, range);
+  if (style === "hd") return hdTone(bin < 0 ? hdLight(gx, gy) : shadeTable()[bin], tx, ty);
+  const shadowed = castShadows()[ty * DUNE_PERIOD * ART + tx] === 1;
+  return sandAt(bin < 0 ? duneShade(gx, gy, shadowed) : shadeTable()[bin + (shadowed ? BINS * BINS : 0)]);
+}
+
+const heightCache: Record<DuneStyle, Float32Array | null> = { simple: null, hd: null };
+/** The dunes' surface over one field period, art pixels high at `ART`
+ * pixels a cell, in the current style. Simple: long, low, rounded swells
+ * running across the wind, gently bent and a little taller in places. HD:
+ * the sim's own dunes, with wind ripples across their windward sides. Tiles. */
 export function duneHeights() {
-  if (heights) return heights;
-  const n = DUNE_PERIOD * ART, p = DUNE_PERIOD;
-  heights = new Float32Array(n * n);
+  const done = heightCache[style];
+  if (done) return done;
+  const n = DUNE_PERIOD * ART, p = DUNE_PERIOD, h = new Float32Array(n * n);
   for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    if (style === "hd") {
+      const d = duneAt((x + .5) / ART, (y + .5) / ART);
+      let v = d.height * HD_RELIEF;
+      if (d.wave < DUNE_CREST) {
+        const s = d.wave / DUNE_CREST, fade = Math.min(1, s * 4, (1 - s) * 6);
+        const wobble = periodicNoise(x / 32, y / 32, n / 32, n / 32, 830) * .7;
+        v += Math.sin((d.phase * 17 + wobble) * Math.PI * 2) * .28 * fade * (.5 + d.amp * .5);
+      }
+      h[y * n + x] = v;
+      continue;
+    }
     const cx = (x + .5) / ART, cy = (y + .5) / ART;
     const bend = periodicNoise(cx / 32, cy / 32, p / 32, p / 32, 821) * .45;
     const amp = .65 + .35 * periodicNoise(cx / 48, cy / 48, p / 48, p / 48, 823);
     const phase = (cy - cx * SWELL_LEAN) / SWELL + bend;
-    heights[y * n + x] = (.5 - .5 * Math.cos(phase * Math.PI * 2)) * amp * DUNE_RELIEF;
+    h[y * n + x] = (.5 - .5 * Math.cos(phase * Math.PI * 2)) * amp * DUNE_RELIEF;
   }
-  return heights;
-}
-/** The steepest slope of the swells, which full shade is measured against. */
-function slopeScale() {
-  if (steepest) return steepest;
-  const n = DUNE_PERIOD * ART, h = duneHeights();
-  let most = 1e-3;
-  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
-    const gx = (h[y * n + (x + 1) % n] - h[y * n + (x + n - 1) % n]) * .5, gy = (h[((y + 1) % n) * n + x] - h[((y + n - 1) % n) * n + x]) * .5;
-    const g = Math.sqrt(gx * gx + gy * gy);
-    if (g > most) most = g;
-  }
-  return steepest = most;
+  return heightCache[style] = h;
 }
 
-/** The tiling dune sprite, `DUNE_PERIOD * ART` pixels square, RGBA, opaque:
- * every pixel of `duneHeights` shaded by its slope in the current light.
- * Tiles seamlessly; pure. */
-export function dunePixels() {
-  const n = DUNE_PERIOD * ART, h = duneHeights(), out = new Uint8ClampedArray(n * n * 4);
+const slopeCache: Record<DuneStyle, { bins: Int32Array; range: number } | null> = { simple: null, hd: null };
+/** Every tile pixel's slope bin, and the steepest slope (`range`) the bins
+ * span, read once a style. */
+function slopes() {
+  const done = slopeCache[style];
+  if (done) return done;
+  const n = DUNE_PERIOD * ART, h = duneHeights(), gx = new Float64Array(n * n), gy = new Float64Array(n * n);
+  let range = 1e-3;
   for (let y = 0; y < n; y++) {
     const up = ((y + n - 1) % n) * n, down = ((y + 1) % n) * n, row = y * n;
     for (let x = 0; x < n; x++) {
-      const l = (x + n - 1) % n, r = (x + 1) % n;
-      const col = duneTone(sunlight((h[row + r] - h[row + l]) * .5, (h[down + x] - h[up + x]) * .5), x, y);
-      const k = (row + x) * 4;
-      out[k] = col[0]; out[k + 1] = col[1]; out[k + 2] = col[2]; out[k + 3] = 255;
+      const a = (h[row + (x + 1) % n] - h[row + (x + n - 1) % n]) * .5, b = (h[down + x] - h[up + x]) * .5;
+      gx[row + x] = a; gy[row + x] = b;
+      range = Math.max(range, Math.abs(a), Math.abs(b));
     }
   }
+  const bins = new Int32Array(n * n);
+  for (let i = 0; i < n * n; i++) bins[i] = binOf(gx[i], gy[i], range);
+  return slopeCache[style] = { bins, range };
+}
+
+type ShadowJob = { light: Light; top: Float32Array; pass: number; passes: number; step: number; drop: number; u: number; sa: number; sb: number; b0: Int32Array; b1: Int32Array };
+/** A sweep of `l`'s cast shadows over the simple tile: from the sun's side
+ * away from it, a line at a time along the sun's main axis, each pixel
+ * carrying on the shadow's top (`top`, its swells lit `BUMP` times as steep)
+ * from the pixel before it toward the sun, lowered by the sun's `rise` a
+ * pixel; a lap of the tile and then as far again as the tallest shadow
+ * reaches, so it wraps. */
+function shadowJob(l: Light): ShadowJob {
+  const n = DUNE_PERIOD * ART, alongX = Math.abs(l.x) >= Math.abs(l.y);
+  const main = alongX ? l.x : l.y, side = alongX ? l.y : l.x;
+  const step = main >= 0 ? 1 : -1, slant = side / Math.abs(main), drop = l.rise / BUMP / Math.abs(main);
+  const shift = Math.floor(slant), b0 = new Int32Array(n), b1 = new Int32Array(n);
+  // Lines run along the other axis: (a, b) is the pixel h[b * n + a] when the
+  // sun's main axis is x, h[a * n + b] when it is y.
+  const sa = alongX ? 1 : n, sb = alongX ? n : 1;
+  for (let b = 0; b < n; b++) { b0[b] = (((b + shift) % n + n) % n) * sb; b1[b] = (((b + shift + 1) % n + n) % n) * sb; }
+  return { light: l, top: new Float32Array(n * n), pass: 0, passes: n + Math.min(n, Math.ceil(duneRelief() / drop) + 2), step, drop, u: slant - shift, sa, sb, b0, b1 };
+}
+/** Up to `lines` more lines of the sweep; whether any are left. */
+function sweep(j: ShadowJob, lines: number) {
+  const n = DUNE_PERIOD * ART, h = duneHeights(), { top, b0, b1, sa, sb, drop, u } = j, v = 1 - u;
+  for (const last = Math.min(j.passes, j.pass + lines); j.pass < last; j.pass++) {
+    const a = j.step > 0 ? n - 1 - (j.pass % n) : j.pass % n, from = ((a + j.step) % n + n) % n;
+    const ia = a * sa, fa = from * sa;
+    for (let b = 0; b < n; b++) {
+      const up = top[fa + b0[b]] * v + top[fa + b1[b]] * u - drop, i = ia + b * sb, own = h[i];
+      top[i] = up > own ? up : own;
+    }
+  }
+  return j.pass < j.passes;
+}
+/** The finished sweep's shadows: 1 where the shadow's top stands over the sand. */
+function shadowMask(j: ShadowJob) {
+  const n = DUNE_PERIOD * ART, h = duneHeights(), out = new Uint8Array(n * n);
+  for (let i = 0; i < n * n; i++) out[i] = j.top[i] > h[i] + .05 ? 1 : 0;
+  return out;
+}
+/** Which pixels of the simple dune tile lie in a shadow the swells cast in
+ * the current light: 1 in shadow. None while the sun is down. */
+export function castShadows() {
+  if (shadows) return shadows;
+  if (style === "hd" || light.contrast < SHADOWS_FROM) return shadows = new Uint8Array(DUNE_PERIOD * ART * DUNE_PERIOD * ART);
+  const j = shadowJob({ ...light });
+  sweep(j, Infinity);
+  return shadows = shadowMask(j);
+}
+
+/** The tiling dune sprite, `DUNE_PERIOD * ART` pixels square, RGBA, opaque:
+ * every pixel of `duneHeights` shaded by its slope in the current light and
+ * style. Tiles seamlessly; pure. */
+export function dunePixels() {
+  const n = DUNE_PERIOD * ART, { bins } = slopes(), t = shadeTable(), out = new Uint8ClampedArray(n * n * 4);
+  if (style === "hd") {
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+      const i = y * n + x, k = i * 4, col = hdTone(t[bins[i]], x, y);
+      out[k] = col[0]; out[k + 1] = col[1]; out[k + 2] = col[2]; out[k + 3] = 255;
+    }
+    return { size: n, data: out };
+  }
+  // Each bin's colour packed once, then a lookup a pixel.
+  const cast = castShadows(), colors = new Uint32Array(BINS * BINS * 2), words = new Uint32Array(out.buffer);
+  const pack = new Uint8Array(colors.buffer);
+  for (let b = 0; b < colors.length; b++) {
+    const col = sandAt(t[b]);
+    pack[b * 4] = col[0]; pack[b * 4 + 1] = col[1]; pack[b * 4 + 2] = col[2]; pack[b * 4 + 3] = 255;
+  }
+  for (let i = 0; i < n * n; i++) words[i] = colors[bins[i] + (cast[i] ? BINS * BINS : 0)];
   return { size: n, data: out };
 }
 let duneSprite: HTMLCanvasElement | null = null;
@@ -155,9 +365,9 @@ export const CHUNK = 16;
 const CW = BW / CHUNK, CH = BH / CHUNK;
 /** Trails: how deep a footprint presses into a full swell, and the lip it
  * pushes up either side; how many units print a frame at most. */
-const TRAIL = { depth: 1.4, lip: .6, step: 1.5, perFrame: 500 };
+const TRAILS = { simple: { depth: 1.4, lip: .6, step: 1.5, perFrame: 500 }, hd: { depth: 2.2, lip: .9, step: 1.5, perFrame: 500 } };
 /** Craters: depth a cell of blast radius, deepest, and the rim's height. */
-const CRATER = { depth: 3, max: 8, rim: .5, reach: 1.7 };
+const CRATERS = { simple: { depth: 3, max: 8, rim: .5, reach: 1.7 }, hd: { depth: 4, max: 11, rim: .6, reach: 1.7 } };
 /** The wind fills marks back in: every `every` seconds of battle a chunk's
  * marks keep `keep` of their depth, and go once shallower than `gone`. */
 const HEAL = { every: 2.5, keep: .9, gone: .25, perFrame: 48 };
@@ -218,12 +428,13 @@ export class SandMarks {
   /** A footprint at board art pixel (x, y), `r` across: pressed into a
    * swell as deep as it stands above the floor's sheet, a lip either side. */
   print(x: number, y: number, r: number) {
+    const TRAIL = TRAILS[style], relief = duneRelief();
     const reach = r + 1.6, x0 = Math.max(0, Math.floor(x - reach)), x1 = Math.min(BW - 1, Math.ceil(x + reach));
     const y0 = Math.max(0, Math.floor(y - reach)), y1 = Math.min(BH - 1, Math.ceil(y + reach));
     let any = false;
     for (let py = y0; py <= y1; py++) for (let px = x0; px <= x1; px++) {
       if (!this.ground[(py >> 3) * CELLS_W + (px >> 3)]) continue;
-      const k = (this.base(px, py) / DUNE_RELIEF - FLOOR) / .25;
+      const k = (this.base(px, py) / relief - FLOOR) / .25;
       if (k <= 0) continue;
       const ox = px + .5 - x, oy = py + .5 - y, d = Math.sqrt(ox * ox + oy * oy), i = py * BW + px, w = k > 1 ? 1 : k;
       if (d < r) { const v = -TRAIL.depth * w * (1 - d * d / (r * r)); if (v < this.delta[i]) { this.delta[i] = v; any = true; } }
@@ -234,6 +445,7 @@ export class SandMarks {
 
   /** A blast's crater, `r` art pixels across, its sand thrown out into a rim. */
   crater(x: number, y: number, r: number) {
+    const CRATER = CRATERS[style];
     const depth = Math.min(CRATER.max, r / ART * CRATER.depth), reach = r * CRATER.reach;
     const x0 = Math.max(0, Math.floor(x - reach)), x1 = Math.min(BW - 1, Math.ceil(x + reach));
     const y0 = Math.max(0, Math.floor(y - reach)), y1 = Math.min(BH - 1, Math.ceil(y + reach));
@@ -267,6 +479,7 @@ export class SandMarks {
   /** Trails: each walker prints a footprint every `TRAIL.step` art pixels it
    * goes over the dunes, a bounded few hundred a frame, taken in turn. */
   private walk(sim: DefendSim) {
+    const TRAIL = TRAILS[style];
     let budget = TRAIL.perFrame;
     const lists = [sim.enemies, sim.soldiers, sim.civilians] as { x: number; y: number; hp: number; kind?: string; perch?: unknown }[][];
     const total = lists[0].length + lists[1].length + lists[2].length;
@@ -314,7 +527,8 @@ export class SandMarks {
 
   /** Repaint the dirty chunks, a bounded number a frame. */
   private paint() {
-    let budget = PAINT_PER_FRAME;
+    // A relight or a drift dirties every mark: catch up within a few frames.
+    let budget = Math.max(PAINT_PER_FRAME, Math.ceil(this.dirty.size / 4));
     for (const k of this.dirty) {
       if (budget-- <= 0) break;
       this.dirty.delete(k);
@@ -323,9 +537,9 @@ export class SandMarks {
     }
   }
 
-  /** One chunk: over the dunes their surface with its marks, shaded as the
-   * tile is (so an unmarked pixel matches it exactly); clear elsewhere. A
-   * chunk with no marks left goes quiet, left clear. */
+  /** One chunk: the marked dune pixels (and those beside them, whose slope a
+   * mark changes) shaded as the tile is; clear elsewhere, so the tile shows.
+   * A chunk with no marks left goes quiet, left clear. */
   paintChunk(k: number) {
     const x0 = (k % CW) * CHUNK, y0 = Math.floor(k / CW) * CHUNK, out = this.pixels, delta = this.delta;
     const n = DUNE_PERIOD * ART;
@@ -339,10 +553,13 @@ export class SandMarks {
     for (let y = y0; y < y0 + CHUNK; y++) for (let x = x0; x < x0 + CHUNK; x++) {
       const i = y * BW + x, o = i * 4, c = (y >> 3) * CELLS_W + (x >> 3);
       if (delta[i]) keep = true;
-      if (this.ground[c]) {
+      // Only the marks and the pixels their slope reaches; the rest is left
+      // clear so the dune tile shows through, never a square of old light.
+      const near = delta[i] || (x > 0 && delta[i - 1]) || (x < BW - 1 && delta[i + 1]) || (y > 0 && delta[i - BW]) || (y < BH - 1 && delta[i + BW]);
+      if (near && this.ground[c]) {
         const tx = ((x - this.ox) % n + n) % n, ty = ((y - this.oy) % n + n) % n;
         const m = (y - y0 + 1) * S + x - x0 + 1;
-        const col = duneTone(sunlight((surface[m + 1] - surface[m - 1]) * .5, (surface[m + S] - surface[m - S]) * .5), tx, ty);
+        const col = duneColor((surface[m + 1] - surface[m - 1]) * .5, (surface[m + S] - surface[m - S]) * .5, tx, ty);
         out[o] = col[0]; out[o + 1] = col[1]; out[o + 2] = col[2]; out[o + 3] = 255;
       } else out[o + 3] = 0;
     }
@@ -471,10 +688,11 @@ export class AtmosphereArt {
    * the city's ground, before the battle's darkness and tint, so they light
    * and darken with the rest of the board. `sun` is the shared sky's, absent
    * without one. */
-  drawGround(c: CanvasRenderingContext2D, px: number, sim: DefendSim, reduceMotion: boolean, effects: boolean, sun?: Sun) {
+  drawGround(c: CanvasRenderingContext2D, px: number, sim: DefendSim, reduceMotion: boolean, effects: boolean, sun?: Sun, hd = false) {
     const env = sim.atmosphere;
     if (!env || env.mode !== "sand") return;
-    setDuneLight(sun);
+    setDuneStyle(hd);
+    easeDuneLight(sun);
     c.save();
     c.imageSmoothingEnabled = false;
     c.drawImage(this.composeDunes(env, sim, reduceMotion), 0, 0, CELLS_W * px, CELLS_H * px);
@@ -608,9 +826,7 @@ export class AtmosphereArt {
       for (let y = cy * RES; y < cy * RES + RES; y++) for (let x = cx * RES; x < cx * RES + RES; x++) {
         const cover = sample(s, x, y) + (tex(t, x, y) - .5) * .12;
         if (cover < .16) continue;
-        let tone = MID + (slope[i] > .08 ? 1 : slope[i] < -.08 ? -1 : 0);
-        if (cover < .22) tone = MID - 1;
-        const col = DUNE_TONES[Math.max(0, Math.min(DUNE_TONES.length - 1, tone))], k = (y * W + x) * 4;
+        const col = sandAt(cover < .22 ? CITY_SAND.edge : slope[i] > .08 ? CITY_SAND.bank : slope[i] < -.08 ? CITY_SAND.lee : 1), k = (y * W + x) * 4;
         out[k] = col[0]; out[k + 1] = col[1]; out[k + 2] = col[2]; out[k + 3] = 255;
         this.painted.push(k);
       }

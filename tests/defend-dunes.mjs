@@ -1,4 +1,4 @@
-// The Amber Desert's dunes in a real battle page: the gentle sand swells over
+// The Amber Desert's dunes in a real battle page: the gentle one-colour swells over
 // all the ground, trails walked into them, blast craters, no sand over the
 // wall, and tumbleweeds of several sizes, desktop and phone. Isolated
 // stress fixture, no player saves. Screenshots go to test-results/.
@@ -37,6 +37,26 @@ try {
     assert.ok(state.active > 0 && state.dug && state.rims, 'craters and trails in the sand');
     assert.equal(state.spill, false, 'no sand drawn over the wall');
     await page.screenshot({ path: `test-results/dunes-${name}.png` });
+    // Through the day: one sand colour shaped by the sun's light and shadow,
+    // then HD Sand's detailed dunes. No flagstone light over the sand.
+    for (const [phase, hd] of [['day', false], ['sunset', false], ['night', false], ['day', true], ['sunset', true]]) {
+      const shown = await page.evaluate(async ([phase, hd]) => {
+        // The modules the page itself loaded (Vite may have stamped their URLs).
+        const loaded = path => performance.getEntriesByType('resource').map(e => e.name).find(n => new URL(n).pathname === path) ?? path;
+        const solar = await import(loaded('/src/daylight.ts')), art = await import(loaded('/src/defend/atmosphere-art.ts'));
+        solar.useDayClock(new solar.DayClock(), () => ({ dayNightCycle: false, timeOfDay: phase }));
+        const p = window.stressPage;
+        p.host.hdSand = () => hd;
+        for (let k = 0; k < 60; k++) { p.draw(false); await new Promise(r => requestAnimationFrame(r)); }
+        let drew = 0; const relief = p.renderer.relief, was = relief.draw;
+        relief.draw = (...a) => { drew++; return was.apply(relief, a); };
+        p.draw(false); relief.draw = was;
+        return { style: art.duneStyle(), drew };
+      }, [phase, hd]);
+      assert.equal(shown.style, hd ? 'hd' : 'simple');
+      assert.equal(shown.drew, 0, 'no flagstone relief over the desert');
+      await page.screenshot({ path: `test-results/dunes-${name}-${phase}${hd ? '-hd' : ''}.png` });
+    }
     assert.deepEqual(errors, []);
     await page.close();
   }

@@ -41,6 +41,7 @@ export const SETTINGS_TEXT = [
  ["settings.opacityAria","Tile grid line opacity, percent","Opacidad de la cuadrícula, porcentaje","Opacité de la grille, pourcentage","Rasterdeckkraft in Prozent","Opacidade da grade, porcentagem","Opacità della griglia, percentuale","タイルのグリッド線の不透明度、パーセント","타일 격자선 불투명도, 백분율","地块网格线不透明度，百分比"],
  ["setting.soundOff","Sound","Sonido","Son","Ton","Som","Audio","効果音","소리","音效"],
  ["setting.ambienceOff","Ambient sound","Sonido ambiental","Ambiance sonore","Umgebungsgeräusche","Som ambiente","Suoni ambientali","環境音","환경음","环境音"],
+ ["setting.hdSand","HD Sand","Arena HD","Sable HD","HD-Sand","Areia HD","Sabbia HD","HDの砂","HD 모래","高清沙地"],
  ["setting.crispZoom","Crisp pixel zoom","Zoom de píxeles nítidos","Zoom aux pixels nets","Scharfer Pixel-Zoom","Zoom de pixels nítidos","Zoom a pixel nitidi","ピクセルをくっきり拡大","선명한 픽셀 확대","清晰像素缩放"],
  ["setting.pixelArt","Pixel Art","Arte píxel","Pixel art","Pixelgrafik","Pixel Art","Pixel art","ピクセルアート","픽셀 아트","像素画"],
  ["setting.legacyGraphics","Show legacy graphics","Mostrar gráficos clásicos","Afficher les graphismes classiques","Klassische Grafik anzeigen","Mostrar gráficos clássicos","Mostra grafica classica","従来のグラフィックを表示","이전 그래픽 표시","显示经典画面"],
