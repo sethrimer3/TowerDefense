@@ -33,28 +33,42 @@ try {
       const renderer = new DefendRenderer(cv); renderer.resize(w, h);
       renderer.cam.s = phone ? 5 : 4; renderer.cam.x = cv.width / 2 - 22 * renderer.px * renderer.cam.s; renderer.cam.y = cv.height / 2 - 10 * renderer.px * renderer.cam.s;
       const c = cv.getContext('2d');
-      const count = (sim, now, reduceMotion = false) => {
-        const opts = { grid: 0, weather: null, night: 0, now, reduceMotion, effects: false, mergedOutlines: true };
+      const count = (sim, now, reduceMotion = false, pixelPortals = false) => {
+        const opts = { grid: 0, weather: null, night: 0, now, reduceMotion, effects: false, mergedOutlines: true, pixelPortals };
         renderer.draw(map, sim, null, opts);
         const d = c.getImageData(0, 0, cv.width, cv.height).data;
-        let fire = 0, hash = 0;
-        for (let i = 0; i < d.length; i += 4) if (d[i] > 110 && d[i] > d[i + 1] && d[i + 1] > d[i + 2] && d[i] - d[i + 2] > 80 && d[i + 1] > 25) { fire++; hash = (hash * 31 + d[i] + d[i + 1] * 7) | 0; }
-        return { fire, hash };
+        let fire = 0, hash = 0, same = 0;
+        const hot = i => d[i] > 110 && d[i] > d[i + 1] && d[i + 1] > d[i + 2] && d[i] - d[i + 2] > 80 && d[i + 1] > 25;
+        for (let i = 0; i < d.length; i += 4) if (hot(i)) {
+          fire++; hash = (hash * 31 + d[i] + d[i + 1] * 7) | 0;
+          // Pixel art fire comes in blocks: the next pixel along is the same colour.
+          if (hot(i + 4) && d[i] === d[i + 4] && d[i + 1] === d[i + 5] && d[i + 2] === d[i + 6]) same++;
+        }
+        return { fire, hash, blocky: fire ? same / fire : 0 };
       };
       const base = scene(false); count(base, 900); const plain = count(base, 1000);
       const sim = scene(true);
       count(sim, 900); const a = count(sim, 1000), b = count(sim, 4000);
       const still = [count(sim, 1000, true), count(sim, 9000, true)];
-      // Leave a frame showing for the screenshot.
-      count(sim, 2500);
-      return { plain, a, b, still, width: cv.width, height: cv.height };
+      // Pixel art perlin noise outlines: one pixel a half art pixel, still scrolling.
+      const pixelA = count(sim, 1000, false, true), pixelB = count(sim, 4000, false, true);
+      const k = renderer.px * renderer.cam.s / 16;
+      // Leave a frame showing for the screenshots.
+      window.portalFrame = pixel => count(sim, 2500, false, pixel);
+      window.portalFrame(false);
+      return { plain, a, b, still, pixelA, pixelB, k, width: cv.width, height: cv.height };
     }, phone);
     await page.screenshot({ path: `test-results/major-darklings-${phone ? 'phone' : 'desktop'}.png` });
+    await page.evaluate(() => window.portalFrame(true));
+    await page.screenshot({ path: `test-results/major-darklings-pixel-${phone ? 'phone' : 'desktop'}.png` });
     assert.deepEqual(errors, []);
     assert.ok(r.plain.fire > 0, 'Large and smaller Darklings have fiery contours too');
     assert.ok(r.a.fire > r.plain.fire, `portal contours show fire (${r.a.fire} vs ${r.plain.fire})`);
     assert.notEqual(r.a.hash, r.b.hash, 'the dimension scrolls with the wall clock');
     assert.deepEqual(r.still[0], r.still[1], 'Reduce Motion holds it still');
+    assert.ok(r.pixelA.fire > r.plain.fire, `pixel portal contours show fire (${r.pixelA.fire})`);
+    assert.notEqual(r.pixelA.hash, r.pixelB.hash, 'the pixel dimension scrolls too');
+    if (r.k >= 2) assert.ok(r.pixelA.blocky > r.a.blocky + .2, `pixel fire comes in blocks (${r.pixelA.blocky.toFixed(2)} vs smooth ${r.a.blocky.toFixed(2)})`);
     results.push({ phone, ...r });
     await page.close();
   }

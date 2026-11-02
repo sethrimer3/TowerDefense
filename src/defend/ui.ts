@@ -92,6 +92,8 @@ export type DefendHost = {
   mergedOutlines?(): boolean;
   /** The Amber Desert's detailed dunes (the HD Sand setting). */
   hdSand?(): boolean;
+  /** Portal contours as half-art-pixel pixel art (the Pixel art perlin noise outlines setting). */
+  pixelPortals?(): boolean;
   /** Settings' Board resolution: the most device pixels a CSS pixel (0: the screen's own). */
   resolution?(): number;
   /** Settings' Ultra graphics: torchlight sheen on outlines, among the costliest effects. */
@@ -972,6 +974,7 @@ export class DefendPage {
       simpleTroops: this.host.simpleTroops?.() ?? false,
       mergedOutlines: this.host.mergedOutlines?.() ?? true,
       hdSand: this.host.hdSand?.() ?? false,
+      pixelPortals: this.host.pixelPortals?.() ?? false,
       sheen: this.host.ultraGraphics?.() ?? false,
       looks: this.looks(),
       gate: this.save.gateRanks,

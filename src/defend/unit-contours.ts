@@ -24,8 +24,12 @@ export class UnitContours {
   private innerChannel: Channel | null = null;
   private portal: HTMLCanvasElement | null = null;
   private portalFire: HTMLCanvasElement | null = null;
+  private portalPixels: HTMLCanvasElement | null = null;
   /** Wall-clock seconds the portal dimension has scrolled to. */
   seconds = 0;
+  /** Portal contours as pixel art: the dimension and its cut both on a
+   * lattice of half art pixels, anchored to the board. */
+  pixelPortals = false;
   /** How far the contour reaches out from the bodies, in screen pixels. */
   get width() { return this.radius; }
   private scale = 1;
@@ -275,6 +279,7 @@ export class UnitContours {
       box = { x: x0, y: y0, w: Math.min(canvas.width, Math.ceil(b.x1 + pad)) - x0, h: Math.min(canvas.height, Math.ceil(b.y1 + pad)) - y0 };
       if (box.w <= 0 || box.h <= 0) return;
     }
+    if (this.pixelPortals && !plain) { this.drawPixelPortal(c, channel, box); return; }
     // destination-in affects the whole destination, even for a cropped
     // drawImage. Keep fire in a local reusable surface so a lone dart cannot
     // pay for a full-DPR viewport mask. Chunked growth avoids resize churn.
@@ -301,6 +306,37 @@ export class UnitContours {
     }
     s.globalCompositeOperation = 'source-over';
     c.drawImage(scratch, 0, 0, box.w, box.h, box.x, box.y, box.w, box.h);
+  }
+  /** The same dimension and cut, painted at one pixel per half art pixel
+   * (the contour's own width, `radius`) on the board's lattice and scaled
+   * up nearest-neighbour, so the fire reads as pixel art finer than the
+   * board's. The cut samples the contour once a pixel, so it is hard-edged. */
+  private drawPixelPortal(c: Ctx, channel: Channel, box: { x: number; y: number; w: number; h: number }) {
+    const k = Math.max(1, this.radius), { canvas } = channel, m = this.matrix;
+    const ox = m.e - Math.floor(m.e / k) * k, oy = m.f - Math.floor(m.f / k) * k;
+    const gx = Math.floor((box.x - ox) / k), gy = Math.floor((box.y - oy) / k);
+    const gw = Math.ceil((box.x + box.w - ox) / k) - gx, gh = Math.ceil((box.y + box.h - oy) / k) - gy;
+    if (gw <= 0 || gh <= 0) return;
+    const x0 = ox + gx * k, y0 = oy + gy * k;
+    this.portalPixels ??= document.createElement('canvas');
+    const low = this.portalPixels;
+    if (low.width < gw || low.width > gw * 2 + 64) low.width = Math.ceil(gw / 32) * 32;
+    if (low.height < gh || low.height > gh * 2 + 64) low.height = Math.ceil(gh / 32) * 32;
+    const l = low.getContext('2d')!;
+    l.setTransform(1 / k, 0, 0, 1 / k, -x0 / k, -y0 / k);
+    paintPortal(l, { x: x0, y: y0, w: gw * k, h: gh * k }, this.seconds, globalThis.devicePixelRatio || 1);
+    l.setTransform(1, 0, 0, 1, 0, 0);
+    l.imageSmoothingEnabled = false;
+    // Nearest-neighbour downscaling samples each pixel's middle.
+    const sample = (from: HTMLCanvasElement) => l.drawImage(from, x0, y0, gw * k, gh * k, 0, 0, gw, gh);
+    const join = this.innerChannel === channel ? this.inner : null;
+    if (join) { l.globalCompositeOperation = 'source-atop'; sample(join); }
+    l.globalCompositeOperation = 'destination-in'; sample(canvas);
+    l.globalCompositeOperation = 'source-over';
+    const smooth = c.imageSmoothingEnabled;
+    c.imageSmoothingEnabled = false;
+    c.drawImage(low, 0, 0, gw, gh, x0, y0, gw * k, gh * k);
+    c.imageSmoothingEnabled = smooth;
   }
 }
 

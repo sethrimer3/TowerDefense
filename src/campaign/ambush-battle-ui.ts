@@ -531,6 +531,7 @@ export class AmbushBattlePage {
       simpleTroops: settings.simpleTroops,
       mergedOutlines: settings.mergedOutlines,
       hdSand: settings.hdSand,
+      pixelPortals: settings.pixelPortals,
       sheen: settings.ultraGraphics,
       looks,
       ...(this.picked !== undefined

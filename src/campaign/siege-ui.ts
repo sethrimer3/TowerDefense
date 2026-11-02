@@ -410,6 +410,7 @@ export class SiegePage {
       simpleTroops: settings.simpleTroops,
       mergedOutlines: settings.mergedOutlines,
       hdSand: settings.hdSand,
+      pixelPortals: settings.pixelPortals,
       sheen: settings.ultraGraphics,
       looks,
       ...(this.inspection !== undefined ? { inspect: { id: this.inspection, armed: owner } } : {}),

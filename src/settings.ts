@@ -37,6 +37,9 @@ export const SETTINGS = {
   crispZoom: { kind: "toggle", default: true, page: { id: "crisp-zoom", label: "Crisp pixel zoom" } },
   /** The Amber Desert's detailed dunes: rippled, in dithered sand tones,
    * instead of one sand colour shaped only by light and shadow. */
+  /** Portal contours (the Major Darkling's burning outline) drawn as pixel
+   * art, half an art pixel a pixel, rather than smooth. */
+  pixelPortals: { kind: "toggle", default: false, page: { id: "pixel-portals", label: "Pixel art perlin noise outlines" } },
   hdSand: { kind: "toggle", default: false, page: { id: "hd-sand", label: "HD Sand" } },
   /** The most device pixels a CSS pixel the battle board draws at (0: the
    * screen's own); fewer pixels are cheaper to draw and are scaled up. */
