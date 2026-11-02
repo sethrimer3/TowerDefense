@@ -138,6 +138,7 @@ const defendPage = new DefendPage(el("defend"), {
     }
     return r;
   },
+  earnEssence: (amount) => { save.essence += amount; store(); refreshCurrencies(); },
   persist: store,
   reduceMotion: () => save.settings.reduceMotion,
   healthbars: () => save.settings.showHealthbars,

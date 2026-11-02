@@ -78,6 +78,8 @@ export type DefendHost = {
   spentKnowledge?(): void;
   /** Awards an upgrade point for a new highest wave, recording it with payment. */
   earnWave(wave: number): { upgrade: number };
+  /** Blight Essence from Dark One kills: add it, store and show it. */
+  earnEssence?(amount: number): void;
   persist(): void;
   reduceMotion(): boolean;
   /** The park grass and pond effects are on. */
@@ -911,8 +913,28 @@ export class DefendPage {
     if (changed) { this.host.persist(); this.refreshJournal(); }
   }
 
+  /** The sim whose Essence was last paid and how much of it. */
+  private essenceSim: DefendSim | null = null;
+  private essencePaid = 0;
+  private essenceAt = 0;
+
+  /** Pays the run's new Blight Essence, at most once a second (and at
+   * once when the run ends); never for the Unit tester. */
+  private payEssence() {
+    const sim = this.sim;
+    if (!sim || sim.unitTester) return;
+    if (this.essenceSim !== sim) { this.essenceSim = sim; this.essencePaid = 0; }
+    const owed = sim.essence - this.essencePaid;
+    const now = performance.now();
+    if (owed <= 0 || (!sim.lost && now - this.essenceAt < 1000)) return;
+    this.essencePaid = sim.essence;
+    this.essenceAt = now;
+    this.host.earnEssence?.(owed);
+  }
+
   private handleEvents() {
     this.discoverEnemies();
+    this.payEssence();
     const sim = this.sim!;
     for (const ev of sim.events.splice(0)) {
       if (ev.type === "waveCleared") {
