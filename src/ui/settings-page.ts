@@ -54,26 +54,54 @@ function daylightControls(ctx: AppContext) {
     `<p class="hint">${t("settings.dayCycleHint")}</p>`;
 }
 
+/** Sections folded shut this session, by key; the page redraws with them still shut. */
+const folded = new Set<string>();
+
+/** A major section under a heading that folds it away: a brass-ruled toggle over a
+    body whose height animates (a grid row easing between 0fr and 1fr). */
+function section(key: string, title: string, body: string): string {
+  const open = !folded.has(key);
+  return `<section class="settings-section${open ? "" : " folded"}" data-section="${key}">` +
+    `<h3 class="settings-group"><button class="settings-toggle" aria-expanded="${open}" aria-controls="settings-${key}">` +
+    `<span>${title}</span><span class="settings-chevron" aria-hidden="true"></span></button></h3>` +
+    `<div class="settings-body" id="settings-${key}" ${open ? "" : "inert"}><div class="settings-inner">${body}</div></div></section>`;
+}
+
+/** Folds a section open or shut, remembering it for redraws. */
+function bindSections() {
+  for (const button of Array.from(document.querySelectorAll("#settings .settings-toggle")) as HTMLButtonElement[]) {
+    button.onclick = () => {
+      const box = button.closest(".settings-section") as HTMLElement, key = box.dataset.section!;
+      const open = box.classList.toggle("folded") === false;
+      if (open) folded.delete(key); else folded.add(key);
+      button.setAttribute("aria-expanded", String(open));
+      (box.querySelector(".settings-body") as HTMLElement).inert = !open;
+      // The scroll arrows recheck how far the page now runs.
+      el("settings").dispatchEvent(new Event("scroll"));
+    };
+  }
+}
+
 /** The Settings page: display and dev options, and erasing progress. */
 export function renderSettingsPage(ctx: AppContext) {
   const settings = ctx.save().settings, allOn = ALL_DEV.every((k) => settings[k]);
   el("settings").innerHTML =
     `<div class="page-title"><small>${t("settings.tagline")}</small><h2>${t("nav.settings")}</h2></div>` +
     `<div class="setting language-setting"><span>${t("settings.language")}</span><button id="language" class="language-current" aria-haspopup="dialog" aria-label="${t("settings.chooseLanguage")}">${LANGUAGES.find(l => l.code === settings.language)!.name} ▾</button></div><p class="hint language-note">${t("settings.languageNote")}</p>` +
-    `<h3 class="settings-group">${t("settings.gameplay")}</h3>` +
-    GAMEPLAY.map((key) => control(key, ctx)).join("") +
-    `<h3 class="settings-group">${t("settings.display")}</h3>` +
-    PAGE.map((key) => control(key, ctx) + (key === "tileGrid" ? gridControls(ctx) : key === "dayNightCycle" ? daylightControls(ctx) : key === "fasterSunCatchup" ? `<p class="hint">${t("settings.fasterSunCatchupHint")}</p>` : key === "crispZoom" ? resolutionControls(ctx) : key === "ultraGraphics" ? `<p class="hint">${t("settings.ultraGraphicsHint")}</p>` : "")).join("") +
-    control("developerMode", ctx) +
-    (settings.developerMode ? `<h3 class="settings-group">${t("settings.dev")}</h3>` +
-    `<label class="setting setting-all">${t("settings.allOn")}<input type="checkbox" id="dev-all" ${allOn ? "checked" : ""}></label>` +
-    DEV.map((key) => control(key, ctx)).join("") +
-    `<div class="setting setting-research"><span>${t("settings.allResearch")}</span><span class="research-checks">${RESEARCH.map((key) => `<label>${t(`setting.${key}`)}${checkbox(key, ctx)}</label>`).join("")}</span></div>` +
-    `<button class="wide" id="dev-idle">${t("settings.idleHour")}</button>` +
-    `<button class="wide" id="dev-idle-day">${t("settings.idleDay")}</button>` +
-    `<button class="wide" id="dev-waves">${t("settings.unlockWaves", {count: UNLOCK_WAVES})}</button>` +
-    `<p class="hint" id="dev-waves-reach">${t("settings.waveHint", {wave: waveReach(ctx.save().defend)})}</p>` : "") +
+    section("gameplay", t("settings.gameplay"), GAMEPLAY.map((key) => control(key, ctx)).join("")) +
+    section("display", t("settings.display"),
+      PAGE.map((key) => control(key, ctx) + (key === "tileGrid" ? gridControls(ctx) : key === "dayNightCycle" ? daylightControls(ctx) : key === "fasterSunCatchup" ? `<p class="hint">${t("settings.fasterSunCatchupHint")}</p>` : key === "crispZoom" ? resolutionControls(ctx) : key === "ultraGraphics" ? `<p class="hint">${t("settings.ultraGraphicsHint")}</p>` : "")).join("") +
+      control("developerMode", ctx)) +
+    (settings.developerMode ? section("dev", t("settings.dev"),
+      `<label class="setting setting-all">${t("settings.allOn")}<input type="checkbox" id="dev-all" ${allOn ? "checked" : ""}></label>` +
+      DEV.map((key) => control(key, ctx)).join("") +
+      `<div class="setting setting-research"><span>${t("settings.allResearch")}</span><span class="research-checks">${RESEARCH.map((key) => `<label>${t(`setting.${key}`)}${checkbox(key, ctx)}</label>`).join("")}</span></div>` +
+      `<button class="wide" id="dev-idle">${t("settings.idleHour")}</button>` +
+      `<button class="wide" id="dev-idle-day">${t("settings.idleDay")}</button>` +
+      `<button class="wide" id="dev-waves">${t("settings.unlockWaves", {count: UNLOCK_WAVES})}</button>` +
+      `<p class="hint" id="dev-waves-reach">${t("settings.waveHint", {wave: waveReach(ctx.save().defend)})}</p>`) : "") +
     `<p class="hint">${t("settings.saveHint")}</p><button class="wide danger" id="erase">${t("settings.erase")}</button>`;
+  bindSections();
   el("language").onclick = () => languageMenu(ctx);
   el("developer-mode").onchange = (event) => {
     settings.developerMode = (event.target as HTMLInputElement).checked;
