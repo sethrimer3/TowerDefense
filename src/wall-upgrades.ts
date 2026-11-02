@@ -17,7 +17,7 @@ export type WallRanks = SideRanks<WallPathId>;
 
 // ── What each rank does in battle ─────────────────────────────────────────
 /** Stonework: each placed wall stone's HP times `hp[rank]`; at III a
- * repair workers mend placed stones at `repair` times their usual speed. */
+ * masons mend placed stones at `repair` times their usual speed. */
 export const STONEWORK = { hp: [1, 1.5, 2.2, 2.2], repair: 2 };
 /** Trapped walls: a placed wall stone bursts once as it breaks, a blast of
  * `damage[rank]` over `radius[rank]` cells that spares your own people; at
@@ -34,7 +34,7 @@ export const WALL_PATHS: SidePath<WallPathId>[] = [
     ranks: [
       { name: "Dressed stone", icon: "hammer", cost: studyPathCost(2, 0), text: "Placed walls have 50% more HP" },
       { name: "Ashlar courses", icon: "mail", cost: studyPathCost(2, 1), text: "120% more HP in all" },
-      { name: "Living rock", icon: "heart", cost: studyPathCost(2, 2), text: "Repair workers mend placed walls twice as fast" },
+      { name: "Living rock", icon: "heart", cost: studyPathCost(2, 2), text: "Masons mend placed walls twice as fast" },
     ],
   },
   {

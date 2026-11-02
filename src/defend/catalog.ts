@@ -167,7 +167,7 @@ export type StructureDef = {
 export type TileSpan = 1 | 2;
 
 export const STRUCTURES: Record<StructureKind, StructureDef> = {
-  repairShop: { kind: "repairShop", name: "Repair shop", w: 4, h: 2, maxHp: 160, outsideOk: false, description: "Two carpenters come out of this workshop to rebuild destroyed houses and service buildings. Its tree teaches Advanced carpentry for infantry buildings and towers, Masonry for walls and gates, larger crews, critical repair priorities and a retreating bow. Repairs restore a percentage of maximum HP." },
+  repairShop: { kind: "repairShop", name: "Repair shop", w: 4, h: 2, maxHp: 160, outsideOk: false, description: "Two masons come out of this workshop to repair and rebuild every building and tower. Its tree teaches Wall masonry for walls and gates, larger crews, critical repair priorities and a retreating bow. Repairs restore a percentage of maximum HP." },
   keep: {
     kind: "keep",
     name: "Keep",
@@ -934,9 +934,9 @@ export const UPGRADES: UpgradeDef[] = [
   { id: "ballistaRange", group: "Wall ballista", name: "Long stocks", maxLevel: 4, describe: (l) => `${ballistaRange(l)} cell range` },
   { id: "wallStrength", group: "City", name: "Masonry", maxLevel: 6, describe: (l) => `${wallHp(l)} HP per wall stone` },
   { id: "keepStrength", group: "City", name: "Keep bastions", maxLevel: 6, describe: (l) => `${keepHp(l)} keep HP` },
-  { id: "civilianCount", group: "Repair shop", name: "Spare tools", maxLevel: 5, describe: (l) => `Repair crews work ${l * 10}% faster` },
-  { id: "civilianHealth", group: "Repair shop", name: "Hardy carpenters", maxLevel: 5, describe: (l) => `${civilianHp(l)} civilian HP` },
-  { id: "rebuildSpeed", group: "Repair shop", name: "Master carpenters", maxLevel: 5, describe: (l) => `${(100 / (rebuildSeconds(l) * 10)).toFixed(1)}% maximum HP repaired per second` },
+  { id: "civilianCount", group: "Repair shop", name: "Spare tools", maxLevel: 5, describe: (l) => `Masons work ${l * 10}% faster` },
+  { id: "civilianHealth", group: "Repair shop", name: "Hardy masons", maxLevel: 5, describe: (l) => `${civilianHp(l)} mason HP` },
+  { id: "rebuildSpeed", group: "Repair shop", name: "Master masons", maxLevel: 5, describe: (l) => `${(100 / (rebuildSeconds(l) * 10)).toFixed(1)}% maximum HP repaired per second` },
 ];
 
 /** A level's usual Forge price: copper, then silver from the fourth level
@@ -1295,7 +1295,7 @@ export type Bonuses = {
   wallHp: number;
   /** The keep's HP. */
   keepHp: number;
-  /** Multiplier on the seconds workers take to restore maximum HP. */
+  /** Multiplier on the seconds masons take to restore maximum HP. */
   rebuild: number;
   repairHp: number;
   repairDamage: number;

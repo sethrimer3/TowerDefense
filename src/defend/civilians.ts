@@ -1,4 +1,4 @@
-/** Repair workers are recruited by intact Repair shops. No shop, no repairs.
+/** Masons are recruited by intact Repair shops. No shop, no repairs.
  * Jobs reserve whole buildings; work restores a percentage of maximum HP. */
 import { STONEWORK, wallRank } from "../wall-upgrades.ts";
 import { IRONBOUND, gateRank } from "../gate-upgrades.ts";
@@ -183,14 +183,14 @@ export function escaped(c: Civilian) {
 }
 
 
-/** Carpentry is innate; combat buildings and stone defenses need their own skills. */
+/** Masons mend every building and tower from the start, the keep included
+ * while it stands; walls, gates and wall ballistas need Wall masonry. */
 export function canRepair(sim: DefendSim, b: Building): boolean {
   if (!sim.ownsBuilding(b) || b.hidden || sim.aloft(b.id) || sim.intact(b) && sim.hp[b.id] >= sim.maxHp[b.id]) return false;
-  if (b.kind === "keep") return sim.hp[b.id] > 0 && !!repairRank(sim.bonuses.repair, "advancedCarpentry");
+  if (b.kind === "keep") return sim.hp[b.id] > 0;
   if (b.kind === "wall" || b.kind === "gate" || b.kind === "wallBallista") return !!repairRank(sim.bonuses.repair, "masonry");
   if (b.kind === "monsterBait") return restockable(sim, b) && !sim.intact(b);
-  if (b.kind === "house" || b.kind === "repairShop") return true;
-  return !!repairRank(sim.bonuses.repair, "advancedCarpentry");
+  return true;
 }
 
 function jobScore(sim: DefendSim, b: Building, from: Point) {
@@ -247,7 +247,7 @@ function goHome(sim: DefendSim, c: Civilian, dt: number) {
     if (!c.path.length || c.thinkT <= 0) { c.path = findPath(sim.ownSolid, c, cellCenter(cell), ERRAND) ?? []; c.thinkT = 1; }
     sim.followPath(c, cellCenter(cell), CIVILIAN.speed, dt); return;
   }
-  // Surviving workers may rebuild their fallen shop. Without a reachable
+  // Surviving masons may rebuild their fallen shop. Without a reachable
   // refuge they leave the board and release their slot.
   if (pickJob(sim, c, -1, c) >= 0) assignNext(sim, c);
   else { panic(sim, c); flee(sim, c, dt); }

@@ -3,7 +3,7 @@
  * gone; until Portcullis bars it, the enemy may slip through while it is
  * open (`DefendSim.foeSolid`), and whoever is caught in the gateway as it
  * shuts is shoved out. The gates' upgrades (`gate-upgrades.ts`) add murder
- * holes and small ballistas on the gatehouse. Repairs require shop workers. A city
+ * holes and small ballistas on the gatehouse. Repairs require masons. A city
  * without gates does none of it, so such runs replay exactly as before. */
 import { GATE_TOWERS, PORTCULLIS, gateBarred, gateRank } from "../gate-upgrades.ts";
 import { sq } from "../exact.ts";

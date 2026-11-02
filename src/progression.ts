@@ -32,8 +32,8 @@ export const TRAINING_GROUPS = { army: "Army", towers: "Towers", city: "City", s
 /** Each rank adds `per` percent to its target, with quadratic metal cost
  * (`rankCost`) in its tier (`rankPrice`). */
 export const TRAINING: TrainingRow[] = [
-  { id: "repairHp", group: "city", name: "Repair worker HP", per: 5, max: 50 },
-  { id: "repairDamage", group: "city", name: "Repair worker bow damage", per: 5, max: 50 },
+  { id: "repairHp", group: "city", name: "Mason HP", per: 5, max: 50 },
+  { id: "repairDamage", group: "city", name: "Mason bow damage", per: 5, max: 50 },
   { id: "buildingHp", group: "city", name: "Building HP", per: 5, max: 50 },
   { id: "towerHp", group: "towers", name: "Tower HP", per: 5, max: 50 },
   { id: "troopHp", group: "army", name: "Troop HP", per: 4, max: 50 },

@@ -273,14 +273,16 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   drawn back with a bolt laid on, rockets refilling their racks, the
   trebuchet's arm swinging over; rockets wobble up on spark trails and burst
   into fireworks.
-- Destruction lasts for the whole run. **Repair shops** recruit two workers
-  each; without a shop, houses never send out automatic builders. Initial
-  **Carpentry** rebuilds houses and service buildings. **Advanced carpentry**
-  unlocks infantry buildings and towers; **Masonry** unlocks walls and gates.
-  Independent skills add a third/fourth worker, critical repair priorities,
+- Destruction lasts for the whole run. Every building and tower takes damage and can
+  be destroyed. **Repair shops** recruit two **masons** each; without a shop,
+  houses never send out automatic builders. Initial **Mending** repairs and
+  rebuilds every building and tower, and repairs the keep while it stands;
+  **Wall masonry** unlocks walls, gates and wall ballistas. (Advanced
+  carpentry, once needed for towers and troop buildings, is retired and its
+  Knowledge refunded on load.) Independent skills add a third/fourth mason, critical repair priorities,
   and weak bow shots while retreating. Repairs take a percentage of maximum
   HP, so extra HP does not increase repair time. The Smithy improves repair
-  rate, worker HP, bow damage, building HP and tower HP. See
+  rate, mason HP, bow damage, building HP and tower HP. See
   [Repair shop](upgrades/REPAIR_SHOP.md) for tuning and saved-state rules.
 - **Basic buildings and their upgrades.** The shop sells the Repair shop plus three basic combat
   buildings: the **watch tower**, the **Melee Guild** and the **Ranged
@@ -671,7 +673,7 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   Paths: Oil-soaked (whoever bites a stack catches fire, hotter each
   rank) or Fortified crates (more HP, then spikes hurting each biter
   thrice its bite).
-- Repair workers stand in a reachable open cell beside their building,
+- Masons stand in a reachable open cell beside their building,
   reserve the whole job, and restore rubble cell by cell over a fixed total
   work time. Gates and placed walls require workers even with their old
   mending upgrades: those upgrades now accelerate the workers' repairs.
