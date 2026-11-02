@@ -1,4 +1,4 @@
-import { civilianHp, rebuildSeconds } from "../defend/catalog.ts";
+import { civilianHp, rebuildSeconds, WATCHMAN } from "../defend/catalog.ts";
 import { REPAIR, REPAIR_PATHS, repairAllocated, repairCrew, respecRepair, undoRepair, upgradeRepair, type RepairRanks, type RepairPathId } from "../repair-upgrades.ts";
 import {CHRONO,CHRONO_PATHS,chronoAllocated,chronoRank,respecChrono,undoChrono,upgradeChrono,type ChronoRanks,type ChronoPathId} from "../chrono-upgrades.ts";
 import type { CircleState } from "../magic-circle/formation.ts";
@@ -11,7 +11,7 @@ import type { CircleState } from "../magic-circle/formation.ts";
 import type { Save } from "../save.ts";
 import { TROOPS, allocated, attunedOf, mergePartners, rootOf, hasTree, buildingTree, fullTree, undoRefund, undoTo, type Partner, type TreeNode, type UpgradeStep, type Wear } from "../specializations.ts";
 import type { GraphNode } from "./upgrade-graph.ts";
-import { ARROW_LOOPS, BASTIONS, BOILING_OIL, KEEP_PATHS, keepAllocated, keepRank, respecKeep, undoKeep, upgradeKeep, type KeepPathId, type KeepRanks } from "../keep-upgrades.ts";
+import { ARROW_LOOPS, BASTIONS, BOILING_OIL, cityWatch, KEEP_PATHS, keepAllocated, keepRank, respecKeep, undoKeep, upgradeKeep, type KeepPathId, type KeepRanks } from "../keep-upgrades.ts";
 import { STONEWORK, TOWN_WALLS, TRAPPED, WALL_PATHS, respecWalls, undoWalls, upgradeWalls, wallAllocated, wallRank, type WallPathId, type WallRanks } from "../wall-upgrades.ts";
 import { sideRank, type SidePath, type SideRanks } from "../side-ranks.ts";
 import { GATE_PATHS, GATE_TOWERS, IRONBOUND, PORTCULLIS, gateAllocated, gateBarred, gateRank, respecGate, undoGate, upgradeGate, type GatePathId, type GateRanks } from "../gate-upgrades.ts";
@@ -473,6 +473,8 @@ export function keepStats(save: Save, ranks: KeepRanks | undefined): string {
   const parts = [`${Math.round(keepHp(l.keepStrength) * b.keepHp * BASTIONS.hp[keepRank(ranks, "bastions")]).toLocaleString("en")} HP`];
   if (loops) parts.push(`${n(archerDamage(l.archerDamage) * b.towerDamage * ARROW_LOOPS.damage[loops])} arrow damage every ${n(ARROW_LOOPS.reload[loops] * b.towerReload)}s · ${ARROW_LOOPS.range[loops]} range${loops >= 3 ? ` · ${ARROW_LOOPS.volley} arrows` : ""}`);
   if (oil) parts.push(`${n(BOILING_OIL.damage[oil] * b.towerDamage)} oil damage every ${BOILING_OIL.every[oil]}s · ${BOILING_OIL.reach[oil]} cells out${BOILING_OIL.burn[oil] ? ` · ${BOILING_OIL.burn[oil]}s burn` : ""}`);
+  const w = cityWatch(ranks);
+  parts.push(`${w.guards} guards · ${Math.round(WATCHMAN.hp * w.hp * b.troopHp)} HP · ${n(WATCHMAN.damage * w.damage * b.troopDamage)} damage · one trained back every ${n(w.drill * b.drill)}s`);
   return parts.join(" · ");
 }
 

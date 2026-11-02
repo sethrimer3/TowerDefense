@@ -77,6 +77,9 @@ import { ForestGrass } from "./forest-grass.ts";
 import { hasForest } from "./forest.ts";
 
 export type DrawOptions = {
+  /** How many watchmen walk the city (the keep's City watch, in Defend);
+   * absent, a few by the city's size. */
+  watchmen?: number;
   /** Optional natural daylight and board tint; absent in ordinary modes. */
   sun?: { x: number; y: number; strength: number };
   tint?: { color: string; strength: number };
@@ -391,7 +394,7 @@ export class DefendRenderer {
     const dt = this.lastNow ? (opts.now - this.lastNow) / 1000 : 0;
     this.lastNow = opts.now;
     this.lighting.solarTime = sky?.time ?? null;
-    this.cityLife.sync(map, sim, hasForest(this.area));
+    this.cityLife.sync(map, sim, hasForest(this.area), opts.watchmen);
     const lifeDt = sim ? (sim === this.lifeSim ? Math.max(0, sim.time - this.lifeTime) : 0) : dt;
     this.lifeSim = sim; this.lifeTime = sim?.time ?? 0;
     this.cityLife.update(lifeDt, sky?.time ?? 0, sky ? torchLevel(sky.time,0) > .5 : opts.night > .5, opts.reduceMotion, sim?.enemies ?? []);

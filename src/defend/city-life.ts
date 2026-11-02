@@ -1,5 +1,9 @@
 /** Noncombat city residents. Their paths, threats and lights never enter
- * DefendSim, its spatial indexes, targeting, casualties, saves or RNG. */
+ * DefendSim, its spatial indexes, targeting, casualties, saves or RNG.
+ * In a Defend battle whose sim has the keep's guards (`Bonuses.watch`,
+ * `city-watch.ts`), the watchmen hand over to them: they muster the battle's
+ * guards where they stand (`watchmenAt`), stay out of sight while it lasts
+ * and follow the guards about, so they walk on from where the guards were. */
 import { CellType, type Building, type CityMap } from './citygen.ts';
 import { CELL_COUNT, CELLS_W, CELLS_H, cellIndex, cellInBounds, sideCells, hash01 } from './grid.ts';
 import { cellAt, cellCenter, findPath } from './pathing.ts';
@@ -29,9 +33,18 @@ export class CityLife {
   private enemyPresent = false;
   private canExit = false;
   private routeBudget = 0;
+  private watchmen: number | undefined;
+  /** Whether the sim's guards stand in for the watchmen. */
+  private fighting = false;
 
-  sync(map: CityMap, sim: DefendSim | null, forest: boolean) {
-    const fresh = map !== this.map;
+  /** `watchmen`: how many watchmen walk the city (the keep's City watch);
+   * absent, a few by the city's size. */
+  sync(map: CityMap, sim: DefendSim | null, forest: boolean, watchmen?: number) {
+    const fresh = map !== this.map || watchmen !== this.watchmen;
+    this.watchmen = watchmen;
+    const fighting = !!sim?.bonuses.watch;
+    if (this.fighting && !fighting) for (const p of this.people) if (p.role === 'watchman' && p.mode === 'walk' && p.hidden) { p.hidden = false; p.path = []; p.wait = .5; }
+    this.fighting = fighting;
     const key = `${sim?.mapVersion ?? -1}:${forest}`;
     if (!fresh && sim === this.sim && key === this.version) return;
     this.map = map; this.sim = sim; this.version = key;
@@ -66,7 +79,7 @@ export class CityLife {
       this.people.length = 0; this.clock = 0; this.sampled = -Infinity;
       if (!this.doors.length) return;
       const citizens = Math.min(CITY_LIFE.townsfolk, Math.max(2, Math.ceil(this.doors.length / 3)));
-      const guards = Math.min(CITY_LIFE.watchmen, Math.max(2, Math.ceil(this.doors.length / 12)));
+      const guards = watchmen ?? Math.min(CITY_LIFE.watchmen, Math.max(2, Math.ceil(this.doors.length / 12)));
       for(let n=0;n<citizens+guards;n++) {
         const d=this.doors[n%this.doors.length];
         this.people.push({id:900000+n,role:n<citizens?'townsfolk':'watchman',x:d.x,y:d.y,size:.35,mode:'indoors',hidden:true,path:[],wait:n*.35,turn:0});
@@ -93,7 +106,9 @@ export class CityLife {
       }
     }
     this.routeBudget=6;
+    if(this.fighting) this.follow();
     for(const p of this.people) {
+      if(this.fighting && p.role==='watchman') continue;
       const outside=!this.map.city[cellAt(p.x,p.y)], danger=this.danger(p);
       if(!p.hidden && p.mode!=='escape' && p.mode!=='shelter' && (danger || (p.role==='townsfolk' && this.enemyPresent))) {
         p.path=[];
@@ -181,6 +196,20 @@ export class CityLife {
       else {p.x+=dx/d*left;p.y+=dy/d*left;left=0;}
     }
   }
+  /** Puts the watchmen where the sim's guards are (hidden, the guards drawn
+   * instead); a watchman whose guard fell goes indoors for a while. */
+  private follow() {
+    const guards=this.sim?.soldiers.filter(s=>s.kind==='watchman'&&s.hp>0)??[];
+    let n=0;
+    for(const p of this.people) if(p.role==='watchman') {
+      const g=guards[n++];
+      p.path=[];
+      if(g){p.x=g.x;p.y=g.y;p.hidden=true;p.mode='walk';}
+      else if(p.mode==='walk'){p.hidden=true;p.mode='indoors';p.wait=5;}
+    }
+  }
+  /** Where the watchmen out on their rounds stand, for the battle's guards to muster at. */
+  watchmenAt() { return this.visible.filter(p=>p.role==='watchman').map(p=>({x:p.x,y:p.y})); }
   get visible() { return this.people.filter(p=>!p.hidden); }
   nearGate(b: Building) {return this.visible.some(p=>p.x>=b.rect.x-1&&p.x<=b.rect.x+b.rect.w+1&&p.y>=b.rect.y-1&&p.y<=b.rect.y+b.rect.h+1);}
   lights(time: number) {return this.visible.map(p=>({id:p.id,x:p.x+.2,y:p.y-.15,r:4.5,k:PERSON_TORCH_STRENGTH*torchLevel(time,p.id)})).filter(l=>l.k>0);}

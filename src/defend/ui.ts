@@ -1,3 +1,5 @@
+import { cityWatch } from "../keep-upgrades.ts";
+import { musterWatch } from "./city-watch.ts";
 import {t} from "../i18n/index.ts";
 import { MagicCircle } from "../magic-circle/render.ts";
 import { SpellBar, STRIKE_SPELLS, castStrike } from "../ui/spell-bar.ts";
@@ -863,7 +865,9 @@ export class DefendPage {
     // A fresh city every run; upgrades bought mid-run apply next time.
     this.map = null;
     const map = this.currentMap();
-    this.sim = new DefendSim(map, { ...this.save.levels }, (defendRandom("rolls")() * 2147483648) | 0, this.host.bonuses());
+    // The keep's guards fight in Defend, mustering where the watchmen walked.
+    this.sim = new DefendSim(map, { ...this.save.levels }, (defendRandom("rolls")() * 2147483648) | 0, { ...this.host.bonuses(), watch: cityWatch(this.save.keepRanks) });
+    musterWatch(this.sim, this.renderer?.cityLife.watchmenAt() ?? []);
     this.sim.speed = Math.min(this.save.battleSpeed, this.save.speed3 ? 3 : 2);
     if (this.testerSelected && this.host.devMode()) this.sim.startUnitTester();
     else this.sim.startAt(startingWave(this.save));
@@ -984,6 +988,7 @@ export class DefendPage {
     this.renderer.draw(map, this.sim, this.overlay(), {
       area: areaForWave(this.sim?.unitTester ? 1 : Math.max(this.sim?.wave ?? 1, startingWave(this.save))).id,
       grid: this.phase === "build" ? (this.host.gridLines?.() ?? 0) : 0,
+      watchmen: cityWatch(this.save.keepRanks).guards,
       gridColor: this.host.gridColor?.(),
       timings: this.frameTimes.enabled,
       weather: this.weather,

@@ -1,7 +1,7 @@
 import type { RepairRanks } from "../repair-upgrades.ts";
 import { BLIGHT_WORM, SMALL_BLIGHT_WORM, MEDIUM_BLIGHT_WORM } from "./blight-worm-tuning.ts";
 import type { ChronoRanks } from "../chrono-upgrades.ts";
-import type { KeepRanks } from "../keep-upgrades.ts";
+import type { CityWatch, KeepRanks } from "../keep-upgrades.ts";
 import type { WallRanks } from "../wall-upgrades.ts";
 import type { GateRanks } from "../gate-upgrades.ts";
 import type { BallistaRanks } from "../ballista-upgrades.ts";
@@ -1352,10 +1352,17 @@ export type Bonuses = {
   chrono?: ChronoRanks;
   /** The C4 nanobots' upgrades (`nanobot-upgrades.ts`); absent with none. */
   nano?: NanoRanks;
+  /** The keep's guards (`keep-upgrades.ts`'s `cityWatch`, `city-watch.ts`):
+   * only a Defend battle sets it, so fixtures, Ambush and Siege fight without them. */
+  watch?: CityWatch;
 };
 export const NO_BONUSES: Readonly<Bonuses> = Object.freeze({
   troopHp: 1, troopDamage: 1, deployRange: 1, drill: 1, towerDamage: 1, towerReload: 1, wallHp: 1, keepHp: 1, rebuild: 1, repairHp: 1, repairDamage: 1, buildingHp: 1, towerHp: 1, bombDamage: 1, undeadHp: 1, undeadDamage: 1, graveTime: 1, meteorDamage: 1, meteorRadius: 1, frostTime: 1, frostRadius: 1, reinforceHp: 1, reinforceDamage: 1, reinforceTime: 1,
 });
+
+/** A keep guard (`city-watch.ts`): a 3 × 3 art-pixel body with a spear,
+ * lighter than a swordsman and a little slower. */
+export const WATCHMAN = { hp: 30, damage: 5, cooldown: 0.9, speed: 2, reach: 0.85, leash: Infinity, size: 3 / 8, color: "#3f5f8f" };
 
 export const SOLDIER = { hp: 40, damage: 6, cooldown: 0.8, speed: 2.4, reach: 0.75, leash: 16, size: 0.4, color: "#5b8fd9" };
 export const ARCHER_UNIT = { hp: 24, damage: 5, cooldown: 1.1, speed: 2.1, size: 0.36, color: "#6cc08a" };

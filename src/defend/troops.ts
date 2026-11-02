@@ -46,7 +46,9 @@ import {
   soldierScale,
   trainSeconds,
   VALKYRIE,
+  WATCHMAN,
 } from "./catalog.ts";
+import { patrolPath, WATCH_PATROL } from "./city-watch.ts";
 import type { Building } from "./citygen.ts";
 import { CELLS_W, CELLS_H, CELL_COUNT, cellX, cellY } from "./grid.ts";
 import { cellAt, cellCenter, center, findPath, firstSorted, nearest, type PathLimits, type Point } from "./pathing.ts";
@@ -85,11 +87,13 @@ function swordStats(sim: DefendSim, home: number) {
 /** How fast a swordsman (or brawler) walks. */
 function swordSpeed(sim: DefendSim, s: Soldier) {
   if (isSpear(s.kind)) return spearSpeed(sim, s as Soldier & { kind: typeof s.kind });
+  // The keep's guards stroll their rounds and hurry to a fight.
+  if (s.kind === "watchman" && s.target < 0) return WATCH_PATROL.speed;
   return melee(s).speed * (s.kind === "sword" && paths(sim, s.home).crusader ? CRUSADE.speed : 1);
 }
 /** A melee troop's own numbers: a brawler's fists, an assassin's knives,
  * the spear line's spears, else a swordsman's blade. */
-const melee = (s: Soldier) => (s.kind === "brawler" ? BRAWLER : s.kind === "assassin" ? ASSASSIN_UNIT : isSpear(s.kind) ? SPEARS[s.kind] : SOLDIER);
+const melee = (s: Soldier) => (s.kind === "watchman" ? WATCHMAN : s.kind === "brawler" ? BRAWLER : s.kind === "assassin" ? ASSASSIN_UNIT : isSpear(s.kind) ? SPEARS[s.kind] : SOLDIER);
 /** A ranged troop's own numbers, besides an archer's. */
 const RANGED = { slinger: SLINGER, sniper: SNIPER, musketeer: MUSKETEER, gunner: GUNNER, machineGunner: MACHINE_GUNNER, gatlingGunner: GATLING_GUNNER, rocketeer: ROCKETEER, railSniper: RAIL_SNIPER, javelineer: JAVELINEER };
 /** What each ranged troop looses: an arrow (none), a stone, a bullet, a ball or a rocket. */
@@ -190,7 +194,7 @@ class Patrol {
     this.bounds = deployment(sim, s);
     // Headhunters range further, and at Kingslayer anywhere in the city.
     // Winged lancers ride further from the stable.
-    this.leash = sim.scenario?.unrestricted ? Infinity : soldierLeash(sim.levels.soldierReach ?? 0) * (s.kind === "assassin" ? huntReach(sim, s.home) : spearLeash(sim, s));
+    this.leash = sim.scenario?.unrestricted || s.kind === "watchman" ? Infinity : soldierLeash(sim.levels.soldierReach ?? 0) * (s.kind === "assassin" ? huntReach(sim, s.home) : spearLeash(sim, s));
     this.toughest = headhunter(sim, s);
     this.citywide = !Number.isFinite(this.leash);
   }
@@ -245,7 +249,7 @@ function rally(sim: DefendSim, s: Soldier, banner: WarBanner, dt: number) {
 
 /** How far a melee troop reaches: Halberdiers further. */
 const swordReach = (sim: DefendSim, s: Soldier) =>
-  isSpear(s.kind) ? spearReach(sim, s as Soldier & { kind: typeof s.kind }) : melee(s).reach + (s.kind === "sword" ? halberdReach(paths(sim, s.home)) : 0);
+  s.kind === "watchman" ? (sim.bonuses.watch?.reach ?? WATCHMAN.reach) : isSpear(s.kind) ? spearReach(sim, s as Soldier & { kind: typeof s.kind }) : melee(s).reach + (s.kind === "sword" ? halberdReach(paths(sim, s.home)) : 0);
 /** The reach a Halberd yard's drill or Halberdiers add. */
 const halberdReach = ({ halberd, halberdier }: { halberd: number; halberdier: boolean }) => (halberd ? HALBERD.reach : halberdier ? HALBERD.drill : 0);
 const inSwordReach = (sim: DefendSim, s: Soldier, e: Enemy) => dist(e.x - s.x, e.y - s.y) <= swordReach(sim, s) + enemySize(e) / 2;
@@ -278,7 +282,8 @@ function replan(sim: DefendSim, s: Soldier, patrol: Patrol): Enemy | null {
   s.path = [];
   const target = pathToFirst(sim, s, patrol.candidates(s), patrol.limits);
   s.target = target ? target.id : -1;
-  if (!target && !postPath(sim, s)) returnToDoor(sim, s, patrol.home);
+  if (!target && s.kind === "watchman") patrolPath(sim, s);
+  else if (!target && !postPath(sim, s)) returnToDoor(sim, s, patrol.home);
   return target;
 }
 

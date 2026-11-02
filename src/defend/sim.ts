@@ -70,6 +70,7 @@ import type { WispTrail } from "./wisp-trail.ts";
 import type { WispFireTrail } from "./wisp-fire.ts";
 import { FORTIFY, SHATTER, SIGNAL, SPOTTERS, pathRank } from "../knowledge-paths.ts";
 import { Barracks, stepArcher, stepSwordsman } from "./troops.ts";
+import { stepCityWatch } from "./city-watch.ts";
 import { cloaked, spreadVenom, stepVenom } from "./assassins.ts";
 import { nanoDeath, stepNano, type Infection, type NanoBurst, type NanoCloud, type NanoShell } from "./nanobots.ts";
 import { perched } from "./gun-sight.ts";
@@ -192,7 +193,7 @@ export type Soldier = {
    * throw like archers; the Hero hunts the city with its sword combos; the Shadow's shade
    * hunts it with knives that loop out through crowds. */
   kind: "sword" | "archer" | "mage" | "valkyrie" | "darkWizard" | "undead" | "reinforcement" | "brawler" | "slinger" | "sniper" | "musketeer" | "gunner" | "machineGunner" | "gatlingGunner" | "rocketeer" | "railSniper" | "assassin"
-    | "spearman" | "hoplite" | "javelineer" | "lancer" | "hero" | "shade" | "flagBearer";
+    | "spearman" | "hoplite" | "javelineer" | "lancer" | "hero" | "shade" | "flagBearer" | "watchman";
   home: number;
   x: number;
   y: number;
@@ -342,6 +343,7 @@ const STEP_SOLDIER: Record<Soldier["kind"], (sim: DefendSim, s: Soldier, dt: num
   hero: stepHero,
   shade: stepShade,
   flagBearer: stepFlagBearer,
+  watchman: stepSwordsman,
 };
 /** How long a struck building flashes, in seconds. */
 export const BUILDING_FLASH = 0.14;
@@ -798,6 +800,7 @@ export class DefendSim {
     stepFrosts(this, dt);
     this.darkKeeps.step(this, dt);
     this.barracks.step(this, dt);
+    stepCityWatch(this, dt);
     this.warBanner?.refresh(this);
     for (const s of this.soldiers) {
       stepBannerLife(this, s, dt);
