@@ -90,6 +90,8 @@ export type DefendHost = {
   simpleEnemies?(): boolean;
   simpleTroops?(): boolean;
   mergedOutlines?(): boolean;
+  /** The Amber Desert's detailed dunes (the HD Sand setting). */
+  hdSand?(): boolean;
   /** The tile grid's opacity while building, 0 when it's hidden. */
   gridLines?(): number;
   gridColor?(): GridColor;
@@ -964,6 +966,7 @@ export class DefendPage {
       simpleEnemies: this.host.simpleEnemies?.() ?? false,
       simpleTroops: this.host.simpleTroops?.() ?? false,
       mergedOutlines: this.host.mergedOutlines?.() ?? true,
+      hdSand: this.host.hdSand?.() ?? false,
       looks: this.looks(),
       gate: this.save.gateRanks,
       over: this.phase === "over",

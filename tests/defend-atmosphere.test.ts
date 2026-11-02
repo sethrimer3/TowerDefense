@@ -9,7 +9,8 @@ import { CELLS_W, CELLS_H, CELL_COUNT } from '../src/defend/grid.ts';
 import { ART } from '../src/defend/park-art.ts';
 import { SNOW_CAP, STORM_CHANCE, rollWeather, skyLabel, Snow } from '../src/defend/weather.ts';
 import { areaForWave } from '../src/defend/areas.ts';
-import { tumbleweedPixels, dunePixels, duneHeights, SandMarks, CHUNK, DUNE_RELIEF, DUNE_TONES, FLOOR, SUN, SWELL, sunlight, setDuneLight, duneLightKey } from '../src/defend/atmosphere-art.ts';
+import { tumbleweedPixels, dunePixels, duneHeights, SandMarks, CHUNK, DUNE_RELIEF, HD_RELIEF, HD_TONES, SAND_COLOR, FLOOR, SUN, SWELL, duneShade, castShadows, setDuneLight, easeDuneLight, setDuneStyle, duneLightKey } from '../src/defend/atmosphere-art.ts';
+import { skyAtTime } from '../src/daylight.ts';
 import { OUTLINE } from '../src/defend/pixel-fx.ts';
 
 function scene(wave = 21, gate = false, repair = false) {
@@ -209,20 +210,25 @@ test('the dunes are large, creep slowly downwind and leave the sand outside sett
   assert.ok(Math.abs(env.sand[i] - env.duneAt(i)) < .3);
 });
 
-test('the dunes are a few low, gentle swells in a handful of flat sand tones, tiling', () => {
-  setDuneLight();
+test('the dunes are a few low, gentle swells of one sand colour, shaped only by light, tiling', () => {
+  setDuneStyle(false); setDuneLight();
   const { size, data } = dunePixels(), h = duneHeights();
-  const tones = new Set<string>();
+  const shades = new Set<string>();
   let tallest = 0, steepest = 0;
   for (let i = 0; i < size * size; i++) {
     assert.equal(data[i * 4 + 3], 255, 'no bare floor anywhere');
-    tones.add(`${data[i * 4]},${data[i * 4 + 1]},${data[i * 4 + 2]}`);
+    shades.add(`${data[i * 4]},${data[i * 4 + 1]},${data[i * 4 + 2]}`);
     tallest = Math.max(tallest, h[i]);
     const x = i % size, y = Math.floor(i / size);
     steepest = Math.max(steepest, Math.abs(h[y * size + (x + 1) % size] - h[i]), Math.abs(h[((y + 1) % size) * size + x] - h[i]));
   }
-  assert.ok(tones.size <= DUNE_TONES.length && tones.size >= 3, `${tones.size} tones`);
-  for (const t of tones) assert.ok(DUNE_TONES.some(c => c.join(',') === t), 'only the sand tones, no dithered blends');
+  assert.ok(shades.size >= 6, `${shades.size} shades: the height shows in the light`);
+  // Every pixel is the one sand colour, lighter or darker: its channels keep
+  // the colour's proportions (to rounding), never a different hue.
+  for (const t of shades) {
+    const [r, g, b] = t.split(',').map(Number), k = r / SAND_COLOR[0];
+    assert.ok(Math.abs(g - SAND_COLOR[1] * k) <= 1.5 && Math.abs(b - SAND_COLOR[2] * k) <= 1.5, `${t} is the sand colour`);
+  }
   assert.ok(tallest <= DUNE_RELIEF + 1e-6 && steepest < .2, `gentle: ${tallest} high, ${steepest} a pixel at most`);
   // Only a couple of crests across a whole field period down any column.
   let crests = 0;
@@ -234,28 +240,63 @@ test('the dunes are a few low, gentle swells in a handful of flat sand tones, ti
   assert.ok(seam <= steepest * 1.5 + 1e-6, `seam ${seam}`);
 });
 
-test('the dunes turn with the sun: lit faces follow its heading, and night flattens them', () => {
-  setDuneLight();
-  assert.ok(sunlight(1, 1) > sunlight(0, 0) && sunlight(0, 0) > sunlight(-1, -1) && SUN.x < 0 && SUN.y < 0, 'from the upper left without a sky');
+test('the dunes turn with the sun: lit faces follow its heading, low suns cast shadows, and night flattens them', () => {
+  setDuneStyle(false); setDuneLight();
+  assert.ok(duneShade(.05, .05) > duneShade(0, 0) && duneShade(0, 0) > duneShade(-.05, -.05) && SUN.x < 0 && SUN.y < 0, 'from the upper left without a sky');
+  assert.ok(duneShade(0, 0, true) < duneShade(0, 0), 'a cast shadow darkens the sand');
   const bright = (d: Uint8ClampedArray) => { let n = 0; for (let i = 0; i < d.length; i += 4) n += d[i]; return n; };
   // Morning: shadows fall west, so the sun is in the east and east faces are lit.
   assert.ok(setDuneLight({ x: -1, y: .3, strength: .27 }));
-  assert.ok(sunlight(-1, 0) > 0 && sunlight(1, 0) < 0, 'faces turned east are lit');
+  assert.ok(duneShade(-.05, 0) > 1 && duneShade(.05, 0) < 1, 'faces turned east are lit');
   const morning = dunePixels().data, key = duneLightKey();
   assert.ok(!setDuneLight({ x: -1.001, y: .3, strength: .27 }), 'a hair of movement does not relight');
   // Evening: the sun in the west.
   assert.ok(setDuneLight({ x: 1, y: .3, strength: .27 }));
-  assert.ok(sunlight(1, 0) > 0 && duneLightKey() !== key);
+  assert.ok(duneShade(.05, 0) > 1 && duneLightKey() !== key);
   const evening = dunePixels().data;
   let differ = 0;
   for (let i = 0; i < morning.length; i += 4) if (morning[i] !== evening[i]) differ++;
   assert.ok(differ > morning.length / 40, 'the shading moves with the sun');
-  // Night: the sun gone, the swells barely shaded.
+  // A low sun across the swells casts their shadows; the noon sun none.
+  const share = () => { const s = castShadows(); let n = 0; for (const v of s) n += v; return n / s.length; };
+  setDuneLight(skyAtTime(0, 'sunset').sun);
+  assert.ok(share() > .05, `sunset shadows ${share()}`);
+  setDuneLight(skyAtTime(0, 'day').sun);
+  assert.equal(share(), 0, 'no shadows at noon');
+  // Night: the sun gone, the swells barely shaded and casting nothing.
   setDuneLight({ x: 1, y: .3, strength: 0 });
+  assert.equal(share(), 0);
   const night = new Set<number>(); const d = dunePixels().data;
   for (let i = 0; i < d.length; i += 4) night.add(d[i]);
-  assert.ok(night.size <= 3, `${night.size} tones by night`);
+  assert.ok(night.size <= 16, `${night.size} shades by night`);
   assert.ok(Math.abs(bright(d) - bright(evening)) < bright(evening) * .1, 'its colour comes from the board\'s darkness, not a second dimming');
+  setDuneLight();
+});
+
+test('a relight is spread over frames and shows the same shadows as one at once', () => {
+  setDuneStyle(false); setDuneLight();
+  const sun = skyAtTime(0, 'sunset').sun;
+  let frames = 0;
+  while (!easeDuneLight(sun, 0)) { frames++; assert.ok(frames < 500); }
+  assert.ok(frames > 2, `${frames} frames`);
+  const eased = castShadows().slice(), key = duneLightKey();
+  setDuneLight(); setDuneLight(sun);
+  assert.equal(duneLightKey(), key);
+  assert.deepEqual(castShadows(), eased);
+  setDuneLight();
+});
+
+test('HD Sand brings back the tall rippled dunes in their dithered tones', () => {
+  setDuneStyle(true); setDuneLight();
+  const { size, data } = dunePixels(), h = duneHeights();
+  const tones = new Set<string>();
+  let tallest = 0;
+  for (let i = 0; i < size * size; i++) { tones.add(`${data[i * 4]},${data[i * 4 + 1]},${data[i * 4 + 2]}`); tallest = Math.max(tallest, h[i]); }
+  for (const t of tones) assert.ok(HD_TONES.some(c => c.join(',') === t), 'only the HD tones');
+  assert.ok(tones.size >= 6, `${tones.size} tones`);
+  assert.ok(tallest > DUNE_RELIEF * 1.5 && tallest <= HD_RELIEF + 1, `${tallest} high`);
+  setDuneStyle(false);
+  assert.ok(duneHeights().every(v => v <= DUNE_RELIEF + 1e-6), 'back to the simple swells');
   setDuneLight();
 });
 
@@ -313,20 +354,22 @@ test('blasts leave craters with their sand thrown out, repainting only the chunk
   const reach = Math.ceil(r * 1.7 / CHUNK) + 1;
   assert.ok(marks.active.size <= (2 * reach + 1) ** 2, `${marks.active.size} chunks marked`);
   marks.update(sim);
-  // The same blast is not dug twice, and an unmarked painted pixel matches the dune tile.
+  // The same blast is not dug twice; unmarked sand in a marked chunk is left
+  // clear, so the dune tile shows there (no square of another light), and a
+  // flat-bottomed pixel the blast left is the tile's own colour for its slope.
   const before = marks.delta.slice(); marks.update(sim);
   assert.deepEqual(marks.delta, before);
-  const { size, data } = dunePixels(), k = [...marks.active][0], cw = W / CHUNK;
+  const k = [...marks.active][0], cw = W / CHUNK;
   marks.paintChunk(k);
   const x0 = (k % cw) * CHUNK, y0 = Math.floor(k / cw) * CHUNK;
-  let same = 0, checked = 0;
+  let clear = 0, painted = 0;
   for (let y = y0 + 1; y < y0 + CHUNK - 1; y++) for (let x = x0 + 1; x < x0 + CHUNK - 1; x++) {
     const i = y * W + x;
-    if (!ground[(y >> 3) * CELLS_W + (x >> 3)] || [i, i - 1, i + 1, i - W, i + W].some(j => marks.delta[j])) continue;
-    checked++;
-    if ([0, 1, 2].every(c => marks.pixels[i * 4 + c] === data[((y % size) * size + x % size) * 4 + c])) same++;
+    if (!ground[(y >> 3) * CELLS_W + (x >> 3)]) continue;
+    if ([i, i - 1, i + 1, i - W, i + W].some(j => marks.delta[j])) { painted++; assert.equal(marks.pixels[i * 4 + 3], 255); }
+    else { clear++; assert.equal(marks.pixels[i * 4 + 3], 0, 'unmarked sand left to the tile'); }
   }
-  assert.equal(same, checked, 'unmarked sand in a marked chunk is the tile exactly');
+  assert.ok(painted > 0 && clear + painted > 0);
 });
 
 test('no sand is drawn over the city wall', () => {
