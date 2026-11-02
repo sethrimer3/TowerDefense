@@ -364,6 +364,7 @@ export class SiegePage {
     this.banners.draw(this.now, this.host.save().settings.reduceMotion);
     const r = this.renderer,
       box = this.canvas.getBoundingClientRect();
+    r.maxDpr = this.host.save().settings.resolution;
     r.resize(box.width, box.height);
     if (this.freshCamera) {
       r.resetCam();
@@ -409,6 +410,7 @@ export class SiegePage {
       simpleTroops: settings.simpleTroops,
       mergedOutlines: settings.mergedOutlines,
       hdSand: settings.hdSand,
+      sheen: settings.ultraGraphics,
       looks,
       ...(this.inspection !== undefined ? { inspect: { id: this.inspection, armed: owner } } : {}),
     });

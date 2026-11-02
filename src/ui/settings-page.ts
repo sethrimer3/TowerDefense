@@ -9,7 +9,7 @@ import { LANGUAGES, isLanguage, t } from "../i18n/index.ts";
 /** The settings on the page, in order; each control comes from its row in SETTINGS. */
 /** Gameplay settings, under their own heading first. */
 const GAMEPLAY = ["showEmpty", "raiseDrag", "magnifier", "tripleTapFlag"] as const satisfies readonly SettingKey[];
-const PAGE = ["pixelArt", "legacyGraphics", "dayNightCycle", "fasterSunCatchup", "reduceMotion", "effectsOff", "simpleEnemies", "simpleTroops", "mergedOutlines", "crispZoom", "hdSand", "tileGrid", "soundOff", "ambienceOff", "pixelFont"] as const satisfies readonly SettingKey[];
+const PAGE = ["pixelArt", "legacyGraphics", "dayNightCycle", "fasterSunCatchup", "reduceMotion", "effectsOff", "simpleEnemies", "simpleTroops", "mergedOutlines", "crispZoom", "hdSand", "ultraGraphics", "tileGrid", "soundOff", "ambienceOff", "pixelFont"] as const satisfies readonly SettingKey[];
 /** The dev options, under ALL ON. */
 const DEV = ["devMode", "devTowers", "devJournal", "instantResearch"] as const satisfies readonly SettingKey[];
 /** All research unlocked: the Smithy's rows and each skill tree. */
@@ -38,6 +38,14 @@ function gridControls(ctx: AppContext): string {
     color.choices.map(([value]) => `<option value="${value}" ${settings.gridColor === value ? "selected" : ""}>${t(`settings.gridColor.${value}`)}</option>`).join("") + `</select></label>`;
 }
 
+/** The board's resolution cap, a choice of how many device pixels a CSS pixel. */
+function resolutionControls(ctx: AppContext) {
+  const row = SETTINGS.resolution, value = ctx.save().settings.resolution;
+  return `<label class="setting setting-grid" id="resolution-row">${t("setting.resolution")}<select id="${row.page.id}">` +
+    row.choices.map(([v]) => `<option value="${v}" ${value === v ? "selected" : ""}>${t(`settings.resolution.${v}`)}</option>`).join("") + `</select></label>` +
+    `<p class="hint">${t("settings.resolutionHint")}</p>`;
+}
+
 /** Disabling the cycle uses the selected, persistent time of day. */
 function daylightControls(ctx: AppContext) {
   const settings = ctx.save().settings;
@@ -55,7 +63,7 @@ export function renderSettingsPage(ctx: AppContext) {
     `<h3 class="settings-group">${t("settings.gameplay")}</h3>` +
     GAMEPLAY.map((key) => control(key, ctx)).join("") +
     `<h3 class="settings-group">${t("settings.display")}</h3>` +
-    PAGE.map((key) => control(key, ctx) + (key === "tileGrid" ? gridControls(ctx) : key === "dayNightCycle" ? daylightControls(ctx) : key === "fasterSunCatchup" ? `<p class="hint">${t("settings.fasterSunCatchupHint")}</p>` : "")).join("") +
+    PAGE.map((key) => control(key, ctx) + (key === "tileGrid" ? gridControls(ctx) : key === "dayNightCycle" ? daylightControls(ctx) : key === "fasterSunCatchup" ? `<p class="hint">${t("settings.fasterSunCatchupHint")}</p>` : key === "crispZoom" ? resolutionControls(ctx) : key === "ultraGraphics" ? `<p class="hint">${t("settings.ultraGraphicsHint")}</p>` : "")).join("") +
     control("developerMode", ctx) +
     (settings.developerMode ? `<h3 class="settings-group">${t("settings.dev")}</h3>` +
     `<label class="setting setting-all">${t("settings.allOn")}<input type="checkbox" id="dev-all" ${allOn ? "checked" : ""}></label>` +
@@ -104,6 +112,11 @@ export function renderSettingsPage(ctx: AppContext) {
   const color = el(SETTINGS.gridColor.page.id) as HTMLSelectElement;
   color.onchange = () => {
     settings.gridColor = color.value as GridColor;
+    ctx.update();
+  };
+  const resolution = el(SETTINGS.resolution.page.id) as HTMLSelectElement;
+  resolution.onchange = () => {
+    settings.resolution = Number(resolution.value) as typeof settings.resolution;
     ctx.update();
   };
   el("erase").onclick = () => confirmErase(ctx);
