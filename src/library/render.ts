@@ -524,6 +524,11 @@ export class LibraryRenderer {
     TORCHES.forEach((t, n) => shine(t.x, t.y - 3, 70, flicker(this.flame, n) * 1.25, 1, 0.62, 0.3));
     this.blazes.forEach((b, n) => shine(b.x, b.y, 26 + Math.min(44, b.n * 0.9), Math.min(1.9, 0.35 + b.n * 0.03) * flicker(this.flame * 2.3, n + 20), 1, 0.52, 0.22));
     CANDLES.forEach((c, n) => this.candles[n] && shine(c.x, c.y, 28, flicker(this.flame * 1.7, n + 9) * 0.75, 1, 0.75, 0.45));
+    // The night's lanterns, on the shelves or in hand.
+    sim.lanterns.forEach((n, k) => {
+      const at = n.lit ? sim.lanternAt(n) : null;
+      if (at && at.x >= 0 && at.x < W) shine(at.x, at.y - 3, 38, flicker(this.flame * 1.5, k + 40) * 0.8, 1, 0.78, 0.46);
+    });
     // Librarians out in the hallways: their candles' light comes in through
     // the doors onto the piers and the nearest shelves, less the further
     // down the hallway they are.
@@ -685,6 +690,7 @@ export class LibraryRenderer {
     ctx.clip();
     for (const l of sim.librarians) if (!l.away) this.drawLibrarian(l, time);
     ctx.restore();
+    this.drawLanterns(sim, effects);
     // The piers' feet stand in front, so those going to and from the
     // hallways pass behind them.
     for (const x of [0, W - BAY_X0]) ctx.drawImage(this.off, x, PIER_FRONT, BAY_X0, FLOOR - PIER_FRONT, x, PIER_FRONT, BAY_X0, FLOOR - PIER_FRONT);
@@ -1228,6 +1234,49 @@ export class LibraryRenderer {
       ctx.fillStyle = l.burntFrom >= 0 ? "#2c2420" : BOOK_COLORS[l.carrying];
       ctx.fillRect(l.facing > 0 ? x + 2 : x - 2, y - 2, 2, 1);
     }
+  }
+
+  /** The night's lanterns: a brass cap and base, iron posts and the candle
+   * behind the glass, its flame flickering while lit, a soft glow round it.
+   * No outline: the frame is its own edge. */
+  private drawLanterns(sim: LibrarySim, effects: boolean) {
+    const ctx = this.ctx;
+    sim.lanterns.forEach((n, k) => {
+      const at = sim.lanternAt(n);
+      if (!at) return;
+      const x = at.x, y = at.y, f = flicker(this.flame * 1.5, k + 40), lum = n.lit ? Math.max(0.85, this.lum(x, y - 3)) : this.lum(x, y - 3);
+      ctx.fillStyle = shade([150, 112, 52], lum);
+      ctx.fillRect(x, y - 6, 1, 1);
+      ctx.fillStyle = shade([196, 150, 70], lum);
+      ctx.fillRect(x - 1, y - 5, 3, 1);
+      ctx.fillRect(x - 1, y - 1, 3, 1);
+      ctx.fillStyle = shade([70, 62, 56], lum);
+      ctx.fillRect(x - 1, y - 4, 1, 3);
+      ctx.fillRect(x + 1, y - 4, 1, 3);
+      if (n.lit) {
+        ctx.fillStyle = f > 1 ? "#fff2b8" : "#ffd36a";
+        ctx.fillRect(x, y - 4, 1, 1);
+        ctx.fillStyle = f > 0.9 ? "#ffb24a" : "#f08a2a";
+        ctx.fillRect(x, y - 3, 1, 1);
+        ctx.fillStyle = "#f4ead0";
+        ctx.fillRect(x, y - 2, 1, 1);
+      } else {
+        ctx.fillStyle = shade([40, 44, 52], lum);
+        ctx.fillRect(x, y - 4, 1, 2);
+        ctx.fillStyle = shade([220, 210, 186], lum);
+        ctx.fillRect(x, y - 2, 1, 1);
+      }
+    });
+    if (!effects) return;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    sim.lanterns.forEach((n, k) => {
+      const at = n.lit ? sim.lanternAt(n) : null;
+      if (!at) return;
+      ctx.globalAlpha = 0.32 * flicker(this.flame * 1.5, k + 40);
+      ctx.drawImage(this.glow, at.x + 0.5 - 10, at.y - 3.5 - 10, 20, 20);
+    });
+    ctx.restore();
   }
 
   private drawFlames(time: number, effects: boolean) {
