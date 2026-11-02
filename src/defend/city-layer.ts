@@ -92,10 +92,24 @@ export type CityScene = {
   stones: readonly Stone[];
   /** Each structure's path by its uid, for the paths with their own look. */
   looks?: Readonly<Record<number, string>>;
+  /** Cells (x1/y1 exclusive) the caller has clipped the canvas to: what
+   * can't reach them is skipped, so a small repaint is cheap. */
+  within?: Within;
 };
+
+/** A box of cells the repaint is clipped to. */
+export type Within = { x0: number; y0: number; x1: number; y1: number };
+/** How far past its cells anything painted for one can reach (sprites'
+ * outlines and padding, a wall's hanging face). */
+const REACH = 2;
+/** Whether cells `x`..`x + w`, `y`..`y + h` may paint inside `within`. */
+function reaches(within: Within | undefined, x: number, y: number, w = 1, h = 1) {
+  return !within || (x + w + REACH > within.x0 && x - REACH < within.x1 && y + h + REACH > within.y0 && y - REACH < within.y1);
+}
 
 /** Everything the painters share for one repaint. */
 type Paint = {
+  within?: Within;
   area: AreaId;
   c: CanvasRenderingContext2D;
   px: number;
@@ -110,7 +124,7 @@ type Paint = {
 export function paintCityLayer(c: CanvasRenderingContext2D, px: number, scene: CityScene) {
   const { map, sim } = scene;
   const solid = (i: number) => (sim ? sim.solid[i] === 1 : map.owner[i] >= 0 && map.type[i] !== CellType.ROAD);
-  const p: Paint = { c, px, map, sim, solid, area: scene.area ?? "moss", looks: scene.looks };
+  const p: Paint = { c, px, map, sim, solid, area: scene.area ?? "moss", looks: scene.looks, within: scene.within };
   c.imageSmoothingEnabled = false;
   paintFlagstones(p);
   paintCityGround(p);
@@ -124,9 +138,10 @@ export function paintCityLayer(c: CanvasRenderingContext2D, px: number, scene: C
   // the wall. Walls next: a wall's face hangs over the cell below it, and a
   // house or structure standing there is in front of the face, so it covers it.
   paintSpikes(p);
-  for (const b of map.buildings) if (b.kind === "wall") paintBuilding(p, b);
+  const near = (b: Building) => reaches(p.within, b.rect.x, b.rect.y, b.rect.w, b.rect.h);
+  for (const b of map.buildings) if (b.kind === "wall" && near(b)) paintBuilding(p, b);
   paintFences(c, px, map, sim);
-  for (const b of map.buildings) if (b.kind !== "wall") paintBuilding(p, b);
+  for (const b of map.buildings) if (b.kind !== "wall" && near(b)) paintBuilding(p, b);
   if (!scene.omitSunShadows) paintShadows(c, cityShadows(map, sim, scene.looks), px);
   paintLanternBrackets(p, scene.lights);
 }
@@ -139,10 +154,11 @@ export function paintCityLayer(c: CanvasRenderingContext2D, px: number, scene: C
 export function paintBuildingMask(c: CanvasRenderingContext2D, px: number, scene: CityScene, mode: MaskMode) {
   const { map, sim } = scene;
   const solid = (i: number) => (sim ? sim.solid[i] === 1 : map.owner[i] >= 0 && map.type[i] !== CellType.ROAD);
-  const p: Paint = { c, px, map, sim, solid, area: scene.area ?? "moss", looks: scene.looks };
+  const p: Paint = { c, px, map, sim, solid, area: scene.area ?? "moss", looks: scene.looks, within: scene.within };
   c.imageSmoothingEnabled = false;
   withMask(mode, () => {
     for (const b of map.buildings) {
+      if (!reaches(p.within, b.rect.x, b.rect.y, b.rect.w, b.rect.h)) continue;
       if (b.hidden || b.fence || (sim && !sim.intact(b)) || !b.cells.length || !solid(b.cells[0])) continue;
       paintBuilding(p, b);
     }
@@ -245,9 +261,11 @@ export const floorArtLoaded = (area: AreaId = "moss") => (area === "moss" ? floo
 /** City ground: park grass, and gravel under the streets' dirt and for
  * cleared rubble and breached wall. */
 function paintCityGround(p: Paint) {
-  const { map, solid } = p;
-  for (let cy = 0; cy < CELLS_H; cy++)
-    for (let cx = 0; cx < CELLS_W; cx++) {
+  const { map, solid, within: w } = p;
+  const x0 = w ? Math.max(0, w.x0 - REACH) : 0, x1 = w ? Math.min(CELLS_W, w.x1 + REACH) : CELLS_W;
+  const y0 = w ? Math.max(0, w.y0 - REACH) : 0, y1 = w ? Math.min(CELLS_H, w.y1 + REACH) : CELLS_H;
+  for (let cy = y0; cy < y1; cy++)
+    for (let cx = x0; cx < x1; cx++) {
       const i = cellIndex(cx, cy);
       const t = map.type[i];
       // A structure placed outside the city stands on the open floor, and
@@ -275,8 +293,9 @@ function paintGravel({ c, px, map, solid }: Paint, cx: number, cy: number) {
 }
 
 /** Pebbles on the streets, with a darker underside so they sit in the dirt. */
-function paintRoadStones({ c, px }: Paint, stones: readonly Stone[]) {
+function paintRoadStones({ c, px, within }: Paint, stones: readonly Stone[]) {
   for (const st of stones) {
+    if (!reaches(within, Math.floor(st.x), Math.floor(st.y))) continue;
     const s = Math.max(1, st.s * px);
     const x = st.x * px - s / 2,
       y = st.y * px - s / 2;
@@ -628,8 +647,9 @@ function paintWallFace({ c, px, area }: Paint, cx: number, { x, y }: { x: number
 }
 
 /** Lantern brackets on house walls (lit during battles). */
-function paintLanternBrackets({ c, px, map, sim }: Paint, lights: readonly Light[]) {
+function paintLanternBrackets({ c, px, map, sim, within }: Paint, lights: readonly Light[]) {
   for (const l of lights) {
+    if (!reaches(within, Math.floor(l.x), Math.floor(l.y))) continue;
     if (l.kind !== "lantern" && l.kind !== "door") continue;
     if (sim && !sim.intact(map.buildings[l.owner])) continue;
     const s = Math.max(2, px * 0.28);

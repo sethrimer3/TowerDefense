@@ -258,16 +258,8 @@ export class DefendLighting {
     this.tintKey = this.buildingGrownKey = "";
     // Read only cached source masks, never a rendered scene. Resolve light
     // occlusion at native art pixels so rounded corners are not whole cells.
-    const a = body.getContext("2d", { willReadFrequently: true })!.getImageData(0,0,body.width,body.height).data;
-    const b = rim.getContext("2d", { willReadFrequently: true })!.getImageData(0,0,rim.width,rim.height).data;
-    const covered = coverage(body, a);
-    const width = CELLS_W * ART, pixels = new Uint8Array(width * CELLS_H * ART), ratio = MASK / ART;
-    for (let y=0;y<CELLS_H*ART;y++) for(let x=0;x<width;x++) {
-      for(let sy=0;sy<ratio&&!pixels[y*width+x];sy++) for(let sx=0;sx<ratio;sx++) {
-        const i=((y*ratio+sy)*body.width+x*ratio+sx)*4+3;
-        if(a[i]>=128 || b[i]>=128) { pixels[y*width+x]=1; break; }
-      }
-    }
+    const covered = new Uint8Array(CELL_COUNT), pixels = new Uint8Array(CELLS_W * ART * CELLS_H * ART);
+    readMasks(body, rim, { x0: 0, y0: 0, x1: CELLS_W, y1: CELLS_H }, covered, pixels);
     const old = this.masks?.covered, oldPixels = this.masks?.pixels;
     this.masks = { body, rim, covered, pixels };
     this.upKey = "";
@@ -277,6 +269,7 @@ export class DefendLighting {
       this.domDirty = true;
       return;
     }
+    const width = CELLS_W * ART;
     const changed: number[] = [];
     for (let i = 0; i < covered.length; i++) if (covered[i] !== old[i]) changed.push(i);
     if(oldPixels) {
@@ -284,6 +277,19 @@ export class DefendLighting {
       for(let i=0;i<pixels.length;i++) if(pixels[i]!==oldPixels[i]) cells.add(cellIndex(Math.floor((i%width)/ART),Math.floor(i/width/ART)));
       this.invalidate([...cells]);
     } else this.invalidate(changed);
+  }
+
+  /** The masks given to `setMasks` were repainted in place inside `boxes`
+   * (in cells) only: rereads just those, as `setMasks` would have read the
+   * whole, and rebakes the lights near what changed. */
+  patchMasks(boxes: readonly CellBox[]) {
+    const m = this.masks;
+    if (!m) return;
+    this.tintKey = this.buildingGrownKey = "";
+    this.upKey = "";
+    const cells = new Set<number>();
+    for (const box of boxes) for (const i of readMasks(m.body, m.rim, box, m.covered, m.pixels)) cells.add(i);
+    this.invalidate([...cells]);
   }
 
   get roadStones() {
@@ -782,19 +788,43 @@ function rgbOf(color: string) {
 export const MASK = 16;
 
 /** Per cell, 1 where the body mask covers at least half of it. */
-function coverage(body: HTMLCanvasElement, data: Uint8ClampedArray) {
-  const out = new Uint8Array(CELL_COUNT);
-  const half = (MASK * MASK) / 2;
-  for (let cy = 0; cy < CELLS_H; cy++)
-    for (let cx = 0; cx < CELLS_W; cx++) {
+/** A box of cells, `x1`/`y1` exclusive. */
+export type CellBox = { x0: number; y0: number; x1: number; y1: number };
+
+/** Reads `box` of the body and rim masks into `covered` (a cell is covered
+ * while the body fills half of it) and `pixels` (an art pixel stands while
+ * either mask covers any of its samples), returning the cells whose value
+ * or art pixels changed. */
+function readMasks(body: HTMLCanvasElement, rim: HTMLCanvasElement, box: CellBox, covered: Uint8Array, pixels: Uint8Array) {
+  const changed: number[] = [];
+  const w = (box.x1 - box.x0) * MASK, h = (box.y1 - box.y0) * MASK;
+  if (w <= 0 || h <= 0) return changed;
+  const a = body.getContext("2d", { willReadFrequently: true })!.getImageData(box.x0 * MASK, box.y0 * MASK, w, h).data;
+  const b = rim.getContext("2d", { willReadFrequently: true })!.getImageData(box.x0 * MASK, box.y0 * MASK, w, h).data;
+  const half = (MASK * MASK) / 2, ratio = MASK / ART, width = CELLS_W * ART;
+  for (let cy = box.y0; cy < box.y1; cy++)
+    for (let cx = box.x0; cx < box.x1; cx++) {
+      const ly = (cy - box.y0) * MASK, lx = (cx - box.x0) * MASK;
       let n = 0;
-      for (let y = cy * MASK; y < (cy + 1) * MASK; y++) {
-        let k = (y * body.width + cx * MASK) * 4 + 3;
-        for (let x = 0; x < MASK; x++, k += 4) if (data[k] >= 128) n++;
+      for (let y = ly; y < ly + MASK; y++) {
+        let k = (y * w + lx) * 4 + 3;
+        for (let x = 0; x < MASK; x++, k += 4) if (a[k] >= 128) n++;
       }
-      out[cellIndex(cx, cy)] = n >= half ? 1 : 0;
+      const i = cellIndex(cx, cy), v = n >= half ? 1 : 0;
+      let moved = covered[i] !== v;
+      covered[i] = v;
+      for (let py = 0; py < ART; py++) for (let px = 0; px < ART; px++) {
+        let on = 0;
+        for (let sy = 0; sy < ratio && !on; sy++) for (let sx = 0; sx < ratio; sx++) {
+          const k = ((ly + py * ratio + sy) * w + lx + px * ratio + sx) * 4 + 3;
+          if (a[k] >= 128 || b[k] >= 128) { on = 1; break; }
+        }
+        const j = (cy * ART + py) * width + cx * ART + px;
+        if (pixels[j] !== on) { pixels[j] = on; moved = true; }
+      }
+      if (moved) changed.push(i);
     }
-  return out;
+  return changed;
 }
 
 /** `src` drawn up to w × h without smoothing. */
