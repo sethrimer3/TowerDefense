@@ -1405,22 +1405,14 @@ nav button { position: relative; }
 .td-currencies { flex-wrap: nowrap; gap: 0; align-items: stretch; }
 .td-currencies .currency { flex: 1 1 0; min-width: 0; display: grid; grid-template-columns: auto auto; justify-content: center; align-content: center; align-items: center; column-gap: 4px; font-size: 17px; white-space: nowrap; }
 .td-currencies .currency small { grid-column: 1 / -1; overflow: hidden; }
-.td-currencies .ui-sprite { width: 20px; height: 20px; display: block; }
 .td-currencies .currency b { display: block; }
-.td-currencies .bar-icon { display: block; width: 16px; height: 8px; border-radius: 2px; border: 1px solid #000a; }
-.td-currencies .bar-icon.copper { background: linear-gradient(#f0a272, #9a4e26); }
-.td-currencies .bar-icon.silver { background: linear-gradient(#f4f6fa, #8e98a8); }
-.td-currencies .bar-icon.gold { background: linear-gradient(#ffe08a, #b07a1c); }
+.td-currencies .currency-icon { display: block; width: 28px; height: 28px; image-rendering: pixelated; }
 .td-currencies .knowledge-currency { color: #e6c8ff; }
-.td-currencies .secret-currency { flex: 0 1 auto; opacity: 0.75; grid-template-columns: auto; }
-.td-currencies .secret-mark { display: grid; place-items: center; justify-self: center; width: 18px; height: 18px; border: 1px dashed currentColor; border-radius: 50%; font-style: normal; font-size: 11px; }
 @media (max-width: 480px) {
   .td-currencies { padding-left: 2px; padding-right: 2px; }
   .td-currencies .currency { column-gap: 2px; font-size: 13px; }
   .td-currencies .currency small { font-size: 6px; letter-spacing: 0; }
-  .td-currencies .ui-sprite { width: 14px; height: 14px; }
-  .td-currencies .bar-icon { width: 10px; height: 6px; }
-  .td-currencies .secret-mark { width: 13px; height: 13px; font-size: 8px; }
+  .td-currencies .currency-icon { width: 14px; height: 14px; }
 }
 .tree-tabs { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 /* The Upgrades ledger: subjects, then a subject's topics, then its Forge

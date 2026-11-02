@@ -223,9 +223,21 @@ dialog > small {
   color: #c79f5c;
 }
 
-/* ── The currency bar: a signboard hung on two chains ── */
+/* ── The currency bar: a signboard hung on two hemp ropes, shown only on
+   the Mine, Library and Tiles tabs. Elsewhere it is lifted out of sight and
+   takes no room; arriving, it drops in and swings to a stop. ── */
+.currency-hold {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 200ms ease-in;
+}
+.shell.show-currencies .currency-hold {
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 320ms ease-out;
+}
 .td-currencies {
   position: relative;
+  min-height: 0;
   gap: 0;
   padding: 7px 6px 6px;
   margin: 0 0 14px;
@@ -242,22 +254,57 @@ dialog > small {
     inset 0 0 0 1px #00000070,
     0 3px 0 #000000a0,
     0 8px 18px #000000a0;
+  transform-origin: 50% -40px;
+  transform: translateY(calc(-100% - 64px));
+  visibility: hidden;
+  transition: transform 200ms ease-in, visibility 0s 200ms;
 }
+.shell.show-currencies .td-currencies {
+  transform: none;
+  visibility: visible;
+  transition: none;
+  animation: sign-drop 560ms ease-out;
+}
+@keyframes sign-drop {
+  0% { transform: translateY(calc(-100% - 64px)); }
+  55% { transform: translateY(5px) rotate(1.1deg); }
+  75% { transform: translateY(-2px) rotate(-0.6deg); }
+  90% { transform: translateY(1px) rotate(0.2deg); }
+  100% { transform: none; }
+}
+:root.reduce-motion .currency-hold,
+:root.reduce-motion .td-currencies {
+  transition: none !important;
+  animation: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .currency-hold,
+  .td-currencies {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+/* The ropes: pixel-art twisted hemp (`currency-icons.ts`, `--rope-art`)
+   knotted where it meets the sign (`--rope-knot`), two art pixels a pixel,
+   fading into the dark above. */
 .td-currencies::before,
 .td-currencies::after {
   content: "";
   position: absolute;
-  bottom: 100%;
-  width: 5px;
-  height: 24px;
-  background: repeating-linear-gradient(#8d877c 0 3px, #3a3631 3px 4px, #5e5952 4px 6px, #1a1816 6px 7px);
-  border-radius: 2px;
+  bottom: calc(100% - 7px);
+  width: 16px;
+  height: 34px;
+  margin-left: -8px;
+  background: var(--rope-knot) bottom center / 16px 16px no-repeat, var(--rope-art) bottom 8px center / 12px 8px repeat-y;
+  image-rendering: pixelated;
+  -webkit-mask-image: linear-gradient(transparent, #000 45%);
+  mask-image: linear-gradient(transparent, #000 45%);
 }
 .td-currencies::before {
   left: 18%;
 }
 .td-currencies::after {
-  right: 18%;
+  left: 82%;
 }
 .td-currencies .currency {
   padding: 0 10px;
@@ -275,14 +322,9 @@ dialog > small {
   color: #e6c8ff;
   text-shadow: 0 1px 0 #000, 0 0 8px #b07aff70;
 }
-.td-currencies .bar-icon {
-  border-color: #000;
-  box-shadow: inset 0 1px 0 #ffffff80, 0 1px 0 #000;
-}
-/* Undiscovered resources: dim, their sign scratched in. */
-.td-currencies .secret-currency {
-  color: #b8a888;
-  text-shadow: 0 1px 0 #000;
+.td-currencies .essence-currency {
+  color: #ffb070;
+  text-shadow: 0 1px 0 #000, 0 0 8px #f07a1860;
 }
 .td-currencies .upgrade-currency b {
   color: #ffe1a0;
@@ -1149,7 +1191,12 @@ dialog .away-row .away-note {
   }
   .td-currencies::before,
   .td-currencies::after {
-    height: 12px;
+    width: 8px;
+    height: 20px;
+    margin-left: -4px;
+    bottom: calc(100% - 4px);
+    background-size: 8px 8px, 6px 4px;
+    background-position: bottom center, bottom 4px center;
   }
 }
 

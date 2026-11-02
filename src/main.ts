@@ -35,6 +35,7 @@ import { ROSES, setRose, type Rose } from "./ui/hall-art.ts";
 import { fitViewport } from "./ui/viewport.ts";
 import { setLanguage, translateWithin } from "./i18n/index.ts";
 import { installSeal } from "./ui/seal-art.ts";
+import { EssenceGlob } from "./ui/currency-icons.ts";
 import { installScrollArrows } from "./ui/scroll-arrows.ts";
 
 // Wires the pages together: builds the shell, loads the save, and routes
@@ -301,6 +302,7 @@ function refreshCurrencies() {
   show("gold", save.smithy.gold);
   show("knowledge", save.knowledge);
   show("upgrade-points", save.upgradePoints);
+  show("essence", save.essence);
 }
 /** Saves and refreshes the currency bar. */
 function update() {
@@ -325,11 +327,15 @@ function renderPage() {
   if (tab === "tiles") tilesPage.render();
   if (tab === "settings") renderSettingsPage(ctx);
 }
+/** The currency sign hangs over these tabs only. */
+const signTab = (id: Tab) => id === "mine" || id === "library" || id === "tiles";
+const essenceGlob = new EssenceGlob(document.querySelector<HTMLCanvasElement>('canvas[data-currency-icon="essence"]'));
 function navigate(id: Tab) {
   if (id !== "defend" || combatMode !== "defend") defendPage.pause();
   ambushPage.pause();
   siegePage.pause();
   tab = id;
+  document.querySelector(".shell")!.classList.toggle("show-currencies", signTab(id));
   document.querySelectorAll(".page").forEach((p) => p.classList.toggle("active", p.id === (id === "defend" ? combatMode : id)));
   document.querySelectorAll<HTMLElement>("[data-tab]").forEach((b) => {
     b.classList.toggle("selected", b.dataset.tab === id);
@@ -386,6 +392,7 @@ function frame(time: number) {
     study.drawCircle(time, reduced());
   }
   if (tab === "tiles") tilesPage.frame(clock());
+  if (signTab(tab)) essenceGlob.draw(time, reduced());
   if (mineDirty && time - lastMineSave > 30000) {
     lastMineSave = time;
     store();
