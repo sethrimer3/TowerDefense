@@ -94,6 +94,7 @@ import { stepGates } from "./gates.ts";
 import { IRONBOUND, gateBarred, gateRank } from "../gate-upgrades.ts";
 import { stepBallistaBolts, stepSpikes, trappedWallFell, type BallistaBolt, type SpikeThrust } from "./wall-defenses.ts";
 import { STONEWORK, TOWN_WALLS, wallRank } from "../wall-upgrades.ts";
+import { bossLuck, essenceFor } from "./essence.ts";
 
 export type Levels = Record<UpgradeId, number>;
 
@@ -401,6 +402,13 @@ export class DefendSim {
   /** The run's tally for the summary when the keep falls; not part of the
    * replayed state. */
   readonly stats = new BattleStats();
+  /** Blight Essence the run's Dark One kills have left (`essence.ts`); the
+   * page pays it out. Not part of the replayed state. */
+  essence = 0;
+  private readonly essenceSeed: number;
+  /** Each boss worm segment's head at spawn, so all its pieces share one
+   * luck (`bossLuck`). Not part of the replayed state. */
+  private readonly wormRoot = new Map<number, number>();
   readonly slain: Record<EnemyKind, number> = { smallBlightWorm: 0, mediumBlightWorm: 0, blightPlasmaFortress: 0, blightDinghy: 0, blightSailboat: 0, blightCutter: 0, blightCog: 0, blightSkiff: 0, blightSloop: 0, blightGalleon: 0, blightArk: 0, blightCannon: 0, blightLance: 0, blightFortress: 0, blightDart: 0, blightPrism: 0, greaterBlightPrism: 0, miniDarkling: 0, darkling: 0, largeDarkling: 0, majorDarkling: 0, significantDarkling: 0, blightWorm: 0, roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0, darkKnight: 0, bombOrc: 0, bombBird: 0, voidSparrow: 0, shieldLesser: 0, shieldGreater: 0, poisonLesser: 0, poisonBearer: 0, poisonGreater: 0, poisonSovereign: 0, siegeBeetle: 0, burrowingMole: 0, necromancer: 0, skeleton: 0, bannerCaptain: 0, mirrorKnight: 0, leechSwarm: 0, ashPhoenix: 0, phoenixEgg: 0, blinkImp: 0, fortressHut: 0, fortressOutpost: 0, fortressTower: 0, fortressKeep: 0, fortressLesser: 0, fortress: 0, fortressGreater: 0, fortressSovereign: 0, rollingCannon: 0, ballista: 0, fireworkLauncher: 0, trebuchet: 0, bombard: 0, rocketBattery: 0, boatDinghy: 0, boatSailboat: 0, boatCutter: 0, boatCog: 0, boatLesser: 0, boat: 0, boatGreater: 0, boatSovereign: 0, iceGolem: 0, iceCube: 0, briarling: 0, mossBoar: 0, rootTreant: 0, duneScorpion: 0, sunScarab: 0, sandVulture: 0, sporeling: 0, fungalBrute: 0, sporeMoth: 0, shardling: 0, crystalSentinel: 0, prismRay: 0, starWisp: 0, cometHound: 0, astralWarden: 0, brineCrab: 0, lanternJelly: 0, coralGuardian: 0, fernMantis: 0, mossTroll: 0, lanternHornet: 0, glassJackal: 0, duneTortoise: 0, dustDjinn: 0, cinderImp: 0, slagGolem: 0, emberMoth: 0, kelpStalker: 0, capCrawler: 0, myceliumHulk: 0, rotMite: 0, geodeCrab: 0, prismMoth: 0, shardBrood: 0, cryptHound: 0, graveWisp: 0, novaMoth: 0 };
   /** 1 while a cell is part of a standing (built) building. */
   readonly solid: Uint8Array;
@@ -601,6 +609,7 @@ export class DefendSim {
     this.levels = levels;
     this.bonuses = bonuses;
     this.rand = rng(seed);
+    this.essenceSeed = seed;
     const n = map.buildings.length;
     this.solid = new Uint8Array(CELL_COUNT);
     this.hp = new Float32Array(n);
@@ -828,6 +837,8 @@ export class DefendSim {
         if (!e.fortressPart) {
           this.slain[e.kind]++;
           this.stats.current.slain++;
+          const root = this.wormRoot.get(e.id);
+          this.essence += essenceFor(e.kind, e.id, this.essenceSeed, root === undefined ? 1 : bossLuck(this.essenceSeed, root));
         }
         if (e.fortressParts) for (const part of e.fortressParts) part.hp = 0;
         bury(this, e);
@@ -992,6 +1003,7 @@ export class DefendSim {
         worm?.push(segment);
       }
       if (worm) initWorm(this, worm);
+      if (kind === "blightWorm" && worm) for (const segment of worm) this.wormRoot.set(segment.id, worm[0].id);
       return;
     }
   }

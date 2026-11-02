@@ -17,6 +17,35 @@ test("every currency icon is the same size and ringed in ink drawn after its art
   assert.notDeepEqual(iconPixels("copper").px, iconPixels("gold").px);
 });
 
+test("the metals count up in bars: Copper one, Silver two stacked, Gold three in a triangle", () => {
+  // Bars are the painted pixels' four-connected pieces, the ink between them aside.
+  const bars = (name: "copper" | "silver" | "gold") => {
+    const p = iconPixels(name), seen = new Set<number>(), found: { x: number; y: number }[] = [];
+    for (let i = 0; i < p.px.length; i++) {
+      if (seen.has(i) || p.px[i] < 0 || p.px[i] === OUTLINE_INK) continue;
+      const stack = [i]; let sx = 0, sy = 0, n = 0; seen.add(i);
+      while (stack.length) {
+        const j = stack.pop()!, x = j % p.w, y = Math.floor(j / p.w); sx += x; sy += y; n++;
+        for (const k of [j - 1, j + 1, j - p.w, j + p.w]) {
+          if (k < 0 || k >= p.px.length || seen.has(k) || p.px[k] < 0 || p.px[k] === OUTLINE_INK) continue;
+          if (Math.abs((k % p.w) - x) > 1) continue;
+          seen.add(k); stack.push(k);
+        }
+      }
+      found.push({ x: sx / n, y: sy / n });
+    }
+    return found;
+  };
+  assert.equal(bars("copper").length, 1);
+  const silver = bars("silver");
+  assert.equal(silver.length, 2);
+  assert.equal(silver[0].x, silver[1].x, "stacked straight");
+  const gold = bars("gold").sort((a, b) => a.y - b.y);
+  assert.equal(gold.length, 3);
+  assert.ok(gold[0].y < gold[1].y && gold[1].y === gold[2].y, "one on two");
+  assert.equal(gold[0].x, (gold[1].x + gold[2].x) / 2, "the top bar centred");
+});
+
 test("outlined grows a picture by one pixel each way, corners cut", () => {
   const o = outlined({ w: 1, h: 1, px: [0xffffff] });
   assert.deepEqual(o.px, [-1, OUTLINE_INK, -1, OUTLINE_INK, 0xffffff, OUTLINE_INK, -1, OUTLINE_INK, -1]);

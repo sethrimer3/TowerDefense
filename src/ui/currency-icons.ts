@@ -39,25 +39,32 @@ function rows(art: string[], key: Record<string, number>): Pixels {
   return { w, h, px };
 }
 
-/** An ingot seen from the front and above: a lit top face with a glint,
- * a front face darkening toward the bottom and a shaded end. */
-const INGOT = [
-  "............",
-  "............",
-  "............",
-  "..wwTTTTTTt.",
-  "..TTTTTTTTtE",
-  ".hhhhhhhhhhE",
-  ".FFFFFFFFFFE",
-  ".FFFFFFFFFFE",
-  ".ffffffffffE",
-  "............",
-  "............",
-  "............",
-];
-/** Gold: the same ingot, with a star glinting off its corner. */
-const GOLD_INGOT = INGOT.map((row, y) => y === 0 || y === 2 ? ".s" + row.slice(2) : y === 1 ? "sws" + row.slice(3) : row);
-/** A metal's tones: glint, top, top's far edge, the front's lit lip, front, front's foot, end, star. */
+/** An ingot `w` wide and `h` tall, seen from the front and above: a lit
+ * top face with a glint, the front's lit lip, a front face darkening toward
+ * the bottom and a shaded end. */
+function bar(w: number, h: number): string[] {
+  return [
+    "." + "w" + "T".repeat(w - 4) + "t" + ".",
+    "h".repeat(w - 1) + "E",
+    ...Array.from({ length: h - 3 }, () => "F".repeat(w - 1) + "E"),
+    "f".repeat(w - 1) + "E",
+  ];
+}
+/** Bars laid on a clear body at their top left corners. A clear pixel left
+ * between two bars takes the outline's ink, so they read apart. */
+function pile(bars: { x: number; y: number; w: number; h: number }[]): string[] {
+  const grid = Array.from({ length: ICON_BODY }, () => Array<string>(ICON_BODY).fill("."));
+  for (const b of bars) bar(b.w, b.h).forEach((row, y) => [...row].forEach((ch, x) => { if (ch !== ".") grid[b.y + y][b.x + x] = ch; }));
+  return grid.map(row => row.join(""));
+}
+/** The metals count up in bars, so they read apart without their colours:
+ * Copper one, Silver two stacked, Gold three in a triangle. */
+const INGOTS = {
+  copper: pile([{ x: 1, y: 4, w: 10, h: 5 }]),
+  silver: pile([{ x: 2, y: 2, w: 8, h: 4 }, { x: 2, y: 7, w: 8, h: 4 }]),
+  gold: pile([{ x: 4, y: 2, w: 5, h: 4 }, { x: 1, y: 7, w: 5, h: 4 }, { x: 7, y: 7, w: 5, h: 4 }]),
+};
+/** A metal's tones: glint, top, top's far edge, the front's lit lip, front, front's foot, end. */
 const METALS = {
   copper: { w: 0xffd8b4, T: 0xf0a272, t: 0xd8814e, h: 0xe08a56, F: 0xc0673a, f: 0x8e4524, E: 0x6a3018, s: 0xffe7c8 },
   silver: { w: 0xffffff, T: 0xe4e8f0, t: 0xc4cad6, h: 0xccd2de, F: 0xa8b0c0, f: 0x7a8396, E: 0x596274, s: 0xffffff },
@@ -102,7 +109,7 @@ export function iconPixels(name: CurrencyIcon, seconds = 0): Pixels {
   if (name === "essence") return essencePixels(seconds);
   if (name === "knowledge") return outlined(rows(BOOK, BOOK_KEY));
   if (name === "upgrade") return outlined(rows(ARROW, ARROW_KEY));
-  return outlined(rows(name === "gold" ? GOLD_INGOT : INGOT, METALS[name]));
+  return outlined(rows(INGOTS[name], METALS[name]));
 }
 
 // ── Blight Essence ──
