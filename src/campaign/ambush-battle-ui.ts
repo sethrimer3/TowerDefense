@@ -484,6 +484,7 @@ export class AmbushBattlePage {
   private draw() {
     const r = this.renderer,
       box = this.canvas.getBoundingClientRect();
+    r.maxDpr = this.host.save().settings.resolution;
     r.resize(box.width, box.height);
     if (this.resetCamera) {
       r.resetCam();
@@ -530,6 +531,7 @@ export class AmbushBattlePage {
       simpleTroops: settings.simpleTroops,
       mergedOutlines: settings.mergedOutlines,
       hdSand: settings.hdSand,
+      sheen: settings.ultraGraphics,
       looks,
       ...(this.picked !== undefined
         ? { inspect: { id: this.picked, armed: s.engine, ...(this.aimPreview?.id === this.picked ? { aim: this.aimPreview } : {}) } }

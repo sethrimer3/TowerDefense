@@ -38,6 +38,11 @@ export const SETTINGS = {
   /** The Amber Desert's detailed dunes: rippled, in dithered sand tones,
    * instead of one sand colour shaped only by light and shadow. */
   hdSand: { kind: "toggle", default: false, page: { id: "hd-sand", label: "HD Sand" } },
+  /** The most device pixels a CSS pixel the battle board draws at (0: the
+   * screen's own); fewer pixels are cheaper to draw and are scaled up. */
+  resolution: { kind: "choice", default: 0, choices: [[0, "Full"], [2, "2×"], [1.5, "1.5×"], [1, "1×"]], page: { id: "resolution", label: "Board resolution" } },
+  /** The costliest effects, such as torchlight sheen on building and unit outlines. */
+  ultraGraphics: { kind: "toggle", default: false, page: { id: "ultra-graphics", label: "Ultra graphics" } },
   /** The Defend palette lists items the player has none of (greyed); off, only those owned. */
   showEmpty: { kind: "toggle", default: false, page: { id: "show-empty", label: "Show items you have none of" } },
   /** Items dragged on the Defend board ride a few blocks above the pointer,

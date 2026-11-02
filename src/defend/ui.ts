@@ -92,6 +92,10 @@ export type DefendHost = {
   mergedOutlines?(): boolean;
   /** The Amber Desert's detailed dunes (the HD Sand setting). */
   hdSand?(): boolean;
+  /** Settings' Board resolution: the most device pixels a CSS pixel (0: the screen's own). */
+  resolution?(): number;
+  /** Settings' Ultra graphics: torchlight sheen on outlines, among the costliest effects. */
+  ultraGraphics?(): boolean;
   /** The tile grid's opacity while building, 0 when it's hidden. */
   gridLines?(): number;
   gridColor?(): GridColor;
@@ -946,6 +950,7 @@ export class DefendPage {
     if (!this.renderer) return;
     const crisp = !!this.host.crispZoom?.();
     this.renderer.crisp = crisp;
+    this.renderer.maxDpr = this.host.resolution?.() ?? 0;
     const box = this.root.querySelector<HTMLInputElement>("#defend-crisp");
     if (box && box.checked !== crisp) box.checked = crisp;
     if (fit) this.fitView();
@@ -967,6 +972,7 @@ export class DefendPage {
       simpleTroops: this.host.simpleTroops?.() ?? false,
       mergedOutlines: this.host.mergedOutlines?.() ?? true,
       hdSand: this.host.hdSand?.() ?? false,
+      sheen: this.host.ultraGraphics?.() ?? false,
       looks: this.looks(),
       gate: this.save.gateRanks,
       over: this.phase === "over",

@@ -142,6 +142,8 @@ const defendPage = new DefendPage(el("defend"), {
   simpleTroops: () => save.settings.simpleTroops,
   mergedOutlines: () => save.settings.mergedOutlines,
   hdSand: () => save.settings.hdSand,
+  resolution: () => save.settings.resolution,
+  ultraGraphics: () => save.settings.ultraGraphics,
   setHealthbars: (value) => { save.settings.showHealthbars = value; store(); },
   crispZoom: () => save.settings.crispZoom,
   setCrispZoom: (value) => { save.settings.crispZoom = value; store(); },

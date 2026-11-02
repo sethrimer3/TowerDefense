@@ -442,7 +442,7 @@ export class DefendLighting {
    * game's recipe. `ambient` is the overlay colour and opacity. The pools
    * and torches are summed in a `LightField`, then drawn scaled up into
    * the board-sized darkness and glow, as each pool once was. */
-  drawLight(c: CanvasRenderingContext2D, frame: LightFrame, ambient: Ambient, carried: Carried) {
+  drawLight(c: CanvasRenderingContext2D, frame: LightFrame, ambient: Ambient, carried: Carried, sheen = true) {
     const { W, H } = boardSize(frame.px);
     const field = (this.field ??= new LightField());
     field.clear();
@@ -465,7 +465,7 @@ export class DefendLighting {
     c.globalAlpha = LIGHTING_CONFIG.glow.bloom;
     c.drawImage(this.glow, 0, 0);
     c.restore();
-    if (up) this.shine(c, up.rim, (r) => r.drawImage(this.glow!, 0, 0), { body: up.body, by: frame.px / ART / 4 });
+    if (up && sheen) this.shine(c, up.rim, (r) => r.drawImage(this.glow!, 0, 0), { body: up.body, by: frame.px / ART / 4 });
   }
 
   /** Lights outlines from this frame's glow (from the last `drawLight`),

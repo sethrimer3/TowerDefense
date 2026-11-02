@@ -101,6 +101,9 @@ export type DrawOptions = {
   mergedOutlines?: boolean;
   /** The desert's detailed dunes rather than its simple ones. */
   hdSand?: boolean;
+  /** Torchlight sheen on building rims and unit contours (Settings' Ultra
+   * graphics). Absent counts as on, so fixtures keep the full drawing. */
+  sheen?: boolean;
   sides?: UnitInks;
   keepFlag?: Flag | null;
   collapsed?: ReadonlySet<number>;
@@ -224,7 +227,7 @@ export class DefendRenderer {
    * view narrows; the board point in the middle of the view stays there. */
   resize(refW: number, refH: number) {
     this.ref = { w: refW, h: refH };
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = this.dpr;
     const w = Math.max(1, Math.round(this.canvas.clientWidth * dpr)),
       h = Math.max(1, Math.round(this.canvas.clientHeight * dpr));
     const fit = Math.max(1, Math.min((refW * dpr) / CELLS_W, (refH * dpr) / CELLS_H));
@@ -246,6 +249,24 @@ export class DefendRenderer {
     this.clampCam();
   }
   private ref = { w: 0, h: 0 };
+
+  /** The most device pixels a CSS pixel the board draws at (Settings' Board
+   * resolution; 0 for the screen's own). Fewer are cheaper; the browser
+   * scales the canvas up. Changing it resizes on the next `resize`. */
+  get maxDpr() {
+    return this.dprCap;
+  }
+  set maxDpr(cap: number) {
+    if (cap === this.dprCap) return;
+    this.dprCap = cap;
+    this.rescale = true;
+  }
+  private dprCap = 0;
+  /** Device pixels a CSS pixel, within `maxDpr`. */
+  get dpr() {
+    const screen = window.devicePixelRatio || 1;
+    return this.dprCap > 0 ? Math.min(screen, this.dprCap) : screen;
+  }
 
   /** Crisp pixels: the board's scale (`px`) a whole number of art pixels'
    * worth of device pixels and the zoom stepping so every art pixel covers
@@ -419,7 +440,7 @@ export class DefendRenderer {
     this.ctx.restore();
     this.darkDrain.draw(this.ctx, this.px, sim, opts.now, blightNight, this.protectCombat ? this.actors : null);
     if (sim) this.outline?.drawContours(this.ctx, opts.reduceMotion ? 0 : opts.now / 1000);
-    if (sim && this.lit) this.outline?.shineContours(this.ctx, this.lighting);
+    if (sim && this.lit && opts.sheen !== false) this.outline?.shineContours(this.ctx, this.lighting);
     opts.markers?.(this.ctx,this.px);
     this.rallyFlag.draw(this.ctx, this.px, sim, sim?.warBanner?.flag && !opts.hideBanner ? sim.warBanner : null, opts);
     if (sim?.warBanner && !sim.warBanner.flag && !opts.hideBanner) drawWarBanner(this.ctx, this.px, sim.warBanner, bannerReach(sim), { t: opts.now / 1000, reduceMotion: opts.reduceMotion });
@@ -929,7 +950,7 @@ export class DefendRenderer {
       torches: [...(sim ? this.carried(sim) : []), ...this.cityLife.lights(this.lighting.solarTime ?? 0), ...flames.carried, ...mages.carried, ...stabs.carried, ...hero.carried, ...dark.carried, ...meteors.carried],
       solid: sim?.solid ?? this.cityLife.solid,
       version: sim?.mapVersion ?? -1,
-    });
+    }, opts.sheen !== false);
     this.lighting.drawRelief(this.ctx, this.px, weather.rain ? 0.85 : 0.65);
     if (sim) this.drawGroundRelief(map, sim, opts, [...flames.relief, ...mages.relief, ...stabs.relief, ...hero.relief, ...dark.relief, ...raisingLights(sim), ...meteors.relief, ...frostLights(sim), ...reinforceLights(sim)]);
     this.lighting.drawFlames(this.ctx, frame);
