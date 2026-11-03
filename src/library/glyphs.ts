@@ -183,3 +183,59 @@ export function glowOf(lit: ReadonlyArray<readonly [number, number]>) {
   }
   return glow;
 }
+
+/** A title glyph's width and height in fine pixels: smaller than the runes,
+ * so a few stack down a spine. */
+export const TITLE_SIZE = 5;
+
+/** The runic script books' titles are written in, `#` inked. */
+const TITLE_ROWS: string[][] = [
+  ["..#..", ".#.#.", "#.#.#", "..#..", "..#.."],
+  ["#.#.#", ".###.", "..#..", "..#..", "..#.."],
+  ["###..", "#..#.", "###..", "#.#..", "#..#."],
+  ["#....", "##...", "#.#..", "##...", "#...."],
+  ["###..", "#..#.", "#...#", "#...#", "#...#"],
+  ["...#.", "..#..", ".#...", "..#..", "...#."],
+  ["#...#", ".#.#.", "..#..", ".#.#.", "#...#"],
+  ["###..", "#..#.", "###..", "#....", "#...."],
+  ["#...#", "##..#", "#.#.#", "#..##", "#...#"],
+  ["..#..", "..##.", "..#.#", "..#..", "..#.."],
+  [".#...", "#.#..", ".#.#.", "..#.#", "...#."],
+  ["..##.", "..#..", "..#..", "..#..", ".##.."],
+  ["##...", "#.#..", "##...", "#.#..", "##..."],
+  ["#...#", "##.##", "#.#.#", "#...#", "#...#"],
+  ["#...#", "##.##", "#.#.#", "##.##", "#...#"],
+  ["#....", "##...", "#.#..", "#....", "#...."],
+  ["..#..", ".#.#.", "#...#", ".#.#.", "..#.."],
+  ["..#..", ".#.#.", "#...#", ".#.#.", "#...#"],
+  ["...#.", "..#..", ".###.", "..#..", ".#..."],
+];
+
+/** Each letter as the fine pixels it inks, `[x, y]` from its top left. */
+export const TITLE_GLYPHS: ReadonlyArray<ReadonlyArray<readonly [number, number]>> = TITLE_ROWS.map((rows) => {
+  const lit: [number, number][] = [];
+  rows.forEach((row, y) => [...row].forEach((ch, x) => ch === "#" && lit.push([x, y])));
+  return lit;
+});
+
+function mix(a: number, b: number) {
+  let h = Math.imul(a + 1, 0x9e3779b1) ^ Math.imul(b + 13, 0x85ebca6b);
+  h ^= h >>> 15;
+  h = Math.imul(h, 0x2c1b3c6d);
+  h ^= h >>> 12;
+  return h >>> 0;
+}
+
+/** The title on the book in slot `slot` as indexes into `TITLE_GLYPHS`: two
+ * letters, or three on a spine `tall` enough, or none on about a quarter of
+ * the books, which go untitled. Steady, so a book keeps its title. */
+export function titleFor(slot: number, tall: number): number[] {
+  if (mix(slot, 1) % 4 === 0) return [];
+  const n = tall >= 5 && mix(slot, 2) % 2 ? 3 : 2;
+  return Array.from({ length: n }, (_, k) => mix(slot, 10 + k) % TITLE_GLYPHS.length);
+}
+
+/** A title's ink: very dark brown on the lighter covers, dark gold on the darker. */
+export function titleInk(cover: readonly [number, number, number]): readonly [number, number, number] {
+  return cover[0] * 0.3 + cover[1] * 0.59 + cover[2] * 0.11 > 85 ? [40, 24, 12] : [150, 112, 40];
+}
