@@ -37,7 +37,7 @@ import { Fences } from "./fences.ts";
 import { Rain, Snow, ambientFor, type Weather } from "./weather.ts";
 import { areaFade, type AreaId } from "./areas.ts";
 import { gateArtRect } from "./wood-gate-art.ts";
-import { FACE_HANG, damageKey, gateSpriteOf, hangingFaces, onCityArtLoaded, paintBuildingMask, paintCityLayer, paintFences, paintSpikePoints, paintStanding, stageOf } from "./city-layer.ts";
+import { FACE_HANG, buildingState, damageKey, gateSpriteOf, shapeOf, hangingFaces, onCityArtLoaded, paintBuildingMask, paintCityLayer, paintFences, paintSpikePoints, paintStanding, stageOf } from "./city-layer.ts";
 import { GATE_FRAMES } from "./gate-art.ts";
 import { peopleAt } from "./gates.ts";
 import type { GateRanks } from "../gate-upgrades.ts";
@@ -780,7 +780,7 @@ export class DefendRenderer {
     while (k > 1 && W * H * k * k > 18e6) k--;
     this.layerScale = k;
     // Every building's damage stage is painted into the layer too.
-    const maskKey = `${this.area}:${pixelKey()}:${sim ? `${sim.mapVersion}:${damageKey(sim)}` : -1}:${looks ? Object.entries(looks).join(",") : ""}`;
+    const maskKey = `${this.area}:${pixelKey()}:${sim ? damageKey(sim) : -1}:${looks ? Object.entries(looks).join(",") : ""}`;
     const key = `${W}:${k}:${this.worldLighting}:${maskKey}`;
     if (this.previousArea && (key !== this.previousKey || !this.layerKey)) {
       this.previousLayer ??= document.createElement("canvas");
@@ -791,10 +791,11 @@ export class DefendRenderer {
       this.previousKey = key;
     }
     if (map === this.map && key === this.layerKey) return;
-    // Only some standing buildings' damage stages changed: repaint just
-    // round them, not the whole city and its lighting masks (a hitch of a
-    // tenth of a second or more on a big city, every few hits in a wave).
-    const base = `${W}:${k}:${this.worldLighting}:${this.area}:${pixelKey()}:${sim ? sim.mapVersion : -1}:${looks ? Object.entries(looks).join(",") : ""}`;
+    // Only some buildings changed (a damage stage, a fall, a rebuilt
+    // section): repaint just round them, not the whole city and its
+    // lighting masks (a hitch of a tenth of a second or more on a big city,
+    // many times a second while a worm tears through it and masons rebuild).
+    const base = `${W}:${k}:${this.worldLighting}:${this.area}:${pixelKey()}:${looks ? Object.entries(looks).join(",") : ""}`;
     const boxes = map === this.map && sim && sim === this.stagedSim && base === this.baseKey && !this.previousArea ? this.damageBoxes(map, sim) : null;
     this.baseKey = base;
     this.stagedSim = sim;
@@ -803,12 +804,17 @@ export class DefendRenderer {
       this.layerKey = key;
       this.maskKey = maskKey;
       const P = this.px * k;
+      const masked: CellBox[] = [];
       for (const box of boxes) {
         repaintBox(this.lctx, P, box, (c) => paintCityLayer(c, P, { map, sim, area: this.area, lights: this.lighting.lights, stones: this.lighting.roadStones, looks, omitSunShadows: this.worldLighting, within: box }));
+        // A fallen building being rebuilt isn't in the masks: only its timber shows.
+        if (box.layerOnly) continue;
+        masked.push(box);
         for (const [cv, mode] of [[this.bodyMask, "body"], [this.rimMask, "rim"]] as const)
           repaintBox(cv.getContext("2d", { willReadFrequently: true })!, MASK, box, (c) => paintBuildingMask(c, MASK, { map, sim, area: this.area, looks, lights: this.lighting.lights, stones: this.lighting.roadStones, within: box }, mode));
       }
-      this.lighting.patchMasks(boxes);
+      if (masked.length) this.lighting.patchMasks(masked);
+      this.findFaces(map, sim);
       return;
     }
     this.map = map;
@@ -823,24 +829,37 @@ export class DefendRenderer {
       this.maskMap = map; this.maskKey = maskKey;
       this.paintMasks(map, sim, looks);
     }
+    this.findFaces(map, sim);
+  }
+
+  /** The wall's brick faces hanging over open ground, as they stand. */
+  private findFaces(map: CityMap, sim: DefendSim | null) {
     this.faces = hangingFaces(map, sim);
     this.faced.fill(0);
     for (const f of this.faces) for (let x = f.x0; x < f.x1; x++) this.faced[cellIndex(x, f.y)] = 1;
   }
 
-  /** The boxes (in cells) round the standing buildings whose damage stage
-   * changed since `recordStages`, or null when anything else changed (a
-   * building fell or rose) or so much did that one full repaint is best. */
+  /** The boxes (in cells) round the buildings whose look changed since
+   * `recordStages` (a damage stage, a fall or rise, a rebuilt section), or
+   * null when anything else changed (a building's kind or lot) or so much
+   * did that one full repaint is best. A box is `layerOnly` when only a
+   * fallen building's rebuilt sections changed there, which the lighting's
+   * masks (of what stands) don't hold. */
   private damageBoxes(map: CityMap, sim: DefendSim): CellBox[] | null {
+    if (map.buildings.length !== this.stages.size) return null;
     const boxes: CellBox[] = [];
     for (const b of map.buildings) {
-      const was = this.stages.get(b.id), now = sim.intact(b) ? stageOf(sim, b) : FALLEN;
+      const was = this.stages.get(b.id), now = buildingState(sim, b);
       if (was === now) continue;
-      if (was === undefined || was === FALLEN || now === FALLEN) return null;
+      if (was === undefined || this.shapes.get(b.id) !== shapeOf(b)) return null;
+      const rose = was < 0 !== now < 0;
+      // Without the shared sky the city layer holds the shadows, which a
+      // fall or rise changes well beyond the building.
+      if (rose && !this.worldLighting) return null;
       // Sprites overhang their lots by their outline and padding, walls
       // join their neighbours and hang a face over the cell below.
       const r = b.rect, m = DAMAGE_MARGIN;
-      boxes.push({ x0: Math.max(0, r.x - m), y0: Math.max(0, r.y - m), x1: Math.min(CELLS_W, r.x + r.w + m), y1: Math.min(CELLS_H, r.y + r.h + m) });
+      boxes.push({ x0: Math.max(0, r.x - m), y0: Math.max(0, r.y - m), x1: Math.min(CELLS_W, r.x + r.w + m), y1: Math.min(CELLS_H, r.y + r.h + m), layerOnly: !rose && now < 0 && b.kind !== "wall" && b.kind !== "gate" });
     }
     if (!boxes.length || boxes.length > MAX_DAMAGE_BOXES) return null;
     // Merge overlapping boxes, so no area is painted twice.
@@ -849,7 +868,7 @@ export class DefendRenderer {
       for (let i = 0; i < boxes.length && !merged; i++) for (let j = i + 1; j < boxes.length; j++) {
         const a = boxes[i], b = boxes[j];
         if (a.x0 > b.x1 || b.x0 > a.x1 || a.y0 > b.y1 || b.y0 > a.y1) continue;
-        boxes[i] = { x0: Math.min(a.x0, b.x0), y0: Math.min(a.y0, b.y0), x1: Math.max(a.x1, b.x1), y1: Math.max(a.y1, b.y1) };
+        boxes[i] = { x0: Math.min(a.x0, b.x0), y0: Math.min(a.y0, b.y0), x1: Math.max(a.x1, b.x1), y1: Math.max(a.y1, b.y1), layerOnly: a.layerOnly && b.layerOnly };
         boxes.splice(j, 1);
         merged = true;
         break;
@@ -859,11 +878,13 @@ export class DefendRenderer {
     for (const b of boxes) area += (b.x1 - b.x0) * (b.y1 - b.y0);
     return area > CELLS_W * CELLS_H * 0.4 ? null : boxes;
   }
-  /** Each building's damage stage as last painted (`FALLEN` once down). */
+  /** Each building's look (`buildingState`) and kind and lot as last painted. */
   private recordStages(map: CityMap, sim: DefendSim | null) {
     this.stages.clear();
-    if (sim) for (const b of map.buildings) this.stages.set(b.id, sim.intact(b) ? stageOf(sim, b) : FALLEN);
+    this.shapes.clear();
+    if (sim) for (const b of map.buildings) { this.stages.set(b.id, buildingState(sim, b)); this.shapes.set(b.id, shapeOf(b)); }
   }
+  private shapes = new Map<number, number>();
   private stages = new Map<number, number>();
   private stagedSim: DefendSim | null = null;
   private baseKey = "";
@@ -1003,9 +1024,7 @@ const standing = (map: CityMap, sim: DefendSim | null) => (id: number) => !!map.
 /** Cells round a building whose damage stage changed that are repainted. */
 const DAMAGE_MARGIN = 2;
 /** More changed buildings than this in one frame: repaint everything. */
-const MAX_DAMAGE_BOXES = 16;
-/** `recordStages`' mark for a building that has fallen. */
-const FALLEN = -1;
+const MAX_DAMAGE_BOXES = 64;
 
 /** Repaints `box` (cells, at `P` pixels a cell) of `c`'s canvas alone:
  * cleared and painted again through a clip, exactly as a whole repaint

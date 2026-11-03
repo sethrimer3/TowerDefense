@@ -789,7 +789,7 @@ export const MASK = 16;
 
 /** Per cell, 1 where the body mask covers at least half of it. */
 /** A box of cells, `x1`/`y1` exclusive. */
-export type CellBox = { x0: number; y0: number; x1: number; y1: number };
+export type CellBox = { x0: number; y0: number; x1: number; y1: number; layerOnly?: boolean };
 
 /** Reads `box` of the body and rim masks into `covered` (a cell is covered
  * while the body fills half of it) and `pixels` (an art pixel stands while
