@@ -73,6 +73,10 @@ export function drawDamage(b: Brush, sim: DefendSim) {
   drawHurt(b, sim);
 }
 
+/** How pale a struck building flashes at first (a translucent fill, cheap
+ * however many are struck), fading over `BUILDING_FLASH` seconds. */
+const STRIKE_FLASH = 0.28;
+
 function drawStrikes({ c, px }: Brush, sim: DefendSim) {
   for (const bd of sim.map.buildings) {
     const f = sim.flash[bd.id];
@@ -80,10 +84,10 @@ function drawStrikes({ c, px }: Brush, sim: DefendSim) {
     const r = bd.rect;
     if (bd.kind === "keep") {
       const x = Math.round(r.x * px), y = Math.round(r.y * px);
-      paintKeepFlash(c, { x, y, w: Math.round((r.x + r.w) * px) - x, h: Math.round((r.y + r.h) * px) - y, px }, (f / BUILDING_FLASH) * .55);
+      paintKeepFlash(c, { x, y, w: Math.round((r.x + r.w) * px) - x, h: Math.round((r.y + r.h) * px) - y, px }, (f / BUILDING_FLASH) * STRIKE_FLASH);
       continue;
     }
-    c.fillStyle = `rgba(255,244,220,${(f / BUILDING_FLASH) * 0.55})`;
+    c.fillStyle = `rgba(255,244,220,${(f / BUILDING_FLASH) * STRIKE_FLASH})`;
     c.fillRect(r.x * px, r.y * px, r.w * px, r.h * px);
   }
 }

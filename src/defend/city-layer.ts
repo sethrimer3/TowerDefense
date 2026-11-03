@@ -419,11 +419,41 @@ export function stageOf(sim: DefendSim | null, b: Building) {
   return b.kind === "keep" ? keepStage(sim.hp[b.id], sim.maxHp[b.id]) : damageStage(sim.hp[b.id], sim.maxHp[b.id]);
 }
 
-/** A number that changes whenever any standing building's damage stage
- * does, so the renderer knows to repaint the layer. */
+/** How building `b` shows in the city layer: its damage stage while it
+ * stands, else how many of its cells are rebuilt (`-1 - built`), since
+ * finished sections show as timber over the rubble. */
+export function buildingState(sim: DefendSim, b: Building) {
+  return sim.intact(b) ? stageOf(sim, b) : -1 - sim.built[b.id];
+}
+
+/** A number that changes whenever anything the city layer shows of the
+ * battle does: a building's damage stage, its fall or a rebuilt section,
+ * its kind or lot. Unlike `mapVersion` it ignores what the layer doesn't
+ * draw, so the renderer repaints only for what it would see. */
 export function damageKey(sim: DefendSim) {
   let k = 0;
-  for (const b of sim.map.buildings) k = (Math.imul(k, 31) + (sim.intact(b) ? stageOf(sim, b) : 7)) | 0;
+  for (const b of sim.map.buildings) k = (Math.imul(k, 31) + buildingState(sim, b) * 7 + shapeOf(b)) | 0;
+  return k;
+}
+
+/** A number for a building's kind and lot. */
+export function shapeOf(b: Building) {
+  let h = kindCodes.get(b.kind);
+  if (h === undefined) {
+    h = 0;
+    for (let i = 0; i < b.kind.length; i++) h = (Math.imul(h, 31) + b.kind.charCodeAt(i)) | 0;
+    kindCodes.set(b.kind, h);
+  }
+  const r = b.rect;
+  return (Math.imul((Math.imul((Math.imul(r.x, 211) + r.y) | 0, 211) + r.w) | 0, 211) + r.h + Math.imul(h, 0x9e3779b1)) | 0;
+}
+const kindCodes = new Map<string, number>();
+
+/** A number that changes whenever a building falls, rises or changes kind
+ * or lot: what the sun's shadows are cast from. */
+export function standingKey(sim: DefendSim) {
+  let k = 0;
+  for (const b of sim.map.buildings) k = (Math.imul(k, 31) + (sim.intact(b) ? 1 : 0) + shapeOf(b)) | 0;
   return k;
 }
 

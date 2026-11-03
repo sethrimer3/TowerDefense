@@ -1,4 +1,5 @@
-// A building's damage stage changing repaints only the boxes round it: the
+// A building's damage stage changing, its fall or a rebuilt section (with
+// the shared sky) repaints only the boxes round it: the
 // city layer, the lighting's body/rim masks and their occlusion read back
 // must match a whole repaint exactly, and cost a fraction of one.
 // Needs `npm run dev`. PLAYWRIGHT_EXECUTABLE / TEST_URL supported.
@@ -38,6 +39,26 @@ try {
         a.draw(s.map, s.sim, null, opts(16 * (step + 1)));
         timings.push(performance.now() - t);
         const fresh = make(); fresh.draw(s.map, s.sim, null, opts(16 * (step + 1)));
+        results.push({ step, incremental: full === before, ...compare(a, fresh) });
+      }
+      // With the shared sky (the live game), falls and rebuilt sections
+      // are repainted round the building too: the sun's shadows aren't in
+      // the layer.
+      const { DayClock, useDayClock } = await import('/src/daylight.ts');
+      useDayClock(new DayClock(60_000), () => ({ dayNightCycle: false, timeOfDay: 'day' }));
+      a.draw(s.map, s.sim, null, opts(200));
+      const fallen = [];
+      for (const kind of kinds.filter(k => k !== 'keep')) {
+        const all = s.map.buildings.filter(b => b.kind === kind && s.sim.intact(b));
+        for (const b of all.slice(1, 3)) { s.sim.damageBuilding(b.id, s.sim.maxHp[b.id] * 2); fallen.push(b); }
+      }
+      const rebuild = (n) => { for (const b of fallen) for (const c of b.cells.slice(0, n)) s.sim.rebuildCell(c); };
+      for (const [step, change] of [[5, () => {}], [6, () => rebuild(1)], [7, () => rebuild(3)], [8, () => rebuild(1e9)]]) {
+        change();
+        const before = full, t = performance.now();
+        a.draw(s.map, s.sim, null, opts(16 * (step + 20)));
+        timings.push(performance.now() - t);
+        const fresh = make(); fresh.draw(s.map, s.sim, null, opts(16 * (step + 20)));
         results.push({ step, incremental: full === before, ...compare(a, fresh) });
       }
       return { results, timings };

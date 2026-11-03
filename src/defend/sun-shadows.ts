@@ -5,7 +5,7 @@ import { ART } from "./art-scale.ts";
 import type { CityMap, Building } from "./citygen.ts";
 import type { DefendSim } from "./sim.ts";
 import { heights, paintShadows, sunShadowMask } from "./shadow-art.ts";
-import { spriteFootprint } from "./city-layer.ts";
+import { spriteFootprint, standingKey } from "./city-layer.ts";
 import { pixelKey } from "./pixel-sprites.ts";
 
 export class SunShadows {
@@ -14,12 +14,20 @@ export class SunShadows {
   private direction = "";
   private h: Float32Array = new Float32Array(0);
   private canvas: HTMLCanvasElement | null = null;
+  /** When (`performance.now()`) the heights were last taken. */
+  private cast = -Infinity;
+  private stands = 0;
 
   draw(c: CanvasRenderingContext2D, px: number, map: CityMap, sim: DefendSim | null, sun: Sun, looks?: Readonly<Record<number, string>>) {
     if (sun.strength <= 0) return;
-    const terrain = `${sim?.mapVersion ?? -1}:${pixelKey()}:${looks ? Object.entries(looks).join() : ""}`;
+    // What stands, not `mapVersion`, which also counts each rebuilt cell.
+    const terrain = `${pixelKey()}:${looks ? Object.entries(looks).join() : ""}`, stands = sim ? standingKey(sim) : -1;
     const x = Math.round(sun.x * 8) / 8, y = Math.round(sun.y * 8) / 8, direction = `${x}:${y}`;
-    if (this.map !== map || this.terrain !== terrain) {
+    // Buildings falling every frame (a worm through the city) recast the
+    // whole board's shadows at most every `RECAST_MS`.
+    const clock = performance.now();
+    if (this.map !== map || this.terrain !== terrain || this.stands !== stands && clock - this.cast >= RECAST_MS) {
+      this.cast = clock; this.stands = stands;
       const standing = (b: Building) => (!sim || sim.intact(b)) && !(b.structureUid !== undefined && looks?.[b.structureUid] === "cloudborne");
       this.h = heights(map, standing, b => spriteFootprint(map, b, b.structureUid !== undefined ? looks?.[b.structureUid] : undefined));
       this.map = map; this.terrain = terrain; this.direction = "";
@@ -35,3 +43,6 @@ export class SunShadows {
     c.drawImage(this.canvas!, 0, 0, CELLS_W * px, CELLS_H * px); c.restore();
   }
 }
+
+/** Milliseconds at least between recasting for buildings falling or rising. */
+const RECAST_MS = 250;
