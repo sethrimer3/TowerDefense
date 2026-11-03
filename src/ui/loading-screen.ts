@@ -4,6 +4,9 @@ import { BRICKS, W, TOP, COURSE, paintBrick, paintBrickBed } from "./brick-wall.
 const DROP = 16, BRICK_MS = 90, SETTLE_MS = 100;
 // Lay the lower course first so every falling brick has something to land on.
 const ORDER = [...BRICKS].sort((a, b) => b.y - a.y || a.x - b.x);
+const target = (ready: boolean) => ready ? ORDER.length : ORDER.length - 1;
+/** Uncover the game this long after it is ready even if no animation frame comes. */
+const HANDOFF_MS = ORDER.length * BRICK_MS + SETTLE_MS + 1500;
 
 /** The boot screen owns its animation, independent of the game's frame loop.
  * It never consumes a game random stream or changes a player's save. */
@@ -16,6 +19,7 @@ export class LoadingScreen {
   private frame = 0;
   private ready = false;
   private finish: (() => void) | null = null;
+  private paintFailed = false;
 
   constructor(private root: HTMLElement, private reduced: () => boolean) {
     this.wall = new HallBackdrop(root.querySelector<HTMLCanvasElement>(".loading-stones")!, "vault", "left");
@@ -27,42 +31,61 @@ export class LoadingScreen {
   }
 
   private draw = () => {
-    const now = Date.now(), reduced = this.reduced();
-    const base = this.root.getBoundingClientRect(), torch = this.torch.getBoundingClientRect();
-    paintSconce(this.torch, now, "left", reduced);
-    // Match the actual wick at art pixel (6, 9), and light the stone's bevels.
-    this.wall.draw(now, [{ x: torch.left - base.left + 6.5 * ART, y: torch.top - base.top + 9 * ART }], 0, reduced);
-    const time = performance.now();
-    // Resume gently after synchronous initialization or a backgrounded tab.
-    this.elapsed += Math.min(50, time - this.last);
-    this.last = time;
-    const target = this.ready ? ORDER.length : ORDER.length - 1;
-    if (!this.ready) this.elapsed = Math.min(this.elapsed, target * BRICK_MS);
-    const elapsed = this.elapsed;
-    const laid = reduced ? target : Math.min(target, Math.floor(elapsed / BRICK_MS));
-    const c = this.bricks.getContext("2d")!;
-    c.clearRect(0, 0, this.bricks.width, this.bricks.height);
-    c.save();
-    c.translate(0, DROP);
-    paintBrickBed(c);
-    for (let i = 0; i < laid; i++) paintBrick(c, ORDER[i]);
-    if (!reduced && laid < target) {
-      const fall = (elapsed % BRICK_MS) / BRICK_MS;
-      const b = ORDER[laid];
-      paintBrick(c, { ...b, y: b.y - Math.round((1 - fall * fall) * (DROP + b.y)) });
+    // A painting error must never stop the loop that hands over to the game.
+    this.advance();
+    try { this.paint(); } catch (error) {
+      if (!this.paintFailed) console.error("Loading screen paint failed", error);
+      this.paintFailed = true;
     }
-    c.restore();
-    if (this.ready && (reduced || elapsed >= ORDER.length * BRICK_MS + SETTLE_MS)) {
+    if (this.ready && (this.reduced() || this.elapsed >= ORDER.length * BRICK_MS + SETTLE_MS)) {
       this.finish?.();
       return;
     }
     this.frame = requestAnimationFrame(this.draw);
   };
 
+  private paint() {
+    const now = Date.now(), reduced = this.reduced();
+    const base = this.root.getBoundingClientRect(), torch = this.torch.getBoundingClientRect();
+    paintSconce(this.torch, now, "left", reduced);
+    // Match the actual wick at art pixel (6, 9), and light the stone's bevels.
+    this.wall.draw(now, [{ x: torch.left - base.left + 6.5 * ART, y: torch.top - base.top + 9 * ART }], 0, reduced);
+    const elapsed = this.elapsed;
+    const laid = reduced ? target(this.ready) : Math.min(target(this.ready), Math.floor(elapsed / BRICK_MS));
+    const c = this.bricks.getContext("2d");
+    if (!c) return;
+    c.clearRect(0, 0, this.bricks.width, this.bricks.height);
+    c.save();
+    c.translate(0, DROP);
+    paintBrickBed(c);
+    for (let i = 0; i < laid; i++) paintBrick(c, ORDER[i]);
+    if (!reduced && laid < target(this.ready)) {
+      const fall = (elapsed % BRICK_MS) / BRICK_MS;
+      const b = ORDER[laid];
+      paintBrick(c, { ...b, y: b.y - Math.round((1 - fall * fall) * (DROP + b.y)) });
+    }
+    c.restore();
+  }
+
+  /** Move the bar's clock on, held one brick short until the game is ready. */
+  private advance() {
+    const time = performance.now();
+    // Resume gently after synchronous initialization or a backgrounded tab.
+    this.elapsed += Math.min(50, time - this.last);
+    this.last = time;
+    if (!this.ready) this.elapsed = Math.min(this.elapsed, target(false) * BRICK_MS);
+  }
+
   /** Complete the wall only when the game and its fonts are ready. */
   complete(): Promise<void> {
     return new Promise(resolve => {
+      let done = false;
+      const fallback = setTimeout(() => this.finish?.(), HANDOFF_MS);
       this.finish = () => {
+        if (done) return;
+        done = true;
+        clearTimeout(fallback);
+        cancelAnimationFrame(this.frame);
         this.root.remove();
         document.documentElement.classList.remove("game-loading");
         const app = document.querySelector<HTMLElement>("#app")!;
@@ -74,12 +97,25 @@ export class LoadingScreen {
     });
   }
 
+  /** Still loading after a long while: offer a reload without giving up on this start. */
+  slow() {
+    if (!this.root.isConnected) return;
+    this.showRetry();
+  }
+
   fail() {
+    if (!this.root.isConnected) return;
     cancelAnimationFrame(this.frame);
     this.root.setAttribute("aria-label", "Unable to load the game. Try again.");
-    this.root.querySelector<HTMLElement>(".loading-label")!.textContent = "Unable to load game";
+    const label = this.root.querySelector<HTMLElement>(".loading-label");
+    if (label) label.textContent = "Unable to load game";
     this.bricks.hidden = true;
-    const retry = this.root.querySelector<HTMLButtonElement>(".loading-retry")!;
+    this.showRetry();
+  }
+
+  private showRetry() {
+    const retry = this.root.querySelector<HTMLButtonElement>(".loading-retry");
+    if (!retry) return;
     retry.hidden = false;
     retry.onclick = () => location.reload();
   }

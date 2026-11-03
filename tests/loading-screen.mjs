@@ -98,6 +98,43 @@ try {
   await page.locator('#profile-editor[open]').waitFor();
   await page.close();
   console.log('failed import: retry successfully starts the game');
+
+  // A game import that never answers: Try again appears, then one automatic reload starts the game.
+  {
+    const page = await browser.newPage();
+    await page.clock.install();
+    let stalls = 0;
+    await page.route(mainModule, route => { if (stalls++ === 0) return; route.continue(); });
+    await page.goto(base, { waitUntil: 'domcontentloaded' });
+    await page.clock.runFor(11_000);
+    await page.locator('.loading-retry').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#loading-screen').count(), 1, 'stalled: still waiting after Try again shows');
+    await page.clock.runFor(15_000);
+    await page.waitForURL(base);
+    await page.clock.resume();
+    await page.locator('#loading-screen').waitFor({ state: 'detached' });
+    await page.locator('#profile-editor[open]').waitFor();
+    await page.close();
+    console.log('stalled import: Try again offered, automatic reload starts the game');
+  }
+
+  // A painting error or a font that never loads cannot hold the wall up.
+  {
+    const page = await browser.newPage();
+    await page.addInitScript(() => {
+      const draw = CanvasRenderingContext2D.prototype.clearRect;
+      CanvasRenderingContext2D.prototype.clearRect = function (...args) {
+        if (this.canvas.classList?.contains('loading-bricks')) throw new Error('paint broke');
+        return draw.apply(this, args);
+      };
+      Object.defineProperty(document.fonts, 'ready', { get: () => new Promise(() => {}) });
+    });
+    await page.goto(base);
+    await page.locator('#loading-screen').waitFor({ state: 'detached', timeout: 15_000 });
+    await page.locator('#profile-editor[open]').waitFor();
+    await page.close();
+    console.log('paint error and stalled fonts: game still starts');
+  }
 } finally {
   await browser.close();
 }
