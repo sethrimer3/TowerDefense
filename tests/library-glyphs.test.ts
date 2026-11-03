@@ -23,3 +23,18 @@ test("enchanted book glyphs fade in as the view zooms in", () => {
   const mid = glyphShare(2.25 * GLYPH_FINE);
   assert.ok(mid > 0 && mid < 1);
 });
+
+test("book titles: distinct runic letters, most books titled, black or dark gold by cover", async () => {
+  const { TITLE_GLYPHS, TITLE_SIZE, titleFor, titleInk } = await import("../src/library/glyphs.ts");
+  const keys = new Set(TITLE_GLYPHS.map((g) => g.map(([x, y]) => `${x},${y}`).join(";")));
+  assert.equal(keys.size, TITLE_GLYPHS.length, "every letter differs");
+  for (const g of TITLE_GLYPHS) for (const [x, y] of g) assert.ok(x >= 0 && y >= 0 && x < TITLE_SIZE && y < TITLE_SIZE);
+  const titles = Array.from({ length: 400 }, (_, s) => titleFor(s, 6));
+  const titled = titles.filter((t) => t.length).length;
+  assert.ok(titled > 250 && titled < 350, "about three in four books titled");
+  for (const t of titles) assert.ok(t.length === 0 || t.length === 2 || t.length === 3);
+  for (let s = 0; s < 100; s++) assert.ok(titleFor(s, 4).length <= 2, "short spines hold two letters");
+  assert.deepEqual(titleFor(42, 6), titleFor(42, 6));
+  assert.deepEqual(titleInk([138, 122, 90]), [12, 9, 6], "black on a light cover");
+  assert.deepEqual(titleInk([47, 77, 122]), [150, 112, 40], "dark gold on a dark cover");
+});

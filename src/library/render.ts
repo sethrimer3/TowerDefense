@@ -28,7 +28,7 @@ import {
   TABLE_TOP, W, WINDOW, WORLD_H, bayX, ladderX, slotIndex, slotPlace, unitTop, type Cart, type Librarian, type LibrarySim, type Role,
 } from "./sim.ts";
 import { CELL, FW } from "./fire.ts";
-import { GLYPH_FINE, GLYPH_SIZE, glowOf, glyphFor, glyphShare } from "./glyphs.ts";
+import { GLYPH_FINE, GLYPH_SIZE, TITLE_GLYPHS, TITLE_SIZE, glowOf, glyphFor, glyphShare, titleFor, titleInk } from "./glyphs.ts";
 import { ELIXIRS } from "./lab.ts";
 import { HATCH_Y, LabRenderer } from "./lab-render.ts";
 import { LAB_TOP } from "./geometry.ts";
@@ -679,6 +679,7 @@ export class LibraryRenderer {
     if (effects && sunlight.strength > 0) this.drawRays(animationTime, sunlight.strength, sunlight.tilt);
     else this.motes.length = 0;
     for (const r of sim.remains) this.drawRemains(r.x, Math.min(1, (600 - (sim.time - r.at)) / 30));
+    this.drawTitles(sim);
     this.drawRunes(sim);
     this.drawButts(sim);
     for (const c of [sim.barrow, sim.bookCart]) if (c.here) this.drawCart(c);
@@ -855,6 +856,63 @@ export class LibraryRenderer {
   }
 
   /** The flames cell by cell, licking upward, with smoke, embers and thrown water. */
+  /** Zoomed in, most shelved books show their titles down their spines: two
+   * or three small letters (`titleFor`) in pixels a fifth the size, black or
+   * dark gold by the cover (`titleInk`), lit like the books, fading in with
+   * the runes' glyphs. Each letter in its lit colour is a tiny sprite, kept,
+   * so a frame costs one draw a letter, and only books in view are drawn. */
+  private drawTitles(sim: LibrarySim) {
+    const { scale, ox, oy } = this.view, share = glyphShare(scale);
+    if (share <= 0) return;
+    const ctx = this.ctx, L = this.light, f = scale / GLYPH_FINE;
+    const left = -ox / scale - 2, right = (this.canvas.width - ox) / scale + 2, top = -oy / scale - 8, bottom = (this.canvas.height - oy) / scale + 8;
+    const X = (fx: number) => Math.round(ox + fx * f), Y = (fy: number) => Math.round(oy + fy * f);
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    ctx.globalAlpha = share;
+    for (let s = 0; s < sim.slots.length; s++) {
+      const c = sim.slots[s];
+      if (!c || sim.enchanted[s] || sim.burntSlots[s]) continue;
+      const { bay, unit, row, i } = slotPlace(s);
+      const bx = bayX(bay) + 1 + i * 2, by = unitTop(unit) + row * ROW_H + ROW_H - 1;
+      if (bx + 2 < left || bx > right || by < top || by - 7 > bottom) continue;
+      const tall = 4 + Math.floor(h01(bay * 31 + unit, row * 7 + i, 4) * 3), title = titleFor(s, tall);
+      if (!title.length || sim.fire.missing(bx, by - 2)) continue;
+      const j = ((by - (tall >> 1)) * W + bx) * 3, ink = titleInk(hex(BOOK_COLORS[c]));
+      const lit = [0, 1, 2].map((n) => Math.min(255, Math.round((ink[n] * L[j + n]) / 6) * 6)) as RGB;
+      // Centred down the spine, a fine pixel between letters.
+      const span = title.length * TITLE_SIZE + title.length - 1, fx = bx * GLYPH_FINE + 2;
+      let fy = (by - tall) * GLYPH_FINE + ((tall * GLYPH_FINE - span) >> 1);
+      const S = this.scene, cover = hex(BOOK_COLORS[c]);
+      for (const g of title) {
+        // Only where the spine shows: not behind a table or a ladder.
+        const at = ((((fy + 2) / GLYPH_FINE) | 0) * W + bx) * 3;
+        const shows = S[at] === cover[0] && S[at + 1] === cover[1] && S[at + 2] === cover[2];
+        if (shows) ctx.drawImage(this.titleSprite(g, lit), X(fx), Y(fy), X(fx + TITLE_SIZE) - X(fx), Y(fy + TITLE_SIZE) - Y(fy));
+        fy += TITLE_SIZE + 1;
+      }
+    }
+    ctx.restore();
+  }
+
+  private titleSprites = new Map<string, HTMLCanvasElement>();
+  /** A title letter in one colour, one canvas pixel a fine pixel. */
+  private titleSprite(g: number, rgb: RGB) {
+    const key = `${g}:${rgb.join(",")}`;
+    let c = this.titleSprites.get(key);
+    if (!c) {
+      if (this.titleSprites.size > 800) this.titleSprites.clear();
+      c = document.createElement("canvas");
+      c.width = c.height = TITLE_SIZE;
+      const x = c.getContext("2d")!;
+      x.fillStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+      for (const [px, py] of TITLE_GLYPHS[g]) x.fillRect(px, py, 1, 1);
+      this.titleSprites.set(key, c);
+    }
+    return c;
+  }
+
   /** Enchanted books: tiny runes glowing up their spines, one pixel each,
    * slowly cycling between arcane blue and violet, with a faint halo. Zoomed
    * in, each rune pixel fades into a glyph drawn in pixels a fifth the size
