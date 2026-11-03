@@ -235,7 +235,7 @@ export function titleFor(slot: number, tall: number): number[] {
   return Array.from({ length: n }, (_, k) => mix(slot, 10 + k) % TITLE_GLYPHS.length);
 }
 
-/** A title's ink: black on the lighter covers, dark gold on the darker. */
+/** A title's ink: very dark brown on the lighter covers, dark gold on the darker. */
 export function titleInk(cover: readonly [number, number, number]): readonly [number, number, number] {
-  return cover[0] * 0.3 + cover[1] * 0.59 + cover[2] * 0.11 > 85 ? [12, 9, 6] : [150, 112, 40];
+  return cover[0] * 0.3 + cover[1] * 0.59 + cover[2] * 0.11 > 85 ? [40, 24, 12] : [150, 112, 40];
 }

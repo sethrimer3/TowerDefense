@@ -35,6 +35,6 @@ test("book titles: distinct runic letters, most books titled, black or dark gold
   for (const t of titles) assert.ok(t.length === 0 || t.length === 2 || t.length === 3);
   for (let s = 0; s < 100; s++) assert.ok(titleFor(s, 4).length <= 2, "short spines hold two letters");
   assert.deepEqual(titleFor(42, 6), titleFor(42, 6));
-  assert.deepEqual(titleInk([138, 122, 90]), [12, 9, 6], "black on a light cover");
+  assert.deepEqual(titleInk([138, 122, 90]), [40, 24, 12], "very dark brown on a light cover");
   assert.deepEqual(titleInk([47, 77, 122]), [150, 112, 40], "dark gold on a dark cover");
 });
