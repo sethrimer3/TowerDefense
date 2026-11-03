@@ -79,6 +79,16 @@ test('sand stays outside cracked walls, pours through a breach, and creates clea
   assert.ok(!('grains' in env), 'no specks of sand fly over the board');
 });
 
+test('an inner wall stone broken while the outer one stands lets no sand in', () => {
+  const sim = scene(), env = sim.atmosphere!, [inner, ...rest] = corridor(sim);
+  assert.ok(rest.length > 0, 'the wall is more than one stone deep here');
+  sim.damageBuilding(inner.id, sim.maxHp[inner.id]);
+  run(sim, 40);
+  assert.equal(env.passage[inner.cells[0]], 1, 'the fallen stone is open ground');
+  assert.equal(inner.cells.reduce((sum, i) => sum + env.sand[i], 0), 0, 'no sand on the fallen stone');
+  assert.equal(inside(sim, env.sand), 0, 'none in the city');
+});
+
 test('an open gate lets the sand pour into the city, and a shut one keeps it out', () => {
   const sim = scene(21, true), env = sim.atmosphere!, gate = sim.gates[0];
   assert.ok(gate, 'a gate in the north wall');
@@ -192,7 +202,7 @@ test('tumbleweeds are twigs in a black outline, turning frame to frame', () => {
   assert.notDeepEqual(a.px, b.px);
 });
 
-test('the dunes are large, creep slowly downwind and leave the sand outside settled into them', () => {
+test('the dunes are large, hold still and leave the sand outside settled into them', () => {
   const sim = scene(), env = sim.atmosphere!;
   // Crests stand a whole dune wave apart: several tiles, not a few cells.
   let crests = 0;
@@ -205,7 +215,8 @@ test('the dunes are large, creep slowly downwind and leave the sand outside sett
   const before = { ...env.drift };
   run(sim, 20);
   const moved = Math.sqrt((env.drift.x - before.x) ** 2 + (env.drift.y - before.y) ** 2);
-  assert.ok(moved > 0 && moved <= DUNE_SPEED * 20 * 1.5 + 1e-9, `drifted ${moved} cells in 20 s`);
+  assert.equal(DUNE_SPEED, 0);
+  assert.equal(moved, 0, 'the dunes hold still');
   const i = sim.map.city.findIndex((v, i) => !v && !sim.solid[i]);
   assert.ok(Math.abs(env.sand[i] - env.duneAt(i)) < .3);
 });
