@@ -1225,6 +1225,9 @@ export class DefendSim {
       return landed;
     }
     if (e.fortressPart?.role === "armor") return false;
+    const equipmentBuilding = origin?.building ?? (origin && "home" in origin ? (origin as Soldier).home : undefined);
+    const equipmentUid = equipmentBuilding === undefined ? undefined : this.map.buildings[equipmentBuilding]?.structureUid;
+    if(equipmentUid !== undefined) amount *= this.bonuses.equipment?.[equipmentUid]?.power ?? 1;
     if (e.fortressPart?.role === "turret" && source === "melee" && !viaBody && (origin as Partial<Soldier> | undefined)?.kind !== "valkyrie") return false;
     if (isBlightWorm(e.kind) && (e.burrow || e.untargetable)) return false;
     if (source === "ranged") {
@@ -1571,7 +1574,7 @@ function maxHpOf(b: Building, levels: Levels, bonuses: Readonly<Bonuses>) {
   if (b.kind === "house") return HOUSE_HP_PER_CELL * b.cells.length;
   if (b.kind === "keep") return keepHp(levels.keepStrength) * bonuses.keepHp * BASTIONS.hp[keepRank(bonuses.keep, "bastions")];
   if (b.kind === "monsterBait") return STRUCTURES[b.kind].maxHp * FORTIFY.hp[pathRank(buildingPaths({ bonuses }, b), "bait", "fortified")];
-  return STRUCTURES[b.kind].maxHp * (b.kind.endsWith("Tower") ? bonuses.towerHp : bonuses.buildingHp);
+  return STRUCTURES[b.kind].maxHp * (b.kind.endsWith("Tower") ? bonuses.towerHp : bonuses.buildingHp) * (b.structureUid === undefined ? 1 : bonuses.equipment?.[b.structureUid]?.hp ?? 1);
 }
 
 /** Road cells inside the city. */

@@ -363,6 +363,7 @@ export class MineSim {
   private paceBars = noMetals();
   /** Ranks of the Mine skills: Coffee (more of the crew on the night
    * shift) and Waterproofing (the shaft house keeps more rain out). */
+  workPower = 1;
   coffee = 0;
   waterproof = 0;
   /** Mine carts: track along the trunk tunnels and carts on it. Without it
@@ -1900,7 +1901,7 @@ export class MineSim {
       m.facing = t.cell % W > m.x ? 1 : t.cell % W < m.x ? -1 : m.facing;
       if (t.kind === "dig" || t.kind === "build") this.workLight(m);
       // A way to sensed ore follows the rock's seams: it cuts quicker.
-      m.timer = t.kind === "dig" ? Math.round((DIG_TICKS[m2] ?? 120) * (this.side[t.cell] ? SEAM_CUT : 1)) : t.kind === "bail" ? BAIL_TICKS : t.kind === "douse" ? DOUSE_TICKS : BUILD_TICKS[FIXTURE[this.plan[t.cell]]];
+      m.timer = t.kind === "dig" ? Math.max(1, Math.round((DIG_TICKS[m2] ?? 120) * (this.side[t.cell] ? SEAM_CUT : 1) / this.workPower)) : t.kind === "bail" ? BAIL_TICKS : t.kind === "douse" ? DOUSE_TICKS : BUILD_TICKS[FIXTURE[this.plan[t.cell]]];
       m.working = true;
       return;
     }

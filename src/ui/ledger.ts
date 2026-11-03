@@ -1,8 +1,10 @@
-import {t as tr} from "../i18n/index.ts";
+import { hasTree } from "../specializations.ts";
+import { equipmentCopy } from "../equipment.ts";
+import {t as tr, type MessageKey} from "../i18n/index.ts";
 import { TreeMotes, type MoteNode } from "./tree-motes.ts";
 import { MagicCircle } from "../magic-circle/render.ts";
 import { studyCircle } from "../magic-circle/progression.ts";
-import { TILE_TYPE } from "../tiles.ts";
+import { tileStacks, tileCopies, tileTree, TILE_NAMES, TILE_TYPE, type TileId } from "../tiles.ts";
 import { play } from "../sound.ts";
 import { TRAINING, addSmith, busySmiths, whole, cancelTraining, removeSmith, skillPurchase, skillRank, startTraining, trainingLeft, trainingStep, type TrainingId } from "../progression.ts";
 import { BARS_PER_POINT, METALS } from "../mine/sim.ts";
@@ -46,14 +48,16 @@ export type LedgerKind = "smithy" | "study";
 
 /** Whether a topic has anything for one chamber. */
 export function topicHas(t: Topic, kind: LedgerKind) {
+  if (t.item && ["towers","units"].includes(TILE_TYPE[t.item])) return true;
+  if (kind === "study" && t.item && hasTree(t.item)) return true;
   if (kind === "smithy") return !!(t.upgrades?.length || t.training?.length || t.extras?.includes("speed3"));
   // Buildings are upgraded one at a time in Defend; the Study researches
   // the spells' paths and the shared skills.
   return !!(t.skills?.length || (isSpell(t.id) && pathsOf(t.id).length));
 }
 /** The subjects with something for a chamber, each with only those topics. */
-export function ledgerSubjects(kind: LedgerKind): Subject[] {
-  return SUBJECTS.map((s) => ({ ...s, topics: s.topics.filter((t) => topicHas(t, kind)) })).filter((s) => s.topics.length);
+export function ledgerSubjects(_kind: LedgerKind): Subject[] {
+  return [{id:'all',name:'All',sprite:'upgrades',blurb:'Every owned tile.',topics:SUBJECTS.flatMap(s=>s.topics)},...SUBJECTS];
 }
 
 const CHAMBER = {
@@ -66,6 +70,8 @@ const CHAMBER = {
  * research both serve every building of a type; which researched path each
  * building wears is chosen in Defend as it is placed. */
 export class Ledger {
+  private openTile: TileId | null = null;
+  private copyKey: string | null = null;
   private subjects: Subject[];
   private subject: SubjectId;
   private topics: Partial<Record<SubjectId, string>> = {};
@@ -113,6 +119,7 @@ export class Ledger {
     if (!s) return;
     this.subject = s.id;
     this.topics[s.id] = topicId;
+    this.openTile = (topicId === "walls" ? "cityTile" : topicId === "battle" ? "bomb" : topicId) as TileId;
   }
 
   render() {
@@ -133,7 +140,7 @@ export class Ledger {
     const scroll = !same ? 0 : job ? wasResearching ? (list?.scrollTop ?? 0) : 0 : wasResearching ? this.researchScroll : (list?.scrollTop ?? 0);
     const strips = Array.from(this.root.querySelectorAll(".ledger-strip")).map((s) => s.scrollLeft);
     this.shown = `${subject.id}:${topic.id}`;
-    const subjects = this.subjects.map((s) => `<button data-subject="${s.id}" aria-pressed="${s.id === subject.id}"><span>${uiSprite(s.sprite)}</span>${tr(s.id === "mine" || s.id === "library" ? `nav.${s.id}` : `subject.${s.id}`)}</button>`).join("");
+    const subjects = this.subjects.map((s) => `<button data-subject="${s.id}" aria-pressed="${s.id === subject.id}"><span>${uiSprite(s.sprite)}</span>${tr((s.id === "all" ? "filter.all" : `subject.${s.id}`) as MessageKey)}</button>`).join("");
     this.root.innerHTML = `<header class="chamber-head">
         <button class="chamber-up" data-up title="${c.up}"><span aria-hidden="true">⤒</span> ${tr(smithy ? "nav.mine" : "nav.library")}</button>
         <div class="chamber-title"><h2>${tr(smithy ? "chamber.smithy" : "chamber.study")}</h2><small>${c.blurb}</small></div>
@@ -142,7 +149,7 @@ export class Ledger {
       ${job ? this.researchHtml() : `<div class="ledger-strip ledger-subjects" role="group" aria-label="Subjects">${subjects}</div>
       <section class="chamber-list ledger-half ${smithy ? "ledger-forge" : "ledger-study"}" aria-label="${topic.name}">${smithy ? `<canvas class="training-particles" aria-hidden="true"></canvas>` : ""}
         ${this.galleryHtml(subject)}
-        ${smithy ? `<p class="ledger-scope">GLOBAL EQUIPMENT · ${topic.item ? `Every ${topic.name}, owned now or bought later` : topic.name}</p>${this.forgeHtml(topic)}` : `<p class="ledger-scope">SHARED RESEARCH · ${topic.name}</p>${this.studyHtml(topic)}`}</section>`}`;
+        ${this.openTile && this.copyKey !== null ? (smithy ? this.forgeHtml(topic) : this.studyHtml(topic)) : ""}</section>`}`;
     const root = this.root;
     root.classList.toggle("researching", !!job);
     if (!smithy) {
@@ -153,11 +160,22 @@ export class Ledger {
       const research = relevant ? `${job.kind}:${job.id}:${job.rank}` : "";
       if (research && this.circleResearch !== null && research !== this.circleResearch) this.circle.energize();
       this.circleResearch = research;
-      this.circle.attach(root.querySelector<HTMLElement>(".research-orbit") ?? root.querySelector<HTMLElement>("[data-banner-tree], [data-bomb-tree]") ?? root);
+      this.circle.attach(root.querySelector<HTMLElement>(".research-orbit") ?? root.querySelector<HTMLElement>("[data-banner-tree], [data-bomb-tree], [data-economy-tree]") ?? root);
       root.classList.add("has-magic-circle");
     }
     root.querySelectorAll<HTMLButtonElement>("[data-ledger-stack]").forEach(b => b.onclick = () => {
-      this.topics[this.subject] = b.dataset.ledgerStack!;
+      const id = b.dataset.ledgerStack as TileId;
+      this.openTile = this.openTile === id ? null : id; this.copyKey = null;
+      const topic = this.current().topics.find(t => id === 'keep' ? t.id === 'keep' : (topicItems(t).includes(id as never) || t.icon === id || (id === 'bomb' && t.id === 'battle') || (id === 'warBanner' && t.id === 'warBanner')));
+      if (topic) this.topics[this.subject] = topic.id;
+      this.render();
+    });
+    root.querySelectorAll<HTMLButtonElement>('[data-ledger-copy]').forEach(b=>b.onclick=()=>{
+      this.copyKey=b.dataset.ledgerCopy!;
+      if(this.kind==='study' && this.openTile && !['mine','library'].includes(this.openTile)) {
+        const target=tileTree(this.save,this.openTile,this.copyKey);
+        if(target) { this.ctx.openTree(target); return; }
+      }
       this.render();
     });
     if (!this.holding) {
@@ -181,6 +199,7 @@ export class Ledger {
     root.querySelector<HTMLButtonElement>("[data-up]")!.onclick = () => this.up();
     root.querySelectorAll<HTMLButtonElement>("[data-subject]").forEach((b) => (b.onclick = () => {
       this.subject = b.dataset.subject as SubjectId;
+      this.openTile = null; this.copyKey = null;
       this.render();
     }));
     root.querySelectorAll<HTMLButtonElement>("[data-topic]").forEach((b) => (b.onclick = () => {
@@ -213,15 +232,15 @@ export class Ledger {
   }
 
   private galleryHtml(subject: Subject) {
-    const study = this.kind === "study", current = this.topic();
-    const stacks = subject.topics.map(t => {
-      const count = this.owned(t), type = t.item ? TILE_TYPE[t.item] : "consumables", on = t.id === current.id;
-      const layers = count > 2 ? "layers-2" : count > 1 ? "layers-1" : "";
-      const sub = study ? t.id === "warBanner" || t.id === "battle" ? "Knowledge tree" : pathsOf(t.id).length ? "Spell paths" : "Shared research" : "Upgrades all";
-      return `<button class="tile type-${type} ${layers} ${on ? "open" : ""}" data-key="${t.id}" data-ledger-stack="${t.id}" aria-pressed="${on}" aria-label="${t.name}${t.item ? `, ${count} owned` : ""}">
-        <span class="tile-face">${t.item ?? t.icon ? `<canvas width="48" height="48" data-icon="${t.item ?? t.icon}"></canvas>` : uiSprite(subject.sprite)}</span><span class="tile-name">${t.name}</span>${t.item ? `<b class="tile-count">×${count}</b>` : ""}<small class="tile-sub">${sub}</small></button>`;
-    }).join("");
-    return `<div class="ledger-collection"><p class="ledger-note">${study ? "Research the shared skills and the strike spells' paths. Each building is upgraded on its own: tap it in Defend while building." : "Select a type. Smithy equipment improves every building of that type."}</p><div class="tiles-grid ledger-tiles">${stacks}</div></div>`;
+    const ids = new Set(subject.topics.flatMap(t=>topicItems(t)));
+    const stacks = tileStacks(this.save,'all').filter(s=>subject.id==='all'||(s.id==='keep'?subject.id==='realm':ids.has(s.id as never)||subject.id==='spells'&&s.type==='consumables'));
+    return `<div class="ledger-collection"><p class="ledger-note">Choose a tile, then choose the individual copy to upgrade.</p><div class="tiles-grid ledger-tiles">${stacks.map(stack=>{
+      const id=stack.id, open=this.openTile===id;
+      const button=`<button class="tile type-${stack.type} ${open?'open':''}" data-ledger-stack="${id}" aria-expanded="${open}" aria-label="${TILE_NAMES[id]}, ${stack.count} owned"><span class="tile-face"><canvas width="48" height="48" data-icon="${id==='warBanner'?'banner':id}"></canvas></span><span class="tile-name">${TILE_NAMES[id]}</span><b class="tile-count">×${stack.count}</b></button>`;
+      if(!open)return button;
+      const copies=tileCopies(this.save,stack).map(c=>`<button class="tile type-${stack.type}" data-ledger-copy="${c.key}" aria-pressed="${this.copyKey===c.key}"><span class="tile-face"><canvas width="48" height="48" data-icon="${id==='warBanner'?'banner':id}"></canvas></span><span class="tile-name">${TILE_NAMES[id]} ${c.index+1}</span><small>${c.placed?'Placed':'In collection'}</small></button>`).join('');
+      return `${button}<div class="ledger-copies tiles-detail" role="group" aria-label="${TILE_NAMES[id]} copies"><div class="tiles-grid">${copies}</div></div>`;
+    }).join('')}</div></div>`;
   }
 
   // ── The Smithy ──────────────────────────────────────────────────────────
@@ -234,7 +253,7 @@ export class Ledger {
   private walletHtml() {
     const s = this.save, w = this.wallet(), smiths = this.ctx.smiths(), free = this.freeSmiths();
     const job = s.forgeJob;
-    const name = job ? job.kind === "speed" ? "War drums" : UPGRADES.find(u => u.id === job.id)!.name : "";
+    const name = job ? job.kind === "speed" ? "War drums" : job.kind === "equipment" ? `Individual ${job.id === "hp" ? "armour" : "power"}` : UPGRADES.find(u => u.id === job.id)!.name : "";
     return `<p class="ledger-note chamber-wallet">${METALS.map((k) => `<span class="cost-metal">${metalIcon(k)}<b class="metal-${k}">${bal(s, w[k])}</b> ${k}</span>`).join(" · ")}
       <span>· smiths <b id="training-slots">${smiths.length - free.length} / ${smiths.length}</b> busy</span><small> · a point of a metal from every ${BARS_PER_POINT} bars</small></p>
       ${job ? `<div class="research-project"><div><b>${name}</b><small data-forge-timer>${this.forgeTimeLeft()}</small></div><div class="smith-count"><button data-less-forge aria-label="One smith fewer on Forge project" ${job.smiths.length <= 1 ? "disabled" : ""}>−</button><b>${job.smiths.length} smiths</b><button data-more-forge aria-label="One more smith on Forge project" ${free.length ? "" : "disabled"}>+</button></div><button data-cancel-forge>Cancel<small>Refund ${costHtml(job.paid) || "0 metal"}</small></button></div>` : ""}`;
@@ -246,6 +265,7 @@ export class Ledger {
   }
 
   private forgeHtml(t: Topic) {
+    if (t.item && ['towers','units'].includes(TILE_TYPE[t.item])) return this.equipmentHtml(t.item as PlacedKind);
     const d = this.save.defend, w = this.wallet();
     const busy = !!this.save.forgeJob, staffed = this.freeSmiths().length > 0;
     const extras = t.extras?.includes("speed3")
@@ -264,6 +284,19 @@ export class Ledger {
     return body || `<p class="ledger-empty">Nothing to forge here.</p>`;
   }
 
+  private selectedEquipment(kind: PlacedKind) {
+    const stack=tileStacks(this.save,'all').find(s=>s.id===kind)!;
+    const copy=tileCopies(this.save,stack).find(c=>c.key===this.copyKey);
+    return copy ? equipmentCopy(this.save,kind,copy.index) : null;
+  }
+  private equipmentHtml(kind: PlacedKind) {
+    const gear=this.selectedEquipment(kind);if(!gear)return '';
+    return `<p class="ledger-scope">${TILE_NAMES[kind]} · individual equipment</p>${(['hp','power'] as const).map(id=>{
+      const rank=gear[id],price={copper:1+5*rank*rank};
+      return `<article class="card defend-card ledger-card"><div><h3>${id==='hp'?'Armour & vitality':'Weapons & power'}</h3><p>+5% ${id==='hp'?'building and trained troop health':'damage'} per rank, for this copy only.</p><b>Rank ${rank}/50 · +${rank*5}%</b></div><button data-gear="${id}" ${rank>=50||this.save.forgeJob||!this.freeSmiths().length||!canAfford(this.wallet(),price)?'disabled':''}>Forge<small>${costHtml(price)}</small><small>One smith: ${formatDuration(forgeSeconds(rank,price)*1000)}</small></button></article>`;
+    }).join('')}`;
+  }
+
   private bindForge(root: HTMLElement) {
     const s = this.save;
     /** A purchase rings like coins and stamps its card once the page is redrawn. */
@@ -276,6 +309,10 @@ export class Ledger {
       replay(bought, "bought");
       sparksOver(bought?.querySelector("button") ?? null, "gold");
     };
+    root.querySelectorAll<HTMLButtonElement>('[data-gear]').forEach(b=>b.onclick=()=>{
+      const gear=this.selectedEquipment(this.openTile as PlacedKind);if(!gear)return;
+      commit({kind:'equipment',id:b.dataset.gear as 'hp'|'power',equipment:gear.id},`[data-gear="${b.dataset.gear}"]`);
+    });
     root.querySelectorAll<HTMLButtonElement>("[data-upgrade]").forEach((b) => (b.onclick = () => commit({ kind: "upgrade", id: b.dataset.upgrade as UpgradeId }, `[data-upgrade="${b.dataset.upgrade}"]`)));
     root.querySelector<HTMLButtonElement>("[data-buy-speed3]")?.addEventListener("click", () => commit({ kind: "speed", id: "speed3" }, "[data-buy-speed3]"));
     root.querySelector<HTMLButtonElement>("[data-more-forge]")?.addEventListener("click", () => {
@@ -478,6 +515,10 @@ export class Ledger {
         : `<article class="ledger-skill ${learned ? "owned" : "locked"}"><span class="ledger-glyph" aria-hidden="true">${SKILLS.gunpowder.icon}</span><div><small>RANK ${ROMAN[rank]}</small><h3>Gunpowder ${ROMAN[rank]}</h3><p>+${SKILLS.gunpowder.effect.per}% bomb damage this rank; +${SKILLS.gunpowder.effect.per * (rank + 1)}% from Gunpowder in total.</p></div><button disabled>${learned ? "Researched" : "Learn the previous rank first"}</button></article>`;
       return `<div class="banner-research"><h3>Bomb · Knowledge tree</h3><p class="ledger-note">Research Gunpowder I, II and III in order. Each rank adds 20% bomb damage. Select a node to inspect or research it.</p><div data-bomb-tree></div><div class="banner-tree-detail" aria-live="polite">${detail}</div></div>`;
     }
+    if(t.id==='mine'||t.id==='library'){
+      const picked=(this.picked[t.id]??t.skills![0]) as SkillId;
+      return `<div class="banner-research"><h3>${t.name} · Knowledge tree</h3><div data-economy-tree></div><div class="banner-tree-detail">${skillCard(picked)}</div></div>`;
+    }
     const skills = (t.skills ?? []).map(id => skillCard(id));
     const tree = isSpell(t.id) && pathsOf(t.id).length ? this.spellSetupHtml(t.id) + this.treeHtml(t) : "";
     if (!skills.length && !tree) return `<p class="ledger-empty">Nothing to study here yet.</p>`;
@@ -487,7 +528,7 @@ export class Ledger {
   /** Reattach the same living graph on selection/purchase; stop it during
    * research or when leaving this topic. */
   private renderSkillTree(topic: Topic) {
-    const host = this.root.querySelector<HTMLElement>("[data-banner-tree], [data-bomb-tree]");
+    const host = this.root.querySelector<HTMLElement>("[data-banner-tree], [data-bomb-tree], [data-economy-tree]");
     if (!host || this.skillGraphTopic !== topic.id) { this.skillGraph?.destroy(); this.skillGraph = null; }
     if (!host) return;
     this.skillGraphTopic = topic.id;
@@ -510,7 +551,12 @@ export class Ledger {
     this.skillGraph.el.setAttribute("role", "group");
     this.skillGraph.el.setAttribute("aria-label", `${topic.name} Knowledge tree`);
     host.append(this.skillGraph.el);
-    this.skillGraph.set(bomb ? bombTree(this.save) : bannerTree(this.save), this.picked[topic.id] ?? (bomb ? `gunpowder:${Math.min(skillRank(this.save, "gunpowder"), 2)}` : "warBanner"));
+    const economy=topic.id==='mine'||topic.id==='library';
+    const economyNodes=(topic.skills??[]).map(id=>{
+      const skill=SKILLS[id],p=skillPurchase(this.save,id),parent=TREE_OF[id].nodes.find(n=>n.id===id)?.requires[0];
+      return {id,...(parent?{parent}:{}),state:p.level?'owned' as const:p.available?'next' as const:'locked' as const,face:`<span class="banner-node-glyph">${skill.icon}</span>`,tag:`${p.level}/${skill.max}`};
+    });
+    this.skillGraph.set(economy ? economyNodes : bomb ? bombTree(this.save) : bannerTree(this.save), this.picked[topic.id] ?? (economy ? topic.skills![0] : bomb ? `gunpowder:${Math.min(skillRank(this.save, "gunpowder"), 2)}` : "warBanner"));
   }
 
   /** A strike spell is never placed: it casts with one researched path (or

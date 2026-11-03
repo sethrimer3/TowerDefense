@@ -1,3 +1,5 @@
+import { syncEquipment } from "./equipment.ts";
+import { realmActive, realmPower } from "./realm.ts";
 import { DayClock, useDayClock, sunSpeed } from "./daylight.ts";
 import { ProfileEditor } from "./profile/editor.ts";
 import { loadArtOverrides } from "./defend/art-overrides.ts";
@@ -43,6 +45,7 @@ import { installScrollArrows } from "./ui/scroll-arrows.ts";
 // navigation, the currency bar and the frame loop between the pages.
 
 let save: Save = load();
+let equipmentLayout = save.defend.layout;
 setLanguage(save.settings.language);
 fitViewport();
 setLegacyWalls(save.settings.legacyWalls);
@@ -74,8 +77,8 @@ const ctx: AppContext = {
   renderPage,
   navigate,
   clock,
-  smiths: () => smithNames(),
-  researchers: () => libraryPage.sim.count("researcher"),
+  smiths: () => realmActive(save,"mine") ? smithNames() : [],
+  researchers: () => realmActive(save,"library") ? libraryPage.sim.count("researcher") : 0,
   researched: () => libraryPage.sim.researched(),
   openChamber,
   openTree: (target) => {
@@ -119,6 +122,7 @@ const study = new Ledger(ctx, studyRoom.content, "study", () => libraryDown.go(f
 const mineDown = new Descent(el("mine"), "mine", reduced), libraryDown = new Descent(el("library"), "library", reduced);
 /** Goes to the Mine's Smithy or the Library's Study, open at a topic. */
 function openChamber(where: "smithy" | "study", topic?: string) {
+  if(!realmActive(save,where==="smithy"?"mine":"library")){navigate("tiles");return;}
   const ledger = where === "smithy" ? smithy : study;
   if (topic) ledger.focus(topic);
   navigate(where === "smithy" ? "mine" : "library");
@@ -170,6 +174,7 @@ const ambushPage = new AmbushPage(el("ambush"), { save: () => save, store });
 const siegePage = new SiegePage(el("siege"), { save: () => save, store, editProfile: () => chooseProfile() });
 
 const minePage = new MinePage(el("mine-world"), {
+  active:()=>realmActive(save,"mine"), efficiency:()=>realmPower(save,"minerEfficiency"), power:()=>realmPower(save,"minerPower"),
   metals: () => save.smithy,
   free: () => save.settings.devMode,
   spendMetals: (price) => {
@@ -192,6 +197,7 @@ const minePage = new MinePage(el("mine-world"), {
   descend: () => openChamber("smithy"),
 });
 const libraryPage = new LibraryPage(el("library-world"), {
+  active:()=>realmActive(save,"library"), efficiency:()=>realmPower(save,"librarianEfficiency"), power:()=>realmPower(save,"librarianPower"),
   metals: () => save.smithy,
   free: () => save.settings.devMode,
   spendMetals: (price) => {
@@ -267,6 +273,7 @@ document.addEventListener("click", (e) => {
 });
 
 function store() {
+  if(equipmentLayout!==save.defend.layout){syncEquipment(save.equipment,save.defend.layout,equipmentLayout);equipmentLayout=save.defend.layout;}
   save.dayClock = dayClock.elapsed;
   save.mine = minePage.snapshot(clock());
   save.library = libraryPage.snapshot(clock());
@@ -313,6 +320,11 @@ function update() {
   store();
   refreshCurrencies();
   combatTab.render(combatMode, tab === "defend");
+  for (const id of ['mine','library'] as const) {
+    const button=document.querySelector<HTMLButtonElement>(`nav [data-tab="${id}"]`)!;
+    const unlocked=realmActive(save,id);button.disabled=!unlocked;
+    button.title=unlocked?'':`Place the ${id==='mine'?'Mine':'Library'} tile in your city to unlock this tab.`;
+  }
   if (shownLegacyGraphics !== save.settings.legacyGraphics) {
     shownLegacyGraphics = save.settings.legacyGraphics;
     const icon = document.querySelector<HTMLElement>('nav [data-tab="settings"] > span')!;
@@ -335,6 +347,7 @@ function renderPage() {
 const signTab = (id: Tab) => id === "mine" || id === "library" || id === "tiles";
 const essenceGlob = new EssenceGlob(document.querySelector<HTMLCanvasElement>('canvas[data-currency-icon="essence"]'));
 function navigate(id: Tab) {
+  if ((id === "mine" || id === "library") && !realmActive(save,id)) { id="tiles"; }
   if (id !== "defend" || combatMode !== "defend") defendPage.pause();
   ambushPage.pause();
   siegePage.pause();
@@ -405,11 +418,11 @@ function frame(time: number) {
   hear(save.settings.ambienceOff ? QUIET : tab === "defend" ? defendPage.ambience() : tab === "mine" ? minePage.ambience() : tab === "library" ? libraryPage.ambience() : QUIET);
   if (time - lastTick >= 1000) {
     lastTick = time;
-    const smiths = new Set(smithNames());
+    const smiths = new Set(realmActive(save,"mine") ? smithNames() : []);
     const trained = settleTraining(save, clock(), smiths) > 0;
     const forged = settleForge(save, clock(), smiths);
     const done = trained || forged;
-    const researched = settleResearch(save, clock(), libraryPage.sim.count("researcher"));
+    const researched = settleResearch(save, clock(), realmActive(save,"library") ? libraryPage.sim.count("researcher") : 0);
     if (researched) libraryPage.sim.researched();
     if (done || researched) {
       update();
@@ -462,9 +475,9 @@ window.addEventListener("pageshow", () => dayClock.reset());
   minePage.fastForward(minutes);
 };
 
-settleTraining(save, clock(), new Set(smithNames()));
-settleForge(save, clock(), new Set(smithNames()));
-if (settleResearch(save, clock(), libraryPage.sim.count("researcher"))) libraryPage.sim.researched();
+settleTraining(save, clock(), new Set(realmActive(save,"mine") ? smithNames() : []));
+settleForge(save, clock(), new Set(realmActive(save,"mine") ? smithNames() : []));
+if (settleResearch(save, clock(), realmActive(save,"library") ? libraryPage.sim.count("researcher") : 0)) libraryPage.sim.researched();
 navigate("defend");
 /** Called after boot uncovers the initialized game; native dialogs must open
  * here so they cannot appear above the loading screen's stone wall. */

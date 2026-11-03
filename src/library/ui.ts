@@ -28,6 +28,9 @@ export interface LibraryAway {
 }
 
 export interface LibraryHost extends MetalHost {
+  active?(): boolean;
+  efficiency?(): number;
+  power?(): number;
   effects(): boolean;
   /** A fresh seed for a new library. */
   newSeed(): number;
@@ -95,20 +98,23 @@ export class LibraryPage {
     this.awayKnowledge = 0;
     this.away = null;
     this.burning = this.sim.fire.active;
-    if (saved) this.addAway(Math.min(MAX_AWAY_MS, Math.max(0, now - saved.savedAt) + (saved.idleMs ?? 0)));
+    if (saved && this.host.active?.() !== false) this.addAway(Math.min(MAX_AWAY_MS, Math.max(0, now - saved.savedAt) + (saved.idleMs ?? 0)));
     this.day = now - this.owed;
   }
   snapshot(now: number): LibrarySave {
-    return { ...this.sim.save(now), idleMs: Math.min(MAX_AWAY_MS, this.owed + Math.max(0, now - this.ranTo)) };
+    return { ...this.sim.save(now), idleMs: this.host.active?.() === false ? 0 : Math.min(MAX_AWAY_MS, this.owed + Math.max(0, now - this.ranTo)) };
   }
   get owedMs() { return this.owed; }
 
   /** Spend queued time in ordinary simulation steps, within a frame budget.
    * Knowledge is paid for those steps only, at the rate they actually had. */
   advance(now: number, keepWith = 0) {
+    if (this.host.active?.() === false) { this.ranTo=now; this.owed=0; return; }
     const gap = Math.max(0, now - this.ranTo);
     this.ranTo = now;
     this.owed = Math.min(MAX_AWAY_MS, this.owed + gap);
+    this.sim.knowledgePower=this.host.power?.() ?? 1;
+    this.sim.workEfficiency=this.host.efficiency?.() ?? 1;
     const up = this.host.upgrades();
     this.sim.fireproof = up.fireproof;
     this.sim.fireTraining = up.fireTraining;

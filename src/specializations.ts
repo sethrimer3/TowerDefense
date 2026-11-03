@@ -1,3 +1,4 @@
+import { retagEquipment } from "./equipment.ts";
 /** Each building's own upgrades. The shop sells only the basic buildings
  * (`BASIC_BUILDINGS`: the Watch tower, the Melee Guild and the Ranged Guild,
  * besides the city's own pieces); everything else is one of those upgraded,
@@ -209,7 +210,7 @@ export function stepName(s: UpgradeStep): string {
 /** A building that can be upgraded: a structure by uid, a row of wall
  * spikes by its spot (rows have no uid; their spot moves with them), or a
  * copy still in the palette by its kind and the path it keeps, if any. */
-export type SpecialtyTarget = { uid: number } | { spikes: GateSpot } | { copy: PaletteKind; wear?: Wear };
+export type SpecialtyTarget = { uid: number } | { spikes: GateSpot } | { copy: PaletteKind; wear?: Wear; equipment?: number };
 /** A kind with an upgrade tree, as the palette holds it. */
 export type PaletteKind = PlacedKind | "wallSpikes";
 
@@ -316,6 +317,8 @@ export function upgradeBuilding(save: Save, target: SpecialtyTarget, asked: Upgr
   d.owned[step.to]++;
   d.layout = standing(next, s.uid, kind as PlacedKind);
   const waiting = !d.layout.structures.some((o) => o.uid === s.uid);
+  const gear=save.equipment?.find(g=>g.uid===s.uid);
+  if(gear){gear.kind=step.to;if(waiting){delete gear.uid;retagEquipment(save,gear.id,step.to);}}
   recordFound(d);
   return { ok: true, kind: step.to, waiting };
 }
@@ -324,7 +327,7 @@ export function upgradeBuilding(save: Save, target: SpecialtyTarget, asked: Upgr
  * (a kept copy), a change of kind makes it a copy of the new kind (kept on
  * its branch's first rank for a branch). `copy` in the result names the
  * copy it became. */
-function upgradeCopy(save: Save, target: { copy: PaletteKind; wear?: Wear }, asked: UpgradeStep): UpgradeResult {
+function upgradeCopy(save: Save, target: { copy: PaletteKind; wear?: Wear; equipment?: number }, asked: UpgradeStep): UpgradeResult {
   const d = save.defend, kind = target.copy;
   if (!copyWaits(d, kind, target.wear)) return { ok: false, reason: "That copy is no longer in the palette." };
   const step = nextSteps(kind, target.wear).find((s) => sameStep(s, asked));
@@ -342,7 +345,8 @@ function upgradeCopy(save: Save, target: { copy: PaletteKind; wear?: Wear }, ask
   if (step.type === "path") {
     d.kept.push({ kind, path: step.path, rank: step.rank });
     recordFound(d);
-    return { ok: true, kind, copy: { copy: kind, wear: { path: step.path, rank: step.rank } } };
+    retagEquipment(save,target.equipment,kind as PlacedKind,d.kept.filter(k=>k.kind===kind).length-1,{path:step.path,rank:step.rank});
+    return { ok: true, kind, copy: { copy: kind, wear: { path: step.path, rank: step.rank }, ...(target.equipment?{equipment:target.equipment}:{}) } };
   }
   const layout = cloneLayout(d.layout);
   consume(d, layout, partners);
@@ -350,7 +354,8 @@ function upgradeCopy(save: Save, target: { copy: PaletteKind; wear?: Wear }, ask
   d.owned[kind as PlacedKind]--;
   d.owned[step.to]++;
   recordFound(d);
-  return { ok: true, kind: step.to, copy: { copy: step.to } };
+  retagEquipment(save,target.equipment,step.to);
+  return { ok: true, kind: step.to, copy: { copy: step.to, ...(target.equipment?{equipment:target.equipment}:{}) } };
 }
 
 /** Takes one kept copy of `kind` wearing `wear` off the list (none when plain). */
@@ -480,7 +485,8 @@ function rewind(save: Save, target: SpecialtyTarget, kind: PaletteKind, wear: We
     unkeep(d, kind, wear);
     shift();
     if (to.wear) d.kept.push({ kind: to.kind, path: to.wear.path, rank: to.wear.rank });
-    return { ok: true, kind: to.kind, copy: { copy: to.kind, ...(to.wear ? { wear: to.wear } : {}) } };
+    retagEquipment(save,target.equipment,to.kind as PlacedKind,to.wear?d.kept.filter(k=>k.kind===to.kind).length-1:undefined,to.wear);
+    return { ok: true, kind: to.kind, copy: { copy: to.kind, ...(to.wear ? { wear: to.wear } : {}), ...(target.equipment?{equipment:target.equipment}:{}) } };
   }
   const next = cloneLayout(d.layout), p = placementOf(next, target)!;
   if (to.wear) {

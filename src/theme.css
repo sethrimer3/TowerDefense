@@ -2306,3 +2306,9 @@ button:disabled .metal-icon { filter: saturate(.4) brightness(.8); }
   pointer-events: none;
 }
 .siege-level[hidden] { display: none; }
+
+/* Collections in the workshops unfold copies across the full shelf. */
+.ledger-copies {grid-column:1/-1; padding:12px; border:1px solid var(--brass-nails);}
+.ledger-copies .tiles-grid {display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:12px;}
+[data-economy-tree] {height:360px;position:relative;}
+nav button:disabled {opacity:.45;}

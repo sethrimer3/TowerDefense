@@ -1,7 +1,7 @@
 {
   "kind": "native-crossover-search",
   "raidSeconds": 120,
-  "inputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984",
+  "inputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64",
   "split": "training",
   "floor": 10,
   "ceiling": 2762799.9257329265,
@@ -34,10 +34,10 @@
     },
     {
       "mmr": 1360,
-      "low": 245319.459712,
-      "target": 183989.59478400002,
-      "status": "no-losing-castle-found",
-      "unfillable": 981277.838848
+      "low": 145867.823469,
+      "high": 173467.053519,
+      "target": 159069.98943985967,
+      "status": "bracketed"
     },
     {
       "mmr": 1760,
@@ -62,16 +62,16 @@
     },
     {
       "mmr": 2400,
-      "low": 54822.741732,
-      "high": 65195.594532,
-      "target": 59784.623784816344,
+      "low": 65195.594532,
+      "high": 77531.064884,
+      "target": 71096.29997272325,
       "status": "bracketed"
     },
     {
       "mmr": 2560,
-      "low": 50693.612651,
-      "high": 60285.20485,
-      "target": 55281.77659276235,
+      "low": 120570.409701,
+      "high": 143383.189075,
+      "target": 131482.96410945678,
       "status": "bracketed"
     }
   ],
@@ -90,7 +90,7 @@
       "keepMax": 600,
       "attackUnits": 5,
       "defenseUnits": 6,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 240,
@@ -106,7 +106,7 @@
       "keepMax": 600,
       "attackUnits": 6,
       "defenseUnits": 7,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 240,
@@ -122,7 +122,7 @@
       "keepMax": 600,
       "attackUnits": 6,
       "defenseUnits": 6,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 240,
@@ -138,7 +138,7 @@
       "keepMax": 600,
       "attackUnits": 6,
       "defenseUnits": 6,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 240,
@@ -154,7 +154,7 @@
       "keepMax": 600,
       "attackUnits": 6,
       "defenseUnits": 7,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 240,
@@ -170,7 +170,7 @@
       "keepMax": 600,
       "attackUnits": 6,
       "defenseUnits": 9,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 240,
@@ -186,7 +186,7 @@
       "keepMax": 600,
       "attackUnits": 6,
       "defenseUnits": 10,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 560,
@@ -202,7 +202,7 @@
       "keepMax": 600,
       "attackUnits": 8,
       "defenseUnits": 6,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 560,
@@ -218,7 +218,7 @@
       "keepMax": 600,
       "attackUnits": 6,
       "defenseUnits": 5,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 560,
@@ -234,7 +234,7 @@
       "keepMax": 600,
       "attackUnits": 6,
       "defenseUnits": 6,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 560,
@@ -250,7 +250,7 @@
       "keepMax": 600,
       "attackUnits": 7,
       "defenseUnits": 7,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 560,
@@ -266,7 +266,7 @@
       "keepMax": 600,
       "attackUnits": 6,
       "defenseUnits": 5,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 560,
@@ -282,7 +282,7 @@
       "keepMax": 600,
       "attackUnits": 6,
       "defenseUnits": 5,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 560,
@@ -298,7 +298,7 @@
       "keepMax": 600,
       "attackUnits": 7,
       "defenseUnits": 7,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 560,
@@ -314,7 +314,7 @@
       "keepMax": 600,
       "attackUnits": 6,
       "defenseUnits": 5,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 560,
@@ -330,7 +330,7 @@
       "keepMax": 600,
       "attackUnits": 6,
       "defenseUnits": 5,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 560,
@@ -346,7 +346,7 @@
       "keepMax": 600,
       "attackUnits": 8,
       "defenseUnits": 7,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 560,
@@ -362,7 +362,7 @@
       "keepMax": 600,
       "attackUnits": 5,
       "defenseUnits": 5,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 560,
@@ -378,7 +378,7 @@
       "keepMax": 600,
       "attackUnits": 6,
       "defenseUnits": 5,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 560,
@@ -394,7 +394,7 @@
       "keepMax": 600,
       "attackUnits": 7,
       "defenseUnits": 7,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 560,
@@ -410,23 +410,23 @@
       "keepMax": 600,
       "attackUnits": 6,
       "defenseUnits": 8,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 560,
       "seed": 1,
       "budget": 155.670777,
-      "castleDps": 153.82041073106367,
+      "castleDps": 154.91739221610231,
       "armyBudget": 155.67077653876305,
       "armyDps": 150.72413793103448,
       "homes": 4,
       "phase": "lost",
       "seconds": 120,
-      "keepHp": 461.40008544921875,
+      "keepHp": 600,
       "keepMax": 600,
       "attackUnits": 8,
       "defenseUnits": 11,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 560,
@@ -440,161 +440,65 @@
       "seconds": 120,
       "keepHp": 600,
       "keepMax": 600,
-      "attackUnits": 5,
-      "defenseUnits": 8,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
-    },
-    {
-      "mmr": 1000,
-      "seed": 1,
-      "budget": 187.993247,
-      "castleDps": 187.94503922014326,
-      "armyBudget": 751.9729880107159,
-      "armyDps": 743.6556818181818,
-      "homes": 5,
-      "phase": "won",
-      "seconds": 117.3,
-      "keepHp": 0,
-      "keepMax": 2184,
-      "attackUnits": 15,
-      "defenseUnits": 6,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
-    },
-    {
-      "mmr": 1000,
-      "seed": 2,
-      "budget": 187.993247,
-      "castleDps": 187.96878898599311,
-      "armyBudget": 751.9729880107159,
-      "armyDps": 736.7473431818182,
-      "homes": 5,
-      "phase": "won",
-      "seconds": 98.9,
-      "keepHp": 0,
-      "keepMax": 2184,
-      "attackUnits": 15,
-      "defenseUnits": 6,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
-    },
-    {
-      "mmr": 1000,
-      "seed": 1,
-      "budget": 223.562907,
-      "castleDps": 223.5023295086741,
-      "armyBudget": 751.9729880107159,
-      "armyDps": 743.6556818181818,
-      "homes": 5,
-      "phase": "lost",
-      "seconds": 120,
-      "keepHp": 152.25209045410156,
-      "keepMax": 2184,
-      "attackUnits": 14,
-      "defenseUnits": 13,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
-    },
-    {
-      "mmr": 1000,
-      "seed": 2,
-      "budget": 223.562907,
-      "castleDps": 223.3994848531815,
-      "armyBudget": 751.9729880107159,
-      "armyDps": 736.7473431818182,
-      "homes": 5,
-      "phase": "lost",
-      "seconds": 120,
-      "keepHp": 1105.2677001953125,
-      "keepMax": 2184,
-      "attackUnits": 15,
-      "defenseUnits": 7,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
-    },
-    {
-      "mmr": 1000,
-      "seed": 1,
-      "budget": 265.8626,
-      "castleDps": 265.8064867410945,
-      "armyBudget": 751.9729880107159,
-      "armyDps": 743.6556818181818,
-      "homes": 5,
-      "phase": "lost",
-      "seconds": 120,
-      "keepHp": 1976.3104248046875,
-      "keepMax": 2184,
-      "attackUnits": 14,
-      "defenseUnits": 13,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
-    },
-    {
-      "mmr": 1000,
-      "seed": 2,
-      "budget": 265.8626,
-      "castleDps": 265.8393204324772,
-      "armyBudget": 751.9729880107159,
-      "armyDps": 736.7473431818182,
-      "homes": 5,
-      "phase": "lost",
-      "seconds": 120,
-      "keepHp": 2184,
-      "keepMax": 2184,
-      "attackUnits": 14,
+      "attackUnits": 4,
       "defenseUnits": 11,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 1000,
       "seed": 1,
-      "budget": 375.986494,
-      "castleDps": 375.9863696596574,
+      "budget": 187.993247,
+      "castleDps": 187.99039539384677,
       "armyBudget": 751.9729880107159,
       "armyDps": 743.6556818181818,
       "homes": 5,
       "phase": "lost",
       "seconds": 120,
-      "keepHp": 2184,
-      "keepMax": 2184,
-      "attackUnits": 14,
-      "defenseUnits": 13,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
-    },
-    {
-      "mmr": 1000,
-      "seed": 2,
-      "budget": 375.986494,
-      "castleDps": 375.97391757159085,
-      "armyBudget": 751.9729880107159,
-      "armyDps": 736.7473431818182,
-      "homes": 5,
-      "phase": "lost",
-      "seconds": 120,
-      "keepHp": 2184,
-      "keepMax": 2184,
-      "attackUnits": 13,
-      "defenseUnits": 15,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
-    },
-    {
-      "mmr": 1000,
-      "seed": 1,
-      "budget": 751.972988,
-      "castleDps": 751.9115445880311,
-      "armyBudget": 751.9729880107159,
-      "armyDps": 743.6556818181818,
-      "homes": 5,
-      "phase": "lost",
-      "seconds": 120,
-      "keepHp": 2184,
+      "keepHp": 16.80209732055664,
       "keepMax": 2184,
       "attackUnits": 15,
-      "defenseUnits": 15,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "defenseUnits": 5,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 1000,
       "seed": 2,
-      "budget": 751.972988,
-      "castleDps": 751.8582536106093,
+      "budget": 187.993247,
+      "castleDps": 187.93130373745,
       "armyBudget": 751.9729880107159,
       "armyDps": 736.7473431818182,
+      "homes": 5,
+      "phase": "won",
+      "seconds": 90,
+      "keepHp": 0,
+      "keepMax": 2184,
+      "attackUnits": 15,
+      "defenseUnits": 8,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 1000,
+      "seed": 3,
+      "budget": 187.993247,
+      "castleDps": 187.93130092764872,
+      "armyBudget": 751.9729880107159,
+      "armyDps": 736.7473431818182,
+      "homes": 5,
+      "phase": "won",
+      "seconds": 92.53,
+      "keepHp": 0,
+      "keepMax": 2184,
+      "attackUnits": 15,
+      "defenseUnits": 10,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 1000,
+      "seed": 1,
+      "budget": 223.562907,
+      "castleDps": 223.5392512584013,
+      "armyBudget": 751.9729880107159,
+      "armyDps": 743.6556818181818,
       "homes": 5,
       "phase": "lost",
       "seconds": 120,
@@ -602,13 +506,125 @@
       "keepMax": 2184,
       "attackUnits": 15,
       "defenseUnits": 14,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 1000,
+      "seed": 2,
+      "budget": 223.562907,
+      "castleDps": 223.47448344828084,
+      "armyBudget": 751.9729880107159,
+      "armyDps": 736.7473431818182,
+      "homes": 5,
+      "phase": "lost",
+      "seconds": 120,
+      "keepHp": 1783.36376953125,
+      "keepMax": 2184,
+      "attackUnits": 15,
+      "defenseUnits": 8,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 1000,
+      "seed": 1,
+      "budget": 265.8626,
+      "castleDps": 265.60658749920213,
+      "armyBudget": 751.9729880107159,
+      "armyDps": 743.6556818181818,
+      "homes": 5,
+      "phase": "lost",
+      "seconds": 120,
+      "keepHp": 2184,
+      "keepMax": 2184,
+      "attackUnits": 15,
+      "defenseUnits": 14,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 1000,
+      "seed": 2,
+      "budget": 265.8626,
+      "castleDps": 265.8516107210081,
+      "armyBudget": 751.9729880107159,
+      "armyDps": 736.7473431818182,
+      "homes": 5,
+      "phase": "lost",
+      "seconds": 120,
+      "keepHp": 2184,
+      "keepMax": 2184,
+      "attackUnits": 15,
+      "defenseUnits": 15,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 1000,
+      "seed": 1,
+      "budget": 375.986494,
+      "castleDps": 375.95749601049636,
+      "armyBudget": 751.9729880107159,
+      "armyDps": 743.6556818181818,
+      "homes": 5,
+      "phase": "lost",
+      "seconds": 120,
+      "keepHp": 2184,
+      "keepMax": 2184,
+      "attackUnits": 14,
+      "defenseUnits": 15,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 1000,
+      "seed": 2,
+      "budget": 375.986494,
+      "castleDps": 375.92445033695356,
+      "armyBudget": 751.9729880107159,
+      "armyDps": 736.7473431818182,
+      "homes": 5,
+      "phase": "lost",
+      "seconds": 120,
+      "keepHp": 2184,
+      "keepMax": 2184,
+      "attackUnits": 12,
+      "defenseUnits": 15,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 1000,
+      "seed": 1,
+      "budget": 751.972988,
+      "castleDps": 750.0567879073342,
+      "armyBudget": 751.9729880107159,
+      "armyDps": 743.6556818181818,
+      "homes": 5,
+      "phase": "lost",
+      "seconds": 120,
+      "keepHp": 2184,
+      "keepMax": 2184,
+      "attackUnits": 12,
+      "defenseUnits": 15,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 1000,
+      "seed": 2,
+      "budget": 751.972988,
+      "castleDps": 751.8135648879413,
+      "armyBudget": 751.9729880107159,
+      "armyDps": 736.7473431818182,
+      "homes": 5,
+      "phase": "lost",
+      "seconds": 120,
+      "keepHp": 2184,
+      "keepMax": 2184,
+      "attackUnits": 14,
+      "defenseUnits": 14,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 1360,
       "seed": 1,
       "budget": 3833.116558,
-      "castleDps": 3832.287757984268,
+      "castleDps": 3833.019833469146,
       "armyBudget": 3833.1165575355803,
       "armyDps": 3824.0118883696096,
       "homes": 7,
@@ -616,47 +632,47 @@
       "seconds": 120,
       "keepHp": 3630.89990234375,
       "keepMax": 3630.89990234375,
-      "attackUnits": 27,
-      "defenseUnits": 22,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "attackUnits": 26,
+      "defenseUnits": 19,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 1360,
       "seed": 2,
       "budget": 3833.116558,
-      "castleDps": 3832.6717069658,
+      "castleDps": 3832.9761256989227,
       "armyBudget": 3833.1165575355803,
       "armyDps": 3806.458033304923,
       "homes": 6,
       "phase": "won",
-      "seconds": 60.83,
+      "seconds": 62.3,
       "keepHp": 0,
       "keepMax": 3630.89990234375,
-      "attackUnits": 23,
-      "defenseUnits": 8,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "attackUnits": 24,
+      "defenseUnits": 13,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 1360,
       "seed": 3,
       "budget": 3833.116558,
-      "castleDps": 3833.0125686742185,
+      "castleDps": 3803.5359551859246,
       "armyBudget": 3833.1165575355803,
       "armyDps": 3806.458033304923,
       "homes": 6,
       "phase": "won",
-      "seconds": 61.47,
+      "seconds": 61.93,
       "keepHp": 0,
       "keepMax": 3630.89990234375,
       "attackUnits": 24,
-      "defenseUnits": 7,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "defenseUnits": 3,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 1360,
       "seed": 1,
       "budget": 15332.466232,
-      "castleDps": 15288.079362691256,
+      "castleDps": 15331.193789813817,
       "armyBudget": 3833.1165575355803,
       "armyDps": 3824.0118883696096,
       "homes": 7,
@@ -666,260 +682,381 @@
       "keepMax": 3630.89990234375,
       "attackUnits": 28,
       "defenseUnits": 23,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 1360,
       "seed": 2,
       "budget": 15332.466232,
-      "castleDps": 14801.091350281247,
+      "castleDps": 15329.97451327439,
       "armyBudget": 3833.1165575355803,
       "armyDps": 3806.458033304923,
       "homes": 6,
       "phase": "won",
-      "seconds": 63.03,
+      "seconds": 62,
       "keepHp": 0,
       "keepMax": 3630.89990234375,
       "attackUnits": 24,
-      "defenseUnits": 15,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
-    },
-    {
-      "mmr": 1360,
-      "seed": 3,
-      "budget": 15332.466232,
-      "castleDps": 14913.383016947913,
-      "armyBudget": 3833.1165575355803,
-      "armyDps": 3806.458033304923,
-      "homes": 6,
-      "phase": "won",
-      "seconds": 62.03,
-      "keepHp": 0,
-      "keepMax": 3630.89990234375,
-      "attackUnits": 24,
-      "defenseUnits": 15,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
-    },
-    {
-      "mmr": 1360,
-      "seed": 1,
-      "budget": 61329.864928,
-      "castleDps": 60922.20369625097,
-      "armyBudget": 3833.1165575355803,
-      "armyDps": 3824.0118883696096,
-      "homes": 7,
-      "phase": "lost",
-      "seconds": 120,
-      "keepHp": 3630.89990234375,
-      "keepMax": 3630.89990234375,
-      "attackUnits": 28,
-      "defenseUnits": 35,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
-    },
-    {
-      "mmr": 1360,
-      "seed": 2,
-      "budget": 61329.864928,
-      "castleDps": 60812.47869625096,
-      "armyBudget": 3833.1165575355803,
-      "armyDps": 3806.458033304923,
-      "homes": 6,
-      "phase": "won",
-      "seconds": 61.47,
-      "keepHp": 0,
-      "keepMax": 3630.89990234375,
-      "attackUnits": 24,
-      "defenseUnits": 14,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
-    },
-    {
-      "mmr": 1360,
-      "seed": 3,
-      "budget": 61329.864928,
-      "castleDps": 61239.063129494934,
-      "armyBudget": 3833.1165575355803,
-      "armyDps": 3806.458033304923,
-      "homes": 6,
-      "phase": "won",
-      "seconds": 62.8,
-      "keepHp": 0,
-      "keepMax": 3630.89990234375,
-      "attackUnits": 24,
-      "defenseUnits": 15,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
-    },
-    {
-      "mmr": 1360,
-      "seed": 1,
-      "budget": 245319.459712,
-      "castleDps": 234036.7343681739,
-      "armyBudget": 3833.1165575355803,
-      "armyDps": 3824.0118883696096,
-      "homes": 7,
-      "phase": "lost",
-      "seconds": 120,
-      "keepHp": 3630.89990234375,
-      "keepMax": 3630.89990234375,
-      "attackUnits": 26,
-      "defenseUnits": 87,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
-    },
-    {
-      "mmr": 1360,
-      "seed": 2,
-      "budget": 245319.459712,
-      "castleDps": 243482.81403574586,
-      "armyBudget": 3833.1165575355803,
-      "armyDps": 3806.458033304923,
-      "homes": 6,
-      "phase": "won",
-      "seconds": 66.97,
-      "keepHp": 0,
-      "keepMax": 3630.89990234375,
-      "attackUnits": 24,
-      "defenseUnits": 46,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
-    },
-    {
-      "mmr": 1360,
-      "seed": 3,
-      "budget": 245319.459712,
-      "castleDps": 236714.61204814917,
-      "armyBudget": 3833.1165575355803,
-      "armyDps": 3806.458033304923,
-      "homes": 6,
-      "phase": "won",
-      "seconds": 80.43,
-      "keepHp": 0,
-      "keepMax": 3630.89990234375,
-      "attackUnits": 24,
-      "defenseUnits": 27,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
-    },
-    {
-      "mmr": 1360,
-      "budget": 981277.838848,
-      "seed": 1,
-      "error": "Error: Unfilled budget {\"seed\":3668341704,\"mmr\":1360,\"budget\":981277.838848,\"bestError\":0.793868110706872,\"best\":202272.65484321583}\n    at generateAttempt (/workspace/TowerDefense/src/campaign/castle-generator.ts:303:40)\n    at generateNative (/workspace/TowerDefense/src/campaign/castle-generator.ts:114:14)\n    at calibrateRaid (/workspace/TowerDefense/tools/siege-calibration.ts:54:19)\n    at MessagePort.<anonymous> (/workspace/TowerDefense/tools/siege-calibration-worker.ts:5:36)\n    at [nodejs.internal.kHybridDispatch] (node:internal/event_target:856:20)\n    at MessagePort.<anonymous> (node:internal/per_context/messageport:23:28)",
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
-    },
-    {
-      "mmr": 1760,
-      "seed": 1,
-      "budget": 299.09929,
-      "castleDps": 298.9731274365079,
-      "armyBudget": 19142.35456459427,
-      "armyDps": 18291.20183592802,
-      "homes": 7,
-      "phase": "won",
-      "seconds": 56.03,
-      "keepHp": 0,
-      "keepMax": 4748.10009765625,
-      "attackUnits": 27,
-      "defenseUnits": 14,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
-    },
-    {
-      "mmr": 1760,
-      "seed": 2,
-      "budget": 299.09929,
-      "castleDps": 299.01731019129016,
-      "armyBudget": 19142.35456459427,
-      "armyDps": 19017.50818869558,
-      "homes": 7,
-      "phase": "won",
-      "seconds": 56.93,
-      "keepHp": 0,
-      "keepMax": 4748.10009765625,
-      "attackUnits": 25,
       "defenseUnits": 10,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
-      "mmr": 1760,
-      "seed": 1,
-      "budget": 598.19858,
-      "castleDps": 598.056188052739,
-      "armyBudget": 19142.35456459427,
-      "armyDps": 18291.20183592802,
-      "homes": 7,
+      "mmr": 1360,
+      "seed": 3,
+      "budget": 15332.466232,
+      "castleDps": 15329.97451327439,
+      "armyBudget": 3833.1165575355803,
+      "armyDps": 3806.458033304923,
+      "homes": 6,
       "phase": "won",
-      "seconds": 67.73,
+      "seconds": 105.67,
       "keepHp": 0,
-      "keepMax": 4748.10009765625,
-      "attackUnits": 28,
-      "defenseUnits": 16,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "keepMax": 3630.89990234375,
+      "attackUnits": 24,
+      "defenseUnits": 7,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
-      "mmr": 1760,
+      "mmr": 1360,
+      "seed": 1,
+      "budget": 61329.864928,
+      "castleDps": 60939.73222915188,
+      "armyBudget": 3833.1165575355803,
+      "armyDps": 3824.0118883696096,
+      "homes": 7,
+      "phase": "lost",
+      "seconds": 120,
+      "keepHp": 3630.89990234375,
+      "keepMax": 3630.89990234375,
+      "attackUnits": 24,
+      "defenseUnits": 26,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 1360,
       "seed": 2,
-      "budget": 598.19858,
-      "castleDps": 597.7000715983831,
-      "armyBudget": 19142.35456459427,
-      "armyDps": 19017.50818869558,
-      "homes": 7,
+      "budget": 61329.864928,
+      "castleDps": 59292.99990419356,
+      "armyBudget": 3833.1165575355803,
+      "armyDps": 3806.458033304923,
+      "homes": 6,
       "phase": "won",
-      "seconds": 56.7,
+      "seconds": 62.23,
       "keepHp": 0,
-      "keepMax": 4748.10009765625,
+      "keepMax": 3630.89990234375,
+      "attackUnits": 24,
+      "defenseUnits": 17,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 1360,
+      "seed": 3,
+      "budget": 61329.864928,
+      "castleDps": 59272.583237526895,
+      "armyBudget": 3833.1165575355803,
+      "armyDps": 3806.458033304923,
+      "homes": 6,
+      "phase": "won",
+      "seconds": 62.47,
+      "keepHp": 0,
+      "keepMax": 3630.89990234375,
+      "attackUnits": 24,
+      "defenseUnits": 13,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 1360,
+      "seed": 1,
+      "budget": 122659.729856,
+      "castleDps": 121803.8230830874,
+      "armyBudget": 3833.1165575355803,
+      "armyDps": 3824.0118883696096,
+      "homes": 7,
+      "phase": "lost",
+      "seconds": 120,
+      "keepHp": 3630.89990234375,
+      "keepMax": 3630.89990234375,
+      "attackUnits": 27,
+      "defenseUnits": 48,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 1360,
+      "seed": 2,
+      "budget": 122659.729856,
+      "castleDps": 122406.144764648,
+      "armyBudget": 3833.1165575355803,
+      "armyDps": 3806.458033304923,
+      "homes": 6,
+      "phase": "won",
+      "seconds": 65.17,
+      "keepHp": 0,
+      "keepMax": 3630.89990234375,
+      "attackUnits": 24,
+      "defenseUnits": 24,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 1360,
+      "seed": 3,
+      "budget": 122659.729856,
+      "castleDps": 121305.43651593849,
+      "armyBudget": 3833.1165575355803,
+      "armyDps": 3806.458033304923,
+      "homes": 6,
+      "phase": "won",
+      "seconds": 61.93,
+      "keepHp": 0,
+      "keepMax": 3630.89990234375,
+      "attackUnits": 24,
+      "defenseUnits": 19,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 1360,
+      "seed": 1,
+      "budget": 145867.823469,
+      "castleDps": 143353.43036075955,
+      "armyBudget": 3833.1165575355803,
+      "armyDps": 3824.0118883696096,
+      "homes": 7,
+      "phase": "lost",
+      "seconds": 120,
+      "keepHp": 3630.89990234375,
+      "keepMax": 3630.89990234375,
+      "attackUnits": 27,
+      "defenseUnits": 62,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 1360,
+      "seed": 2,
+      "budget": 145867.823469,
+      "castleDps": 139814.26620091705,
+      "armyBudget": 3833.1165575355803,
+      "armyDps": 3806.458033304923,
+      "homes": 6,
+      "phase": "won",
+      "seconds": 64.17,
+      "keepHp": 0,
+      "keepMax": 3630.89990234375,
+      "attackUnits": 24,
+      "defenseUnits": 30,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 1360,
+      "seed": 3,
+      "budget": 145867.823469,
+      "castleDps": 144662.03266890103,
+      "armyBudget": 3833.1165575355803,
+      "armyDps": 3806.458033304923,
+      "homes": 6,
+      "phase": "won",
+      "seconds": 62.23,
+      "keepHp": 0,
+      "keepMax": 3630.89990234375,
+      "attackUnits": 24,
+      "defenseUnits": 24,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 1360,
+      "seed": 1,
+      "budget": 173467.053519,
+      "castleDps": 167182.51547106815,
+      "armyBudget": 3833.1165575355803,
+      "armyDps": 3824.0118883696096,
+      "homes": 7,
+      "phase": "lost",
+      "seconds": 120,
+      "keepHp": 3630.89990234375,
+      "keepMax": 3630.89990234375,
+      "attackUnits": 18,
+      "defenseUnits": 82,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 1360,
+      "seed": 2,
+      "budget": 173467.053519,
+      "castleDps": 167821.01844335895,
+      "armyBudget": 3833.1165575355803,
+      "armyDps": 3806.458033304923,
+      "homes": 6,
+      "phase": "won",
+      "seconds": 64,
+      "keepHp": 0,
+      "keepMax": 3630.89990234375,
+      "attackUnits": 24,
+      "defenseUnits": 30,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 1360,
+      "seed": 3,
+      "budget": 173467.053519,
+      "castleDps": 165883.88842472294,
+      "armyBudget": 3833.1165575355803,
+      "armyDps": 3806.458033304923,
+      "homes": 6,
+      "phase": "lost",
+      "seconds": 120,
+      "keepHp": 3490.8046875,
+      "keepMax": 3630.89990234375,
+      "attackUnits": 24,
+      "defenseUnits": 30,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 1360,
+      "seed": 1,
+      "budget": 245319.459712,
+      "castleDps": 234711.45809000044,
+      "armyBudget": 3833.1165575355803,
+      "armyDps": 3824.0118883696096,
+      "homes": 7,
+      "phase": "lost",
+      "seconds": 120,
+      "keepHp": 3630.89990234375,
+      "keepMax": 3630.89990234375,
+      "attackUnits": 28,
+      "defenseUnits": 71,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 1360,
+      "seed": 2,
+      "budget": 245319.459712,
+      "castleDps": 236806.6009617644,
+      "armyBudget": 3833.1165575355803,
+      "armyDps": 3806.458033304923,
+      "homes": 6,
+      "phase": "lost",
+      "seconds": 120,
+      "keepHp": 3630.89990234375,
+      "keepMax": 3630.89990234375,
       "attackUnits": 23,
-      "defenseUnits": 5,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "defenseUnits": 75,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 1760,
       "seed": 1,
-      "budget": 845.980545,
-      "castleDps": 845.5514346709253,
+      "budget": 299.09929,
+      "castleDps": 298.94459462606835,
       "armyBudget": 19142.35456459427,
       "armyDps": 18291.20183592802,
       "homes": 7,
       "phase": "won",
-      "seconds": 66.43,
+      "seconds": 53.33,
       "keepHp": 0,
       "keepMax": 4748.10009765625,
       "attackUnits": 28,
       "defenseUnits": 17,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 1760,
+      "seed": 2,
+      "budget": 299.09929,
+      "castleDps": 299.0254826434676,
+      "armyBudget": 19142.35456459427,
+      "armyDps": 19017.50818869558,
+      "homes": 7,
+      "phase": "won",
+      "seconds": 54.47,
+      "keepHp": 0,
+      "keepMax": 4748.10009765625,
+      "attackUnits": 27,
+      "defenseUnits": 14,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 1760,
+      "seed": 1,
+      "budget": 598.19858,
+      "castleDps": 597.4020844728492,
+      "armyBudget": 19142.35456459427,
+      "armyDps": 18291.20183592802,
+      "homes": 7,
+      "phase": "won",
+      "seconds": 57.4,
+      "keepHp": 0,
+      "keepMax": 4748.10009765625,
+      "attackUnits": 26,
+      "defenseUnits": 22,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 1760,
+      "seed": 2,
+      "budget": 598.19858,
+      "castleDps": 598.0816800292557,
+      "armyBudget": 19142.35456459427,
+      "armyDps": 19017.50818869558,
+      "homes": 7,
+      "phase": "won",
+      "seconds": 62.53,
+      "keepHp": 0,
+      "keepMax": 4748.10009765625,
+      "attackUnits": 28,
+      "defenseUnits": 16,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 1760,
+      "seed": 1,
+      "budget": 845.980545,
+      "castleDps": 845.3671540141775,
+      "armyBudget": 19142.35456459427,
+      "armyDps": 18291.20183592802,
+      "homes": 7,
+      "phase": "won",
+      "seconds": 62.67,
+      "keepHp": 0,
+      "keepMax": 4748.10009765625,
+      "attackUnits": 27,
+      "defenseUnits": 22,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 1760,
       "seed": 2,
       "budget": 845.980545,
-      "castleDps": 844.6855158093604,
+      "castleDps": 845.3581376170612,
       "armyBudget": 19142.35456459427,
       "armyDps": 19017.50818869558,
       "homes": 7,
       "phase": "won",
-      "seconds": 66.3,
+      "seconds": 67.7,
       "keepHp": 0,
       "keepMax": 4748.10009765625,
-      "attackUnits": 27,
-      "defenseUnits": 13,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "attackUnits": 28,
+      "defenseUnits": 17,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 1760,
       "seed": 1,
       "budget": 1006.046083,
-      "castleDps": 1005.7770555618976,
+      "castleDps": 1005.2584847422729,
       "armyBudget": 19142.35456459427,
       "armyDps": 18291.20183592802,
       "homes": 7,
-      "phase": "lost",
-      "seconds": 120,
-      "keepHp": 2951.72509765625,
+      "phase": "won",
+      "seconds": 64.4,
+      "keepHp": 0,
       "keepMax": 4748.10009765625,
-      "attackUnits": 26,
-      "defenseUnits": 15,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "attackUnits": 27,
+      "defenseUnits": 10,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 1760,
       "seed": 2,
       "budget": 1006.046083,
-      "castleDps": 1005.6537471851452,
+      "castleDps": 1004.8067947397616,
       "armyBudget": 19142.35456459427,
       "armyDps": 19017.50818869558,
       "homes": 7,
@@ -929,13 +1066,29 @@
       "keepMax": 4748.10009765625,
       "attackUnits": 26,
       "defenseUnits": 27,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 1760,
+      "seed": 3,
+      "budget": 1006.046083,
+      "castleDps": 1005.9362230516356,
+      "armyBudget": 19142.35456459427,
+      "armyDps": 19017.50818869558,
+      "homes": 7,
+      "phase": "lost",
+      "seconds": 120,
+      "keepHp": 3563.4423828125,
+      "keepMax": 4748.10009765625,
+      "attackUnits": 27,
+      "defenseUnits": 11,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 1760,
       "seed": 1,
       "budget": 1196.39716,
-      "castleDps": 1195.5229281868815,
+      "castleDps": 1195.8705412123059,
       "armyBudget": 19142.35456459427,
       "armyDps": 18291.20183592802,
       "homes": 7,
@@ -943,31 +1096,63 @@
       "seconds": 120,
       "keepHp": 4748.10009765625,
       "keepMax": 4748.10009765625,
-      "attackUnits": 27,
-      "defenseUnits": 27,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "attackUnits": 26,
+      "defenseUnits": 26,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 1760,
       "seed": 2,
       "budget": 1196.39716,
-      "castleDps": 1196.1601560717636,
+      "castleDps": 1193.7624244624635,
       "armyBudget": 19142.35456459427,
       "armyDps": 19017.50818869558,
       "homes": 7,
       "phase": "won",
-      "seconds": 63.17,
+      "seconds": 65.77,
       "keepHp": 0,
       "keepMax": 4748.10009765625,
-      "attackUnits": 27,
-      "defenseUnits": 20,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "attackUnits": 28,
+      "defenseUnits": 17,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 1760,
       "seed": 3,
       "budget": 1196.39716,
-      "castleDps": 1195.9989264402288,
+      "castleDps": 1196.3828200420883,
+      "armyBudget": 19142.35456459427,
+      "armyDps": 19017.50818869558,
+      "homes": 7,
+      "phase": "lost",
+      "seconds": 120,
+      "keepHp": 4748.10009765625,
+      "keepMax": 4748.10009765625,
+      "attackUnits": 27,
+      "defenseUnits": 27,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 1760,
+      "seed": 1,
+      "budget": 4785.588641,
+      "castleDps": 4783.195776400509,
+      "armyBudget": 19142.35456459427,
+      "armyDps": 18291.20183592802,
+      "homes": 7,
+      "phase": "lost",
+      "seconds": 120,
+      "keepHp": 4748.10009765625,
+      "keepMax": 4748.10009765625,
+      "attackUnits": 25,
+      "defenseUnits": 25,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 1760,
+      "seed": 2,
+      "budget": 4785.588641,
+      "castleDps": 4784.828016565408,
       "armyBudget": 19142.35456459427,
       "armyDps": 19017.50818869558,
       "homes": 7,
@@ -976,14 +1161,14 @@
       "keepHp": 4748.10009765625,
       "keepMax": 4748.10009765625,
       "attackUnits": 26,
-      "defenseUnits": 27,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "defenseUnits": 25,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 1760,
       "seed": 1,
-      "budget": 4785.588641,
-      "castleDps": 4784.985514545313,
+      "budget": 19142.354565,
+      "castleDps": 19141.417796545615,
       "armyBudget": 19142.35456459427,
       "armyDps": 18291.20183592802,
       "homes": 7,
@@ -991,15 +1176,15 @@
       "seconds": 120,
       "keepHp": 4748.10009765625,
       "keepMax": 4748.10009765625,
-      "attackUnits": 28,
-      "defenseUnits": 27,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "attackUnits": 23,
+      "defenseUnits": 20,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 1760,
       "seed": 2,
-      "budget": 4785.588641,
-      "castleDps": 4784.566218414473,
+      "budget": 19142.354565,
+      "castleDps": 19136.427700384796,
       "armyBudget": 19142.35456459427,
       "armyDps": 19017.50818869558,
       "homes": 7,
@@ -1007,41 +1192,9 @@
       "seconds": 120,
       "keepHp": 4748.10009765625,
       "keepMax": 4748.10009765625,
-      "attackUnits": 25,
+      "attackUnits": 27,
       "defenseUnits": 22,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
-    },
-    {
-      "mmr": 1760,
-      "seed": 1,
-      "budget": 19142.354565,
-      "castleDps": 19139.557589763863,
-      "armyBudget": 19142.35456459427,
-      "armyDps": 18291.20183592802,
-      "homes": 7,
-      "phase": "lost",
-      "seconds": 120,
-      "keepHp": 4748.10009765625,
-      "keepMax": 4748.10009765625,
-      "attackUnits": 26,
-      "defenseUnits": 27,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
-    },
-    {
-      "mmr": 1760,
-      "seed": 2,
-      "budget": 19142.354565,
-      "castleDps": 19140.64705711091,
-      "armyBudget": 19142.35456459427,
-      "armyDps": 19017.50818869558,
-      "homes": 7,
-      "phase": "lost",
-      "seconds": 120,
-      "keepHp": 4748.10009765625,
-      "keepMax": 4748.10009765625,
-      "attackUnits": 25,
-      "defenseUnits": 23,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 2000,
@@ -1057,7 +1210,7 @@
       "keepMax": 7905,
       "attackUnits": 11,
       "defenseUnits": 9,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 2000,
@@ -1073,7 +1226,7 @@
       "keepMax": 7905,
       "attackUnits": 11,
       "defenseUnits": 10,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 2000,
@@ -1089,7 +1242,7 @@
       "keepMax": 7905,
       "attackUnits": 10,
       "defenseUnits": 19,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 2000,
@@ -1101,11 +1254,11 @@
       "homes": 3,
       "phase": "lost",
       "seconds": 120,
-      "keepHp": 7244.83447265625,
+      "keepHp": 7633.544921875,
       "keepMax": 7905,
-      "attackUnits": 11,
-      "defenseUnits": 14,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "attackUnits": 8,
+      "defenseUnits": 17,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 2000,
@@ -1121,7 +1274,7 @@
       "keepMax": 7905,
       "attackUnits": 10,
       "defenseUnits": 20,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 2000,
@@ -1135,9 +1288,9 @@
       "seconds": 120,
       "keepHp": 7905,
       "keepMax": 7905,
-      "attackUnits": 10,
-      "defenseUnits": 20,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "attackUnits": 11,
+      "defenseUnits": 24,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 2000,
@@ -1153,13 +1306,13 @@
       "keepMax": 7905,
       "attackUnits": 9,
       "defenseUnits": 17,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 2000,
       "seed": 2,
       "budget": 83818.630904,
-      "castleDps": 83074.61069989722,
+      "castleDps": 83814.21845653663,
       "armyBudget": 41909.31545220382,
       "armyDps": 41449.52121339175,
       "homes": 3,
@@ -1169,7 +1322,7 @@
       "keepMax": 7905,
       "attackUnits": 11,
       "defenseUnits": 24,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 2000,
@@ -1185,13 +1338,13 @@
       "keepMax": 7905,
       "attackUnits": 7,
       "defenseUnits": 15,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 2000,
       "seed": 2,
       "budget": 167637.261808,
-      "castleDps": 166833.60508328717,
+      "castleDps": 167631.1785524982,
       "armyBudget": 41909.31545220382,
       "armyDps": 41449.52121339175,
       "homes": 3,
@@ -1201,7 +1354,7 @@
       "keepMax": 7905,
       "attackUnits": 11,
       "defenseUnits": 16,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 2160,
@@ -1217,7 +1370,7 @@
       "keepMax": 7905,
       "attackUnits": 11,
       "defenseUnits": 9,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 2160,
@@ -1233,7 +1386,7 @@
       "keepMax": 7905,
       "attackUnits": 11,
       "defenseUnits": 10,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 2160,
@@ -1249,7 +1402,7 @@
       "keepMax": 7905,
       "attackUnits": 11,
       "defenseUnits": 9,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 2160,
@@ -1265,7 +1418,7 @@
       "keepMax": 7905,
       "attackUnits": 11,
       "defenseUnits": 10,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 2160,
@@ -1281,7 +1434,7 @@
       "keepMax": 7905,
       "attackUnits": 11,
       "defenseUnits": 12,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 2160,
@@ -1297,7 +1450,7 @@
       "keepMax": 7905,
       "attackUnits": 11,
       "defenseUnits": 9,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 2160,
@@ -1313,7 +1466,7 @@
       "keepMax": 7905,
       "attackUnits": 11,
       "defenseUnits": 8,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 2160,
@@ -1329,7 +1482,7 @@
       "keepMax": 7905,
       "attackUnits": 11,
       "defenseUnits": 7,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 2160,
@@ -1345,7 +1498,7 @@
       "keepMax": 7905,
       "attackUnits": 10,
       "defenseUnits": 9,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 2160,
@@ -1361,7 +1514,7 @@
       "keepMax": 7905,
       "attackUnits": 11,
       "defenseUnits": 11,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 2160,
@@ -1377,7 +1530,7 @@
       "keepMax": 7905,
       "attackUnits": 10,
       "defenseUnits": 14,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 2160,
@@ -1393,7 +1546,7 @@
       "keepMax": 7905,
       "attackUnits": 10,
       "defenseUnits": 11,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 2400,
@@ -1409,7 +1562,7 @@
       "keepMax": 15321.599609375,
       "attackUnits": 5,
       "defenseUnits": 12,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 2400,
@@ -1425,39 +1578,7 @@
       "keepMax": 15321.599609375,
       "attackUnits": 5,
       "defenseUnits": 12,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
-    },
-    {
-      "mmr": 2400,
-      "seed": 1,
-      "budget": 54822.741732,
-      "castleDps": 53569.706395281995,
-      "armyBudget": 46100.246997424205,
-      "armyDps": 45595.57345670067,
-      "homes": 3,
-      "phase": "won",
-      "seconds": 89.57,
-      "keepHp": 0,
-      "keepMax": 15321.599609375,
-      "attackUnits": 5,
-      "defenseUnits": 0,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
-    },
-    {
-      "mmr": 2400,
-      "seed": 2,
-      "budget": 54822.741732,
-      "castleDps": 53569.706395281995,
-      "armyBudget": 46100.246997424205,
-      "armyDps": 45595.57345670067,
-      "homes": 3,
-      "phase": "won",
-      "seconds": 67.07,
-      "keepHp": 0,
-      "keepMax": 15321.599609375,
-      "attackUnits": 5,
-      "defenseUnits": 5,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 2400,
@@ -1467,13 +1588,13 @@
       "armyBudget": 46100.246997424205,
       "armyDps": 45595.57345670067,
       "homes": 3,
-      "phase": "lost",
-      "seconds": 120,
-      "keepHp": 1206.7216796875,
+      "phase": "won",
+      "seconds": 96.93,
+      "keepHp": 0,
       "keepMax": 15321.599609375,
-      "attackUnits": 5,
-      "defenseUnits": 6,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "attackUnits": 4,
+      "defenseUnits": 14,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 2400,
@@ -1489,7 +1610,55 @@
       "keepMax": 15321.599609375,
       "attackUnits": 5,
       "defenseUnits": 28,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 2400,
+      "seed": 3,
+      "budget": 65195.594532,
+      "castleDps": 62315.54738274889,
+      "armyBudget": 46100.246997424205,
+      "armyDps": 45595.57345670067,
+      "homes": 3,
+      "phase": "won",
+      "seconds": 105.63,
+      "keepHp": 0,
+      "keepMax": 15321.599609375,
+      "attackUnits": 5,
+      "defenseUnits": 22,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 2400,
+      "seed": 1,
+      "budget": 77531.064884,
+      "castleDps": 74607.206395282,
+      "armyBudget": 46100.246997424205,
+      "armyDps": 45595.57345670067,
+      "homes": 3,
+      "phase": "lost",
+      "seconds": 120,
+      "keepHp": 13191.6796875,
+      "keepMax": 15321.599609375,
+      "attackUnits": 5,
+      "defenseUnits": 9,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 2400,
+      "seed": 2,
+      "budget": 77531.064884,
+      "castleDps": 74607.206395282,
+      "armyBudget": 46100.246997424205,
+      "armyDps": 45595.57345670067,
+      "homes": 3,
+      "phase": "lost",
+      "seconds": 120,
+      "keepHp": 13630.349609375,
+      "keepMax": 15321.599609375,
+      "attackUnits": 5,
+      "defenseUnits": 13,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 2400,
@@ -1501,203 +1670,59 @@
       "homes": 3,
       "phase": "lost",
       "seconds": 120,
-      "keepHp": 3343.102783203125,
+      "keepHp": 10894.099609375,
       "keepMax": 15321.599609375,
-      "attackUnits": 4,
-      "defenseUnits": 7,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "attackUnits": 5,
+      "defenseUnits": 14,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 2400,
       "seed": 2,
       "budget": 92200.493994,
-      "castleDps": 92195.95329288804,
+      "castleDps": 92193.79914001147,
       "armyBudget": 46100.246997424205,
       "armyDps": 45595.57345670067,
       "homes": 3,
       "phase": "lost",
       "seconds": 120,
-      "keepHp": 12516.599609375,
+      "keepHp": 10818.693359375,
       "keepMax": 15321.599609375,
       "attackUnits": 5,
-      "defenseUnits": 27,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "defenseUnits": 13,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 2400,
       "seed": 1,
       "budget": 184400.987988,
-      "castleDps": 184363.88729812147,
+      "castleDps": 184383.81981853727,
       "armyBudget": 46100.246997424205,
       "armyDps": 45595.57345670067,
       "homes": 3,
       "phase": "lost",
       "seconds": 120,
-      "keepHp": 12241.599609375,
+      "keepHp": 12731.8193359375,
       "keepMax": 15321.599609375,
       "attackUnits": 5,
       "defenseUnits": 18,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 2400,
       "seed": 2,
       "budget": 184400.987988,
-      "castleDps": 184377.55164386818,
+      "castleDps": 184367.26870279017,
       "armyBudget": 46100.246997424205,
       "armyDps": 45595.57345670067,
       "homes": 3,
       "phase": "lost",
       "seconds": 120,
-      "keepHp": 13946.599609375,
+      "keepHp": 7384.63671875,
       "keepMax": 15321.599609375,
-      "attackUnits": 4,
-      "defenseUnits": 32,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
-    },
-    {
-      "mmr": 2560,
-      "seed": 1,
-      "budget": 30142.602425,
-      "castleDps": 30137.74827425593,
-      "armyBudget": 120570.40970136247,
-      "armyDps": 119433.20140296487,
-      "homes": 7,
-      "phase": "won",
-      "seconds": 48.97,
-      "keepHp": 0,
-      "keepMax": 15321.599609375,
-      "attackUnits": 18,
-      "defenseUnits": 10,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
-    },
-    {
-      "mmr": 2560,
-      "seed": 2,
-      "budget": 30142.602425,
-      "castleDps": 30137.74827425593,
-      "armyBudget": 120570.40970136247,
-      "armyDps": 119415.78198641002,
-      "homes": 5,
-      "phase": "won",
-      "seconds": 50.73,
-      "keepHp": 0,
-      "keepMax": 15321.599609375,
-      "attackUnits": 17,
-      "defenseUnits": 6,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
-    },
-    {
-      "mmr": 2560,
-      "seed": 1,
-      "budget": 42628.077155,
-      "castleDps": 42624.8906273975,
-      "armyBudget": 120570.40970136247,
-      "armyDps": 119433.20140296487,
-      "homes": 7,
-      "phase": "won",
-      "seconds": 49.37,
-      "keepHp": 0,
-      "keepMax": 15321.599609375,
-      "attackUnits": 28,
-      "defenseUnits": 10,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
-    },
-    {
-      "mmr": 2560,
-      "seed": 2,
-      "budget": 42628.077155,
-      "castleDps": 42624.8906273975,
-      "armyBudget": 120570.40970136247,
-      "armyDps": 119415.78198641002,
-      "homes": 5,
-      "phase": "won",
-      "seconds": 52.83,
-      "keepHp": 0,
-      "keepMax": 15321.599609375,
-      "attackUnits": 17,
-      "defenseUnits": 9,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
-    },
-    {
-      "mmr": 2560,
-      "seed": 1,
-      "budget": 50693.612651,
-      "castleDps": 50691.32943474941,
-      "armyBudget": 120570.40970136247,
-      "armyDps": 119433.20140296487,
-      "homes": 7,
-      "phase": "won",
-      "seconds": 49.37,
-      "keepHp": 0,
-      "keepMax": 15321.599609375,
-      "attackUnits": 12,
-      "defenseUnits": 10,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
-    },
-    {
-      "mmr": 2560,
-      "seed": 2,
-      "budget": 50693.612651,
-      "castleDps": 50691.32943474941,
-      "armyBudget": 120570.40970136247,
-      "armyDps": 119415.78198641002,
-      "homes": 5,
-      "phase": "won",
-      "seconds": 52.83,
-      "keepHp": 0,
-      "keepMax": 15321.599609375,
-      "attackUnits": 17,
-      "defenseUnits": 9,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
-    },
-    {
-      "mmr": 2560,
-      "seed": 1,
-      "budget": 60285.20485,
-      "castleDps": 60274.86951211721,
-      "armyBudget": 120570.40970136247,
-      "armyDps": 119433.20140296487,
-      "homes": 7,
-      "phase": "won",
-      "seconds": 51.73,
-      "keepHp": 0,
-      "keepMax": 15321.599609375,
-      "attackUnits": 27,
-      "defenseUnits": 16,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
-    },
-    {
-      "mmr": 2560,
-      "seed": 2,
-      "budget": 60285.20485,
-      "castleDps": 59965.04619020387,
-      "armyBudget": 120570.40970136247,
-      "armyDps": 119415.78198641002,
-      "homes": 5,
-      "phase": "lost",
-      "seconds": 120,
-      "keepHp": 12077.849609375,
-      "keepMax": 15321.599609375,
-      "attackUnits": 15,
-      "defenseUnits": 12,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
-    },
-    {
-      "mmr": 2560,
-      "seed": 3,
-      "budget": 60285.20485,
-      "castleDps": 58096.01725387604,
-      "armyBudget": 120570.40970136247,
-      "armyDps": 119415.78198641002,
-      "homes": 5,
-      "phase": "lost",
-      "seconds": 120,
-      "keepHp": 15321.599609375,
-      "keepMax": 15321.599609375,
-      "attackUnits": 14,
-      "defenseUnits": 39,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "attackUnits": 5,
+      "defenseUnits": 17,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 2560,
@@ -1713,39 +1738,183 @@
       "keepMax": 15321.599609375,
       "attackUnits": 29,
       "defenseUnits": 8,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 2560,
       "seed": 2,
       "budget": 120570.409701,
-      "castleDps": 120547.00956030228,
+      "castleDps": 120532.10530647187,
       "armyBudget": 120570.40970136247,
       "armyDps": 119415.78198641002,
       "homes": 5,
       "phase": "lost",
       "seconds": 120,
-      "keepHp": 3209.099609375,
+      "keepHp": 729.5140380859375,
       "keepMax": 15321.599609375,
-      "attackUnits": 15,
-      "defenseUnits": 10,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "attackUnits": 17,
+      "defenseUnits": 5,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     },
     {
       "mmr": 2560,
       "seed": 3,
       "budget": 120570.409701,
-      "castleDps": 120550.33116968008,
+      "castleDps": 115153.33864275098,
+      "armyBudget": 120570.40970136247,
+      "armyDps": 119415.78198641002,
+      "homes": 5,
+      "phase": "won",
+      "seconds": 104.2,
+      "keepHp": 0,
+      "keepMax": 15321.599609375,
+      "attackUnits": 16,
+      "defenseUnits": 13,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 2560,
+      "seed": 1,
+      "budget": 143383.189075,
+      "castleDps": 143361.8212543311,
+      "armyBudget": 120570.40970136247,
+      "armyDps": 119433.20140296487,
+      "homes": 7,
+      "phase": "lost",
+      "seconds": 120,
+      "keepHp": 12921.599609375,
+      "keepMax": 15321.599609375,
+      "attackUnits": 29,
+      "defenseUnits": 15,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 2560,
+      "seed": 2,
+      "budget": 143383.189075,
+      "castleDps": 140722.27860390974,
       "armyBudget": 120570.40970136247,
       "armyDps": 119415.78198641002,
       "homes": 5,
       "phase": "lost",
       "seconds": 120,
-      "keepHp": 7896.599609375,
+      "keepHp": 9242.2314453125,
       "keepMax": 15321.599609375,
       "attackUnits": 17,
-      "defenseUnits": 28,
-      "observedInputHash": "5fcfba2222b4af2d1fe0d5c8de0bb69700db20fc2a7c7de129daa13534a0f984"
+      "defenseUnits": 19,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 2560,
+      "seed": 1,
+      "budget": 170512.30862,
+      "castleDps": 170481.50732107216,
+      "armyBudget": 120570.40970136247,
+      "armyDps": 119433.20140296487,
+      "homes": 7,
+      "phase": "lost",
+      "seconds": 120,
+      "keepHp": 10155.8291015625,
+      "keepMax": 15321.599609375,
+      "attackUnits": 29,
+      "defenseUnits": 26,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 2560,
+      "seed": 2,
+      "budget": 170512.30862,
+      "castleDps": 165102.27860390974,
+      "armyBudget": 120570.40970136247,
+      "armyDps": 119415.78198641002,
+      "homes": 5,
+      "phase": "lost",
+      "seconds": 120,
+      "keepHp": 9796.2705078125,
+      "keepMax": 15321.599609375,
+      "attackUnits": 16,
+      "defenseUnits": 20,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 2560,
+      "seed": 1,
+      "budget": 241140.819402,
+      "castleDps": 241135.016050727,
+      "armyBudget": 120570.40970136247,
+      "armyDps": 119433.20140296487,
+      "homes": 7,
+      "phase": "lost",
+      "seconds": 120,
+      "keepHp": 4610.27197265625,
+      "keepMax": 15321.599609375,
+      "attackUnits": 25,
+      "defenseUnits": 3,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 2560,
+      "seed": 2,
+      "budget": 241140.819402,
+      "castleDps": 241114.00803694344,
+      "armyBudget": 120570.40970136247,
+      "armyDps": 119415.78198641002,
+      "homes": 5,
+      "phase": "lost",
+      "seconds": 120,
+      "keepHp": 14477.849609375,
+      "keepMax": 15321.599609375,
+      "attackUnits": 17,
+      "defenseUnits": 25,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 2560,
+      "seed": 1,
+      "budget": 482281.638804,
+      "castleDps": 481397.7743082425,
+      "armyBudget": 120570.40970136247,
+      "armyDps": 119433.20140296487,
+      "homes": 7,
+      "phase": "lost",
+      "seconds": 120,
+      "keepHp": 7657.78662109375,
+      "keepMax": 15321.599609375,
+      "attackUnits": 27,
+      "defenseUnits": 5,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 2560,
+      "seed": 2,
+      "budget": 482281.638804,
+      "castleDps": 482275.82129159843,
+      "armyBudget": 120570.40970136247,
+      "armyDps": 119415.78198641002,
+      "homes": 5,
+      "phase": "won",
+      "seconds": 100.77,
+      "keepHp": 0,
+      "keepMax": 15321.599609375,
+      "attackUnits": 16,
+      "defenseUnits": 3,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
+    },
+    {
+      "mmr": 2560,
+      "seed": 3,
+      "budget": 482281.638804,
+      "castleDps": 480261.37513591675,
+      "armyBudget": 120570.40970136247,
+      "armyDps": 119415.78198641002,
+      "homes": 5,
+      "phase": "lost",
+      "seconds": 120,
+      "keepHp": 11352.134765625,
+      "keepMax": 15321.599609375,
+      "attackUnits": 16,
+      "defenseUnits": 10,
+      "observedInputHash": "1c5c49997e0e299119b3051f88d20deaca53e7e4ca78c396b9a22528087fed64"
     }
   ]
 }

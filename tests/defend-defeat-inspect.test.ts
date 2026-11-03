@@ -127,7 +127,7 @@ test("city tiles stand apart from the start, but never on the top row", () => {
 test("the retired Outlying districts skill gives its Knowledge back", () => {
   assert.equal("outskirts" in SKILLS, false);
   assert.ok(!TREES.some((t) => t.nodes.some((n) => (n.id as string) === "outskirts")));
-  assert.ok(!SUBJECTS.find((s) => s.id === "city")!.topics.find((t) => t.id === "walls")!.skills!.includes("outskirts" as never));
+  assert.ok(!SUBJECTS.find((s) => s.id === "realm")!.topics.find((t) => t.id === "walls")!.skills!.includes("outskirts" as never));
   const old = { ...JSON.parse(JSON.stringify(defaults())), knowledge: 5 };
   old.skills.outskirts = 1;
   const back = decode(JSON.stringify(old));

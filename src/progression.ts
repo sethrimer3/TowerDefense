@@ -1,3 +1,4 @@
+import { equipmentBonuses } from "./equipment.ts";
 /** Everything the player keeps between defenses beyond the city itself:
  * the Smithy's upgrades (timed ranks bought with the Smithy points the
  * mine's smithy makes, and worked by its smiths; `training` in the save), the
@@ -17,7 +18,7 @@ import { ECONOMY, quadraticCost } from "./economy.ts";
 
 /** What the Smithy and the skill trees can raise: the battle's `Bonuses`,
  * and how fast the Smithy's upgrades are worked. */
-export type BonusTarget = Exclude<keyof Bonuses, "paths" | "banner" | "structurePaths" | "spikePaths" | "keep" | "walls" | "gate" | "ballista" | "revolutionary" | "shadow" | "nano" | "chrono" | "repair" | "necromancy" | "meteor" | "frostNova" | "reinforcements"> | "smithing";
+export type BonusTarget = Exclude<keyof Bonuses, "equipment" | "paths" | "banner" | "structurePaths" | "spikePaths" | "keep" | "walls" | "gate" | "ballista" | "revolutionary" | "shadow" | "nano" | "chrono" | "repair" | "necromancy" | "meteor" | "frostNova" | "reinforcements"> | "smithing";
 /** Bonuses that shorten a time: their percent divides instead of multiplies. */
 const TIMES = new Set<BonusTarget>(["drill", "towerReload", "rebuild", "smithing"]);
 
@@ -25,13 +26,17 @@ const TIMES = new Set<BonusTarget>(["drill", "towerReload", "rebuild", "smithing
 export const STARTING_METAL: Metals = { copper: 10, silver: 0, gold: 0 };
 
 // ── The Smithy's upgrades (Training) ───────────────────────────────────
-export type TrainingId = "repairHp" | "repairDamage" | "buildingHp" | "towerHp" | "troopHp" | "troopDamage" | "deployRange" | "drill" | "towerDamage" | "towerReload" | "wallHp" | "keepHp" | "rebuild" | "bombDamage" | "undeadHp" | "undeadDamage" | "graveTime" | "meteorDamage" | "meteorRadius" | "frostTime" | "frostRadius" | "reinforceHp" | "reinforceDamage" | "reinforceTime";
+export type TrainingId = "minerEfficiency" | "minerPower" | "librarianEfficiency" | "librarianPower" | "repairHp" | "repairDamage" | "buildingHp" | "towerHp" | "troopHp" | "troopDamage" | "deployRange" | "drill" | "towerDamage" | "towerReload" | "wallHp" | "keepHp" | "rebuild" | "bombDamage" | "undeadHp" | "undeadDamage" | "graveTime" | "meteorDamage" | "meteorRadius" | "frostTime" | "frostRadius" | "reinforceHp" | "reinforceDamage" | "reinforceTime";
 /** `seconds`, when set, shows the row as a time: that many seconds at no ranks. */
 export type TrainingRow = { id: TrainingId; group: keyof typeof TRAINING_GROUPS; name: string; per: number; max: number; seconds?: number };
 export const TRAINING_GROUPS = { army: "Army", towers: "Towers", city: "City", spells: "Spells" } as const;
 /** Each rank adds `per` percent to its target, with quadratic metal cost
  * (`rankCost`) in its tier (`rankPrice`). */
 export const TRAINING: TrainingRow[] = [
+  { id: "minerEfficiency", group: "city", name: "Miner efficiency", per: 2, max: 50 },
+  { id: "minerPower", group: "city", name: "Miner power", per: 2, max: 50 },
+  { id: "librarianEfficiency", group: "city", name: "Librarian efficiency", per: 2, max: 50 },
+  { id: "librarianPower", group: "city", name: "Librarian power", per: 2, max: 50 },
   { id: "repairHp", group: "city", name: "Mason HP", per: 5, max: 50 },
   { id: "repairDamage", group: "city", name: "Mason bow damage", per: 5, max: 50 },
   { id: "buildingHp", group: "city", name: "Building HP", per: 5, max: 50 },
@@ -200,9 +205,10 @@ export function multiplier(save: Save, target: BonusTarget) {
 /** What the next defense fights with. */
 export function bonuses(save: Save): Bonuses {
   const out = { ...NO_BONUSES } as Bonuses;
-  for (const k of Object.keys(out) as Exclude<keyof Bonuses, "paths" | "banner" | "structurePaths" | "spikePaths" | "keep" | "walls" | "gate" | "ballista" | "revolutionary" | "shadow" | "nano" | "chrono" | "repair" | "necromancy" | "meteor" | "frostNova" | "reinforcements" | "watch">[]) out[k] = multiplier(save, k);
+  for (const k of Object.keys(out) as Exclude<keyof Bonuses, "equipment" | "paths" | "banner" | "structurePaths" | "spikePaths" | "keep" | "walls" | "gate" | "ballista" | "revolutionary" | "shadow" | "nano" | "chrono" | "repair" | "necromancy" | "meteor" | "frostNova" | "reinforcements" | "watch">[]) out[k] = multiplier(save, k);
   if (SKILL_IDS.some(id => id.startsWith("banner") && skillRank(save, id) > 0)) out.banner = { cooldown: 10 - skillTotal(save, "bannerCooldown"), defense: skillTotal(save, "bannerDefense") / 100, reach: 5 + skillTotal(save, "bannerReach"), damage: 1 + skillTotal(save, "bannerDamage") / 100, march: 1 + skillTotal(save, "bannerMarch") / 100, life: 1 + skillTotal(save, "bannerLife") / 100, regen: skillTotal(save, "bannerRegen") / 100 };
   Object.assign(out, placedBattlePaths(save));
+  const equipment=equipmentBonuses(save);if(equipment)out.equipment=equipment;
   if (save.defend.keepRanks) out.keep = { ...save.defend.keepRanks };
   if (save.defend.wallRanks) out.walls = { ...save.defend.wallRanks };
   if (save.defend.gateRanks) out.gate = { ...save.defend.gateRanks };

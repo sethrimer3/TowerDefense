@@ -35,23 +35,23 @@ export type TileType = "city" | "units" | "towers" | "consumables";
 export type TileFilter = "all" | TileType;
 export const TILE_FILTERS: { id: TileFilter; name: string }[] = [
   { id: "all", name: "All" },
-  { id: "city", name: "City" },
+  { id: "city", name: "Realm" },
   { id: "units", name: "Barracks" },
   { id: "towers", name: "Towers" },
   { id: "consumables", name: "Skills" },
 ];
-export const TILE_TYPE_NAMES: Record<TileType, string> = { city: "City", units: "Barracks", towers: "Tower", consumables: "Skill" };
+export const TILE_TYPE_NAMES: Record<TileType, string> = { city: "Realm", units: "Barracks", towers: "Tower", consumables: "Skill" };
 
 /** Tiles used up (or carried) in battle rather than placed in the city. */
 export type Consumable = "bomb" | "warBanner" | "necromancy" | "meteor" | "frostNova" | "reinforcements";
 export const CONSUMABLES: Consumable[] = ["bomb", "warBanner", "necromancy", "meteor", "frostNova", "reinforcements"];
-export type TileId = PaletteItem | Consumable;
+export type TileId = PaletteItem | Consumable | "keep";
 
 const TYPE_ORDER: TileType[] = ["city", "units", "towers", "consumables"];
-export const TILE_TYPE: Record<TileId, TileType> = { ...ITEM_CATEGORY, bomb: "consumables", warBanner: "consumables", necromancy: "consumables", meteor: "consumables", frostNova: "consumables", reinforcements: "consumables" };
+export const TILE_TYPE: Record<TileId, TileType> = { ...ITEM_CATEGORY, keep: "city", bomb: "consumables", warBanner: "consumables", necromancy: "consumables", meteor: "consumables", frostNova: "consumables", reinforcements: "consumables" };
 /** Every kind of tile, by type and within a type in the palette's order. */
-export const TILE_IDS: TileId[] = TYPE_ORDER.flatMap((type) => [...PALETTE_ITEMS, ...CONSUMABLES].filter((id) => TILE_TYPE[id] === type));
-export const TILE_NAMES: Record<TileId, string> = { ...ITEM_NAMES, bomb: "Bomb", warBanner: "War banner", necromancy: "Necromancy", meteor: "Meteor strike", frostNova: "Frost nova", reinforcements: "Reinforcements" };
+export const TILE_IDS: TileId[] = TYPE_ORDER.flatMap((type) => ["keep" as const, ...PALETTE_ITEMS, ...CONSUMABLES].filter((id) => TILE_TYPE[id] === type));
+export const TILE_NAMES: Record<TileId, string> = { ...ITEM_NAMES, keep: "Keep", bomb: "Bomb", warBanner: "War banner", necromancy: "Necromancy", meteor: "Meteor strike", frostNova: "Frost nova", reinforcements: "Reinforcements" };
 export const isConsumable = (id: TileId): id is Consumable => (CONSUMABLES as string[]).includes(id);
 export const inFilter = (id: TileId, filter: TileFilter) => filter === "all" || TILE_TYPE[id] === filter;
 
@@ -73,6 +73,7 @@ export type TileStack = { id: TileId; type: TileType; count: number; placed: num
 /** The stack of one kind. */
 export function tileStack(save: Save, id: TileId): TileStack {
   const d = save.defend, type = TILE_TYPE[id];
+  if (id === "keep") return { id, type, count: 1, placed: 1, ready: 0, lasting: true };
   if (id === "bomb") return { id, type, count: d.bombs, placed: 0, ready: d.bombs, lasting: false };
   if (id === "warBanner" || id === "necromancy" || id === "meteor" || id === "frostNova" || id === "reinforcements") return { id, type, count: 1, placed: 0, ready: 1, lasting: true };
   const ready = available(d, id);
@@ -126,8 +127,9 @@ export function tileCopyAt(save: Save, stack: TileStack, key: string | null | un
 /** The upgrade tree a held tile opens in Defend: the walls', gates' and
  * wall ballistas' shared trees, or the copy's own (where it stands in the
  * city, else its palette copy). None for a kind without one. */
-export type TileTree = SpecialtyTarget | { side: "walls" | "gate" | "ballistas" };
+export type TileTree = SpecialtyTarget | { side: "keep" | "walls" | "gate" | "ballistas" };
 export function tileTree(save: Save, id: TileId, key?: string | null): TileTree | null {
+  if (id === "keep") return { side: "keep" };
   if (id === "wallBlock") return { side: "walls" };
   if (id === "cityGate") return { side: "gate" };
   if (id === "wallBallista") return { side: "ballistas" };
@@ -139,7 +141,8 @@ export function tileTree(save: Save, id: TileId, key?: string | null): TileTree 
     if (id === "wallSpikes") { const spot = d.layout.spikes[copy.index]; if (spot) return { spikes: { tx: spot.tx, ty: spot.ty, side: spot.side } }; }
     else { const o = d.layout.structures.filter((s) => s.kind === id)[copy.index]; if (o) return { uid: o.uid }; }
   }
-  return { copy: id, ...(copy.wear ? { wear: copy.wear } : {}) };
+  const gear=save.equipment?.find(g=>g.uid===undefined&&g.kind===id&&g.slot===copy.index-stack.placed);
+  return { copy: id, ...(gear?{equipment:gear.id}:{}), ...(copy.wear ? { wear: copy.wear } : {}) };
 }
 
 /** Copies of a kind wearing the same upgrades, stacked together: plain
@@ -194,7 +197,7 @@ export function tileMarks(save: Save, id: TileId, wear?: Wear): TileMark[] {
 export function marksText(id: TileId, marks: TileMark[]): string {
   if (!marks.length) return "No Knowledge upgrades";
   const parts: string[] = [];
-  if (id !== "wallBlock" && id !== "wallSpikes" && !isConsumable(id)) parts.push(ITEM_NAMES[rootOf(id as PlacedKind)]);
+  if (id !== "wallBlock" && id !== "wallSpikes" && !isConsumable(id)) parts.push(id === "keep" ? "Keep" : ITEM_NAMES[rootOf(id as PlacedKind)]);
   for (let i = 0; i < marks.length; i++) {
     const m = marks[i], next = marks[i + 1];
     if (m.type === "became") parts.push(m.name);
@@ -208,6 +211,7 @@ const specialtyLabelOf = (name: string, rank: number) => `${name} ${ROMAN[rank]}
 /** The shop's metal price, or why a kind isn't sold. */
 export type ShopOffer = { price: Price } | { reason: string };
 export function shopOffer(save: Save, id: TileId): ShopOffer {
+  if (id === "keep") return { reason: "The keep is unique: move its tile in the city." };
   if (id === "bomb") return { price: BOMB_PRICE };
   if (id === "warBanner") return { reason: "Always at hand in battle: one banner, never used up." };
   if (id === "necromancy" || id === "meteor" || id === "frostNova" || id === "reinforcements") return { reason: "Always at hand in battle: a spell, never used up." };
@@ -230,7 +234,7 @@ export function canBuyTile(save: Save, id: TileId): boolean {
 export function buyTile(save: Save, id: TileId): boolean {
   const offer = shopOffer(save, id), free = save.settings.devMode;
   if ("reason" in offer) return false;
-  if (id === "warBanner" || id === "necromancy" || id === "meteor" || id === "frostNova" || id === "reinforcements") return false;
+  if (id === "keep" || id === "warBanner" || id === "necromancy" || id === "meteor" || id === "frostNova" || id === "reinforcements") return false;
   const w: Wallet = { ...save.smithy, free };
   if (!(id === "bomb" ? buyBomb(save.defend, w) : buyItem(save.defend, w, id))) return false;
   if (!free) for (const k of METALS) save.smithy[k] = w[k];
@@ -243,7 +247,7 @@ const CONSUMABLE_TOPIC: Record<Consumable, string> = { bomb: "battle", warBanner
 export function tileTopic(id: TileId): { subject: Subject; topic: Topic } {
   for (const subject of SUBJECTS)
     for (const topic of subject.topics)
-      if (isConsumable(id) ? topic.id === CONSUMABLE_TOPIC[id] : topicItems(topic).includes(id)) return { subject, topic };
+      if (isConsumable(id) ? topic.id === CONSUMABLE_TOPIC[id] : (id === "keep" ? topic.id === "keep" : topicItems(topic).includes(id))) return { subject, topic };
   throw new Error(`No topic holds ${id}`);
 }
 

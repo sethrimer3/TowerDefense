@@ -104,7 +104,7 @@ export const FLOOR_CASTLE:NativeCastle={
     "civilianHealth": 0,
     "rebuildSpeed": 0
   },
-  "training": {
+  "training": { "minerEfficiency":0, "minerPower":0, "librarianEfficiency":0, "librarianPower":0,
     "repairHp": 0, "repairDamage": 0, "buildingHp": 0, "towerHp": 0,
     "troopHp": 0,
     "troopDamage": 0,
@@ -607,7 +607,7 @@ export const CEILING_CASTLE:NativeCastle={
     "civilianHealth": 5,
     "rebuildSpeed": 5
   },
-  "training": {
+  "training": { "minerEfficiency":0, "minerPower":0, "librarianEfficiency":0, "librarianPower":0,
     "repairHp": 0, "repairDamage": 0, "buildingHp": 0, "towerHp": 0,
     "troopHp": 50,
     "troopDamage": 50,

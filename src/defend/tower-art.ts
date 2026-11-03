@@ -131,6 +131,8 @@ const HAZARD = 0xe8c03a;
 
 /** What each structure's damage throws down and its rubble is made of. */
 const MATERIAL: Record<PlacedKind, { m: Material; ruin: Pick<Ruin, "stone" | "top" | "beams" | "round"> }> = {
+  mine: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.plank, beams: true } },
+  library: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.plank, beams: true } },
   repairShop: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.plank, beams: true } },
   meleeGuild: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.straw, beams: true } },
   rangedGuild: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: [0x3a3c42, 0x5a5c62, 0x7a7c84], beams: true } },
@@ -262,9 +264,11 @@ function drawnStructureRubblePixels(kind: PlacedKind, cw: number, ch: number, se
   return rubblePixels(w, h, hash(seed, KINDS.indexOf(kind), 3), { ...frame(w, h), ...MATERIAL[kind].ruin });
 }
 
-export const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall", "assassinDen", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "spearHall", "phalanx", "javelinCamp", "lancerStable", "heroHall", "shadow", "nanoTower", "pyreTower", "frostTower", "stormTower", "chapterHouse", "berserkerLodge", "halberdYard", "bloodHall", "veilHouse", "poisonDen", "brazierTower", "hawkTower", "batteryTower", "mortarTower", "rangerLodge", "skirmishCamp", "infernoHall", "cinderHall", "skyrangerLodge", "minelayerTower", "stormHall", "wispTower", "chronoTower", "repairShop"];
+export const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall", "assassinDen", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "spearHall", "phalanx", "javelinCamp", "lancerStable", "heroHall", "shadow", "nanoTower", "pyreTower", "frostTower", "stormTower", "chapterHouse", "berserkerLodge", "halberdYard", "bloodHall", "veilHouse", "poisonDen", "brazierTower", "hawkTower", "batteryTower", "mortarTower", "rangerLodge", "skirmishCamp", "infernoHall", "cinderHall", "skyrangerLodge", "minelayerTower", "stormHall", "wispTower", "chronoTower", "repairShop", "mine", "library"];
 
 const PAINT: Record<PlacedKind, (p: Pix, look: string) => void> = {
+  mine: (p) => guild(p, C.plank[0], ["  X  ", " XXX ", "  X  ", " X X "], { X: C.gold[1] }),
+  library: (p) => guild(p, C.slate[1], ["XX XX", "XX XX", "XX XX", "XXXXX"], { X: C.gold[2] }),
   repairShop: paintRepairShop,
   meleeGuild: paintMeleeGuild,
   rangedGuild: paintRangedGuild,

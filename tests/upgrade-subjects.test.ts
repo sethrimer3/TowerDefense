@@ -1,3 +1,4 @@
+import { RETIRED_FORGE, RETIRED_TRAINING, RETIRED_SKILLS } from "../src/retired-upgrades.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { PALETTE_ITEMS, UPGRADES } from "../src/defend/catalog.ts";
@@ -25,9 +26,9 @@ const once = (all: readonly string[], n: Map<string, number>, what: string) => {
 };
 
 test("every upgrade in the game sits in exactly one topic", () => {
-  once(UPGRADES.map((u) => u.id), counts((t) => t.upgrades), "Armory upgrade");
-  once(TRAINING_IDS, counts((t) => t.training), "Smithy row");
-  once(SKILL_IDS, counts((t) => t.skills), "skill");
+  once(UPGRADES.map((u) => u.id).filter(id=>!RETIRED_FORGE.includes(id)), counts((t) => t.upgrades), "Armory upgrade");
+  once(TRAINING_IDS.filter(id=>!RETIRED_TRAINING.includes(id)), counts((t) => t.training), "Smithy row");
+  once(SKILL_IDS.filter(id=>!RETIRED_SKILLS.includes(id)), counts((t) => t.skills), "skill");
   once(PALETTE_ITEMS, counts(topicItems), "palette item");
 });
 
@@ -53,7 +54,7 @@ test("War banner and Bombs have standalone Knowledge trees under Spells", () => 
   assert.deepEqual(bombs.skills, ["gunpowder"]);
   assert.deepEqual(bombs.upgrades, ["bombSafe"]);
   assert.deepEqual(bombs.training, ["bombDamage"]);
-  assert.ok(realm.topics.find(t => t.id === "troops")!.extras?.includes("speed3"));
+  assert.ok(realm.topics.find(t => t.id === "keep")!.extras?.includes("speed3"));
   const save = defaults(); save.knowledge = 100000;
   assert.equal(skillPurchase(save, "warBanner").available, true, "no unrelated tower prerequisite");
   let graph = bannerTree(save);

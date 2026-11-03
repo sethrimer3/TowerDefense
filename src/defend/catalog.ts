@@ -16,11 +16,11 @@ import type { BattlePaths, PathId } from "../knowledge-paths.ts";
  * copper, silver and Gold, the universal upgrades, the bonuses the Smithy and the
  * skill trees add, and the enemy roster. */
 
-export type StructureKind = "repairShop" | "keep" | "meleeGuild" | "rangedGuild" | "assassinDen" | "bloodHall" | "veilHouse" | "poisonDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "barracks" | "chapterHouse" | "berserkerLodge" | "halberdYard" | "heroHall" | "shadow" | "archerBarracks" | "rangerLodge" | "skirmishCamp" | "skyrangerLodge" | "sniperLodge" | "gunHall" | "musketHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "revolutionary" | "archerTower" | "brazierTower" | "hawkTower" | "wispTower" | "chronoTower" | "cannonTower" | "batteryTower" | "mortarTower" | "minelayerTower" | "nanoTower" | "watchTower" | "wizardTower" | "pyreTower" | "frostTower" | "stormTower" | "mageGuild" | "infernoHall" | "cinderHall" | "stormHall" | "valkyriePalace" | "darkKeep" | "monsterBait";
+export type StructureKind = "mine" | "library" | "repairShop" | "keep" | "meleeGuild" | "rangedGuild" | "assassinDen" | "bloodHall" | "veilHouse" | "poisonDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "barracks" | "chapterHouse" | "berserkerLodge" | "halberdYard" | "heroHall" | "shadow" | "archerBarracks" | "rangerLodge" | "skirmishCamp" | "skyrangerLodge" | "sniperLodge" | "gunHall" | "musketHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "revolutionary" | "archerTower" | "brazierTower" | "hawkTower" | "wispTower" | "chronoTower" | "cannonTower" | "batteryTower" | "mortarTower" | "minelayerTower" | "nanoTower" | "watchTower" | "wizardTower" | "pyreTower" | "frostTower" | "stormTower" | "mageGuild" | "infernoHall" | "cinderHall" | "stormHall" | "valkyriePalace" | "darkKeep" | "monsterBait";
 /** Everything that appears in the build palette (the keep is placed from the
  * start and can only be moved, so it is not a palette item). */
 export type PaletteItem = "cityTile" | "cityGate" | "wallSpikes" | "wallBallista" | "wallBlock" | Exclude<StructureKind, "keep">;
-export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "repairShop", "meleeGuild", "rangedGuild", "barracks", "chapterHouse", "berserkerLodge", "halberdYard", "heroHall", "assassinDen", "bloodHall", "veilHouse", "poisonDen", "shadow", "spearHall", "phalanx", "javelinCamp", "lancerStable", "archerBarracks", "rangerLodge", "skirmishCamp", "skyrangerLodge", "gunHall", "musketHall", "sniperLodge", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "watchTower", "archerTower", "brazierTower", "hawkTower", "wispTower", "chronoTower", "cannonTower", "batteryTower", "mortarTower", "minelayerTower", "nanoTower", "wizardTower", "pyreTower", "frostTower", "stormTower", "mageGuild", "infernoHall", "cinderHall", "stormHall", "valkyriePalace", "darkKeep", "monsterBait", "wallBlock", "cityGate", "wallSpikes", "wallBallista"];
+export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "mine", "library", "repairShop", "meleeGuild", "rangedGuild", "barracks", "chapterHouse", "berserkerLodge", "halberdYard", "heroHall", "assassinDen", "bloodHall", "veilHouse", "poisonDen", "shadow", "spearHall", "phalanx", "javelinCamp", "lancerStable", "archerBarracks", "rangerLodge", "skirmishCamp", "skyrangerLodge", "gunHall", "musketHall", "sniperLodge", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "watchTower", "archerTower", "brazierTower", "hawkTower", "wispTower", "chronoTower", "cannonTower", "batteryTower", "mortarTower", "minelayerTower", "nanoTower", "wizardTower", "pyreTower", "frostTower", "stormTower", "mageGuild", "infernoHall", "cinderHall", "stormHall", "valkyriePalace", "darkKeep", "monsterBait", "wallBlock", "cityGate", "wallSpikes", "wallBallista"];
 /** The only buildings the shop sells: every other tower or troop building
  * is one of these upgraded, a building at a time, with Knowledge
  * (`building-upgrades.ts`). */
@@ -32,11 +32,12 @@ export const PALETTE_CATEGORIES: { id: PaletteCategory; name: string }[] = [
   { id: "all", name: "All" },
   { id: "towers", name: "Towers" },
   { id: "units", name: "Infantry" },
-  { id: "city", name: "City" },
+  { id: "city", name: "Realm" },
 ];
 /** Which category each palette item belongs to: towers shoot, unit
  * buildings train troops, and the city's own pieces are the rest. */
 export const ITEM_CATEGORY: Record<PaletteItem, Exclude<PaletteCategory, "all">> = {
+  mine: "city", library: "city",
   repairShop: "city",
   cityTile: "city",
   cityGate: "city",
@@ -167,6 +168,8 @@ export type StructureDef = {
 export type TileSpan = 1 | 2;
 
 export const STRUCTURES: Record<StructureKind, StructureDef> = {
+  mine: { kind: "mine", name: "Mine", w: 4, h: 4, maxHp: 250, outsideOk: false, description: "Place in the city to open the Mine and Smithy and put the miners to work." },
+  library: { kind: "library", name: "Library", w: 4, h: 4, maxHp: 250, outsideOk: false, description: "Place in the city to open the Library and Study and put the librarians to work." },
   repairShop: { kind: "repairShop", name: "Repair shop", w: 4, h: 2, maxHp: 160, outsideOk: false, description: "Two masons come out of this workshop to repair and rebuild every building and tower. Its tree teaches Wall masonry for walls and gates, larger crews, critical repair priorities and a retreating bow. Repairs restore a percentage of maximum HP." },
   keep: {
     kind: "keep",
@@ -661,6 +664,7 @@ export const STARTING_OWNED: Record<PaletteItem, number> = {
   stormHall: 0,
   valkyriePalace: 0,
   darkKeep: 0,
+  mine: 1, library: 1,
   repairShop: 0,
   monsterBait: 0,
 };
@@ -726,6 +730,7 @@ export function purchasePrice(item: PaletteItem, owned: number): Price {
     stormHall: { copper: 10 },
     valkyriePalace: { copper: 12, silver: 2 },
     darkKeep: { copper: 25, silver: 8, gold: 2 },
+    mine: { copper: 10 }, library: { copper: 10 },
     repairShop: { copper: 3 },
     monsterBait: { copper: 3 },
   };
@@ -739,6 +744,7 @@ export function purchasePrice(item: PaletteItem, owned: number): Price {
 
 /** What each palette item is called on the page. */
 export const ITEM_NAMES: Record<PaletteItem, string> = {
+  mine: "Mine", library: "Library",
   repairShop: STRUCTURES.repairShop.name,
   cityTile: "City tile",
   cityGate: "City gate",
@@ -1279,6 +1285,7 @@ export const ENEMIES: Record<EnemyKind, EnemyDef> = {
  * of the Armory's levels. Each is 1 when nothing is owned, so a run without
  * them plays exactly as before. */
 export type Bonuses = {
+  equipment?: Record<number, {hp:number;power:number}>;
   /** Swordsmen's and archers' HP. */
   troopHp: number;
   /** Swordsmen's and archers' damage. */

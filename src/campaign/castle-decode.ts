@@ -1,3 +1,4 @@
+import { decodeEquipment } from "../equipment.ts";
 import { decodeRepairRanks } from "../repair-upgrades.ts";
 import { CASTLE_KEEP, castleGame, type NativeCastle } from "./castle-model.ts";
 import { SIDE_GROUPS } from "./siege-dps-catalog.ts";
@@ -106,6 +107,7 @@ export function decodeNativeCastle(raw: unknown): NativeCastle | null {
       levels: base.defend.levels,
       training: base.training,
       skills: base.skills,
+      ...(Array.isArray(raw.equipment)?{equipment:decodeEquipment(raw.equipment,base.defend)}:{}),
       forgeBand: int(raw.forgeBand, 0, 4) ? raw.forgeBand : 0,
       ...ranks,
       ...(repairs ? { repairRanks: repairs } : {}),

@@ -11,7 +11,7 @@ import { buildingSheet } from "../src/ui/specialty.ts";
 import { topicHas } from "../src/ui/ledger.ts";
 
 test("every palette item and consumable is a tile of one type, filed in one topic", () => {
-  assert.deepEqual([...TILE_IDS].sort(), [...PALETTE_ITEMS, ...CONSUMABLES].sort());
+  assert.deepEqual([...TILE_IDS].sort(), ["keep", ...PALETTE_ITEMS, ...CONSUMABLES].sort());
   for (const id of TILE_IDS) {
     assert.ok(TILE_FILTERS.some((f) => f.id === TILE_TYPE[id]), id);
     assert.ok(tileTopic(id).topic, id);

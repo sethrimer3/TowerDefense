@@ -50,7 +50,7 @@ export const CORE = [
  ["collection.stacked","Stacked","Agrupadas","Empilées","Gestapelt","Agrupadas","Impilate","まとめる","묶어서 보기","堆叠"],
  ["collection.spread","Spread","Separadas","Étalées","Einzeln","Separadas","Separate","個別に表示","개별 보기","展开"],
  ["subject.realm","Realm","Reino","Royaume","Reich","Reino","Regno","王国","왕국","王国"],
- ["subject.city","City","Ciudad","Cité","Stadt","Cidade","Città","都市","도시","城市"],
+ ["subject.city","Realm","Reino","Royaume","Reich","Reino","Regno","王国","왕국","王国"],
  ["subject.towers","Towers","Torres","Tours","Türme","Torres","Torri","塔","탑","防御塔"],
  ["subject.units","Infantry","Infantería","Infanterie","Infanterie","Infantaria","Fanteria","歩兵","보병","步兵"],
  ["subject.spells","Spells","Hechizos","Sorts","Zauber","Feitiços","Incantesimi","魔法","주문","法术"],

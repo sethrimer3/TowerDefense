@@ -50,6 +50,9 @@ function tell(n: MineNews) {
 export interface MineHost extends MetalHost {
   /** The smithy turned out Smithy points (copper, silver, gold). */
   earn(points: Metals): void;
+  active?(): boolean;
+  efficiency?(): number;
+  power?(): number;
   /** Ranks of the skills the mine reads: Coffee, Waterproofing, Master
    * smith (room for another smith), Mine carts and Ore sense. */
   upgrades(): { coffee: number; waterproof: number; smiths: number; carts?: boolean; oreSense?: boolean };
@@ -110,8 +113,8 @@ export class MinePage {
    * a fresh one. */
   load(saved: MineSave | null, now: number) {
     this.sim = saved ? new MineSim(saved.seed, saved) : new MineSim(this.host.newSeed());
-    const away = saved ? Math.min(MAX_AWAY_MS, Math.max(0, now - saved.savedAt)) : 0;
-    const simulated = Math.min(MAX_AWAY_MS, away + (saved?.idleMs ?? 0));
+    const away = saved && this.host.active?.() !== false ? Math.min(MAX_AWAY_MS, Math.max(0, now - saved.savedAt)) : 0;
+    const simulated = this.host.active?.() === false ? 0 : Math.min(MAX_AWAY_MS, away * (this.host.efficiency?.() ?? 1) + (saved?.idleMs ?? 0));
     this.owed = (simulated * TICK_HZ) / 1000;
     this.last = now;
     this.away = null;
@@ -123,20 +126,22 @@ export class MinePage {
     if (this.renderer) this.renderer.home(this.sim);
   }
   snapshot(now: number): MineSave {
-    return { ...this.sim.save(now), idleMs: Math.min(MAX_AWAY_MS, this.owedMs + Math.max(0, now - this.last)) };
+    return { ...this.sim.save(now), idleMs: this.host.active?.() === false ? 0 : Math.min(MAX_AWAY_MS, this.owedMs + Math.max(0, now - this.last)) };
   }
 
   /** Runs the mine up to wall-clock time `now`, within a slice of the frame
    * (a bigger one while catching up), and pays what it earned. */
   advance(now: number, keepWith = 0) {
+    if (this.host.active?.() === false) { this.last = now; this.owed = 0; return; }
     const gap = Math.max(0, now - this.last);
     this.last = now;
-    this.owed = Math.min((SIM_AWAY_MS * TICK_HZ) / 1000, this.owed + (gap * TICK_HZ) / 1000);
+    this.owed = Math.min((SIM_AWAY_MS * TICK_HZ) / 1000, this.owed + (gap * TICK_HZ * (this.host.efficiency?.() ?? 1)) / 1000);
     const start = performance.now(), budget = 6;
     const limit = Math.max(1, Math.ceil(Math.min(1000, gap) * IDLE_SPEED * TICK_HZ / 1000));
     // Catching up on time away, only the first miner to come to harm dies.
     this.sim.catchingUp = this.owed > TICK_HZ * 5;
     const up = this.host.upgrades();
+    this.sim.workPower = this.host.power?.() ?? 1;
     this.sim.coffee = up.coffee;
     this.sim.waterproof = up.waterproof;
     this.sim.cartTrack = !!up.carts;

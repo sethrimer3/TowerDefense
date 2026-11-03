@@ -360,7 +360,7 @@ test("version 4: building research all comes back as Knowledge; buildings stand 
   raw.defend.layout.structures[0].path = "pyromancy";
   raw.researchJob = { kind: "path", id: "crusaders", rank: 0, left: 1000, paid: 4 };
   const loaded = decode(JSON.stringify(raw));
-  assert.equal(loaded.version, 7);
+  assert.equal(loaded.version, 8);
   assert.deepEqual(loaded.defend.layout.structures.map((st) => st.path), [undefined, undefined]);
   assert.deepEqual(Object.keys(loaded.pathResearch), ["starfall"]);
   assert.equal(loaded.knowledge, 100 + 4008 + 4 + 175015 + 4, "every building research back, and the research in progress");
@@ -523,7 +523,7 @@ test("version 6: ranks on paths a building can no longer take come back, and ult
   raw.version = 6; raw.knowledge = 100;
   raw.defend.kept = [{ kind: "musketHall", path: "grenadiers", rank: 1 }];
   const loaded = decode(JSON.stringify(raw));
-  assert.equal(loaded.version, 7);
+  assert.equal(loaded.version, 8);
   const spotters = pathById("spotters"), grenadiers = pathById("grenadiers");
   const hero = 100004 - allocated("heroHall");
   assert.ok(hero > 0);

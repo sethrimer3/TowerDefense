@@ -326,6 +326,8 @@ function h01(a: number, b: number) {
 }
 
 export class LibrarySim {
+  workEfficiency = 1;
+  knowledgePower = 1;
   readonly seed: number;
   /** Each shelf unit's planks: -1 none, 0 an outline, `PLANKS` built. */
   readonly units = new Array<number>(BAYS * MAX_UNITS).fill(-1);
@@ -502,7 +504,7 @@ export class LibrarySim {
   }
   /** Knowledge an hour, as things stand. */
   get rate() {
-    return knowledgeRate(this.built, this.count("professor"));
+    return knowledgeRate(this.built, this.count("professor")) * this.knowledgePower;
   }
   /** Librarians in a role. */
   count(role: Role) {
@@ -1708,7 +1710,7 @@ export class LibrarySim {
       if (typeof s.x === "function") s.x = s.x();
       l.action = "walk";
       const speed = WALK * (l.pushing ? 0.7 : 1) * (l.mode === "flee" ? 1.5 : l.mode === "fight" ? this.drill().speed * 1.2 : 1);
-      const d = s.x - l.x, go = speed * dt;
+      const d = s.x - l.x, go = speed * dt * this.workEfficiency;
       if (d) l.facing = Math.sign(d);
       if (Math.abs(d) <= go) {
         l.x = s.x;
@@ -1736,7 +1738,7 @@ export class LibrarySim {
       l.away = true;
       l.action = "idle";
       if (s.until ? !s.until() : s.t > dt) {
-        s.t -= dt;
+        s.t -= dt * this.workEfficiency;
         return 0;
       }
       if (s.until) s.t = 0;
@@ -1756,7 +1758,7 @@ export class LibrarySim {
       }
     }
     if (s.t > dt) {
-      s.t -= dt;
+      s.t -= dt * this.workEfficiency;
       return 0;
     }
     l.steps.shift();

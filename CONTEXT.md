@@ -798,3 +798,7 @@ A fourteen-segment Blight Worm made of touching three-by-three art-pixel squares
 
 **Worm piece**:
 A connected run of living worm segments after a cut. A piece needs at least four segments to survive; shorter pieces die and release their young. This applies to every Blight Worm size, including the original head piece.
+
+- **Realm:** the upgrade collection containing the Keep, city infrastructure, Mine and Library; replaces the City and shared combat upgrade sections.
+- **Individual equipment:** Smithy armour and power ranks belonging to one combat building copy, retained through lifting, placement and evolution.
+- **Economy building:** the placeable Mine or Library that unlocks its corresponding production tab while in the city.

@@ -66,6 +66,7 @@ export type DefendSave = {
    * to; never more of a kind than wait in the palette. */
   kept: Kept[];
   levels: Record<UpgradeId, number>;
+  legacyCompact?: PlacedKind[];
   bombs: number;
   /** Highest wave cleared; used only for records and first-clear rewards. */
   bestWave: number;
@@ -289,7 +290,7 @@ export function buyBomb(save: DefendSave, wallet: Wallet): boolean {
 
 // ── Decoding untrusted saves ─────────────────────────────────────────────
 const int = (n: unknown, min: number, max: number): n is number => Number.isInteger(n) && (n as number) >= min && (n as number) <= max;
-const PLACED: PlacedKind[] = ["repairShop", "meleeGuild", "rangedGuild", "barracks", "chapterHouse", "berserkerLodge", "halberdYard", "heroHall", "shadow", "bloodHall", "veilHouse", "poisonDen", "assassinDen", "spearHall", "phalanx", "javelinCamp", "lancerStable", "archerBarracks", "rangerLodge", "skirmishCamp", "skyrangerLodge", "sniperLodge", "gunHall", "musketHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "archerTower", "cannonTower", "nanoTower", "watchTower", "brazierTower", "hawkTower", "wispTower", "chronoTower", "batteryTower", "mortarTower", "minelayerTower", "wizardTower", "pyreTower", "frostTower", "stormTower", "mageGuild", "infernoHall", "cinderHall", "stormHall", "valkyriePalace", "darkKeep", "monsterBait"];
+const PLACED: PlacedKind[] = ["mine", "library", "repairShop", "meleeGuild", "rangedGuild", "barracks", "chapterHouse", "berserkerLodge", "halberdYard", "heroHall", "shadow", "bloodHall", "veilHouse", "poisonDen", "assassinDen", "spearHall", "phalanx", "javelinCamp", "lancerStable", "archerBarracks", "rangerLodge", "skirmishCamp", "skyrangerLodge", "sniperLodge", "gunHall", "musketHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "archerTower", "cannonTower", "nanoTower", "watchTower", "brazierTower", "hawkTower", "wispTower", "chronoTower", "batteryTower", "mortarTower", "minelayerTower", "wizardTower", "pyreTower", "frostTower", "stormTower", "mageGuild", "infernoHall", "cinderHall", "stormHall", "valkyriePalace", "darkKeep", "monsterBait"];
 
 /** Attuned buildings saved wearing a branch's path, from before
  * each branch made a building of its own: each becomes that building,
@@ -346,7 +347,9 @@ export function decodeDefendSave(raw: any): DefendSave {
   d.journalRead = d.discovered.filter(k => Array.isArray(s.journalRead) && s.journalRead.includes(k));
   const wallRanks = decodeWallRanks(s.wallRanks);
   if (wallRanks) d.wallRanks = wallRanks;
-  d.layout = decodeLayout(s.layout, d.owned, d.levels, innerWalls(wallRanks)) ?? d.layout;
+  const compact = Array.isArray(s.legacyCompact) ? s.legacyCompact.filter((k: unknown)=>k==='darkKeep'||k==='valkyriePalace') as PlacedKind[] : [];
+  if(compact.length)d.legacyCompact=[...new Set(compact)];
+  d.layout = decodeLayout(s.layout, d.owned, d.levels, innerWalls(wallRanks), compact) ?? d.layout;
   d.kept = Array.isArray(s.kept) ? s.kept.filter((k: any) => isObject(k) && (PLACED.includes(k.kind) || k.kind === "wallSpikes") && wearFits(k.kind, k.path, k.rank))
     .slice(0, 9999).map((k: any): Kept => ({ kind: k.kind, path: k.path, rank: k.rank })) : [];
   trimKept(d);
@@ -385,7 +388,7 @@ const tileOk = (tx: unknown, ty: unknown) => int(tx, 0, TILES_W - 1) && int(ty, 
  * player owns everything on it and its tiles join the keep. Structures that
  * no longer fit (a save from before the tile shares, say) are reshuffled on
  * their tiles, and failing that the newest go back to the palette. */
-function decodeLayout(s: any, owned: Record<PaletteItem, number>, levels: Record<UpgradeId, number>, inner: boolean): Layout | null {
+function decodeLayout(s: any, owned: Record<PaletteItem, number>, levels: Record<UpgradeId, number>, inner: boolean, legacyCompact: PlacedKind[] = []): Layout | null {
   if (!isObject(s) || !tileOk(s.keep?.tx, s.keep?.ty) || !int(s.nextUid, 1, 1e9)) return null;
   const keep = { tx: s.keep.tx, ty: s.keep.ty };
   const cityTiles = decodeCityTiles(s.cityTiles, tileKey(keep.tx, keep.ty));
@@ -401,7 +404,7 @@ function decodeLayout(s: any, owned: Record<PaletteItem, number>, levels: Record
   // Saves from before placed walls have none.
   const walls = s.walls === undefined ? [] : decodeWalls(s.walls);
   if (!walls) return null;
-  const layout: Layout = { keep, cityTiles, structures, nextUid: s.nextUid, compact: compactKinds(levels), gates, spikes, ballistas, ...(walls.length ? { walls } : {}), ...(inner ? { innerWalls: true as const } : {}) };
+  const layout: Layout = { keep, cityTiles, structures, nextUid: s.nextUid, compact: [...new Set([...compactKinds(levels),...legacyCompact])], gates, spikes, ballistas, ...(walls.length ? { walls } : {}), ...(inner ? { innerWalls: true as const } : {}) };
   if (!legal(layout, owned)) return null;
   const out = fitted(layout, unplaced);
   return fitLayout(out).ok ? out : null;

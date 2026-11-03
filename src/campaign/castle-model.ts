@@ -18,6 +18,7 @@ export type NativeCastle = CastleRanks & {
   training: Save["training"];
   skills: Save["skills"];
   forgeBand: number;
+  equipment?: Save["equipment"];
 };
 /** Only the fields read by native upgrade and battle snapshot functions.
  * No player save or global random stream is consulted. */
@@ -47,8 +48,9 @@ export function castleGame(seed: number, castle?: NativeCastle): Save {
     spellPaths: {},
   } as Save;
   if (castle) {
-    const { layout, levels, training, skills, forgeBand: _band, ...ranks } = castle;
+    const { layout, levels, training, skills, equipment, forgeBand: _band, ...ranks } = castle;
     game.defend = { ...defend, ...ranks, layout: structuredClone(layout), levels: { ...levels } };
+    if(equipment?.length)game.equipment=structuredClone(equipment);
     game.training = { ...training };
     game.skills = { ...skills };
     for (const s of layout.structures) game.defend.owned[s.kind]++;
@@ -72,5 +74,5 @@ export function castleSnapshot(game: Save, forgeBand: number): NativeCastle {
     ranks: CastleRanks = {};
   for (const key of ["keepRanks", "wallRanks", "gateRanks", "ballistaRanks", "revolutionaryRanks", "shadowRanks", "nanoRanks", "chronoRanks", "repairRanks"] as const)
     if (d[key]) (ranks as Record<string, unknown>)[key] = { ...d[key] };
-  return { layout: structuredClone(d.layout), levels: { ...d.levels }, training: { ...game.training }, skills: { ...game.skills }, forgeBand, ...ranks };
+  return { layout: structuredClone(d.layout), levels: { ...d.levels }, training: { ...game.training }, skills: { ...game.skills }, forgeBand, ...ranks, ...(game.equipment?.length?{equipment:structuredClone(game.equipment)}:{}) };
 }

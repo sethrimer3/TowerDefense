@@ -5,13 +5,13 @@
  * found by the topic's id and drawn as a tree); the Tiles tab sells the
  * copies of its palette items and links each to its topic. Pure data, so a
  * test can check nothing is left out or listed twice. */
-import type { PaletteItem, UpgradeId } from "./defend/catalog.ts";
+import { ITEM_NAMES, type PaletteItem, type UpgradeId } from "./defend/catalog.ts";
 import type { TrainingId } from "./progression.ts";
 import type { SkillId } from "./skill-trees.ts";
 import type { UiSprite } from "./ui/dom.ts";
 import type { IconItem } from "./defend/structure-art.ts";
 
-export type SubjectId = "realm" | "city" | "towers" | "units" | "spells" | "mine" | "library";
+export type SubjectId = "all" | "realm" | "city" | "towers" | "units" | "spells" | "mine" | "library";
 /** One-off buys that aren't palette items or levels. */
 export type Extra = "bomb" | "speed3";
 export type Topic = {
@@ -30,7 +30,7 @@ export type Topic = {
 };
 export type Subject = { id: SubjectId; name: string; sprite: UiSprite; blurb: string; topics: Topic[] };
 
-export const SUBJECTS: Subject[] = [
+const LEGACY_SUBJECTS: Subject[] = [
   {
     id: "realm", name: "Realm", sprite: "upgrades", blurb: "Every troop, every tower, every defense.",
     topics: [
@@ -47,7 +47,7 @@ export const SUBJECTS: Subject[] = [
       { id: "cityGate", name: "City gate", item: "cityGate", upgrades: ["gateStrength", "gateHinges"] },
       { id: "wallBallista", name: "Wall ballista", item: "wallBallista", upgrades: ["ballistaDamage", "ballistaRate", "ballistaRange"] },
       { id: "spikes", name: "Wall spikes", item: "wallSpikes", upgrades: ["spikeDamage", "spikeRate"] },
-      { id: "repairShop", name: "Repair shop", item: "repairShop", upgrades: ["civilianCount", "civilianHealth", "rebuildSpeed"], training: ["rebuild", "repairHp", "repairDamage", "buildingHp"], skills: ["guilds"] },
+      { id: "repairShop", name: "Repair shop", item: "repairShop", upgrades: ["civilianCount", "civilianHealth", "rebuildSpeed"], training: ["rebuild", "repairHp", "repairDamage"], skills: ["guilds"] },
       {
         id: "bait", name: "Monster bait", item: "monsterBait", upgrades: ["baitRestock", "baitBlast"],
       },
@@ -109,3 +109,21 @@ export const SUBJECTS: Subject[] = [
 
 /** Every palette item a topic's Forge sells copies of. */
 export const topicItems = (t: Topic): PaletteItem[] => [...(t.item ? [t.item] : []), ...(t.items ?? [])];
+
+export const SUBJECTS: Subject[] = [
+  { id: "realm", name: "Realm", sprite: "defense", blurb: "The city and its people.", topics: [
+    { id: "keep", name: "Keep", icon: "keep", upgrades: ["keepStrength"], training: ["keepHp"], skills: ["bastions"], extras: ["speed3"] },
+    { id: "mine", name: "Mine", item: "mine", skills: ["coffee", "waterproofing", "mineCarts", "oreSense", "scholars", "tactician"], training: ["minerEfficiency", "minerPower"] },
+    { id: "library", name: "Library", item: "library", skills: ["fireproofWood", "fireTraining", "nightWatch", "enchantedInk"], training: ["librarianEfficiency", "librarianPower"] },
+    ...LEGACY_SUBJECTS.find(s=>s.id==='city')!.topics.map(t=>t.id==='walls'?{...t, name:'City tiles & walls', upgrades:['wallStrength'] as UpgradeId[], training:['wallHp'] as TrainingId[], skills:['masonry'] as SkillId[]}:t),
+  ] },
+  ...LEGACY_SUBJECTS.filter(s=>s.id==='towers'||s.id==='units').map(s=>({...s,topics:s.topics.map(t=>({...t,upgrades:[],training:[],skills:[]}))})),
+  LEGACY_SUBJECTS.find(s=>s.id==='spells')!,
+];
+// The basic guilds and every evolved building get a tile of their own.
+const combat = SUBJECTS.filter(s=>s.id==='towers'||s.id==='units');
+for (const s of combat) {
+  const kinds = s.topics.flatMap(topicItems);
+  if(s.id==='units') kinds.push(...LEGACY_SUBJECTS[0].topics[0].items!);
+  s.topics = [...new Set(kinds)].map(item=>({id:item,name:ITEM_NAMES[item],item}));
+}

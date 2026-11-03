@@ -18,14 +18,9 @@ const ownTopic = (item: PaletteItem) => topics.find((t) => topicItems(t).include
 /** The topics whose Smithy rows apply to a kind: its own, and the shared
  * All troops or All towers topic it fights under. */
 function topicsOf(kind: LeveledKind): { topic: Topic; only?: (id: string) => boolean }[] {
-  if (kind === "keep") return [{ topic: topic("walls"), only: (id) => id.startsWith("keep") }];
-  if (kind === "wall") return [{ topic: topic("walls"), only: (id) => id.startsWith("wall") }];
-  if (kind === "gate") return [{ topic: topic("cityGate") }];
-  if (kind === "spikes") return [{ topic: topic("spikes") }];
-  if (kind === "wallBallista") return [{ topic: topic("wallBallista") }, { topic: topic("towers") }];
-  const own = ownTopic(kind),
-    shared = ITEM_CATEGORY[kind] === "units" ? topic("troops") : ITEM_CATEGORY[kind] === "towers" ? topic("towers") : undefined;
-  return [...(own ? [{ topic: own }] : []), ...(shared ? [{ topic: shared }] : []), ...(ITEM_CATEGORY[kind] === "units" ? [{ topic: topic("repairShop"), only: (id: string) => id === "buildingHp" }] : [])];
+  const id=kind==='keep'?'keep':kind==='wall'?'walls':kind==='gate'?'cityGate':kind;
+  const t=kind==='spikes'?topic('spikes'):kind==='wallBallista'?topic('wallBallista'):topics.find(t=>t.id===id)??ownTopic(kind as PaletteItem);
+  return t?[{topic:t}]:[];
 }
 /** The Smithy rows a kind's level counts. */
 export function smithyRows(kind: LeveledKind): SmithyRows {

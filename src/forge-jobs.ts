@@ -7,7 +7,7 @@ import { busySmiths, multiplier } from "./progression.ts";
 import { billWork } from "./training-jobs.ts";
 import { METALS } from "./mine/sim.ts";
 
-export type ForgeRequest = { kind: "upgrade"; id: UpgradeId } | { kind: "speed"; id: "speed3" };
+export type ForgeRequest = { kind: "equipment"; id: "hp" | "power"; equipment: number } | { kind: "upgrade"; id: UpgradeId } | { kind: "speed"; id: "speed3" };
 export type ForgeJob = ForgeRequest & { rank: number; left: number; smiths: string[]; paid: Price };
 /** One smith's seconds of work on a Forge level with `ranks` already bought
  * and costing `bill`: twice a Smithy row's at the same rank, growing with the
@@ -16,12 +16,20 @@ export const forgeSeconds = (ranks: number, bill: Price = {}) => 120 * (Math.max
 
 export function forgeOffer(save: Save, request: ForgeRequest) {
   if (request.kind === "speed") return { rank: 0, price: SPEED3_PRICE, seconds: forgeSeconds(0, SPEED3_PRICE), maxed: save.defend.speed3 };
+  if(request.kind==='equipment'){
+    const gear=save.equipment?.find(g=>g.id===request.equipment), rank=gear?.[request.id]??0;
+    const price={copper:1+5*rank*rank};return {rank,price,seconds:forgeSeconds(rank,price),maxed:!gear||rank>=50};
+  }
   const def = UPGRADES.find(u => u.id === request.id)!;
   const rank = save.defend.levels[request.id], price = (def.price ?? upgradePrice)(rank);
   return { rank, price, seconds: forgeSeconds(rank, price), maxed: rank >= def.maxLevel };
 }
 
 function grant(save: Save, job: ForgeJob) {
+  if(job.kind==='equipment'){
+    const gear=save.equipment?.find(g=>g.id===job.equipment);if(!gear||gear[job.id]!==job.rank)return false;
+    gear[job.id]++;return true;
+  }
   const free = { ...save.smithy, free: true };
   return job.kind === "speed" ? buySpeed3(save.defend, free)
     : save.defend.levels[job.id] === job.rank && buyUpgrade(save.defend, free, job.id);
@@ -78,7 +86,7 @@ export function settleForge(save: Save, now: number, smiths: ReadonlySet<string>
 export function decodeForgeJob(raw: unknown, save: Save): ForgeJob | null {
   if (!raw || typeof raw !== "object") return null;
   const j = raw as ForgeJob;
-  if (!(j.kind === "speed" && j.id === "speed3") && !(j.kind === "upgrade" && UPGRADES.some(u => u.id === j.id))) return null;
+  if (!(j.kind === "equipment" && ["hp","power"].includes(j.id) && save.equipment?.some(g=>g.id===j.equipment)) && !(j.kind === "speed" && j.id === "speed3") && !(j.kind === "upgrade" && UPGRADES.some(u => u.id === j.id))) return null;
   if (!Number.isInteger(j.rank) || j.rank < 0 || !Number.isFinite(j.left) || j.left <= 0 || !Array.isArray(j.smiths)
     || !j.paid || typeof j.paid !== "object" || !METALS.every(k => j.paid[k] === undefined || Number.isSafeInteger(j.paid[k]) && j.paid[k]! >= 0)) return null;
   const offer = forgeOffer(save, j);

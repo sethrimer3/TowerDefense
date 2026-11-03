@@ -37,3 +37,5 @@
 - Evolution: `evolves: { from, item, name, cost, text }` puts a crown after the last rank; `evolve` turns every owned `from` into `item` (placed ones lifted to the palette), `unlearnPath` turns them back, and the Tiles shop stops selling `item` on its own (`shopOffer` in `src/tiles.ts`).
 - Exclusive: the first rank chooses the path and seals the topic's others; unlearning returns all the Knowledge spent (`spent` in `save.paths`).
 - Effect: the battle reads `Bonuses.paths` with `pathRank(paths, topic, id)`; keep the numbers in an exported table beside the paths, keep any new unit or enemy state absent when the path isn't chosen, and use exact math only, so replays don't move.
+
+Realm workshops (save 8): Ledger begins on All and unfolds owned copies. Combat building Smithy work uses `equipment.ts` and Forge equipment requests; shared legacy combat tables remain for historical pricing. Economy Training rows live on separate Mine/Library tiles under Realm, and their production tabs require those buildings to be placed in the city. See `docs/upgrades/REALM_WORKSHOPS.md`.

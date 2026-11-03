@@ -19,7 +19,7 @@ test("research reserves Knowledge, shares a single project, and only applies the
   assert.ok(startResearch(s, { kind: "skill", id: "masonry" }, 1000, 1));
   assert.equal(s.knowledge, 99);
   assert.equal(s.skills.masonry, 0);
-  assert.equal(startResearch(s, { kind: "skill", id: "drillSergeant" }, 1000, 2), false);
+  assert.equal(startResearch(s, { kind: "skill", id: "masonry" }, 1000, 2), false);
   assert.equal(researchLeft(s, 2), researchSeconds(0) * 1000 / 2);
   assert.equal(settleResearch(s, 1000 + researchSeconds(0) * 1000 - 1, 1), false);
   assert.equal(s.skills.masonry, 0);
@@ -40,7 +40,7 @@ test("temporary dev unlocks do not discard paid research", () => {
 
 test("research responds to staffing changes, pauses without banking work, and survives time away", () => {
   const s = defaults(); s.knowledge = 50;
-  startResearch(s, { kind: "skill", id: "drillSergeant" }, 1000, 1);
+  startResearch(s, { kind: "skill", id: "masonry" }, 1000, 1);
   settleResearch(s, 101000, 1);
   assert.equal(s.researchJob!.left, 200000);
   settleResearch(s, 201000, 0);
@@ -50,7 +50,7 @@ test("research responds to staffing changes, pauses without banking work, and su
   assert.deepEqual(back.researchJob, s.researchJob);
   assert.equal(back.researchClock, 201000);
   assert.ok(settleResearch(back, 301000, 2));
-  assert.equal(back.skills.drillSergeant, 1);
+  assert.equal(back.skills.masonry, 1);
   const clock = back.researchClock;
   settleResearch(back, clock - 100, 1);
   assert.equal(back.researchClock, clock, "a rolled-back clock cannot credit time twice");
@@ -105,8 +105,8 @@ test("instant research bypasses workers and timers but still checks and pays the
 
 test("Forge and Training share named smiths; Forge levels apply after work, not when paid", () => {
   const s = defaults(); s.smithy = { copper: 100, silver: 100, gold: 100 };
-  assert.ok(startForge(s, { kind: "upgrade", id: "soldierArms" }, "Ada", 1000));
-  assert.equal(s.defend.levels.soldierArms, 0); assert.equal(s.smithy.copper, 98);
+  assert.ok(startForge(s, { kind: "upgrade", id: "keepStrength" }, "Ada", 1000));
+  assert.equal(s.defend.levels.keepStrength, 0); assert.equal(s.smithy.copper, 98);
   assert.equal(startTraining(s, "keepHp", "Ada"), false, "already working at the Forge");
   assert.ok(startTraining(s, "keepHp", "Bram"));
   assert.equal(addForgeSmith(s, "Bram"), false);
@@ -117,7 +117,7 @@ test("Forge and Training share named smiths; Forge levels apply after work, not 
   const loaded = decode(JSON.stringify(s));
   assert.deepEqual(loaded.forgeJob, s.forgeJob);
   assert.ok(settleForge(loaded, 1000 + forgeSeconds(0) * 1000 / 2, new Set(["Ada", "Bram", "Cara"])));
-  assert.equal(loaded.defend.levels.soldierArms, 1);
+  assert.equal(loaded.defend.levels.keepStrength, 1);
   assert.equal(loaded.smithy.copper, 97, "both reserved prices paid once");
   assert.deepEqual([...busySmiths(loaded)], ["Bram"]);
 });

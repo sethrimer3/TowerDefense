@@ -1,3 +1,5 @@
+import { refundRetired } from "./retired-upgrades.ts";
+import { decodeEquipment, type Equipment } from "./equipment.ts";
 import { decodeProfile, type PlayerProfile } from "./profile/model.ts";
 import { decodeSiege, type SiegeSave } from "./campaign/siege-progress.ts";
 import { decodeCampaigns, emptyCampaigns, type CampaignSave } from "./campaign/sim.ts";
@@ -27,8 +29,9 @@ export const SAVE_KEY = "towerdefense.v1";
  * 5: each building is upgraded on its own, its path's rank kept with it;
  * the Study researches only the spells. 6: the Ranged Guild's musket hall
  * and sniper lodge moved behind the Gunner hall (`migrateGunLine`). 7: every
- * line one shape, its ultimate merged from three buildings (`migrateTrees`). */
-export const SAVE_VERSION = 7;
+ * line one shape, its ultimate merged from three buildings (`migrateTrees`).
+ * 8: Realm economy buildings, individual Smithy equipment and shared combat refunds. */
+export const SAVE_VERSION = 8;
 
 export type Save = {
   version: number;
@@ -55,6 +58,7 @@ export type Save = {
   spellPaths: Partial<Record<SpellId, PathId>>;
   /** The Smithy's upgrades: ranks completed per row, the ranks in work, and
    * when their work was last settled (ms). */
+  equipment?: Equipment[];
   training: Record<TrainingId, number>;
   trainingJobs: TrainingJob[];
   trainingClock: number;
@@ -142,6 +146,7 @@ export function decode(raw: string | null): Save {
   d.trainingJobs = decodeJobs(s.trainingJobs, d.training);
   d.trainingClock = num(s.trainingClock, 0);
   d.defend = decodeDefendSave(s.defend);
+  const equipment=decodeEquipment(s.equipment,d.defend);if(equipment.length)d.equipment=equipment;
   // Advanced carpentry was a Repair shop skill before masons mended every
   // building and tower from the start: its Knowledge comes back.
   if (s.defend?.repairRanks?.advancedCarpentry === 1) d.knowledge += RETIRED_REPAIR_KNOWLEDGE;
@@ -179,6 +184,7 @@ export function decode(raw: string | null): Save {
   d.researchClock = num(s.researchClock, 0);
   d.forgeJob = decodeForgeJob(s.forgeJob, d);
   d.forgeClock = num(s.forgeClock, 0);
+  refundRetired(d);
   return d;
 }
 

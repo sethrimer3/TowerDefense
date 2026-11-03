@@ -193,7 +193,7 @@ export class TilesPage {
     stacking.disabled = shop;
     c.querySelector(".tiles-filters")!.innerHTML = TILE_FILTERS.map((f) => {
       const n = tileStacks(s, f.id, shop).reduce((a, t) => a + (shop ? 1 : t.count), 0);
-      return `<button data-filter="${f.id}" class="filter-${f.id}" aria-pressed="${f.id === this.filter}">${tr((f.id === "all" ? "filter.all" : f.id === "consumables" ? "control.skills" : f.id === "units" ? "filter.units" : `subject.${f.id}`) as MessageKey)}<b>${n}</b></button>`;
+      return `<button data-filter="${f.id}" class="filter-${f.id}" aria-pressed="${f.id === this.filter}">${f.id === "city" ? "Realm" : tr((f.id === "all" ? "filter.all" : f.id === "consumables" ? "control.skills" : f.id === "units" ? "filter.units" : `subject.${f.id}`) as MessageKey)}<b>${n}</b></button>`;
     }).join("");
     const stacks = tileStacks(s, this.filter, shop);
     if (this.open && !stacks.some((t) => t.id === this.open)) this.open = null;
@@ -225,10 +225,10 @@ export class TilesPage {
     const where = (placed: number, count: number) => (placed === count ? "In the city" : placed ? `${placed} in the city` : count > 1 ? "In the palette" : "Ready");
     let tiles: string;
     if (shop || t.lasting || !t.count || universal(t.id)) {
-      const sub = shop ? (offerText(offer) || "Not sold") : t.lasting ? "Never used up" : t.placed ? `${t.placed} in the city` : "In the palette";
+      const sub = shop ? (offerText(offer) || "Not sold") : t.id === "keep" ? "In the city" : t.lasting ? "Never used up" : t.placed ? `${t.placed} in the city` : "In the palette";
       const marks = shop ? "" : this.marksHtml(t.id, tileMarks(this.save, t.id), false);
       tiles = `<button class="tile ${type}${layers(t.count)}${open ? " open" : ""}${shop && !canBuyTile(this.save, t.id) ? " dear" : ""}" data-key="${t.id}" data-tile="${t.id}" aria-expanded="${open}" title="${name}">
-          ${face()}<span class="tile-name">${name}</span>${marks}${t.count ? `<b class="tile-count">${t.lasting ? "∞" : `×${t.count}`}</b>` : ""}<small class="tile-sub">${sub}</small></button>`;
+          ${face()}<span class="tile-name">${name}</span>${marks}${t.count ? `<b class="tile-count">${t.id === "keep" ? "1" : t.lasting ? "∞" : `×${t.count}`}</b>` : ""}<small class="tile-sub">${sub}</small></button>`;
     } else if (this.stacked) {
       tiles = tileGroups(this.save, t).map((g) => `<button class="tile ${type}${layers(g.count)}${g.placed ? " placed" : ""}${open ? " open" : ""}" data-key="${g.key}" data-tile="${t.id}" aria-expanded="${open}" title="${name}: ${marksText(t.id, g.marks)}">
           ${face(g.wear)}<span class="tile-name">${name}</span>${this.marksHtml(t.id, g.marks, true)}<b class="tile-count">×${g.count}</b><small class="tile-sub">${where(g.placed, g.count)}</small></button>`).join("");
@@ -274,7 +274,7 @@ export class TilesPage {
     const tree = !shop && t.count && tileTree(s, t.id, copy?.key)
       ? `<button class="tile-go go-tree" data-tree="${t.id}"${copy ? ` data-copy="${copy.key}"` : ""}>♛ Upgrade tree<small>in Defend</small></button>`
       : "";
-    const counts = t.lasting ? "ONE BANNER" : `OWNED ${t.count}${isConsumable(t.id) ? "" : ` · ${t.placed} IN THE CITY · ${t.ready} READY`}`;
+    const counts = t.id === "keep" ? "UNIQUE KEEP" : t.lasting ? "PERMANENT SKILL" : `OWNED ${t.count}${isConsumable(t.id) ? "" : ` · ${t.placed} IN THE CITY · ${t.ready} READY`}`;
     const where = copy?.placed ? "IN THE CITY" : "IN THE PALETTE";
     const sheet = this.sheet(t.id, wear);
     return `<div class="tile-detail type-${t.type}" data-key="detail:${t.id}" data-grow role="region" aria-label="${name}">
@@ -291,6 +291,8 @@ export class TilesPage {
   /** What tile `id` (wearing `wear`) shows: its basic stats and its
    * upgrades' abilities; a line saying what it does where it has no numbers. */
   private sheet(id: TileId, wear?: Wear): StatSheet & { about?: string } {
+    if (id === "keep") return {stats:[],abilities:[],about:"The heart of the city. Open its Knowledge tree for bastions, arrow loops, boiling oil and the city watch."};
+    if (id === "mine" || id === "library") return {stats:[],abilities:[],about:`Place the ${TILE_NAMES[id]} in the city to unlock its tab, production and upgrades.`};
     if (id === "bomb") return { stats: [`${Number((BOMB_DAMAGE * bonuses(this.save).bombDamage).toFixed(2))} damage`, `${BOMB_RADIUS.toFixed(1)} cell radius`], abilities: [] };
     if (isConsumable(id)) return { stats: [], abilities: [], about: CONSUMABLE_TEXT[id] };
     if (id === "cityTile") return { stats: [], abilities: [], about: "Expands the city limits; the wall moves out to enclose it." };

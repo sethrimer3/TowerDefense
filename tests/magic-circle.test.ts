@@ -136,7 +136,7 @@ test('city, strike spells, infantry and towers select distinct motif families', 
     assert.equal(studyCircle(save, topics.find(t => t.id === id)!).motif, 'triangles');
   for (const id of ['walls', 'spikes', 'repairShop', 'bait'])
     assert.equal(studyCircle(save, topics.find(t => t.id === id)!).motif, 'tesseract');
-  for (const id of ['troops', 'towers', 'barracks', 'wizardTower'])
+  for (const id of ['barracks', 'wizardTower'])
     assert.equal(studyCircle(save, topics.find(t => t.id === id)!).motif, 'voronoi');
   for (const kind of ['keep', 'walls', 'wallSpikes', 'monsterBait'] as const)
     assert.equal(specialtyCircle(kind).motif, 'tesseract');

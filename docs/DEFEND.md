@@ -1173,3 +1173,7 @@ When a target enters its fourteen-cell reach, it locks an aim and charges for fi
 Impact creates a 6.5-cell-radius sphere lasting six seconds, dealing twelve pulses half a second apart. Pulses hit troops, civilians, enemies (including Blight) and structures, through native damage/guard/shield/immunity and water rules. A grounded fortress and its mounts cannot take duplicate damage from the same pulse. The shattered ground uses cannon/meteor scorch art with three times the main arms, extra branches, a wider reach and a 24-second cooling lifetime.
 
 Available in the developer unit tester and enemy journal; authored wave placement remains pending.
+
+### Realm workshops and economy tiles
+
+The Mine and Library are 4 × 4 structures placed through the native city palette. They unlock production/navigation when placed, pause without losing stored crews when lifted, and have separate Realm tiles for Knowledge and Smithy upgrades. The Keep is also a unique Realm tile. Smithy/Study collections start on All and unfold owned copies. Combat buildings use individual timed armour/power equipment; their Knowledge upgrades use their existing per-building trees. Retired shared combat upgrades and work are refunded by save schema 8. See [Realm workshops](upgrades/REALM_WORKSHOPS.md).
