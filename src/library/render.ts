@@ -121,6 +121,8 @@ function candleUp(x: number) {
 }
 /** How far in the view zooms. */
 const MAX_ZOOM = 6;
+/** The gold band across a plain book's spine, and its shaded right half. */
+const BAND_GOLD: RGB = [168, 118, 30], BAND_SHADE: RGB = [126, 88, 22];
 /** How much of the hallways the view shows at the widest zoom: all the
  * nave and most of each hallway (the rest pans into view). */
 const FIT_W = W + HALL * 1.2;
@@ -412,11 +414,15 @@ export class LibraryRenderer {
             const slot = slotIndex(bay, unit, row, i), burnt = !!sim.burntSlots[slot];
             const c = sim.slots[slot] || sim.burntSlots[slot];
             if (!c) continue;
-            const rgb: RGB = burnt ? [30, 24, 20] : hex(BOOK_COLORS[c]), tall = 4 + Math.floor(h01(bay * 31 + unit, row * 7 + i, 4) * 3), band = h01(bay * 31 + unit, row * 7 + i, 6) < 0.4 ? 2 + (c % 2) : -1;
+            const rgb: RGB = burnt ? [30, 24, 20] : hex(BOOK_COLORS[c]), tall = 4 + Math.floor(h01(bay * 31 + unit, row * 7 + i, 4) * 3);
+            // A deep gold band across the spine, only on books with no
+            // title or runes to show when zoomed in.
+            const plain = !burnt && !sim.enchanted[slot] && !titleFor(slot, tall).length;
+            const band = plain && h01(bay * 31 + unit, row * 7 + i, 6) < 0.4 ? 2 + (c % 2) : -1;
             const bx = x0 + 1 + i * 2, by = y0 + row * ROW_H + ROW_H - 1;
             for (let k = 1; k <= tall && k < ROW_H; k++) {
-              put(bx, by - k, rgb, burnt);
-              put(bx + 1, by - k, k === band && !burnt ? [190, 160, 84] : [rgb[0] * 0.75, rgb[1] * 0.75, rgb[2] * 0.75], burnt);
+              put(bx, by - k, k === band ? BAND_GOLD : rgb, burnt);
+              put(bx + 1, by - k, k === band ? BAND_SHADE : [rgb[0] * 0.75, rgb[1] * 0.75, rgb[2] * 0.75], burnt);
             }
           }
       }
@@ -1451,6 +1457,8 @@ const flicker = (t: number, n: number) => 0.88 + 0.08 * Math.sin(t * 2.3 + n * 1
 function slotsKey(sim: LibrarySim) {
   let h = 0;
   for (let i = 0; i < sim.slots.length; i++) if (sim.slots[i]) h = (h * 31 + i * 7 + sim.slots[i]) | 0;
+  // Enchanted books lose their gold band, so the shelves repaint for them too.
+  for (let i = 0; i < sim.enchanted.length; i++) if (sim.enchanted[i]) h = (h * 31 + i * 13 + 101) | 0;
   return h;
 }
 
