@@ -10,9 +10,9 @@ import { NO_BONUSES, ballistaDamage, gateHpScale, gateShut, type Bonuses } from 
 import { generateCity } from "../src/defend/citygen.ts";
 import { cellIndex } from "../src/defend/grid.ts";
 import { defaultLayout, fitLayout, gateRect, placeCityTile, placeGate, type GateSpot, type Layout } from "../src/defend/layout.ts";
-import { findPath } from "../src/defend/pathing.ts";
+import { cellAt, cellCenter, findPath } from "../src/defend/pathing.ts";
 import { DefendSim, type Enemy, type Levels } from "../src/defend/sim.ts";
-import { gateTowerSpots, stepGates } from "../src/defend/gates.ts";
+import { gatePassage, gateTowerSpots, stepGates } from "../src/defend/gates.ts";
 import { stepBallistaBolts } from "../src/defend/wall-defenses.ts";
 import { GATE_PATHS, GATE_TOWERS, IRONBOUND, PORTCULLIS, decodeGateRanks, gateAllocated, respecGate, undoGate, upgradeGate, type GateRanks } from "../src/gate-upgrades.ts";
 import { SIDE_UI, gateStats } from "../src/ui/specialty.ts";
@@ -44,7 +44,8 @@ function enemy(s: DefendSim, x: number, y: number, hp = 1e6) {
 }
 /** One of the city's people standing just inside the gate. */
 const townsman = (s: DefendSim) => {
-  const u = { x: R.x + 1.5, y: R.y + R.h + 0.5, hp: 10 };
+  const u = { x: R.x + 1.5, y: R.y + R.h + 0.5, hp: 10, path: [] as number[] };
+  u.path = findPath(s.ownSolid, u, { x: u.x, y: R.y - 1.5 }, { maxCost: 40 })!;
   s.civilians.push(u as never);
   return u;
 };
@@ -206,4 +207,41 @@ test("the gates' tree shows in Defend's panel with its numbers", () => {
   assert.ok(tree.buy(s, "gateTowers").ok);
   assert.equal(tree.allocated(s), gateAllocated(s.defend.gateRanks));
   assert.deepEqual(tree.undo(s, "q:gateTowers:1"), { id: "gateTowers", rank: 1 });
+});
+
+test("nearby idle people and parallel errands do not open a gate", () => {
+  for (const soldier of [false, true]) {
+    const s = sim(), u = townsman(s);
+    if (soldier) { s.civilians.length = 0; s.soldiers.push({ ...u, kind: 'sword' } as never); }
+    const person = soldier ? s.soldiers[0] : u;
+    person.path = [];
+    run(s, .1); assert.equal(s.gateOpen.size, 0);
+    person.path = [cellIndex(Math.floor(person.x + 1), Math.floor(person.y))];
+    run(s, .1); assert.equal(s.gateOpen.size, 0, 'walking alongside the wall');
+    person.path = findPath(s.ownSolid, person, { x: R.x + 1.5, y: R.y - 1.5 }, { maxCost: 40 })!;
+    run(s, .1); assert.ok(foeOpen(s), 'a route outside opens it');
+    person.path = [];
+    run(s, gateShut(0) + .1); assert.equal(s.gateOpen.size, 0, 'cancelling the route closes it despite proximity');
+  }
+});
+
+test("gate passage follows the wall axis in both directions, only on the local route", () => {
+  for (const side of ['n', 's', 'e', 'w'] as const) {
+    const l = placeGate(L, { tx: KX, ty: side === 's' ? KY : KY - 1, side })!;
+    const s = sim(undefined, {}, l), b = gateOf(s), r = b.rect;
+    const horizontal = r.w >= r.h;
+    const a = horizontal ? { x: r.x + 1.5, y: r.y - .5 } : { x: r.x - .5, y: r.y + 1.5 };
+    const z = horizontal ? { x: a.x, y: r.y + r.h + .5 } : { x: r.x + r.w + .5, y: a.y };
+    for (const [from,to] of [[a,z],[z,a]]) {
+      const path = findPath(s.ownSolid, from, to, { maxCost: 40 })!;
+      assert.ok(gatePassage(b, { ...from, path }, s.ownSolid), side);
+      assert.ok(!gatePassage(b, { ...from, path: [] }), 'no movement intention');
+      const inside = path.findIndex(c => { const p = cellCenter(c); return p.x >= r.x && p.x < r.x+r.w && p.y >= r.y && p.y < r.y+r.h; });
+      assert.ok(gatePassage(b, { ...cellCenter(path[inside]), path: path.slice(inside+1) }, s.ownSolid), 'continues opening while crossing');
+      const detour = Array.from({ length: 4 }, (_,i) => cellAt(from.x + (horizontal ? i + 1 : 0), from.y + (horizontal ? 0 : i + 1)));
+      assert.ok(!gatePassage(b, { ...from, path: [...detour, ...detour.toReversed(), ...path] }), 'a distant later visit is not an upcoming passage');
+      const blocked = s.ownSolid.slice();blocked[path[0]] = 1;
+      assert.ok(!gatePassage(b, { ...from, path }, blocked), 'blocked route');
+    }
+  }
 });

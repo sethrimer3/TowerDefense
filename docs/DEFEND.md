@@ -592,10 +592,13 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   bands and studs, painted along the wall and turned to its side, then lit
   from the upper left in screen space; it takes the usual damage stages and
   leaves rubble. The doors swing inward over `GATE_FRAMES` while a soldier
-  or civilian is within `GATE.reach` cells, or the sim holds the gate open,
-  and close behind them (`DefendRenderer`, presentation only).
+  or civilian within `GATE.reach` has an upcoming route through the gateway
+  to the other side of the wall, or the sim holds the gate open,
+  and close behind them (`DefendRenderer`, presentation only). Nearby idle
+  people, parallel errands and distant later gate visits do not open it.
+  Cosmetic residents use the same route check as soldiers and masons.
   A gate that opens lets the enemy in too (`gates.ts`, `stepGates`): while
-  any of the city's people are at a standing gate it stands open, and
+  one of the city's people plans to cross a standing gate it stands open, and
   shuts `gateShut` seconds after the last has gone (the Forge's Greased
   hinges, `gateHinges`, shorten it). The enemy walks `sim.foeSolid`, the
   `solid` mask with the open gates open (its flow field, `downhill`, its

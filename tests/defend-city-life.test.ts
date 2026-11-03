@@ -123,3 +123,16 @@ test('keep heights include padded sprite edges, trim transparent corners and ret
   assert.ok(field.some(n=>n===HEIGHT.keep.tower));
   assert.ok(field.some(n=>n===HEIGHT.keep.court));
 });
+
+test('residents request gates only for an upcoming passage', () => {
+ const map=city(true), life=new CityLife();life.sync(map,null,false);
+ const b=map.buildings.find(b=>b.kind==='gate')!, r=b.rect, p=life.people[0];
+ for(const person of life.people)person.hidden=true;
+ p.hidden=false;p.x=r.x+1.5;p.y=r.y+r.h+.5;p.path=[];
+ assert.equal(life.nearGate(b),false,'idle beside a gate');
+ p.path=[cellAt(p.x+1,p.y),cellAt(p.x+2,p.y)];
+ assert.equal(life.nearGate(b),false,'parallel errand');
+ p.path=[];for(let y=r.y+r.h-1;y>=r.y-1;y--)p.path.push(cellAt(p.x,y+.5));
+ assert.equal(life.nearGate(b),true,'heading outside');
+ p.hidden=true;assert.equal(life.nearGate(b),false,'hidden residents cannot request a gate');
+});

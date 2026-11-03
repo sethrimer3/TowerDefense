@@ -1,6 +1,6 @@
 /** The city gates in battle. A standing gate swings open while any of the
- * city's people are at it and shuts `gateShut` seconds after the last has
- * gone; until Portcullis bars it, the enemy may slip through while it is
+ * city's people intend to pass through it, shutting `gateShut` seconds
+ * after the last has gone; until Portcullis bars it, the enemy may slip through while it is
  * open (`DefendSim.foeSolid`), and whoever is caught in the gateway as it
  * shuts is shoved out. The gates' upgrades (`gate-upgrades.ts`) add murder
  * holes and small ballistas on the gatehouse. Repairs require masons. A city
@@ -10,7 +10,7 @@ import { sq } from "../exact.ts";
 import { GATE, ballistaDamage, enemySize, gateShut } from "./catalog.ts";
 import type { Building } from "./citygen.ts";
 import { cellIndex, CELLS_H, CELLS_W } from "./grid.ts";
-import { center, nearest, nearestOpen, rectDist, type Point } from "./pathing.ts";
+import { cellCenter, center, nearest, nearestOpen, rectDist, type Point } from "./pathing.ts";
 import type { DefendSim } from "./sim.ts";
 import { ignite } from "./towers.ts";
 import { fireBolt, onFoot } from "./wall-defenses.ts";
@@ -24,8 +24,8 @@ export function stepGates(sim: DefendSim, dt: number) {
   gateTowers(sim, dt);
 }
 
-/** Opens each standing gate while the city's people are at it, to the
- * enemy as well, and shuts it behind them. */
+/** Opens each standing gate for a planned passage, to the enemy as well,
+ * and shuts it behind the city's people. */
 function swingGates(sim: DefendSim, dt: number) {
   const shut = gateShut(sim.levels.gateHinges ?? 0);
   for (const b of sim.gates) {
@@ -44,10 +44,37 @@ function swingGates(sim: DefendSim, dt: number) {
   }
 }
 
-/** Whether any of the city's people stand at gate `b`, so it swings open
- * (the same reach the renderer opens its doors by). */
+/** A nearby individual's upcoming route must pass through this gateway and
+ * emerge on the other side of the wall. Parallel errands and idle units do
+ * not request it. Only inspect the local approach, not a distant later visit. */
+export function gatePassage(b: Building, u: Point & { path: readonly number[] }, solid?: Uint8Array): boolean {
+  const r = b.rect;
+  if (rectDist(r, u.x, u.y) >= GATE.reach || !u.path.length) return false;
+  const horizontal = r.w >= r.h;
+  const lo = horizontal ? r.y : r.x, hi = lo + (horizontal ? r.h : r.w);
+  const side = (p: Point) => {
+    const v = horizontal ? p.y : p.x;
+    return v < lo ? -1 : v >= hi ? 1 : 0;
+  };
+  const within = (p: Point) => p.x >= r.x && p.x < r.x + r.w && p.y >= r.y && p.y < r.y + r.h;
+  const from = side(u);
+  let entered = within(u), previous: Point = u, distance = 0;
+  for (const cell of u.path) {
+    if (solid?.[cell]) return false;
+    const p = cellCenter(cell);
+    distance += Math.hypot(p.x - previous.x, p.y - previous.y);
+    if (distance > GATE.reach + (hi - lo) + 2) return false;
+    entered ||= within(p);
+    if (entered && side(p) !== 0 && (from === 0 || side(p) !== from)) return true;
+    previous = p;
+  }
+  return false;
+}
+
+/** Soldiers and masons open a gate for a planned passage, never proximity. */
 export const peopleAt = (sim: DefendSim, b: Building) =>
-  sim.soldiers.some((u) => u.hp > 0 && rectDist(b.rect, u.x, u.y) < GATE.reach) || sim.civilians.some((u) => u.hp > 0 && rectDist(b.rect, u.x, u.y) < GATE.reach);
+  sim.soldiers.some((u) => u.hp > 0 && u.kind !== "valkyrie" && !u.perch?.up && gatePassage(b, u, sim.ownSolid)) ||
+  sim.civilians.some((u) => u.hp > 0 && gatePassage(b, u, sim.ownSolid));
 
 /** Enemies on foot caught in the gateway as it shuts step out of it. */
 function shoveOut(sim: DefendSim, b: Building) {

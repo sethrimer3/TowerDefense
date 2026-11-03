@@ -9,6 +9,7 @@ import { CELL_COUNT, CELLS_W, CELLS_H, cellIndex, cellInBounds, sideCells, hash0
 import { cellAt, cellCenter, findPath } from './pathing.ts';
 import type { DefendSim } from './sim.ts';
 import { boulderPlan } from './forest.ts';
+import { gatePassage } from './gates.ts';
 import { PERSON_TORCH_STRENGTH, torchLevel } from './city-torches.ts';
 export type Resident = {
   id: number; role: 'townsfolk' | 'watchman'; x: number; y: number; size: number;
@@ -211,6 +212,6 @@ export class CityLife {
   /** Where the watchmen out on their rounds stand, for the battle's guards to muster at. */
   watchmenAt() { return this.visible.filter(p=>p.role==='watchman').map(p=>({x:p.x,y:p.y})); }
   get visible() { return this.people.filter(p=>!p.hidden); }
-  nearGate(b: Building) {return this.visible.some(p=>p.x>=b.rect.x-1&&p.x<=b.rect.x+b.rect.w+1&&p.y>=b.rect.y-1&&p.y<=b.rect.y+b.rect.h+1);}
+  nearGate(b: Building) {return this.people.some(p=>!p.hidden&&gatePassage(b,p,this.solid));}
   lights(time: number) {return this.visible.map(p=>({id:p.id,x:p.x+.2,y:p.y-.15,r:4.5,k:PERSON_TORCH_STRENGTH*torchLevel(time,p.id)})).filter(l=>l.k>0);}
 }

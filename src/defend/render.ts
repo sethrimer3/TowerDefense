@@ -549,7 +549,7 @@ export class DefendRenderer {
     }
   }
 
-  /** The city gates swing open while any of the city's people are at
+  /** The city gates swing open while any of the city's people plan to pass through
    * them, and shut behind them; the layer shows them shut (a wooden
    * gate's leaves, shut or not, are drawn here over its posts). */
   private drawGates(map: CityMap, sim: DefendSim | null, opts: DrawOptions, dt: number) {
@@ -559,7 +559,7 @@ export class DefendRenderer {
         this.gateOpen.delete(b.id);
         continue;
       }
-      // Open while the sim holds it open to the enemy too, or anyone of the city is at it.
+      // Open while the sim holds it open to the enemy too, or someone has a route through it.
       const near = !!(sim && (sim.gateOpen.has(b.id) || peopleAt(sim, b))) || this.cityLife.nearGate(b);
       const was = this.gateOpen.get(b.id) ?? 0;
       const open = opts.reduceMotion ? (near ? 1 : 0) : Math.max(0, Math.min(1, was + (near ? 2.5 : -1.5) * Math.min(dt, 0.1)));
