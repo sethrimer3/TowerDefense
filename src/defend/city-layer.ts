@@ -77,6 +77,17 @@ const FACE = { x0: 8, span: 64, y: 44, h: 14 };
 /** How far a wall stone's brick face hangs over the cell below, in cells. */
 export const FACE_HANG = WALL_FACE_HANG;
 
+/** Legacy Walls: the stone wall's brick south face hung below the stones
+ * (the old slanted look). Off, the default, walls are drawn top-down only:
+ * cap stones and their outline, no face. Presentation only. */
+let legacyWalls = false;
+export const wallFaces = () => legacyWalls;
+export function setLegacyWalls(on: boolean) {
+  if (on === legacyWalls) return;
+  legacyWalls = on;
+  artListeners.forEach((f) => f());
+}
+
 const RUBBLE = "#4a443d";
 const WALL = "#8e897c";
 
@@ -450,7 +461,7 @@ function paintSpikes({ c, px, map, solid }: Paint, outside = false) {
     for (const i of row.cells) {
       if (!solid(i)) continue;
       const cx = i % CELLS_W, cy = (i - cx) / CELLS_W;
-      const hung = row.side === "s" && cy + 1 < CELLS_H && !solid(i + CELLS_W);
+      const hung = legacyWalls && row.side === "s" && cy + 1 < CELLS_H && !solid(i + CELLS_W);
       const reach = SPIKE_REACH / ART + (hung ? FACE_HANG : 0);
       const x = Math.round((cx + dx * reach) * px), y = Math.round((cy + dy * reach) * px);
       const w = Math.round((cx + dx * reach + 1) * px) - x, h = Math.round((cy + dy * reach + 1) * px) - y;
@@ -534,7 +545,7 @@ function paintWall(p: Paint, b: Building) {
     return map.wall[i] === 1 && solid(i);
   };
   const w = Math.round((cx + 1) * px) - x, h = Math.round((cy + 1) * px) - y;
-  const face = !standing(0, 1) && cy + 1 < CELLS_H;
+  const face = legacyWalls && !standing(0, 1) && cy + 1 < CELLS_H;
   // A mask (`paintBuildingMask`): the stone and its face, or its outline alone.
   const mode = maskMode();
   if (mode) {
@@ -566,6 +577,7 @@ function paintWall(p: Paint, b: Building) {
  * (exclusive) the cells. Whatever is drawn on that ground after the city
  * layer (the forest's floor) must leave the face showing. */
 export function hangingFaces(map: CityMap, sim: DefendSim | null): { y: number; x0: number; x1: number }[] {
+  if (!legacyWalls) return [];
   const standing = (i: number) => map.wall[i] === 1 && !map.buildings[map.owner[i]]?.fence && (sim ? sim.solid[i] === 1 : map.owner[i] >= 0);
   const runs: { y: number; x0: number; x1: number }[] = [];
   for (let cy = 1; cy < CELLS_H; cy++) {

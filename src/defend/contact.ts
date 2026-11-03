@@ -1,6 +1,6 @@
 /** Contact attacks use body/outline geometry rather than the old 0.4-cell
  * reach bonus. Pure world measurements; never dependent on zoom or pixels. */
-import { ART, UNIT_CONTOUR_ART_PIXELS, WALL_FACE_HANG } from "./art-scale.ts";
+import { ART, UNIT_CONTOUR_ART_PIXELS } from "./art-scale.ts";
 import { ENEMIES, enemySize } from "./catalog.ts";
 import { dist } from "../exact.ts";
 import { blocked, cellAt, nearestPoint, type Point } from "./pathing.ts";
@@ -27,7 +27,8 @@ export function fenceContactRects(b: Building): Rect[] {
 }
 
 /** Stone-wall outlines occupy the outer half art pixel of their painted
- * box. Their south face also hangs beyond the logical collision cell. */
+ * box. Walls are drawn top-down (Legacy Walls' hanging south face is
+ * presentation only), so contact stops at the stone's own cell. */
 export function structureContactRect(sim: DefendSim, b: Building): Rect {
   if (b.kind !== "wall" || b.fence) return b.rect;
   const r = b.rect;
@@ -37,9 +38,8 @@ export function structureContactRect(sim: DefendSim, b: Building): Rect {
   };
   const top = standing(0, -1) ? 0 : CONTACT_OUTLINE;
   const left = standing(-1, 0) ? 0 : CONTACT_OUTLINE, right = standing(1, 0) ? 0 : CONTACT_OUTLINE;
-  const south = standing(0, 1), face = !south && r.y + r.h < CELLS_H;
-  const bottom = south ? 0 : CONTACT_OUTLINE;
-  return { x: r.x + left, y: r.y + top, w: r.w - left - right, h: r.h + (face ? WALL_FACE_HANG : 0) - top - bottom };
+  const bottom = standing(0, 1) ? 0 : CONTACT_OUTLINE;
+  return { x: r.x + left, y: r.y + top, w: r.w - left - right, h: r.h - top - bottom };
 }
 
 /** Project onto the perimeter, including when already inside the approach

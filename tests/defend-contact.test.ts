@@ -41,18 +41,18 @@ test('all three Darkling sizes close the old attack gap before damaging a wall',
   }
 });
 
-test('contact is geometric on every face and at corners, including the wall front', () => {
+test('contact is geometric on every face and at corners, including the south edge of the wall', () => {
   for (const kind of ['miniDarkling', 'darkling', 'largeDarkling'] as const) {
     const { sim, b } = fixture(), half = ENEMIES[kind].size / 2, clearance = half + 1 / ART;
     const body = structureContactRect(sim, b);
-    close(body.h, 1.45 - 1 / ART);
+    close(body.h, 1 - 1 / ART); // top-down: no hanging face beyond the cell
     for (const [x, y] of [[20.5, body.y - clearance], [body.x - clearance, 20.5], [body.x + body.w + clearance, 20.5],
       [20.5, body.y + body.h + clearance], [body.x - clearance, body.y - clearance], [body.x + body.w + clearance, body.y - clearance]]) {
       const e = sim.spawnAuxiliary(kind, x, y)!;
       assert.equal(approachBuildingContact(sim, e, b, DT), true);
       const p = buildingContactPoint(sim, e, b); close(p.x, x); close(p.y, y);
       e.cd = 0; const hp = sim.hp[b.id]; routeToBuilding(sim, e, b.id, DT, sim.field);
-      assert.ok(sim.hp[b.id] < hp, 'scenario routes recognize the visible wall face');
+      assert.ok(sim.hp[b.id] < hp, 'scenario routes recognize the visible wall edge');
     }
   }
 });
