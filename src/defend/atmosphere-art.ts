@@ -17,8 +17,9 @@
  * changes. Over it `SandMarks` keeps what the battle did to the sand (trails
  * walked into the raised swells, craters blasted out of it) and repaints
  * only the marked pixels of the small chunks that changed. Sand blown into
- * the city and the Fungal Hollow's mist are painted at `RES` art pixels a
- * cell, the city's only over the cells holding any. Then the tumbleweeds,
+ * the city is painted at the dunes' own `ART` pixels a cell, only over the
+ * cells holding any, each drift a low rise (`DRIFT_RELIEF`) lit and coloured
+ * exactly as the dunes are; the Fungal Hollow's mist at `RES`. Then the tumbleweeds,
  * black-outlined sprites in several sizes, over it. Presentation only: it
  * reads `sim.atmosphere` and changes nothing. */
 import { CELLS_W, CELLS_H, CELL_COUNT, cellIndex, hash } from "./grid.ts";
@@ -69,9 +70,10 @@ const HD_LO = .16, HD_HI = .7;
 /** Ordered dither thresholds, for the HD dunes' tones and the mist's thin edges. */
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => (v + .5) / 16);
 
-/** The city's drifts' brightness: their thin edges, banks turned to the
- * wind and lee sides, the same sand as the dunes. */
-const CITY_SAND = { edge: .86, bank: 1.08, lee: .92 };
+/** How tall the city's drifts stand, in art pixels a unit of the sim's sand
+ * depth, low enough that their slopes are as gentle as the swells': their surface is lit by the same sun, in the same style, as the
+ * dunes outside, so a drift reads as the desert's own sand. */
+export const DRIFT_RELIEF = .6;
 
 /** Which dunes are drawn: "simple", one sand colour shaped only by light and
  * shadow; "hd", the detailed rippled dunes in their dithered tones. */
@@ -220,10 +222,10 @@ function binOf(gx: number, gy: number, range: number) {
 }
 /** A dune pixel's colour from its surface's slope (gx, gy) at tile pixel
  * (tx, ty), in the current style and light. */
-function duneColor(gx: number, gy: number, tx: number, ty: number) {
+function duneColor(gx: number, gy: number, tx: number, ty: number, cast = true) {
   const range = slopes().range, bin = binOf(gx, gy, range);
   if (style === "hd") return hdTone(bin < 0 ? hdLight(gx, gy) : shadeTable()[bin], tx, ty);
-  const shadowed = castShadows()[ty * DUNE_PERIOD * ART + tx] === 1;
+  const shadowed = cast && castShadows()[ty * DUNE_PERIOD * ART + tx] === 1;
   return sandAt(bin < 0 ? duneShade(gx, gy, shadowed) : shadeTable()[bin + (shadowed ? BINS * BINS : 0)]);
 }
 
@@ -588,19 +590,23 @@ const tex = (t: Float32Array, x: number, y: number) => t[((y & (TEX - 1)) * TEX)
 
 /** Bilinear weights between cell centres for each art pixel column (and,
  * the same way, row): the two cells either side and the share of the second. */
-function axis(n: number, cells: number) {
+function axis(n: number, cells: number, res = RES) {
   const a = new Int32Array(n), b = new Int32Array(n), w = new Float32Array(n);
   for (let p = 0; p < n; p++) {
-    const f = (p + .5) / RES - .5, c0 = Math.max(0, Math.min(cells - 1, Math.floor(f)));
+    const f = (p + .5) / res - .5, c0 = Math.max(0, Math.min(cells - 1, Math.floor(f)));
     a[p] = c0; b[p] = Math.min(cells - 1, c0 + 1); w[p] = Math.max(0, Math.min(1, f - c0));
   }
   return { a, b, w };
 }
 const XS = axis(W, CELLS_W), YS = axis(H, CELLS_H);
+/** The same at `ART` pixels a cell, for the city's drifts. */
+const AXS = axis(BW, CELLS_W, ART), AYS = axis(BH, CELLS_H, ART);
 
-/** A field's value at art pixel (x, y), bilinear between cell centres. */
-function sample(field: Float32Array, x: number, y: number) {
-  const u = XS.w[x], v = YS.w[y], r0 = YS.a[y] * CELLS_W, r1 = YS.b[y] * CELLS_W, x0 = XS.a[x], x1 = XS.b[x];
+/** A field's value at pixel (x, y) of a `RES` (or, with `fine`, `ART`)
+ * pixels a cell image, bilinear between cell centres. */
+function sample(field: Float32Array, x: number, y: number, fine = false) {
+  const X = fine ? AXS : XS, Y = fine ? AYS : YS;
+  const u = X.w[x], v = Y.w[y], r0 = Y.a[y] * CELLS_W, r1 = Y.b[y] * CELLS_W, x0 = X.a[x], x1 = X.b[x];
   const top = field[r0 + x0] + (field[r0 + x1] - field[r0 + x0]) * u;
   const bottom = field[r1 + x0] + (field[r1 + x1] - field[r1 + x0]) * u;
   return top + (bottom - top) * v;
@@ -659,16 +665,18 @@ function weeds() {
 }
 
 export class AtmosphereArt {
-  /** City sand and mist, `RES` art pixels a cell. */
+  /** The mist, `RES` art pixels a cell. */
   private canvas: HTMLCanvasElement | null = null;
   private data: ImageData | null = null;
   private sim: DefendSim | null = null;
   private key = "";
-  /** Art pixels of the city sand last painted, cleared before the next. */
-  private painted: number[] = [];
-  private shown = false;
-  private misty = false;
-  private slope = new Float32Array(CELL_COUNT);
+  /** The city's sand, `ART` pixels a cell, and the pixels last painted. */
+  private sandCanvas: HTMLCanvasElement | null = null;
+  private sandData: ImageData | null = null;
+  private sandSim: DefendSim | null = null;
+  private sandKey = "";
+  private sandPainted: number[] = [];
+  private sandShown = false;
   /** Trails, craters and the spill over the wall, and their image. */
   readonly marks = new SandMarks();
   private marksCanvas: HTMLCanvasElement | null = null;
@@ -698,8 +706,8 @@ export class AtmosphereArt {
     c.drawImage(this.composeDunes(env, sim, reduceMotion), 0, 0, CELLS_W * px, CELLS_H * px);
     const marks = this.drawMarks(sim);
     if (marks) c.drawImage(marks, 0, 0, CELLS_W * px, CELLS_H * px);
-    const layer = this.layer(env, sim, reduceMotion, effects);
-    if (layer) c.drawImage(layer, 0, 0, CELLS_W * px, CELLS_H * px);
+    const sand = this.sandLayer(env, sim, reduceMotion);
+    if (sand) c.drawImage(sand, 0, 0, CELLS_W * px, CELLS_H * px);
     this.drawBlowing(c, px, env, reduceMotion);
     c.restore();
   }
@@ -783,52 +791,66 @@ export class AtmosphereArt {
     return this.marksShown ? this.marksCanvas : null;
   }
 
-  /** Sand blown into the city and the mist, repainted at most four times a
-   * simulated second; null while there is neither. */
+  /** The mist, repainted as it moves; null while there is none. */
   private layer(env: Atmosphere, sim: DefendSim, reduceMotion: boolean, effects: boolean) {
-    const mist = env.mode === "mist" && effects;
-    const key = mist ? `m${env.time.toFixed(2)}:${reduceMotion}` : `s${Math.floor(env.time * 4)}:${env.version > 0}`;
-    if (sim === this.sim && key === this.key) return this.shown ? this.canvas : null;
+    if (!effects) return null;
+    const key = `m${env.time.toFixed(2)}:${reduceMotion}`;
+    if (sim === this.sim && key === this.key) return this.canvas;
     this.sim = sim; this.key = key;
     if (!this.canvas) {
       this.canvas = document.createElement("canvas");
       this.canvas.width = W; this.canvas.height = H;
       this.data = this.canvas.getContext("2d")!.createImageData(W, H);
     }
-    const out = this.data!.data;
-    if (mist) { out.fill(0); this.painted.length = 0; this.paintMist(env, reduceMotion); this.shown = true; this.misty = true; }
-    else {
-      // Leaving the mist: clear it all, and upload the cleared image once.
-      if (this.misty) { out.fill(0); this.misty = false; }
-      const had = this.painted.length || this.shown;
-      for (const k of this.painted) out[k + 3] = 0;
-      this.painted.length = 0;
-      this.paintCitySand(env, sim);
-      this.shown = this.painted.length > 0;
-      // Nothing was there and nothing is: the upload can be skipped.
-      if (!had && !this.shown) return null;
-    }
+    this.data!.data.fill(0);
+    this.paintMist(env, reduceMotion);
     this.canvas.getContext("2d")!.putImageData(this.data!, 0, 0);
-    return this.shown ? this.canvas : null;
+    return this.canvas;
+  }
+
+  /** Sand blown into the city, at the dunes' own `ART` pixels a cell,
+   * repainted at most four times a simulated second and whenever the dunes'
+   * light or style changes; null while there is none. */
+  private sandLayer(env: Atmosphere, sim: DefendSim, reduceMotion: boolean) {
+    const ox = reduceMotion ? 0 : Math.round(env.drift.x * ART), oy = reduceMotion ? 0 : Math.round(env.drift.y * ART);
+    const key = `${Math.floor(env.time * 4)}:${env.version > 0}:${light.key}:${style}:${ox}:${oy}`;
+    if (sim === this.sandSim && key === this.sandKey) return this.sandShown ? this.sandCanvas : null;
+    this.sandSim = sim; this.sandKey = key;
+    if (!this.sandCanvas) {
+      this.sandCanvas = document.createElement("canvas");
+      this.sandCanvas.width = BW; this.sandCanvas.height = BH;
+      this.sandData = this.sandCanvas.getContext("2d")!.createImageData(BW, BH);
+    }
+    const out = this.sandData!.data, had = this.sandPainted.length || this.sandShown;
+    for (const k of this.sandPainted) out[k + 3] = 0;
+    this.sandPainted.length = 0;
+    this.paintCitySand(env, sim, ox, oy);
+    this.sandShown = this.sandPainted.length > 0;
+    // Nothing was there and nothing is: the upload can be skipped.
+    if (!had && !this.sandShown) return null;
+    this.sandCanvas.getContext("2d")!.putImageData(this.sandData!, 0, 0);
+    return this.sandShown ? this.sandCanvas : null;
   }
 
   /** Sand inside the city, a pixel at a time but only over the cells near
-   * any: flat drifts in the dunes' tones, a shade darker at their edges and
-   * on the side turned from the wind, lighter where they bank up. */
-  private paintCitySand(env: Atmosphere, sim: DefendSim) {
-    const out = this.data!.data, t = noiseTexture(), s = env.sand, slope = this.slope;
+   * any: each drift a low rise `DRIFT_RELIEF` art pixels a unit deep, its
+   * slopes lit exactly as the dunes outside are (same sun, colour, banding
+   * and style), without the dunes' cast shadows; ragged at its thin edges. */
+  private paintCitySand(env: Atmosphere, sim: DefendSim, ox: number, oy: number) {
+    const out = this.sandData!.data, t = noiseTexture(), s = env.sand, n = DUNE_PERIOD * ART;
     const at = (x: number, y: number) => s[cellIndex(Math.max(0, Math.min(CELLS_W - 1, x)), Math.max(0, Math.min(CELLS_H - 1, y)))];
+    const height = (x: number, y: number) => sample(s, Math.max(0, Math.min(BW - 1, x)), Math.max(0, Math.min(BH - 1, y)), true) * DRIFT_RELIEF;
     for (let cy = 0; cy < CELLS_H; cy++) for (let cx = 0; cx < CELLS_W; cx++) {
       const i = cellIndex(cx, cy);
       if (!sim.map.city[i] || env.passage[i] !== 1) continue;
       if (Math.max(at(cx, cy), at(cx + 1, cy), at(cx - 1, cy), at(cx, cy + 1), at(cx, cy - 1)) <= .06) continue;
-      slope[i] = (at(cx + 1, cy) - at(cx - 1, cy) + at(cx, cy + 1) - at(cx, cy - 1)) * .5;
-      for (let y = cy * RES; y < cy * RES + RES; y++) for (let x = cx * RES; x < cx * RES + RES; x++) {
-        const cover = sample(s, x, y) + (tex(t, x, y) - .5) * .12;
+      for (let y = cy * ART; y < cy * ART + ART; y++) for (let x = cx * ART; x < cx * ART + ART; x++) {
+        const cover = sample(s, x, y, true) + (tex(t, x >> 1, y >> 1) - .5) * .12;
         if (cover < .16) continue;
-        const col = sandAt(cover < .22 ? CITY_SAND.edge : slope[i] > .08 ? CITY_SAND.bank : slope[i] < -.08 ? CITY_SAND.lee : 1), k = (y * W + x) * 4;
+        const gx = (height(x + 1, y) - height(x - 1, y)) * .5, gy = (height(x, y + 1) - height(x, y - 1)) * .5;
+        const col = duneColor(gx, gy, ((x - ox) % n + n) % n, ((y - oy) % n + n) % n, false), k = (y * BW + x) * 4;
         out[k] = col[0]; out[k + 1] = col[1]; out[k + 2] = col[2]; out[k + 3] = 255;
-        this.painted.push(k);
+        this.sandPainted.push(k);
       }
     }
   }
