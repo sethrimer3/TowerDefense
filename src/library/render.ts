@@ -28,6 +28,7 @@ import {
   TABLE_TOP, W, WINDOW, WORLD_H, bayX, ladderX, slotIndex, slotPlace, unitTop, type Cart, type Librarian, type LibrarySim, type Role,
 } from "./sim.ts";
 import { CELL, FW } from "./fire.ts";
+import { GLYPH_FINE, GLYPH_SIZE, glowOf, glyphFor, glyphShare } from "./glyphs.ts";
 import { ELIXIRS } from "./lab.ts";
 import { HATCH_Y, LabRenderer } from "./lab-render.ts";
 import { LAB_TOP } from "./geometry.ts";
@@ -855,9 +856,12 @@ export class LibraryRenderer {
 
   /** The flames cell by cell, licking upward, with smoke, embers and thrown water. */
   /** Enchanted books: tiny runes glowing up their spines, one pixel each,
-   * slowly cycling between arcane blue and violet, with a faint halo. */
+   * slowly cycling between arcane blue and violet, with a faint halo. Zoomed
+   * in, each rune pixel fades into a glyph drawn in pixels a fifth the size
+   * (`glyphs.ts`), in the same colour, glowing faintly round its strokes. */
   private drawRunes(sim: LibrarySim) {
-    const ctx = this.ctx, t = this.flame;
+    const ctx = this.ctx, t = this.flame, { scale, ox, oy } = this.view, share = glyphShare(scale);
+    const glyphs: { slot: number; k: number; x: number; y: number; color: string }[] = [];
     for (let s = 0; s < sim.enchanted.length; s++) {
       if (!sim.enchanted[s] || !sim.slots[s]) continue;
       const { bay, unit, row, i } = slotPlace(s);
@@ -868,14 +872,35 @@ export class LibraryRenderer {
       ctx.globalAlpha = 0.15 * pulse;
       ctx.fillStyle = "#8fb8ff";
       ctx.fillRect(bx - 1, by - tall - 1, 4, tall + 1);
-      ctx.globalAlpha = 1;
       for (let k = 2; k < tall; k += 2) {
         const phase = Math.sin(t * 2.2 + s + k);
-        ctx.fillStyle = phase > 0.3 ? "#c9e6ff" : phase > -0.3 ? "#7fb0ff" : "#c08cff";
-        ctx.fillRect(bx + ((k >> 1) % 2), by - k, 1, 1);
+        const color = phase > 0.3 ? "#c9e6ff" : phase > -0.3 ? "#7fb0ff" : "#c08cff";
+        if (share < 1) {
+          ctx.globalAlpha = 1 - share;
+          ctx.fillStyle = color;
+          ctx.fillRect(bx + ((k >> 1) % 2), by - k, 1, 1);
+        }
+        // Centred across the spine and on the rune's row.
+        if (share > 0) glyphs.push({ slot: s, k, x: (bx + 1) * GLYPH_FINE - (GLYPH_SIZE >> 1), y: (by - k) * GLYPH_FINE + 2 - (GLYPH_SIZE >> 1), color });
       }
     }
     ctx.globalAlpha = 1;
+    if (!glyphs.length) return;
+    // In screen pixels, each fine pixel's edges rounded, so they meet
+    // without seams or blur at any zoom.
+    const f = scale / GLYPH_FINE, X = (fx: number) => Math.round(ox + fx * f), Y = (fy: number) => Math.round(oy + fy * f);
+    const dot = (fx: number, fy: number) => ctx.fillRect(X(fx), Y(fy), X(fx + 1) - X(fx), Y(fy + 1) - Y(fy));
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    for (const g of glyphs) {
+      const lit = glyphFor(g.slot, g.k);
+      ctx.fillStyle = g.color;
+      ctx.globalAlpha = share * 0.22;
+      for (const [x, y] of glowOf(lit)) dot(g.x + x, g.y + y);
+      ctx.globalAlpha = share;
+      for (const [x, y] of lit) dot(g.x + x, g.y + y);
+    }
+    ctx.restore();
   }
 
   /** The fire's smoke and ash, a pixel at a time into one image, so cells
