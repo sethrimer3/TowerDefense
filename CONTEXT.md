@@ -732,7 +732,7 @@ A rear Blight member’s own attack reaching the front line’s target through a
 A Dark One enemy consisting of a five-by-five black art-pixel square with a portal contour. Defeating it releases two Major Darklings and forty-four descendant bodies.
 
 **Blight Worm**:
-A Dark One boss of fifty touching five-by-five art-pixel segments. It wanders and bounces on the surface, each segment striking in turn, then burrows as an immune shadow straight toward a random standing building. It bounces at the playing-field edges and emerges after reaching that target and spending one uninterrupted second outside placed building tiles. Dirt sprays heavily from each head and lightly from the body; underground damage is one quarter of its former strength. Heads take four times damage; cuts create independent worms, and each destroyed segment releases three Significant Darklings. Pieces of three segments or fewer die and release their offspring.
+A Dark One boss of fifty touching five-by-five art-pixel segments. It wanders and bounces on the surface, turning back toward the city more often when far away, each segment striking in turn, then burrows as an immune shadow straight toward a random standing building. It bounces at the playing-field edges and emerges after reaching that target and spending one uninterrupted second outside placed building tiles. Dirt sprays heavily from each head and lightly from the body; underground damage is one quarter of its former strength. Heads take four times damage; cuts create independent worms, and each destroyed segment releases three Significant Darklings. Pieces of three segments or fewer die and release their offspring.
 
 **Surface spell**:
 The time a worm head spends wandering above ground before its next dive.
@@ -802,3 +802,6 @@ A connected run of living worm segments after a cut. A piece needs at least four
 - **Realm:** the upgrade collection containing the Keep, city infrastructure, Mine and Library; replaces the City and shared combat upgrade sections.
 - **Individual equipment:** Smithy armour and power ranks belonging to one combat building copy, retained through lifting, placement and evolution.
 - **Economy building:** the placeable Mine or Library that unlocks its corresponding production tab while in the city.
+
+**City return**:
+A surfaced worm head's chance to turn back toward the nearest city edge when it strays beyond a few city tiles. The chance increases with distance; a little angular variation remains, and the body follows the head's trail.

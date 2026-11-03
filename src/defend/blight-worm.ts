@@ -1,3 +1,4 @@
+import { wormCityReturn } from "./worm-city-return.ts";
 /** Kinematic Blight Worms follow arc length, never a flow field or a leader's
  * straight-line shortcut. Only worm kinds allocate this state or draw this randomness. */
 import { BLIGHT_WORM as W, wormTuning, isBlightWorm, MIN_WORM_SEGMENTS } from "./blight-worm-tuning.ts";
@@ -305,7 +306,13 @@ export function stepBlightWorm(sim: DefendSim, e: Enemy, dt: number) {
     h.surfaceT -= dt; h.turnT -= dt;
     if (h.surfaceT <= 0 && onBoard(e, HALF)) dive(sim, e);
     else if (h.turnT <= 0) {
+      // Fixed order: wander angle, return roll only beyond the city margin,
+      // then the next turn interval. Burrow rays never use this steering.
       const sine = (sim.rand() * 2 - 1) * W.wanderTurn;
+      const city = wormCityReturn(sim.map, e);
+      if (city && city.chance > 0 && sim.rand() < city.chance) {
+        h.dx = city.dx; h.dy = city.dy;
+      }
       turn(h, Math.sqrt(1 - sine * sine), sine);
       h.turnT = W.turnMin + sim.rand() * W.turnRange;
     }
