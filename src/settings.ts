@@ -71,6 +71,9 @@ export const SETTINGS = {
   pixelArt: { kind: "toggle", default: true, page: { id: "pixel-art", label: "Pixel Art" } },
   /** Use the selected legacy tab icons instead of the current navigation art. */
   legacyGraphics: { kind: "toggle", default: false, page: { id: "legacy-graphics", label: "Show legacy graphics" } },
+  /** City walls with their brick south face hung below the stones (the
+   * old slanted look); off, walls are drawn top-down only. */
+  legacyWalls: { kind: "toggle", default: false, page: { id: "legacy-walls", label: "Legacy Walls" } },
   /** Alembic, the game's own pixel font, for every word on the page; off, Cinzel. */
   pixelFont: { kind: "toggle", default: true, page: { id: "pixel-font", label: "Use Custom Font" } },
   /** Master switch for developer controls, including the enemy tester. */

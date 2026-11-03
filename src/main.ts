@@ -20,6 +20,7 @@ import { TilesPage } from "./ui/tiles-page.ts";
 import { Chamber, Descent } from "./ui/chamber.ts";
 import { paintIcon, type IconItem } from "./defend/structure-art.ts";
 import { onPixelArt, setPixelArt } from "./defend/pixel-sprites.ts";
+import { setLegacyWalls } from "./defend/city-layer.ts";
 import { renderSettingsPage } from "./ui/settings-page.ts";
 import type { Weather } from "./defend/weather.ts";
 import { play, soundEnabledBy } from "./sound.ts";
@@ -44,6 +45,7 @@ import { installScrollArrows } from "./ui/scroll-arrows.ts";
 let save: Save = load();
 setLanguage(save.settings.language);
 fitViewport();
+setLegacyWalls(save.settings.legacyWalls);
 installSeal();
 buildShell(document.querySelector<HTMLDivElement>("#app")!, save.settings.legacyGraphics);
 installScrollArrows();
@@ -291,6 +293,7 @@ function refreshCurrencies() {
   document.documentElement.classList.toggle("pixel-font", save.settings.pixelFont);
   document.documentElement.classList.toggle("legacy-graphics", save.settings.legacyGraphics);
   setPixelArt(save.settings.pixelArt);
+  setLegacyWalls(save.settings.legacyWalls);
   const show = (id: string, n: number) => {
     const value = whole(n), before = shown.get(id);
     el(id).textContent = dev ? "∞" : compact(value);

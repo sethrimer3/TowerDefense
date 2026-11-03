@@ -1,5 +1,4 @@
 import { approachBuildingContact, buildingContactPoint, CONTACT_OUTLINE } from "./contact.ts";
-import { WALL_FACE_HANG } from "./art-scale.ts";
 /** Magic boats: the Enchanted Skiff, Spellbound Sloop, Arcane Galleon and
  * Deluge Ark (`BoatDef` in `catalog.ts`). A boat sails straight through the
  * ground toward the keep, conjuring a pool of water round its hull that it
@@ -187,7 +186,7 @@ export function stepBoat(sim: DefendSim, e: Enemy, dt: number) {
   }
   // Keep ramming a hull contact reached on the previous step. A fresh
   // keepward centre ray can select an adjacent wall segment at a corner.
-  for (const b of near(sim, e, half + 2 * CONTACT_OUTLINE + WALL_FACE_HANG)) {
+  for (const b of near(sim, e, half + 2 * CONTACT_OUTLINE)) {
     if (!sim.solid[cellAt(b.rect.x, b.rect.y)] || sinks(boat, b)) continue;
     const p = buildingContactPoint(sim, e, b);
     if (dist(p.x - e.x, p.y - e.y) <= 1e-9) { ram(sim, e, b.id); return; }
@@ -200,7 +199,7 @@ export function stepBoat(sim: DefendSim, e: Enemy, dt: number) {
   dy /= len;
   e.facing = { x: dx, y: dy };
   // The bow meets anything solid first: a wall it can't sink stops it.
-  const bowReach = half + 2 * CONTACT_OUTLINE + WALL_FACE_HANG;
+  const bowReach = half + 2 * CONTACT_OUTLINE;
   const probes = Math.ceil((bowReach - half) / .1);
   for (let n = 0; n <= probes; n++) {
     const reach = half + (bowReach - half) * n / probes;
