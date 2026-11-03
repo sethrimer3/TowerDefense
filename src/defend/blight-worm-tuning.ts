@@ -36,3 +36,6 @@ export type BlightWormKind = "smallBlightWorm" | "mediumBlightWorm" | "blightWor
 export const isBlightWorm = (kind: string): kind is BlightWormKind => kind === "blightWorm" || kind === "smallBlightWorm" || kind === "mediumBlightWorm";
 export const wormTuning = (kind: string) => kind === "smallBlightWorm" ? SMALL_BLIGHT_WORM : kind === "mediumBlightWorm" ? MEDIUM_BLIGHT_WORM : BLIGHT_WORM;
 export const MIN_WORM_SEGMENTS = 4;
+
+/** Chance per ordinary surface turn, measured in the city's eight-cell tiles. */
+export const WORM_CITY_RETURN = { startTiles: 2.5, fullTiles: 5, maxChance: .95 } as const;
