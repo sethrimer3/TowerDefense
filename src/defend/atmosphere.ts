@@ -41,8 +41,9 @@ export function weatherNoise(x: number, y: number) {
 
 /** Cells across one repeat of the dune field, which tiles in both directions. */
 export const DUNE_PERIOD = 96;
-/** Cells a second the dunes creep downwind: a dune takes minutes to pass. */
-export const DUNE_SPEED = .05;
+/** Cells a second the dunes creep downwind: none, the dunes hold still
+ * (the wind moves only airborne sand and tumbleweeds). */
+export const DUNE_SPEED = 0;
 const wrap = (v: number, n: number) => ((v % n) + n) % n;
 /** Value noise whose lattice repeats every `px` by `py` lattice cells. */
 export function periodicNoise(x: number, y: number, px: number, py: number, salt: number) {
@@ -225,8 +226,10 @@ export class Atmosphere {
       a[i] = clamp(a[i] + da[i] + feed, 0, 1.2);
       if (this.mode === "sand") {
         s[i] = clamp(s[i] + ds[i] + (this.passage[i] ? a[i] * .0006 : 0), 0, 3);
-        // Outside the city the sand settles back into the creeping dunes.
-        if (!sim.map.city[i] && this.passage[i]) s[i] += (this.duneAt(i) - s[i]) * .02;
+        // Out on the open ground the sand settles back into the dunes. A
+        // broken wall stone is not open ground: sand reaches it only by
+        // blowing in from outside, through a breach that goes all the way.
+        if (!sim.map.city[i] && !sim.map.wall[i] && this.passage[i]) s[i] += (this.duneAt(i) - s[i]) * .02;
         if (sim.map.city[i] && sim.map.owner[i] < 0 && s[i] >= CLEANUP_DEPTH) this.cleanup.add(i);
         else this.cleanup.delete(i);
       }

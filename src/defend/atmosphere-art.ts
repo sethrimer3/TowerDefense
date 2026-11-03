@@ -745,7 +745,9 @@ export class AtmosphereArt {
     }
     let changed = false;
     for (let i = 0; i < CELL_COUNT; i++) {
-      const open = env.passage[i] === 1 && !sim.map.city[i] && !this.gateCells[i] ? 1 : 0;
+      // Not over the wall's stones, standing or fallen: its rubble lies on
+      // bare ground, and sand covers it only once it blows in.
+      const open = env.passage[i] === 1 && !sim.map.city[i] && !sim.map.wall[i] && !this.gateCells[i] ? 1 : 0;
       if (open !== this.ground[i]) { this.ground[i] = open; changed = true; }
     }
     if (changed) {
@@ -832,7 +834,7 @@ export class AtmosphereArt {
     return this.sandShown ? this.sandCanvas : null;
   }
 
-  /** Sand inside the city, a pixel at a time but only over the cells near
+  /** Sand inside the city (and on fallen wall stones it has reached), a pixel at a time but only over the cells near
    * any: each drift a low rise `DRIFT_RELIEF` art pixels a unit deep, its
    * slopes lit exactly as the dunes outside are (same sun, colour, banding
    * and style), without the dunes' cast shadows; ragged at its thin edges. */
@@ -842,7 +844,7 @@ export class AtmosphereArt {
     const height = (x: number, y: number) => sample(s, Math.max(0, Math.min(BW - 1, x)), Math.max(0, Math.min(BH - 1, y)), true) * DRIFT_RELIEF;
     for (let cy = 0; cy < CELLS_H; cy++) for (let cx = 0; cx < CELLS_W; cx++) {
       const i = cellIndex(cx, cy);
-      if (!sim.map.city[i] || env.passage[i] !== 1) continue;
+      if (!(sim.map.city[i] || sim.map.wall[i]) || env.passage[i] !== 1) continue;
       if (Math.max(at(cx, cy), at(cx + 1, cy), at(cx - 1, cy), at(cx, cy + 1), at(cx, cy - 1)) <= .06) continue;
       for (let y = cy * ART; y < cy * ART + ART; y++) for (let x = cx * ART; x < cx * ART + ART; x++) {
         const cover = sample(s, x, y, true) + (tex(t, x >> 1, y >> 1) - .5) * .12;
