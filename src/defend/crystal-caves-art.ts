@@ -11,7 +11,7 @@ import { ART } from "./art-scale.ts";
 import { CELLS_H, CELLS_W, hash, hash01 } from "./grid.ts";
 import type { CityMap } from "./citygen.ts";
 import {
-  crystalCavesPlan, CRYSTAL_CAVES, dustAt, shaftLight, sporeAt, type ShaftLight,
+  CAVE_OPENING, crystalCavesPlan, CRYSTAL_CAVES, dustAt, openingDustAt, openingEdge, shaftLight, sporeAt, type ShaftLight,
   type CrystalCavesPlan, type CrystalCluster, type LightShaft, type MushroomCluster,
 } from "./crystal-caves.ts";
 import { artPen } from "./pixel-fx.ts";
@@ -235,6 +235,31 @@ export function sunAt(s: LightShaft, x: number, y: number) {
   return d < 0.55 ? 1 : d < 0.8 ? 0.8 : d < 0.95 ? 0.6 : d < 1.08 ? (d2 ? 0.4 : 0) : d < 1.2 && (x + 2 * y) % 4 === 0 ? 0.25 : 0;
 }
 
+/** How much of the sky's light falls through the great opening onto pixel
+ * (x, y) (art pixels, any x and y; above the board all of it), 0..1 in
+ * steps, dithered along its ragged edge. */
+export function openingLight(x: number, y: number) {
+  const d = openingEdge((x + 0.5) / ART) * ART - (y + 0.5);
+  return d > 14 ? 1 : d > 9 ? 0.85 : d > 5 ? 0.7 : d > 2 ? 0.55 : d > 0 ? 0.4 : d > -3 ? ((x + y) & 1 ? 0.25 : 0) : d > -6 && (x + 2 * y) % 4 === 0 ? 0.15 : 0;
+}
+
+/** Padding (art pixels) round the opening's light mask, so it still covers
+ * the board's top and sides when the sun slides it. */
+const OPEN_PAD = 64;
+
+/** The opening's light as a white mask (alpha the light), `OPEN_PAD` wider
+ * each side and taller above than the board, down to its deepest edge. */
+function openingPixels() {
+  const w = W + 2 * OPEN_PAD, h = OPEN_PAD + Math.ceil((CELLS_H * CAVE_OPENING.depth + CAVE_OPENING.wobble + 1) * ART);
+  const out = new Uint32Array(w * h);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const k = openingLight(x - OPEN_PAD, y - OPEN_PAD);
+      if (k > 0) out[y * w + x] = rgba(0xfff4dc, Math.round(255 * k));
+    }
+  return { pixels: out, w, h };
+}
+
 /** The whole floor as a shaft's daylight would light it: what each patch
  * shows through its shape, wherever it has slid to (empty off the floor). */
 export function sunlitFloor(floor: Uint32Array): Uint32Array {
@@ -315,6 +340,8 @@ export class CrystalCavesArt {
   private column: HTMLCanvasElement | null = null;
   private lit: HTMLCanvasElement | null = null;
   private sunPatches: { cv: HTMLCanvasElement; key: string }[] = [];
+  private openMask: HTMLCanvasElement | null = null;
+  private opening: { cv: HTMLCanvasElement; key: string } | null = null;
 
   /** Plans `map`'s caves (and repaints their floor) when the map changes. */
   sync(map: CityMap) {
@@ -324,6 +351,12 @@ export class CrystalCavesArt {
     this.floor = this.glow = this.lit = null;
     this.patches = [];
     this.sunPatches = [];
+    this.opening = null;
+  }
+
+  private mask() {
+    if (!this.openMask) { const m = openingPixels(); this.openMask = canvasOf(m.pixels, m.w, m.h); }
+    return this.openMask;
   }
 
   private patchSprites() {
@@ -348,6 +381,21 @@ export class CrystalCavesArt {
     c.drawImage(this.floor, 0, 0, CELLS_W * px, CELLS_H * px);
     const ox = Math.round(light.shift.x * ART), oy = Math.round(light.shift.y * ART), key = `${ox}:${oy}`;
     c.globalAlpha *= 0.3 + 0.7 * light.day;
+    // The sky through the great opening, its edge's shadow sliding with the
+    // sun like the patches.
+    if (!this.opening) this.opening = { cv: Object.assign(document.createElement("canvas"), { width: W, height: H }), key: "" };
+    if (this.opening.key !== key) {
+      const sc = this.opening.cv.getContext("2d")!;
+      sc.globalCompositeOperation = "copy";
+      sc.drawImage(this.mask(), ox - OPEN_PAD, oy - OPEN_PAD);
+      sc.globalCompositeOperation = "source-in";
+      sc.drawImage(this.lit!, 0, 0);
+      this.opening.key = key;
+    }
+    c.save();
+    c.globalAlpha *= 0.55;
+    c.drawImage(this.opening.cv, 0, 0, CELLS_W * px, CELLS_H * px);
+    c.restore();
     for (const [i, patch] of this.patchSprites().entries()) {
       const size = patch.cv.width, x0 = patch.x0 + ox, y0 = patch.y0 + oy;
       let sp = this.sunPatches[i];
@@ -425,6 +473,12 @@ export class CrystalCavesArt {
       c.imageSmoothingEnabled = true;
       halo(fx, fy, s.r * 2.4, night > 0.5 ? "200,220,255" : "255,236,190", 0.45 * k, hash01(s.seed, 884));
     }
+    // The opening by night: pale moonlight, a little by day.
+    c.globalCompositeOperation = "lighter";
+    c.imageSmoothingEnabled = false;
+    c.globalAlpha = Math.min(1, base * (0.04 + 0.13 * night));
+    const m = this.mask();
+    c.drawImage(m, ((ox - OPEN_PAD) / ART) * px, ((oy - OPEN_PAD) / ART) * px, (m.width / ART) * px, (m.height / ART) * px);
     // Pixel details: pond glints, spores and dust, on the art grid.
     c.globalCompositeOperation = "lighter";
     c.imageSmoothingEnabled = false;
@@ -447,6 +501,15 @@ export class CrystalCavesArt {
           c.globalAlpha = Math.min(1, base * s.show * (0.6 + 0.4 * night));
           c.fillStyle = m.hue ? "#e2c8ff" : "#b8ffe8";
           dot(Math.floor(s.x * ART), Math.floor(s.y * ART));
+        }
+      if (!o.still)
+        for (let j = 0; j < CAVE_OPENING.dust; j++) {
+          const d = openingDustAt(j, t), x = Math.floor(d.x * ART), y = Math.floor(d.y * ART);
+          const lit = openingLight(x - ox, y - oy);
+          if (lit < 0.5 || y < 0) continue;
+          c.globalAlpha = Math.min(1, base * d.twinkle * 0.55 * (1 - 0.72 * night));
+          c.fillStyle = night > 0.5 ? "#dfe8ff" : "#fff2d0";
+          dot(x, y);
         }
       if (!o.still)
         for (const s of plan.shafts) {

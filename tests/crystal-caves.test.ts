@@ -5,9 +5,9 @@ import { rollWeather } from "../src/defend/weather.ts";
 import { generateCity, CellType } from "../src/defend/citygen.ts";
 import { defaultLayout, fitLayout } from "../src/defend/layout.ts";
 import { cellIndex } from "../src/defend/grid.ts";
-import { CAVE_CEILING, crystalCavesPlan, CRYSTAL_CAVES, dustAt, hasCrystalCaves, SHAFT_UP, shaftLight, sporeAt } from "../src/defend/crystal-caves.ts";
+import { CAVE_CEILING, CAVE_OPENING, crystalCavesPlan, openingDustAt, openingEdge, CRYSTAL_CAVES, dustAt, hasCrystalCaves, SHAFT_UP, shaftLight, sporeAt } from "../src/defend/crystal-caves.ts";
 import { skyAtTime } from "../src/daylight.ts";
-import { cavePixels, columnField, glowPixels, sunAt, sunlitFloor } from "../src/defend/crystal-caves-art.ts";
+import { cavePixels, columnField, glowPixels, openingLight, sunAt, sunlitFloor } from "../src/defend/crystal-caves-art.ts";
 
 function city() {
   const fit = fitLayout(defaultLayout());
@@ -96,4 +96,22 @@ test("the holes' light follows the sun across the day", () => {
     if (along >= -1 && along <= sunset.length) near++;
   }
   assert.equal(near, CRYSTAL_CAVES.dust);
+});
+
+test("a great ragged opening lets the sky in over the top third", () => {
+  const edges = Array.from({ length: 72 * 4 }, (_, i) => openingEdge(i / 4));
+  const lo = Math.min(...edges), hi = Math.max(...edges), mean = edges.reduce((a, b) => a + b) / edges.length;
+  assert.ok(lo > 104 * 0.2 && hi < 104 * 0.5, `${lo}..${hi}`);
+  assert.ok(Math.abs(mean - 104 / 3) < 6, `about a third down: ${mean}`);
+  assert.ok(hi - lo > 8, "its edge wanders in bays and spurs");
+  // Lit above the edge (and above the board), dark below it.
+  assert.equal(openingLight(100, -40), 1);
+  assert.equal(openingLight(100, Math.floor(openingEdge(100.5 / 8) * 8) - 20), 1);
+  assert.equal(openingLight(100, Math.floor(openingEdge(100.5 / 8) * 8) + 20), 0);
+  // No ceiling holes under the open sky.
+  for (const s of crystalCavesPlan(city()).shafts) assert.ok(s.y - s.r > openingEdge(s.x), `shaft at ${s.x},${s.y}`);
+  for (let k = 0; k < CAVE_OPENING.dust; k++) {
+    const d = openingDustAt(k, 7);
+    assert.ok(d.x >= 0 && d.x < 72 && d.y < 104 * 0.5);
+  }
 });
