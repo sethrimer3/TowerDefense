@@ -1,6 +1,6 @@
 # Realm workshops and economy buildings
 
-All is the first subject in both the Smithy and Study. It contains owned tiles only. Realm replaces City and the retired shared troop/tower pages. Realm contains the Keep, city tiles and walls, gates, wall spikes, wall ballistas, Repair shops, bait, Mine and Library. Towers, Infantry and Spells provide focused collections. A kind unfolds its owned copies; selecting a copy opens individual equipment or its native Knowledge tree. Spell and city infrastructure upgrades retain their native trees.
+All is the first subject in both the Smithy and Study. It contains owned tiles only. Realm replaces City and the retired shared troop/tower pages. Realm contains the Keep, city tiles and walls, gates, wall spikes, wall ballistas, Repair shops, bait, Mine and Library. Towers, Infantry and Spells provide focused collections. A tower or troop building unfolds its owned copies; selecting a copy opens individual equipment or its native Knowledge tree. Kinds whose upgrades are shared by every copy (keep, walls, gates, ballistas, Mine, Library, Repair shop, spells) open their upgrades at once instead. Spell and city infrastructure upgrades retain their native trees.
 
 ## Economy buildings
 

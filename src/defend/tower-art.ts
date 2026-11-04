@@ -56,6 +56,12 @@ import { sourcePixels } from "./sprite-source.ts";
  *   raw meat, another crate stacked on top with a haunch lashed to it and
  *   green slime seeping from the seams.
  *
+ * - Mine: a mining camp filling its tile round a terraced open pit, the
+ *   headframe over its shaft, barracks, forge, warehouse and smithy shed,
+ *   ore heaps and a cart on rails.
+ * - Library: a cruciform cathedral under lead with a spire over the
+ *   crossing, in university grounds of lawns, a parterre and a cloister.
+ *
  * Each building's Knowledge paths dress it in their own look (`PATH_LOOKS`):
  * new roofs, emblems, guns, fires and crates, described at each painter.
  *
@@ -131,8 +137,8 @@ const HAZARD = 0xe8c03a;
 
 /** What each structure's damage throws down and its rubble is made of. */
 const MATERIAL: Record<PlacedKind, { m: Material; ruin: Pick<Ruin, "stone" | "top" | "beams" | "round"> }> = {
-  mine: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.plank, beams: true } },
-  library: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.plank, beams: true } },
+  mine: { m: { tones: C.plank.slice(0, 3), roofed: true }, ruin: { stone: STONE, top: C.plank.slice(0, 3), beams: true } },
+  library: { m: { tones: C.pale.slice(1, 4), roofed: true }, ruin: { stone: C.pale.slice(1, 4), top: [0x343c4c, 0x4a5466, 0x606c82], beams: true } },
   repairShop: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.plank, beams: true } },
   meleeGuild: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.straw, beams: true } },
   rangedGuild: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: [0x3a3c42, 0x5a5c62, 0x7a7c84], beams: true } },
@@ -267,8 +273,8 @@ function drawnStructureRubblePixels(kind: PlacedKind, cw: number, ch: number, se
 export const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall", "assassinDen", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "spearHall", "phalanx", "javelinCamp", "lancerStable", "heroHall", "shadow", "nanoTower", "pyreTower", "frostTower", "stormTower", "chapterHouse", "berserkerLodge", "halberdYard", "bloodHall", "veilHouse", "poisonDen", "brazierTower", "hawkTower", "batteryTower", "mortarTower", "rangerLodge", "skirmishCamp", "infernoHall", "cinderHall", "skyrangerLodge", "minelayerTower", "stormHall", "wispTower", "chronoTower", "repairShop", "mine", "library"];
 
 const PAINT: Record<PlacedKind, (p: Pix, look: string) => void> = {
-  mine: (p) => guild(p, C.plank[0], ["  X  ", " XXX ", "  X  ", " X X "], { X: C.gold[1] }),
-  library: (p) => guild(p, C.slate[1], ["XX XX", "XX XX", "XX XX", "XXXXX"], { X: C.gold[2] }),
+  mine: paintMine,
+  library: paintLibrary,
   repairShop: paintRepairShop,
   meleeGuild: paintMeleeGuild,
   rangedGuild: paintRangedGuild,
@@ -1914,4 +1920,245 @@ function paintRepairShop(p: Pix) {
   const x = Math.floor(p.w / 2), y = Math.floor(p.h / 2);
   rect(p, x, y - 1, x + 1, y + 3, C.plank[0]);
   rect(p, x - 2, y - 2, x + 3, y, C.iron[3]);
+}
+
+// ── The Realm's economy buildings, each filling its whole city tile ──────────
+
+/** Grass, gravel and hedges for the Library's grounds, dark to light. */
+const LAWN = [0x2c5422, 0x3a6a2c, 0x4c8236, 0x63993f];
+const HEDGE = [0x1a3416, 0x24481e, 0x33602a, 0x467a36];
+const GRAVEL = [0x8a7c64, 0xa49478, 0xbcae90];
+/** The cathedral's lead roof, dark to light, and its pale ashlar. */
+const LEAD = [0x343c4c, 0x4a5466, 0x606c82, 0x7c889e];
+const FLOWERS = [0xd8553f, 0xe9c46a, 0xf2efe6, 0xa06ac8, 0xe88aa8];
+
+/** A tree's crown seen from above, lit from the upper left. */
+function crown(p: Pix, cx: number, cy: number, r: number, tones: readonly number[]) {
+  disc(p, cx, cy, r, (x, y, d, dx, dy) => (d > r - 0.8 ? tones[0] : tones[Math.min(tones.length - 1, 1 + lit(x, y, dx, dy, d))]));
+}
+
+/** A walled building under a gabled roof: a one-pixel wall lit to the upper
+ * left, a dark eave line, then the roof. */
+function roofed(p: Pix, x0: number, y0: number, x1: number, y1: number, wall: readonly number[], roof: number) {
+  for (let y = y0; y <= y1; y++)
+    for (let x = x0; x <= x1; x++) p.set(x, y, x === x0 || y === y0 ? wall[2] : x === x1 || y === y1 ? wall[0] : wall[1]);
+  rect(p, x0 + 1, y0 + 1, x1 - 1, y1 - 1, OUTLINE);
+  return gable(p, x0 + 2, y0 + 2, x1 - 2, y1 - 2, roof);
+}
+
+/** A heap of ore seen from above: a mound shaded as a ball, flecked with
+ * the metal's glint. */
+function oreHeap(p: Pix, cx: number, cy: number, r: number, tones: readonly number[], glint: number) {
+  disc(p, cx, cy, r, (x, y, d, dx, dy) => {
+    if (hash(x, y, 71) % 7 === 0 && d < r - 1) return glint;
+    return tones[Math.min(tones.length - 1, lit(x, y, dx, dy, d) + (d < r * 0.4 ? 1 : 0))];
+  });
+}
+
+/** The Mine: a mining camp round an open pit, as in the Mine tab. The
+ * barracks' long shingled roof and the forge with its brick chimney along
+ * the north, the warehouse and the smithy's open shed down the west, ore
+ * heaped copper, silver and gold in the yard by a cart on its rails, and
+ * the pit stepped down in terraces to the shaft, the timber headframe and
+ * its wheel standing over it. */
+function paintMine(p: Pix) {
+  const { x0, y0, x1, y1 } = frame(p.w, p.h);
+  const W = x1 - x0, H = y1 - y0;
+  const X = (f: number) => x0 + Math.round(W * f), Y = (f: number) => y0 + Math.round(H * f);
+  // Trodden earth, speckled with grit and spoil.
+  for (let y = y0; y <= y1; y++)
+    for (let x = x0; x <= x1; x++) {
+      const t = hash(x, y, 81) % 11;
+      p.set(x, y, t === 0 ? C.dirt[0] : t < 3 ? C.dirt[2] : t === 3 ? C.stone[1] : C.dirt[1]);
+    }
+  // The open pit: terraces stepping down to the shaft, each ring darker,
+  // its upper left rim lit and its lower right in shadow.
+  const pcx = X(0.66), pcy = Y(0.66), pr = Math.min(W, H) * 0.31;
+  const TERRACE = [0x9a8f7a, 0x7a705e, 0x5a5244, 0x3c362c, 0x221e18];
+  disc(p, pcx, pcy, pr, (x, y, d, dx, dy) => {
+    const ring = Math.min(4, Math.floor(((pr - d) / pr) * 5));
+    const lip = (pr - d) / pr * 5 - ring < 0.22;
+    const sun = -(dx + dy) > 0;
+    let c = TERRACE[ring];
+    // Each step's face: its far (lower right) side lit by the sun, its near
+    // side in the shadow of the rim above.
+    if (lip) c = sun ? shade(c, 0.55) : shade(c, 1.35);
+    if (d > pr - 1) c = OUTLINE;
+    else if (hash(x, y, 83) % 9 === 0) c = shade(c, 0.85);
+    return c;
+  });
+  // The haul road spiralling down the terraces.
+  for (let k = 0; k <= 40; k++) {
+    const t = k / 40, a = Math.PI * (0.85 + 1.25 * t), r = pr * (0.9 - 0.62 * t);
+    const x = Math.round(pcx + Math.cos(a) * r), y = Math.round(pcy + Math.sin(a) * r);
+    p.set(x, y, shade(TERRACE[Math.min(4, Math.floor(t * 4))], 1.35));
+  }
+  // The headframe: two splayed timber legs over the shaft braced to a
+  // back leg, and the iron sheave wheel at its head.
+  const hx = Math.round(pcx) - 1, hy = Math.round(pcy) - 1;
+  for (let k = 1; k <= 6; k++) {
+    p.set(hx - k, hy - k + 1, C.plank[3]); p.set(hx - k + 1, hy - k + 1, C.plank[1]);
+    p.set(hx + k, hy - k + 1, C.plank[2]); p.set(hx + k + 1, hy - k + 1, C.plank[0]);
+    if (k <= 4) { p.set(hx, hy - k - 2, C.plank[2]); p.set(hx + 1, hy - k - 2, C.plank[0]); }
+  }
+  rect(p, hx - 6, hy - 6, hx + 7, hy - 6, C.plank[1]);
+  disc(p, hx + 1, hy - 6.5, 2.7, (_x, _y, d) => (d > 1.9 ? C.iron[3] : d > 1 ? C.iron[1] : C.iron[3]));
+  // The shaft at the pit's heart, its collar timbered.
+  rect(p, Math.round(pcx) - 3, Math.round(pcy) - 3, Math.round(pcx) + 2, Math.round(pcy) + 2, C.plank[1]);
+  rect(p, Math.round(pcx) - 2, Math.round(pcy) - 2, Math.round(pcx) + 1, Math.round(pcy) + 1, 0x0e0b08);
+  // The barracks: a long hall under brown shingles, across the north.
+  roofed(p, x0, y0, X(0.52), Y(0.27), C.plank, C.plank[2]);
+  // The forge: a stone hall under slate with its brick chimney smoking.
+  const fx0 = X(0.6), fy1 = Y(0.3);
+  roofed(p, fx0, y0, x1, fy1, C.stone, 0x5a5c62);
+  const cx = x1 - 6, cy = y0 + 3;
+  for (let dy = 0; dy < 4; dy++)
+    for (let dx = 0; dx < 4; dx++) {
+      const rim = dx === 0 || dy === 0 || dx === 3 || dy === 3;
+      p.set(cx + dx, cy + dy, rim ? ((dx + dy) % 2 ? 0x8e3a26 : 0xb04a30) : dx === 1 && dy === 1 ? C.ember : 0x1a0e0a);
+    }
+  // The warehouse: a timber store under red tiles down the west.
+  const wy0 = Y(0.33), wy1 = Y(0.62);
+  roofed(p, x0, wy0, X(0.24), wy1, C.plank, C.red);
+  // The smithy's open shed: a lean-to roof over the anvil and the quench.
+  const sx0 = X(0.28), sy0 = Y(0.34), sx1 = X(0.45), sy1 = Y(0.52);
+  for (let y = sy0; y <= sy1; y++)
+    for (let x = sx0; x <= sx1; x++) p.set(x, y, y === sy0 ? C.plank[3] : y === sy1 ? C.plank[0] : (y - sy0) % 2 ? C.plank[1] : C.plank[2]);
+  rect(p, sx0 + 2, sy1 - 3, sx0 + 5, sy1 - 2, C.iron[1]);
+  rect(p, sx0 + 2, sy1 - 3, sx0 + 4, sy1 - 3, C.iron[3]);
+  disc(p, sx1 - 2.5, sy1 - 2.5, 1.6, (_x, _y, d) => (d > 1 ? C.plank[0] : C.rune));
+  // The ore yard: heaps of copper, silver and gold ore, a full cart and
+  // the rails running east to the pit's edge.
+  const oy = Y(0.82);
+  oreHeap(p, X(0.08), oy, 3.4, [0x6a3a1c, 0x8e5228, 0xb06a34, 0xd08a4a], 0xf0b070);
+  oreHeap(p, X(0.2), oy + 2, 3, [0x5a5a62, 0x7e7e88, 0xa6a6b0, 0xcacad2], 0xffffff);
+  oreHeap(p, X(0.14), oy - 5, 2.6, [0x6a5420, 0x9a7a2a, 0xc8a03a, 0xe9c46a], 0xfff4c8);
+  const ry = Y(0.7);
+  for (let x = X(0.06); x <= Math.round(pcx - pr + 1); x++) {
+    if (x % 3 === 0) { p.set(x, ry - 1, C.plank[0]); p.set(x, ry + 2, C.plank[0]); }
+    p.set(x, ry, C.iron[2]); p.set(x, ry + 1, C.iron[2]);
+  }
+  const kx = X(0.27);
+  rect(p, kx, ry - 2, kx + 5, ry + 3, C.iron[1]);
+  rect(p, kx + 1, ry - 1, kx + 4, ry + 2, 0x8e5228);
+  p.set(kx + 2, ry, 0xd08a4a); p.set(kx + 3, ry + 1, C.gold[1]);
+  // A lamp post at the pit's edge and a few crates of supplies.
+  p.set(X(0.4), Y(0.6), C.fire[2]);
+  for (const [bx, by] of [[X(0.03), Y(0.66)], [X(0.4), Y(0.9)]]) {
+    rect(p, bx, by, bx + 2, by + 2, C.crate[2]);
+    p.set(bx, by, C.crate[4]); p.set(bx + 2, by + 2, C.crate[0]);
+  }
+}
+
+/** The Library: a great cathedral of pale ashlar in the grounds of a
+ * university. Its lead roof is a cross, the nave running north to a round
+ * apse and the transept across it, buttressed along its walls, with a
+ * spire over the crossing; a gravel walk between trees leads up to its west
+ * door, a parterre of hedges and flower beds lies to one side, and a
+ * cloister's arcade rings a green quad with a fountain on the other. */
+function paintLibrary(p: Pix) {
+  const { x0, y0, x1, y1 } = frame(p.w, p.h);
+  const W = x1 - x0, H = y1 - y0;
+  const X = (f: number) => x0 + Math.round(W * f), Y = (f: number) => y0 + Math.round(H * f);
+  // The lawn.
+  for (let y = y0; y <= y1; y++)
+    for (let x = x0; x <= x1; x++) {
+      const t = hash(x, y, 91) % 13;
+      p.set(x, y, t === 0 ? LAWN[0] : t < 3 ? LAWN[3] : t < 7 ? LAWN[2] : LAWN[1]);
+    }
+  const mid = Math.round((x0 + x1) / 2);
+  // The gravel walk from the south edge to the door, and round the church.
+  for (let y = Y(0.7); y <= y1; y++) for (let x = mid - 2; x <= mid + 2; x++) p.set(x, y, GRAVEL[(x === mid - 2 ? 2 : x === mid + 2 ? 0 : 1)]);
+  for (let x = X(0.06); x <= X(0.94); x++) for (let y = Y(0.66); y <= Y(0.66) + 1; y++) p.set(x, y, GRAVEL[y === Y(0.66) ? 2 : 1]);
+  // The parterre: hedged beds of flowers round a small sundial.
+  const gx0 = X(0.04), gy0 = Y(0.72), gx1 = X(0.36), gy1 = y1 - 1;
+  for (let y = gy0; y <= gy1; y++)
+    for (let x = gx0; x <= gx1; x++) {
+      const edge = x === gx0 || y === gy0 || x === gx1 || y === gy1, cross = x === Math.round((gx0 + gx1) / 2) || y === Math.round((gy0 + gy1) / 2);
+      if (edge) p.set(x, y, x === gx0 || y === gy0 ? HEDGE[3] : HEDGE[1]);
+      else if (cross) p.set(x, y, GRAVEL[1]);
+      else p.set(x, y, hash(x, y, 93) % 3 === 0 ? FLOWERS[hash(x, y, 94) % FLOWERS.length] : HEDGE[2]);
+    }
+  disc(p, (gx0 + gx1 + 1) / 2, (gy0 + gy1 + 1) / 2, 1.3, (_x, _y, d) => (d > 0.8 ? C.pale[1] : C.pale[3]));
+  // The cloister: an arcaded walk round a green quad with a fountain.
+  const qx0 = X(0.64), qy0 = Y(0.72), qx1 = x1, qy1 = y1;
+  for (let y = qy0; y <= qy1; y++)
+    for (let x = qx0; x <= qx1; x++) {
+      const ring = Math.min(x - qx0, y - qy0, qx1 - x, qy1 - y);
+      if (ring === 0) p.set(x, y, x === qx0 || y === qy0 ? C.pale[3] : C.pale[1]);
+      else if (ring === 1) p.set(x, y, LEAD[(x === qx0 + 1 || y === qy0 + 1) ? 3 : 1]);
+      else if (ring === 2) p.set(x, y, (x + y) % 2 ? C.pale[2] : C.pale[0]);
+      else p.set(x, y, hash(x, y, 95) % 5 === 0 ? LAWN[3] : LAWN[2]);
+    }
+  disc(p, (qx0 + qx1 + 1) / 2, (qy0 + qy1 + 1) / 2, 2.4, (_x, _y, d) => (d > 1.7 ? C.pale[2] : d > 0.8 ? C.sky[1] : C.sky[2]));
+  // Trees along the walk.
+  for (const [tx, ty] of [[mid - 5, Y(0.78)], [mid + 5, Y(0.78)], [mid - 5, Y(0.92)], [mid + 5, Y(0.92)]]) crown(p, tx, ty, 2.6, HEDGE);
+  // The cathedral's footprint: the nave, the transept and the apse.
+  const nw = Math.round(W * 0.15), nx0 = mid - nw, nx1 = mid + nw, ny0 = Y(0.1), ny1 = Y(0.64);
+  const tx0 = X(0.1), tx1 = X(0.9), ty0 = Y(0.2), ty1 = Y(0.38);
+  const apse = { cx: mid + 0.5, cy: ny0 + 0.5, r: nw + 0.5 };
+  const inChurch = (x: number, y: number) =>
+    (x >= nx0 && x <= nx1 && y >= ny0 && y <= ny1) || (x >= tx0 && x <= tx1 && y >= ty0 && y <= ty1) ||
+    (y < ny0 && (x + 0.5 - apse.cx) ** 2 + (y + 0.5 - apse.cy) ** 2 <= apse.r ** 2);
+  // Buttresses: stone piers standing out from the walls every few pixels.
+  for (let y = ny0 + 2; y <= ny1 - 1; y += 4) {
+    if (y >= ty0 - 1 && y <= ty1 + 1) continue;
+    for (const x of [nx0 - 1, nx0 - 2, nx1 + 1, nx1 + 2]) { p.set(x, y, x < mid ? C.pale[3] : C.pale[1]); p.set(x, y + 1, C.pale[0]); }
+  }
+  for (let x = tx0 + 2; x <= tx1 - 2; x += 4) {
+    if (x >= nx0 - 1 && x <= nx1 + 1) continue;
+    for (const y of [ty0 - 1, ty1 + 1]) { p.set(x, y, y < ty0 ? C.pale[3] : C.pale[1]); p.set(x + 1, y, C.pale[0]); }
+  }
+  // Walls: the footprint's edge in pale ashlar, lit to the upper left.
+  for (let y = y0; y <= y1; y++)
+    for (let x = x0; x <= x1; x++) {
+      if (!inChurch(x, y)) continue;
+      const edge = !inChurch(x - 1, y) || !inChurch(x + 1, y) || !inChurch(x, y - 1) || !inChurch(x, y + 1);
+      if (edge) p.set(x, y, !inChurch(x - 1, y) || !inChurch(x, y - 1) ? C.pale[3] : C.pale[1]);
+    }
+  // The roofs: lead, the nave's and transept's ridges meeting at the
+  // crossing, each slope shaded by its facing, with seams of lead sheets.
+  for (let y = y0; y <= y1; y++)
+    for (let x = x0; x <= x1; x++) {
+      if (!inChurch(x, y)) continue;
+      const edge = !inChurch(x - 1, y) || !inChurch(x + 1, y) || !inChurch(x, y - 1) || !inChurch(x, y + 1);
+      if (edge) continue;
+      const inNave = x >= nx0 && x <= nx1 && !(y >= ty0 && y <= ty1);
+      const inApse = y < ny0;
+      let c: number;
+      if (inApse) {
+        const dx = x + 0.5 - apse.cx, dy = y + 0.5 - apse.cy;
+        c = LEAD[Math.min(3, lit(x, y, dx, dy, Math.sqrt(dx * dx + dy * dy)) + 0)];
+      } else if (inNave) {
+        const ridge = x === mid;
+        c = ridge ? OUTLINE : x < mid ? LEAD[2] : LEAD[1];
+        if (!ridge && (y - ny0) % 4 === 0) c = shade(c, 0.82);
+      } else {
+        const tmid = Math.round((ty0 + ty1) / 2);
+        c = y === tmid ? OUTLINE : y < tmid ? LEAD[3] : LEAD[0];
+        if (y !== tmid && (x - tx0) % 4 === 0) c = shade(c, 0.82);
+      }
+      p.set(x, y, c);
+    }
+  // Stained glass glowing in the transept's ends and the west front.
+  for (const [gx, gy] of [[tx0, Math.round((ty0 + ty1) / 2)], [tx1, Math.round((ty0 + ty1) / 2)]]) {
+    p.set(gx, gy - 1, 0x5b8fd9); p.set(gx, gy, 0xd8553f); p.set(gx, gy + 1, 0xe9c46a);
+  }
+  for (let x = mid - 2; x <= mid + 2; x++) p.set(x, ny1, [0x5b8fd9, 0xa06ac8, 0xe9c46a, 0xa06ac8, 0x5b8fd9][x - mid + 2]);
+  // The west door, at the head of the walk.
+  rect(p, mid - 1, ny1 + 1, mid + 1, ny1 + 1, C.plank[0]);
+  // The spire over the crossing: a four-sided pyramid lit from the upper
+  // left, a gilded cross at its tip.
+  const scx = mid + 0.5, scy = Math.round((ty0 + ty1) / 2) + 0.5, sr = Math.min(nw, (ty1 - ty0) / 2) + 1.5;
+  for (let y = Math.floor(scy - sr); y <= Math.ceil(scy + sr); y++)
+    for (let x = Math.floor(scx - sr); x <= Math.ceil(scx + sr); x++) {
+      const dx = x + 0.5 - scx, dy = y + 0.5 - scy;
+      if (Math.abs(dx) > sr || Math.abs(dy) > sr) continue;
+      const rim = Math.abs(dx) > sr - 1 || Math.abs(dy) > sr - 1;
+      const diag = Math.abs(Math.abs(dx) - Math.abs(dy)) < 0.6;
+      const face = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 3 : 1) : dy < 0 ? 2 : 0;
+      p.set(x, y, rim ? C.pale[face >= 2 ? 3 : 1] : diag ? LEAD[0] : LEAD[face]);
+    }
+  p.set(mid, Math.round(scy) - 1, C.gold[2]); p.set(mid - 1, Math.round(scy) - 1, C.gold[1]);
+  p.set(mid + 1, Math.round(scy) - 1, C.gold[1]); p.set(mid, Math.round(scy) - 2, C.gold[1]); p.set(mid, Math.round(scy), C.gold[0]);
 }
