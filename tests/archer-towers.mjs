@@ -12,25 +12,13 @@ try{
    const f=window.archerGallery,w=f.scenes[2].sim.wisps[0],initialFire=f.scenes[2].sim.wispOwners.values().next().value.fire.arrows.length,pixels=()=>Array.from(f.c.getImageData(0,0,f.canvas.width,f.canvas.height).data);
    f.draw();const on=pixels();f.draw({pixel:false});const off=pixels();f.draw({reduced:true});const reduced=pixels().some(v=>v!==0);
    const start=[w.x,w.y];f.advance(30);const moved=start[0]!==w.x||start[1]!==w.y;
-   return {initialFire,same:on.every((v,i)=>v===off[i]),reduced,moved,triple:f.scenes[2].sim.wispOwners.values().next().value.arrows.length===3&&f.scenes[2].sim.wisps.includes(w),hits:f.scenes[2].sim.enemies.filter(e=>e.hp<e.maxHp).length};
+   return {initialFire,same:on.every((v,i)=>v===off[i]),reduced,moved,triple:Array.isArray(f.scenes[2].sim.wispOwners.values().next().value.quiver.arrows)&&f.scenes[2].sim.wisps.includes(w),hits:f.scenes[2].sim.enemies.filter(e=>e.hp<e.maxHp).length};
   });assert.ok(gallery.same&&gallery.reduced&&gallery.moved&&gallery.triple&&gallery.initialFire===2&&gallery.hits>1,JSON.stringify(gallery));
   await page.evaluate(()=>window.archerGallery.draw());await page.locator('canvas').screenshot({path:`test-results/archer-towers-${width}.png`});
-  const sparkCheck=await page.evaluate(()=>{
-   const f=window.archerGallery,s=f.scenes[2],owner=s.sim.wispOwners.get(s.b.id),before=[...owner.arrows];
-   s.sim.enemies=[];
-   for(const w of before)for(let i=0;i<40;i++)s.sim.enemies.push({id:s.sim.newId(),kind:'orc',x:w.x,y:w.y,hp:1e6,maxHp:1e6,cd:0,flash:0,jx:0,jy:0,distract:-1,distractT:0,rollT:0,marked:false});
-   s.sim.reindexAfterDisplacement();s.t.step(s.sim,.01);
-   s.sim.enemies=[];s.sim.reindexAfterDisplacement();s.t.step(s.sim,.15);f.draw();
-   const sparks=s.sim.wisps.filter(w=>!w.fire&&!w.lightning&&w.burst!==undefined).length;
-   return {sparks,empty:owner.arrows.length===0,spent:before.every(w=>w.hitsLeft===0)};
-  });assert.ok(sparkCheck.empty&&sparkCheck.spent&&sparkCheck.sparks===3,JSON.stringify(sparkCheck));
-  await page.locator('canvas').screenshot({path:`test-results/wisp-sparks-${width}.png`});
-  await page.evaluate(()=>window.archerGallery.draw({reduced:true}));
-  await page.locator('canvas').screenshot({path:`test-results/wisp-sparks-reduced-${width}.png`});
   await page.reload();await page.waitForFunction(()=>window.archerGallery);
   const fireCheck=await page.evaluate(()=>{
    const f=window.archerGallery,s=f.scenes[2],owner=s.sim.wispOwners.get(s.b.id),originals=[...owner.fire.arrows];
-   owner.arrows=[];owner.refill=0;s.sim.wisps=s.sim.wisps.filter(w=>w.fire);s.sim.enemies=[];
+   owner.quiver.arrows=[];owner.quiver.capacity=0;s.sim.wisps=s.sim.wisps.filter(w=>w.fire);s.sim.enemies=[];
    for(const w of originals)for(let i=0;i<15;i++)s.sim.enemies.push({id:s.sim.newId(),kind:'orc',x:w.x,y:w.y,hp:1e6,maxHp:1e6,cd:0,flash:0,jx:0,jy:0,distract:-1,distractT:0,rollT:0,marked:false});
    s.sim.reindexAfterDisplacement();s.t.step(s.sim,.01);s.sim.enemies=[];s.sim.reindexAfterDisplacement();s.t.step(s.sim,.15);f.draw();
    return {empty:owner.fire.arrows.length===0,exploded:originals.every(w=>w.hitsLeft===0&&w.burst!==undefined),ribbons:s.sim.wispFireTrails.length};
@@ -43,8 +31,8 @@ try{
    s.t.step(s.sim,6-owner.fire.refill-.01);const before=owner.fire.arrows.length;
    s.t.step(s.sim,.01);const first=owner.fire.arrows.length;
    s.t.step(s.sim,6);const second=owner.fire.arrows.length;
-   f.draw();return {before,first,second,blue:owner.arrows.length,trailCount:s.sim.wispFireTrails.length};
-  });assert.deepEqual(restored,{before:0,first:1,second:2,blue:3,trailCount:0});
+   f.draw();return {before,first,second,trailCount:s.sim.wispFireTrails.length};
+  });assert.deepEqual(restored,{before:0,first:1,second:2,trailCount:0});
   await page.locator('canvas').screenshot({path:`test-results/wisp-fire-stock-${width}.png`});
   await page.reload();await page.waitForFunction(()=>window.archerGallery);
   const lightning=await page.evaluate(()=>{
@@ -96,13 +84,13 @@ try{
    const urls=new Set(['/src/defend/ui.ts']);for(const e of performance.getEntriesByType('resource'))if(new URL(e.name).pathname==='/src/defend/ui.ts')urls.add(e.name);
    for(const url of urls){const{DefendPage}=await import(url),frame=DefendPage.prototype.frame;if(frame.__hooked)continue;DefendPage.prototype.frame=function(t){window.__dp=this;return frame.call(this,t);};DefendPage.prototype.frame.__hooked=true;}
   });await page.waitForFunction(()=>window.__dp);
-  await page.locator('#defend-start').click();await page.waitForFunction(()=>window.__dp.sim?.wisps.filter(w=>w.hitsLeft>0).length===6);
+  await page.locator('#defend-start').click();await page.waitForFunction(()=>window.__dp.sim?.wisps.filter(w=>w.hitsLeft>0).length===3);
   assert.equal(await page.evaluate(()=>{window.__dp.sim.speed=0;return window.__dp.sim.wispOwners.size;}),1);
-  const live=await page.evaluate(()=>{const owner=window.__dp.sim.wispOwners.values().next().value;return {blue:owner.arrows.length,fire:owner.fire.arrows.length,purple:owner.lightning.arrows.length};});
-  assert.deepEqual(live,{blue:3,fire:2,purple:1});
+  const live=await page.evaluate(()=>{const owner=window.__dp.sim.wispOwners.values().next().value;return {fire:owner.fire.arrows.length,purple:owner.lightning.arrows.length};});
+  assert.deepEqual(live,{fire:2,purple:1});
   const battle=await page.evaluate(()=>{
    const sim=window.__dp.sim,owner=sim.wispOwners.values().next().value;
-   const tower=sim.map.buildings[owner.arrows[0].building],x=tower.rect.x+tower.rect.w/2,y=tower.rect.y+tower.rect.h/2;
+   const tower=sim.map.buildings[owner.fire.arrows[0].building],x=tower.rect.x+tower.rect.w/2,y=tower.rect.y+tower.rect.h/2;
    for(let i=0;i<40;i++)sim.enemies.push({id:sim.newId(),kind:'bat',x:x+3.5+(i%4)*.1,y:y+Math.floor(i/4)*.05,hp:1e6,maxHp:1e6,cd:0,flash:0,jx:0,jy:0,distract:-1,distractT:0,rollT:0,marked:false});
    sim.reindexAfterDisplacement();sim.speed=1;let ribbon=false,hit=false,lightning=false;
    for(let i=0;i<90;i++){
@@ -111,6 +99,6 @@ try{
    sim.speed=0;
    return {ribbon,hit,lightning,finite:sim.wisps.every(w=>Number.isFinite(w.x)&&Number.isFinite(w.y))&&sim.enemies.every(e=>Number.isFinite(e.hp))};
   });assert.ok(battle.ribbon&&battle.hit&&battle.lightning&&battle.finite,JSON.stringify(battle));
-  assert.deepEqual(errors,[]);await context.close();console.log(`${width}px: gallery, Triple arrows and Fire arrows, fire trails/blasts, independent six-second refills, exhaustion/sparks, reload persistence, slicing/trails, graphics settings, Reduce Motion, all attunements, saved ranks and live Wisp battle with rank-III straight lightning passed`);
+  assert.deepEqual(errors,[]);await context.close();console.log(`${width}px: gallery, Deep quiver and Fire arrows, fire trails/blasts, independent six-second refills, reload persistence, slicing/trails, graphics settings, Reduce Motion, all attunements, saved ranks and live Wisp battle with rank-III straight lightning passed`);
  }
 }finally{await browser.close();}

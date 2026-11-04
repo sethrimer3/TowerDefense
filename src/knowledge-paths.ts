@@ -236,7 +236,14 @@ export const FIRE_ARROWS = { hall: { burn: 2, share: 0.25 }, burn: [0, 3, 4, 4],
 /** Hawk focus: range relative to the ordinary tower, additive shot damage,
  * and a speed multiplier applied to the half-rate cadence. */
 export const SHARP = { range: [0.7, 0.7, 4.3, 4.3], reload: 2, perShot: 0.02, bonusCap: 10, speedCap: 10 };
-/** Wisp flight speeds/radius are shares of tower range; trail distances are cells. */
+/** The Wisp tower's arrow storm: it stores an ordinary arrow every
+ * `every[rank I?]` seconds (scaled like an archer tower's reload), up to
+ * `capacity`, circling the tower, and looses them all at once in a
+ * `spread`-degree spray when an enemy comes in range. Orbit distances are
+ * cells; `reach` is how far past the tower's range a loosed arrow flies. */
+export const WISP_STORM = { every: [1, .5], capacity: [30, 45], spread: 30, reach: 1.25,
+  orbit: 1.5, band: .55, speed: 2.4, pull: 10, keep: 2.5, spin: .8, wander: 3, step: 1 / 30 };
+/** Fire/lightning wisp flight speeds/radius are shares of tower range; trail distances are cells. */
 export const WISP = { width: 1, orbit: 0.65, turnRadius: .24, speed: 2.5, idleSpeed: .4,
   tassels: 6, segments: 12, idleLength: 1, sliceLength: 3, linger: 1, extend: .08, shorten: 1.5,
   fade: .35, spacing: .08, capacity: [1,3], hits: 30, refill: 3, sparkLife: .55, sparks: 18 };
@@ -698,11 +705,11 @@ export const PATHS: KnowledgePath[] = [
       { name: "Gathering storm", icon: "volley", cost: studyPathCost(4, 2), text: "Each further shot speeds the half-rate cadence by another 1x, up to 10x. A new enemy resets both damage and speed" },
     ],
   },
-  { id: "wispArrow", topic: "wispTower", name: "Wisp Arrow", motto: "Living arrows, rising flames and violent lightning", hue: "frost",
+  { id: "wispArrow", topic: "wispTower", name: "Wisp Arrow", motto: "Gathered arrows, rising flames and violent lightning", hue: "frost",
     ranks: [
-      { name: "Triple arrows", icon: "volley", cost: studyPathCost(4, 0), text: "Stores up to 3 living blue arrows instead of 1. Each has 30 hits before bursting into blue sparks; the tower regenerates one arrow every 3 seconds while below capacity" },
-      { name: "Fire arrows", icon: "fireArrow", cost: studyPathCost(4, 1), text: "Adds up to 2 fire arrows alongside the 3 blue arrows, regenerating one every 6 seconds below capacity. Flaming passes leave damaging trails for 2 seconds; after 10 direct hits each arrow explodes for twice its damage within 2 cells. Direct hits, trails and explosions deal fire damage" },
-      { name: "Lightning arrow", icon: "bolt", cost: studyPathCost(4, 2), text: "Adds one larger purple arrow alongside blue and fire arrows. Locks onto a nearby enemy, then flies straight through to the map edge. Leaves violent purple lightning for 5 seconds at each point, dealing 300% attack per second to all enemies in its trail. Regenerates 9 seconds after exiting the map" },
+      { name: "Deep quiver", icon: "volley", cost: studyPathCost(4, 0), text: "Stores an arrow every half second instead of every second, up to 45 instead of 30, all loosed together in the same 30-degree spray" },
+      { name: "Fire arrows", icon: "fireArrow", cost: studyPathCost(4, 1), text: "Adds up to 2 living fire arrows alongside the stored arrows, regenerating one every 6 seconds below capacity. Flaming passes leave damaging trails for 2 seconds; after 10 direct hits each arrow explodes for twice its damage within 2 cells. Direct hits, trails and explosions deal fire damage" },
+      { name: "Lightning arrow", icon: "bolt", cost: studyPathCost(4, 2), text: "Adds one larger purple arrow alongside the stored and fire arrows. Locks onto a nearby enemy, then flies straight through to the map edge. Leaves violent purple lightning for 5 seconds at each point, dealing 300% attack per second to all enemies in its trail. Regenerates 9 seconds after exiting the map" },
     ],
   },
   {
@@ -978,7 +985,7 @@ export const UNSPECIALIZED: Record<PathTopic, string> = {
   archerTower: "Steady single arrows",
   brazierTower: "Lit arrows: burns for 2 seconds",
   hawkTower: "Strongest-enemy focus, 30% shorter range",
-  wispTower: "One living arrow slices in broad arcs for 30 hits, then blue sparks; regenerates every 3 seconds",
+  wispTower: "Stores an arrow a second, up to 30, circling the tower, and looses them all in a 30-degree spray when an enemy comes in range",
   cannonTower: "Standard shells and blasts",
   batteryTower: "Grapeshot: each shell adds four surrounding explosions",
   mortarTower: "Impacts leave burning ground for 4 seconds; slower reload",

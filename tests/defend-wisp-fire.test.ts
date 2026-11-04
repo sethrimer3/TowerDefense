@@ -26,7 +26,7 @@ function enemy(sim:DefendSim,x:number,y:number,kind:Enemy["kind"]="orc") {
 }
 const close=(a:number,b:number)=>assert.ok(Math.abs(a-b)<1e-7,`${a} != ${b}`);
 const clear=(s:ReturnType<typeof scene>)=>{s.sim.enemies=[];s.sim.reindexAfterDisplacement();};
-const fireOnly=(s:ReturnType<typeof scene>)=>{s.owner.arrows=[];s.owner.refill=0;s.sim.wisps=s.sim.wisps.filter(w=>w.fire);};
+const fireOnly=(s:ReturnType<typeof scene>)=>{s.owner.quiver.arrows=[];s.owner.quiver.capacity=0;s.sim.wisps=s.sim.wisps.filter(w=>w.fire);};
 function spendFire(s:ReturnType<typeof scene>) {
  for(const w of s.fire!.arrows)for(let i=0;i<10;i++)enemy(s.sim,w.x,w.y);
  s.t.step(s.sim,.01);assert.equal(s.fire!.arrows.length,0);clear(s);
@@ -46,11 +46,11 @@ test("Fire arrows is rank II, costs 4,004 Knowledge and persists/refunds and lea
  assert.equal(loaded.knowledge,5000);assert.deepEqual(loaded.defend.kept,save.defend.kept.map(k=>({...k,rank:1})));
 });
 
-test("Rank II starts with three blue plus two fire arrows; earlier ranks have no fire state",()=>{
+test("Rank II starts with an empty quiver plus two fire arrows; earlier ranks have no fire state",()=>{
  for(const rank of[0,1]){const s=scene(rank);assert.equal(s.fire,undefined);assert.equal(s.sim.wispFireTrails.length,0);}
- const s=scene();assert.equal(s.owner.arrows.length,3);assert.equal(s.fire!.arrows.length,2);
- assert.deepEqual(s.fire!.arrows.map(w=>w.hitsLeft),[10,10]);assert.ok(s.owner.arrows.every(w=>w.hitsLeft===30));
- assert.equal(new Set(s.sim.wisps.map(w=>`${w.x},${w.y}`)).size,5);
+ const s=scene();assert.equal(s.owner.quiver.arrows.length,0);assert.equal(s.fire!.arrows.length,2);
+ assert.deepEqual(s.fire!.arrows.map(w=>w.hitsLeft),[10,10]);
+ assert.equal(new Set(s.sim.wisps.map(w=>`${w.x},${w.y}`)).size,2);
  assert.equal(s.fire!.capacity,2);close(s.fire!.refill,0);
 });
 
@@ -70,9 +70,9 @@ test("Each fire arrow delivers exactly ten direct contacts, then one fire-elemen
  const count=events.length;s.t.step(s.sim,.3);assert.equal(events.length,count,"spent arrow does not explode again");
 });
 
-test("Six-second fire refills are sequential and independent from the blue three-second timer",()=>{
+test("Six-second fire refills are sequential and independent from the quiver's timer",()=>{
  const s=scene();s.t.step(s.sim,20);close(s.fire!.refill,0);spendFire(s);
- assert.equal(s.owner.arrows.length,3);close(s.owner.refill,0);close(s.fire!.refill,.01);
+ close(s.fire!.refill,.01);
  s.t.step(s.sim,0);close(s.fire!.refill,.01);
  s.t.step(s.sim,5.98);assert.equal(s.fire!.arrows.length,0);
  s.t.step(s.sim,.01);assert.equal(s.fire!.arrows.length,1);close(s.fire!.refill,0);
@@ -159,7 +159,7 @@ test("Source destruction cancels fire regeneration while existing ribbons finish
  assert.equal(s.sim.wispOwners.size,0);assert.ok(e.hp<e.maxHp);assert.ok(s.sim.wispFireTrails.length>0);
  s.t.step(s.sim,3);assert.equal(s.sim.wispFireTrails.length,0);assert.equal(s.sim.wisps.length,0);
  s.sim.built[s.b.id]=s.b.cells.length;s.t.step(s.sim,0);
- const rebuilt=s.sim.wispOwners.get(s.b.id)!;assert.equal(rebuilt.arrows.length,3);assert.equal(rebuilt.fire!.arrows.length,2);
+ const rebuilt=s.sim.wispOwners.get(s.b.id)!;assert.equal(rebuilt.quiver.arrows.length,0);assert.equal(rebuilt.fire!.arrows.length,2);
 });
 
 test("Fire-tail presentation is flame-shaped, finite, harmless and stable under Reduce Motion",()=>{
@@ -180,19 +180,16 @@ test("Active fire ribbons stay lifetime-bounded during a sustained fight and exp
   }
  }
  clear(s);s.t.step(s.sim,4);assert.equal(s.sim.wispFireTrails.length,0);
- assert.ok(s.owner.arrows.every(w=>w.hitsLeft<=WISP.hits));
 });
 
 
-test("Blue and fire inventories replenish on distinct three/six-second schedules after simultaneous exhaustion",()=>{
- const s=scene();
- for(const w of s.owner.arrows)for(let i=0;i<30;i++)enemy(s.sim,w.x,w.y);
+test("Stored and fire arrows replenish on their own half/six-second schedules after both are spent",()=>{
+ const s=scene();s.t.step(s.sim,1.5);assert.equal(s.owner.quiver.arrows.length,3,"Deep quiver stores one every half second");
  for(const w of s.fire!.arrows)for(let i=0;i<10;i++)enemy(s.sim,w.x,w.y);
- s.t.step(s.sim,.01);clear(s);assert.equal(s.owner.arrows.length,0);assert.equal(s.fire!.arrows.length,0);
- s.t.step(s.sim,2.99);assert.equal(s.owner.arrows.length,1);assert.equal(s.fire!.arrows.length,0);
- s.t.step(s.sim,3);assert.equal(s.owner.arrows.length,2);assert.equal(s.fire!.arrows.length,1);
- s.t.step(s.sim,6);assert.equal(s.owner.arrows.length,3);assert.equal(s.fire!.arrows.length,2);
- close(s.owner.refill,0);close(s.fire!.refill,0);
+ s.t.step(s.sim,.01);clear(s);assert.equal(s.owner.quiver.arrows.length,0);assert.equal(s.fire!.arrows.length,0);
+ s.t.step(s.sim,2.99);assert.equal(s.owner.quiver.arrows.length,6);assert.equal(s.fire!.arrows.length,0);
+ s.t.step(s.sim,3);assert.equal(s.owner.quiver.arrows.length,12);assert.equal(s.fire!.arrows.length,1);
+ s.t.step(s.sim,6);assert.equal(s.owner.quiver.arrows.length,24);assert.equal(s.fire!.arrows.length,2);
 });
 
 test("Actual curved fire passes, damage and ribbon timing agree across fine/coarse simulation steps",()=>{

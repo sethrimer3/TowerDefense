@@ -1,7 +1,7 @@
 # Wisp Tower — Fire arrows
 
 Status: approved for implementation by the user on 2026-10-24 (America/Denver). Proposed details below are accepted initial tuning. Extends
-[Triple arrows](WISP_TRIPLE_ARROWS.md) as the second purchased Wisp Arrow rank.
+[Deep quiver](WISP_ARROW_STORM.md) as the second purchased Wisp Arrow rank.
 
 ## Upgrade specification
 

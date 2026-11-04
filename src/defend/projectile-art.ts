@@ -157,6 +157,13 @@ export function drawArrows(c: Ctx, px: number, sim: DefendSim, reduced = false) 
   }
 }
 
+/** An ordinary arrow centred at (`x`, `y`) in cells, pointing along
+ * (`dx`, `dy`): the Wisp tower's stored arrows circling it. */
+export function drawArrowAt(c: Ctx, px: number, x: number, y: number, dx: number, dy: number) {
+  c.imageSmoothingEnabled = false;
+  blit(c, px, arrowSprite(arrowDir(dx, dy)), Math.round(x * ART - ARROW_BOX / 2), Math.round(y * ART - ARROW_BOX / 2));
+}
+
 /** A gun's bullet (gunners, machine and Gatling gunners, snipers, musket
  * balls but the grenadiers'): one pale yellow art pixel trailing
  * `BULLET_TRAIL` pixels back the way it came, orange through dark orange

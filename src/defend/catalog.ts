@@ -450,7 +450,7 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
   },
   wispTower: {
     kind: "wispTower", name: "Wisp Tower", w: 2, h: 2, maxHp: 120, outsideOk: true,
-    description: "One living blue arrow orbits this tower, sweeping through enemies in wide parabolic slices with six flowing tendrils. Later upgrades are still to come.",
+    description: "Gathers an ordinary arrow every second, up to 30, which wander round the tower like electrons round an atom. When an enemy comes in range it looses every stored arrow at once in a 30-degree spray.",
   },
   cannonTower: {
     kind: "cannonTower",

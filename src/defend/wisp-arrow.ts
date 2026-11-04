@@ -1,4 +1,6 @@
-/** Tower-owned living arrows, with broad tangent passes and swept hits.
+/** The Wisp tower: its stored ordinary arrows (`wisp-storm.ts`) and the
+ * living fire and lightning arrows of its later ranks, with broad tangent
+ * passes and swept hits.
  * Recorded flight positions also anchor the quiet, purely decorative tassels. */
 import { WISP, WISP_FIRE, WISP_LIGHTNING, pathRank } from "../knowledge-paths.ts";
 import { archerCooldown, archerDamage, archerRange, enemySize } from "./catalog.ts";
@@ -10,6 +12,7 @@ import { leaveWispFire, explodeWispFire, type WispFireTrail } from "./wisp-fire.
 import { stepWispLightning, type WispLightningRay } from "./wisp-lightning.ts";
 import type { WispTrail } from "./wisp-trail.ts";
 import { wispFlight, flightPosition, type FlightPoint, type WispFlight } from "./wisp-flight.ts";
+import { newQuiver, stepQuiver, type Quiver } from "./wisp-storm.ts";
 
 export type WispSlice = WispFlight & { damage: number; hit: Set<number> };
 export type WispArrow = { building: number; x: number; y: number; vx: number; vy: number; angle: number;
@@ -19,7 +22,9 @@ export type WispArrow = { building: number; x: number; y: number; vx: number; vy
   travel: number; trail: FlightPoint[]; lastTarget?: number; flight?: WispFlight; slice?: WispSlice; fade?: number };
 
 export type WispPool = { arrows: WispArrow[]; capacity: number; refill: number; serial: number };
-export type WispTowerState = WispPool & { fire?: WispPool; lightning?: WispPool };
+/** The tower's stored ordinary arrows (`wisp-storm.ts`), plus the living
+ * fire and lightning arrows its later ranks add. */
+export type WispTowerState = { quiver: Quiver; fire?: WispPool; lightning?: WispPool };
 
 /** First contact with the swept hit band, rather than its nearest point.
  * This orders dense-group hits and makes exhaustion/refill timing independent
@@ -34,18 +39,18 @@ function contact(p: Point, a: Point, b: Point, radius: number) {
   return t>=0&&t<=1?t:Infinity;
 }
 
-type WispKind="blue"|"fire"|"lightning";
-const wispKind=(w:WispArrow):WispKind=>w.lightning?"lightning":w.fire?"fire":"blue";
+type WispKind="fire"|"lightning";
+const wispKind=(w:WispArrow):WispKind=>w.lightning?"lightning":"fire";
 export const wispHomeAngle=(w:Pick<WispArrow,"slot"|"fire"|"lightning">)=>w.lightning?Math.PI*7/6:-Math.PI/2+(w.slot+(w.fire ? .5 : 0))*Math.PI*2/3;
 
-function spawnWisp(sim: DefendSim,b: Building,owner: WispPool,kind:WispKind="blue") {
+function spawnWisp(sim: DefendSim,b: Building,owner: WispPool,kind:WispKind) {
   const c=center(b.rect),range=archerRange(sim.levels.archerRange);
   let slot=0;while(owner.arrows.some(w=>w.slot===slot))slot++;
-  const variant=kind==="fire"?{fire:true as const}:kind==="lightning"?{lightning:true as const}:{};
+  const variant=kind==="fire"?{fire:true as const}:{lightning:true as const};
   const angle=wispHomeAngle({slot,...variant});
   const w: WispArrow={building:b.id,x:c.x+Math.cos(angle)*.8,y:c.y+Math.sin(angle)*.8,
     vx:0,vy:0,angle,cx:c.x,cy:c.y,range,time:0,energy:0,linger:0,
-    slot,serial:owner.serial++,hitsLeft:kind==="fire"?WISP_FIRE.hits:kind==="lightning"?1:WISP.hits,travel:0,trail:[],...variant};
+    slot,serial:owner.serial++,hitsLeft:kind==="fire"?WISP_FIRE.hits:1,travel:0,trail:[],...variant};
   w.trail.push({x:w.x,y:w.y,angle:w.angle,distance:0});
   owner.arrows.push(w);sim.wisps.push(w);
 }
@@ -56,23 +61,22 @@ export function stepWispTower(sim: DefendSim,b: Building,dt: number) {
   let owner=sim.wispOwners.get(b.id);
   if(!owner) {
     const rank=pathRank(buildingPaths(sim,b),"wispTower","wispArrow");
-    owner={arrows:[],capacity:rank?WISP.capacity[1]:WISP.capacity[0],refill:0,serial:0};
+    owner={quiver:newQuiver(rank)};
     if(rank>=2)owner.fire={arrows:[],capacity:WISP_FIRE.capacity,refill:0,serial:0};
     if(rank>=3)owner.lightning={arrows:[],capacity:WISP_LIGHTNING.capacity,refill:0,serial:0};
     sim.wispOwners.set(b.id,owner);
-    while(owner.arrows.length<owner.capacity)spawnWisp(sim,b,owner);
     if(owner.fire)while(owner.fire.arrows.length<owner.fire.capacity)spawnWisp(sim,b,owner.fire,"fire");
     if(owner.lightning)while(owner.lightning.arrows.length<owner.lightning.capacity)spawnWisp(sim,b,owner.lightning,"lightning");
   }
   const c=center(b.rect),range=archerRange(sim.levels.archerRange);
   const candidates=sim.enemiesNear(c.x,c.y,range).filter(e=>e.hp>0&&(e.x-c.x)**2+(e.y-c.y)**2<=range*range);
-  stepWispPool(sim,b,owner,candidates,dt,"blue");
-  if(owner.fire&&sim.intact(b))stepWispPool(sim,b,owner.fire,candidates,dt,"fire");
+  stepQuiver(sim,b,owner.quiver,candidates,dt);
+  if(owner.fire)stepWispPool(sim,b,owner.fire,candidates,dt,"fire");
   if(owner.lightning&&sim.intact(b))stepWispPool(sim,b,owner.lightning,candidates,dt,"lightning");
 }
 
 function stepWispPool(sim:DefendSim,b:Building,owner:WispPool,candidates:Enemy[],dt:number,kind:WispKind) {
-  const refill=kind==="lightning"?WISP_LIGHTNING.refill:kind==="fire"?WISP_FIRE.refill:WISP.refill;
+  const refill=kind==="lightning"?WISP_LIGHTNING.refill:WISP_FIRE.refill;
   let remaining=dt;
   do {
     const full=owner.arrows.length===owner.capacity;
