@@ -107,25 +107,26 @@ test("Minelayer lays without enemies at half range, with all caps including flig
     const cap = [15, 15, 30, 50][rank];
     for (let i = 0; i < cap; i++) assert.ok(fireMine(sim, b));
     assert.equal(mineCount(sim, b.id), cap); assert.equal(fireMine(sim, b), false);
-    for (const s of sim.shells) assert.ok((s.x1 - 20) ** 2 + (s.y1 - 20) ** 2 <= 5.5 ** 2);
+    for (const s of sim.shells) assert.ok(Math.abs(s.x1 - 20) <= 5.5 && Math.abs(s.y1 - 20) <= 5.5, "inside the square range");
     stepShells(sim, 3); assert.equal(sim.mines.length, cap); assert.equal(sim.effects.length, 0, "laying does not explode");
     assert.equal(fireMine(sim, b), false); sim.mines.pop(); assert.ok(fireMine(sim, b));
     assert.equal(sim.mines[0].smart, rank === 3);
   }
 });
 
-test("Directed laying clamps its crosshair and scatters locally; rank zero ignores aim", () => {
+test("Directed laying clamps its crosshair to the square range and scatters within two cells of it, at every rank", () => {
   const { sim, b } = scene("minelayerTower", 1);
   assert.equal(mineAim(b, { x: 20, y: 20 }), undefined);
   assert.equal(mineAim(b, { x: Infinity, y: 2 }), undefined);
   assert.deepEqual(mineAim(b, { x: 100, y: 20 }), { x: 25.5, y: 20 });
   sim.mineAims.set(b.id, { x: 24, y: 20 });
   for (let i = 0; i < 15; i++) assert.ok(fireMine(sim, b));
-  for (const s of sim.shells) assert.ok((s.x1 - 24) ** 2 + (s.y1 - 20) ** 2 <= 1);
+  const near = (s: { x1: number; y1: number }) => Math.abs(s.x1 - 24) <= 2 && Math.abs(s.y1 - 20) <= 2;
+  for (const s of sim.shells) assert.ok(near(s));
   assert.deepEqual(scene().sim.mineAims.size, 0, "aim is local to one battle");
   const basic = scene(); basic.sim.mineAims.set(basic.b.id, { x: 24, y: 20 });
   for (let i = 0; i < 15; i++) fireMine(basic.sim, basic.b);
-  assert.ok(basic.sim.shells.some(s => (s.x1 - 24) ** 2 + (s.y1 - 20) ** 2 > 1));
+  assert.ok(basic.sim.shells.every(near), "the building menu's crosshairs aim rank zero too");
 });
 
 test("Laying rejects buildings, ponds, water and invalidated landings without leaking capacity", () => {
