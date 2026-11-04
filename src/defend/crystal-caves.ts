@@ -10,6 +10,7 @@ import { CELLS_H, CELLS_W, cellIndex, hash, hash01 } from "./grid.ts";
 import { CellType, type CityMap } from "./citygen.ts";
 import type { AreaId } from "./areas.ts";
 import { clearOf } from "./forest.ts";
+import type { Sun } from "../daylight.ts";
 
 /** The areas floored as the Crystal Caves. */
 export const CRYSTAL_CAVES_AREAS: readonly AreaId[] = ["drowned"];
@@ -132,22 +133,47 @@ export function sporeAt(m: MushroomCluster, k: number, t: number) {
   return { x, y, show: Math.sin(age * Math.PI) ** 1.2 };
 }
 
-/** The direction daylight travels down a shaft, from the ceiling's hole to
- * the floor: from the upper left, as the board's light falls. A unit vector
- * pointing back up the shaft toward its hole. */
+/** The direction daylight travels down a shaft without a sky to follow (a
+ * fixture, a preview): from the upper left, as the board's light falls. A
+ * unit vector pointing back up the shaft toward its hole. */
 export const SHAFT_UP = { x: -0.42, y: -0.91 } as const;
-/** How far up the shaft shows, in cells. */
+/** How far up the shaft shows without a sky, in cells. */
 export const SHAFT_LENGTH = 16;
+/** How high the cave's ceiling is over its floor, in cells: how far a hole's
+ * patch of light slides for each cell a building's shadow would reach. */
+export const CAVE_CEILING = 3;
+
+/** How the holes' light falls at the moment: `up` the unit vector back up a
+ * beam toward its hole, `length` how far up it shows (cells), `shift` how far
+ * each patch has slid from under its hole (cells) and `day` the sun's
+ * strength, 0..1. */
+export type ShaftLight = { up: { x: number; y: number }; length: number; shift: { x: number; y: number }; day: number };
+
+/** The holes' light under the shared sky's `sun` (whose `x`, `y` is the way
+ * and length a building's shadow falls): the patches slide away from the sun
+ * as it crosses the sky, the beams lean toward it, long and slanting when it
+ * is low, short and steep at noon. Without a sun, the fixed look. */
+export function shaftLight(sun?: Sun): ShaftLight {
+  if (!sun) return { up: SHAFT_UP, length: SHAFT_LENGTH, shift: { x: 0, y: 0 }, day: 1 };
+  const m = Math.sqrt(sun.x * sun.x + sun.y * sun.y) || 1;
+  return {
+    up: { x: -sun.x / m, y: -sun.y / m },
+    length: Math.min(20, Math.max(5, 5 + m * 6.5)),
+    shift: { x: sun.x * CAVE_CEILING, y: sun.y * CAVE_CEILING },
+    day: Math.min(1, Math.max(0, sun.strength / 0.27)),
+  };
+}
 
 /** Where dust mote `k` of shaft `s` is at `t` seconds (cells) and how
  * brightly the light catches it, 0..1: drifting slowly up and down the beam,
  * only lit while inside it. */
-export function dustAt(s: LightShaft, k: number, t: number) {
+export function dustAt(s: LightShaft, k: number, t: number, light: ShaftLight = shaftLight()) {
   const u = (salt: number) => hash01(s.seed, k, salt);
   const along = (u(861) + t * (0.004 + u(862) * 0.01) * (u(863) < 0.5 ? -1 : 1) + 4) % 1;
   const across = Math.sin(t * (0.15 + u(864) * 0.2) + u(865) * 6.28) * 0.75 + (u(866) - 0.5) * 0.5;
-  const d = along * SHAFT_LENGTH * 0.85, w = s.r * 0.9 * (1 + along * 0.2);
-  const x = s.x + SHAFT_UP.x * d - SHAFT_UP.y * across * w, y = s.y + SHAFT_UP.y * d + SHAFT_UP.x * across * w;
+  const up = light.up, d = along * light.length * 0.85, w = s.r * 0.9 * (1 + along * 0.2);
+  const fx = s.x + light.shift.x, fy = s.y + light.shift.y;
+  const x = fx + up.x * d - up.y * across * w, y = fy + up.y * d + up.x * across * w;
   const edge = Math.min(1, along / 0.1, (1 - along) / 0.25);
   const twinkle = 0.55 + 0.45 * Math.sin(t * (1.3 + u(867) * 1.5) + u(868) * 6.28);
   return { x, y, show: Math.max(0, edge) * Math.exp(-across * across * 1.6) * twinkle };

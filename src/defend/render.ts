@@ -81,7 +81,7 @@ import { hasForest } from "./forest.ts";
 import { MagicForestArt } from "./magic-forest-art.ts";
 import { hasMagicForest } from "./magic-forest.ts";
 import { CrystalCavesArt } from "./crystal-caves-art.ts";
-import { hasCrystalCaves } from "./crystal-caves.ts";
+import { hasCrystalCaves, shaftLight } from "./crystal-caves.ts";
 
 export type DrawOptions = {
   /** How many watchmen walk the city (the keep's City watch, in Defend);
@@ -541,7 +541,7 @@ export class DefendRenderer {
     const caves = this.cavesShare();
     if (caves > 0) {
       this.caves.sync(map);
-      this.caves.drawFloor(ctx, this.px, caves);
+      this.caves.drawFloor(ctx, this.px, caves, shaftLight(this.worldLighting ? opts.sun : undefined));
     }
     this.river.sync(map);
     this.river.draw({
@@ -772,7 +772,7 @@ export class DefendRenderer {
   private drawCaveGlow(opts: DrawOptions) {
     const alpha = this.cavesShare();
     if (alpha <= 0) return;
-    this.caves.drawGlow(this.ctx, this.px, { now: opts.now, alpha, still: opts.reduceMotion, night: opts.night, effects: opts.effects ?? true });
+    this.caves.drawGlow(this.ctx, this.px, { now: opts.now, alpha, still: opts.reduceMotion, night: opts.night, effects: opts.effects ?? true, light: shaftLight(this.worldLighting ? opts.sun : undefined) });
   }
 
   /** The Magic Forest's wispy trees over everyone, darkened like the forest's,

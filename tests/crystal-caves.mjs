@@ -66,6 +66,22 @@ try {
       await page.waitForTimeout(300);
       await page.screenshot({ path: `${out}/crystal-caves-${width}-${what}.png` });
     }
+    // The holes' light through the day: the patch slides and the beam swings
+    // round with the shared sun.
+    const shifts = [];
+    for (const phase of ['dawn', 'day', 'sunset', 'night']) {
+      const light = await page.evaluate(async (phase) => {
+        const g = window.__dp.host.game(); g.settings.dayNightCycle = false; g.settings.timeOfDay = phase;
+        const r = window.__dp.renderer, t = r.caves.plan.shafts[0];
+        r.cam.s = 2; r.cam.x = r.canvas.width / 2 - t.x * r.px * 2; r.cam.y = r.canvas.height / 2 - t.y * r.px * 2;
+        const { shaftLight } = await import('/src/defend/crystal-caves.ts'), { worldSky } = await import('/src/daylight.ts');
+        return shaftLight(worldSky()?.sun);
+      }, phase);
+      shifts.push(light.shift.x);
+      await page.waitForTimeout(400);
+      await page.screenshot({ path: `${out}/crystal-caves-${width}-sun-${phase}.png` });
+    }
+    assert.ok(shifts[0] > 1 && shifts[2] < -1, `patches slide with the sun: ${shifts}`);
     assert.deepEqual(errors, []);
     await context.close();
   }
