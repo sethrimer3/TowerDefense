@@ -2312,3 +2312,39 @@ button:disabled .metal-icon { filter: saturate(.4) brightness(.8); }
 .ledger-copies .tiles-grid {display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:12px;}
 [data-economy-tree] {height:360px;position:relative;}
 nav button:disabled {opacity:.45;}
+
+/* ── The building menu: oak bars bound in brass, black-edged like the
+ * pixel art, opening out of the building. */
+.building-menu .bm-bar {
+  color: #e6d2a6;
+  text-shadow: 0 1px 0 #000, 0 0 2px #000;
+  background: linear-gradient(#ffffff0c, transparent 40%, #00000055), linear-gradient(#00000040, #00000040), var(--wood), #3a2616;
+  border: 2px solid #0c0a0a;
+  box-shadow: inset 0 0 0 1px var(--brass), inset 0 0 0 3px #00000080;
+}
+.building-menu .bm-top, .building-menu .bm-bottom {
+  background: var(--brass-nails), linear-gradient(#ffffff10, transparent 40%, #00000055), linear-gradient(#00000030, #00000030), var(--wood), #3a2616;
+}
+.building-menu .bm-left, .building-menu .bm-right { border-top: 0; border-bottom: 0; }
+.building-menu { filter: drop-shadow(0 3px 0 #000000b0); }
+.building-menu .bm-price { color: #ffd768; }
+.building-menu .bm-range input {
+  -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer;
+}
+.building-menu .bm-range input::-webkit-slider-runnable-track {
+  width: 10px; border: 2px solid #0c0a0a; border-radius: 0;
+  background: linear-gradient(to top, #d1a446 var(--fill, 100%), #1a120b var(--fill, 100%));
+  box-shadow: inset 0 0 0 1px #00000080;
+}
+.building-menu .bm-range input::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 22px; height: 12px; margin-left: -8px;
+  border: 2px solid #0c0a0a; border-radius: 0;
+  background: linear-gradient(#fff1b0, #f2c14e 45%, #a77818);
+}
+.building-menu .bm-range input::-moz-range-track { width: 10px; border: 2px solid #0c0a0a; background: #1a120b; }
+.building-menu .bm-range input::-moz-range-progress { width: 10px; background: #d1a446; }
+.building-menu .bm-range input::-moz-range-thumb { width: 18px; height: 10px; border: 2px solid #0c0a0a; border-radius: 0; background: #f2c14e; }
+@keyframes bm-open { from { transform: scale(0.6); opacity: 0; } to { transform: none; opacity: 1; } }
+.building-menu { animation: bm-open 140ms ease-out; transform-origin: center; }
+:root.reduce-motion .building-menu { animation: none; }
+@media (prefers-reduced-motion: reduce) { .building-menu { animation: none; } }

@@ -227,7 +227,7 @@ function spriteRing(b: Building, look: string | undefined, paint: PaintAlone): R
 /** Draws every trace under way; `c` is in board space at `px` a cell;
  * `looks` are the structures' path looks by uid, and `paint` paints a
  * building alone, for the shape of its sprite. */
-export function drawShimmer(c: CanvasRenderingContext2D, px: number, map: CityMap, now: number, paint: PaintAlone, looks?: Readonly<Record<number, string>>) {
+export function drawShimmer(c: CanvasRenderingContext2D, px: number, map: CityMap, now: number, paint: PaintAlone, looks?: Readonly<Record<number, string>>, fade = 1) {
   const seconds = now / 1000;
   let pen: ReturnType<typeof artPen> | null = null;
   const targets = shimmerTargets(map), period = shimmerPeriod(targets.length);
@@ -236,9 +236,38 @@ export function drawShimmer(c: CanvasRenderingContext2D, px: number, map: CityMa
     if (!s) continue;
     if (!pen) { c.save(); pen = artPen(c, px); }
     const ring = t.b ? spriteRing(t.b, looks?.[t.b.structureUid!], paint) : t.cells ? groupRing(t) : boxRing(t.rect);
-    drawTrace(c, pen, t.rect, ring, s.run, s.alpha);
+    drawTrace(c, pen, t.rect, ring, s.run, s.alpha * fade);
   }
   if (pen) c.restore();
+}
+
+/** Opening the build palette lights every placed piece's whole outline at
+ * once: held at full for `hold` seconds, then faded out over `fade`; closing
+ * it fades any trace under way out over `close` (`drawShimmer`'s `fade`). */
+export const SHIMMER_FLASH = { hold: 0.4, fade: 0.8, close: 0.2 };
+
+/** The flash's opacity `seconds` after the palette opened (0 once done). */
+export function flashAlpha(seconds: number): number {
+  if (!(seconds >= 0)) return 0;
+  if (seconds <= SHIMMER_FLASH.hold) return 1;
+  const t = (seconds - SHIMMER_FLASH.hold) / SHIMMER_FLASH.fade;
+  return t >= 1 ? 0 : 1 - t * t;
+}
+
+/** How much of the traces are left `seconds` after the palette closed. */
+export const closeFade = (seconds: number) => (seconds >= SHIMMER_FLASH.close ? 0 : 1 - Math.max(0, seconds) / SHIMMER_FLASH.close);
+
+/** Draws every placed piece's whole outline at `alpha` (the palette-open
+ * flash, `flashAlpha`); arguments as `drawShimmer`'s. */
+export function drawShimmerFlash(c: CanvasRenderingContext2D, px: number, map: CityMap, alpha: number, paint: PaintAlone, looks?: Readonly<Record<number, string>>) {
+  if (!(alpha > 0)) return;
+  c.save();
+  const pen = artPen(c, px);
+  for (const t of shimmerTargets(map)) {
+    const ring = t.b ? spriteRing(t.b, looks?.[t.b.structureUid!], paint) : t.cells ? groupRing(t) : boxRing(t.rect);
+    drawTrace(c, pen, t.rect, ring, 1, alpha);
+  }
+  c.restore();
 }
 
 /** Lights `ring` round the piece at `r` from its start clockwise `run` of
