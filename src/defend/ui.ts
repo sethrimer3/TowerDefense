@@ -1,3 +1,4 @@
+import type { Highlight } from "./placed-shimmer.ts";
 import { wallAtCell, type SpikeSpot } from "./layout.ts";
 import { STRUCTURES } from "./catalog.ts";
 import type { Building } from "./citygen.ts";
@@ -125,6 +126,8 @@ export type DefendHost = {
   showEmpty?(): boolean;
   /** Whether dragged items ride above the pointer. */
   dragRally?(): boolean;
+  /** The Always highlight selectable buildings setting, null while off. */
+  highlight?(): Highlight | null;
   dragCrosshair?(): boolean;
   raiseDrag?(): boolean;
   /** Whether a magnifying glass shows the board zoomed in above a drag. */
@@ -1055,6 +1058,7 @@ export class DefendPage {
       over: this.phase === "over",
       orders: {levels:this.save.levels,bonuses:this.host.bonuses()},
       shimmer: this.phase === "build" && !this.sim && this.sideOpen.build,
+      highlight: this.host.highlight?.() ?? null,
       ...(lifting ? { lifting } : {}),
       ...(this.picked ? { inspect: { id: this.picked.id, armed: this.sim ?? this.picked.armed, ...(this.aimPreview?.id === this.picked.id ? { aim: this.aimPreview } : {}) } } : {}),
       hideBanner: this.phase === "over" || (this.pointers.session?.drag.from === "banner" && !!this.pointers.session.drag.placed),
@@ -1132,8 +1136,9 @@ export class DefendPage {
     if (!p.inside) return null;
     const banner = sim.warBanner;
     if (banner && !banner.flag && sim.bannerRemaining <= 0 && p.fx >= banner.x - 1 && p.fx <= banner.x + 2.2 && p.fy >= banner.y - 1.4 && p.fy <= banner.y + 1) return null;
-    const hit=sim.map.buildings[sim.map.owner[p.cy*CELLS_W+p.cx]];
-    const b = hit??(this.picked?sim.map.buildings[this.picked.id]:undefined);
+    // Only the building already selected by a tap can be dragged from, so a
+    // press on any other building pans or taps as usual.
+    const b = this.picked ? sim.map.buildings[this.picked.id] : undefined;
     if (!b || !sim.intact(b)) return null;
     const controls=controlsOf(b,sim);
     if(controls==="plain" || (controls==="troops" ? this.host.dragRally?.()===false : this.host.dragCrosshair?.()===false))return null;

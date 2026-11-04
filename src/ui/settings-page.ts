@@ -10,13 +10,15 @@ import { LANGUAGES, isLanguage, t } from "../i18n/index.ts";
 /** Gameplay settings, under their own heading first. */
 const GAMEPLAY = ["showEmpty"] as const satisfies readonly SettingKey[];
 const CONTROLS = ["dragRally", "dragCrosshair", "raiseDrag", "magnifier", "tripleTapFlag"] as const satisfies readonly SettingKey[];
-const PAGE = ["pixelArt", "legacyGraphics", "legacyWalls", "dayNightCycle", "fasterSunCatchup", "reduceMotion", "effectsOff", "simpleEnemies", "simpleTroops", "mergedOutlines", "pixelPortals", "crispZoom", "hdSand", "ultraGraphics", "tileGrid", "soundOff", "ambienceOff", "pixelFont"] as const satisfies readonly SettingKey[];
+const PAGE = ["pixelArt", "legacyGraphics", "legacyWalls", "dayNightCycle", "fasterSunCatchup", "reduceMotion", "effectsOff", "simpleEnemies", "simpleTroops", "mergedOutlines", "pixelPortals", "crispZoom", "hdSand", "ultraGraphics", "highlightBuildings", "tileGrid", "soundOff", "ambienceOff", "pixelFont"] as const satisfies readonly SettingKey[];
 /** The dev options, under ALL ON. */
 const DEV = ["devMode", "devTowers", "devJournal", "instantResearch"] as const satisfies readonly SettingKey[];
 /** All research unlocked: the Smithy's rows and each skill tree. */
 const RESEARCH = ["devSmithy", "devCommand", "devStewardship", "devMine", "devLibrary"] as const satisfies readonly SettingKey[];
 const ALL_DEV = DEV_OPTIONS;
-type PageKey = (typeof CONTROLS)[number] | (typeof GAMEPLAY)[number] | (typeof PAGE)[number] | (typeof ALL_DEV)[number] | "developerMode";
+/** Shown under Always highlight selectable buildings while it is on. */
+const HIGHLIGHT = ["highlightWalls", "highlightRealm"] as const satisfies readonly SettingKey[];
+type PageKey = (typeof CONTROLS)[number] | (typeof HIGHLIGHT)[number] | (typeof GAMEPLAY)[number] | (typeof PAGE)[number] | (typeof ALL_DEV)[number] | "developerMode";
 
 /** One toggle's checkbox, showing its current value. */
 function checkbox(key: PageKey, ctx: AppContext): string {
@@ -37,6 +39,16 @@ function gridControls(ctx: AppContext): string {
     `<output id="grid-opacity-value">${settings.gridOpacity}%</output></span></label>` +
     `<label class="setting setting-grid" id="grid-color-row" ${hidden}>${t("setting.gridColor")}<select id="${color.page.id}">` +
     color.choices.map(([value]) => `<option value="${value}" ${settings.gridColor === value ? "selected" : ""}>${t(`settings.gridColor.${value}`)}</option>`).join("") + `</select></label>`;
+}
+
+/** The highlight's opacity and which pieces it covers, shown only while it is on. */
+function highlightControls(ctx: AppContext): string {
+  const row = SETTINGS.highlightOpacity, settings = ctx.save().settings;
+  const hidden = settings.highlightBuildings ? "" : "hidden";
+  return `<label class="setting setting-range setting-grid setting-highlight" id="highlight-opacity-row" ${hidden}>${t("setting.highlightOpacity")}` +
+    `<span class="range-control"><input type="range" id="${row.page.id}" min="${row.min}" max="${row.max}" step="${row.step}" value="${settings.highlightOpacity}" aria-label="${t("settings.highlightAria")}">` +
+    `<output id="highlight-opacity-value">${settings.highlightOpacity}%</output></span></label>` +
+    HIGHLIGHT.map((key) => `<label class="setting setting-grid setting-highlight" ${hidden}>${t(`setting.${key}`)}${checkbox(key, ctx)}</label>`).join("");
 }
 
 /** The board's resolution cap, a choice of how many device pixels a CSS pixel. */
@@ -92,7 +104,7 @@ export function renderSettingsPage(ctx: AppContext) {
     section("gameplay", t("settings.gameplay"), GAMEPLAY.map((key) => control(key, ctx)).join("")) +
     section("controls", t("settings.controls"), CONTROLS.map((key) => control(key,ctx)).join("")) +
     section("display", t("settings.display"),
-      PAGE.map((key) => control(key, ctx) + (key === "tileGrid" ? gridControls(ctx) : key === "dayNightCycle" ? daylightControls(ctx) : key === "fasterSunCatchup" ? `<p class="hint">${t("settings.fasterSunCatchupHint")}</p>` : key === "crispZoom" ? resolutionControls(ctx) : key === "ultraGraphics" ? `<p class="hint">${t("settings.ultraGraphicsHint")}</p>` : "")).join("") +
+      PAGE.map((key) => control(key, ctx) + (key === "tileGrid" ? gridControls(ctx) : key === "highlightBuildings" ? highlightControls(ctx) : key === "dayNightCycle" ? daylightControls(ctx) : key === "fasterSunCatchup" ? `<p class="hint">${t("settings.fasterSunCatchupHint")}</p>` : key === "crispZoom" ? resolutionControls(ctx) : key === "ultraGraphics" ? `<p class="hint">${t("settings.ultraGraphicsHint")}</p>` : "")).join("") +
       control("developerMode", ctx)) +
     (settings.developerMode ? section("dev", t("settings.dev"),
       `<label class="setting setting-all">${t("settings.allOn")}<input type="checkbox" id="dev-all" ${allOn ? "checked" : ""}></label>` +
@@ -111,7 +123,7 @@ export function renderSettingsPage(ctx: AppContext) {
     ctx.devChanged();
     renderSettingsPage(ctx);
   };
-  for (const key of [...GAMEPLAY, ...CONTROLS, ...PAGE, ...(settings.developerMode ? ALL_DEV : [])]) {
+  for (const key of [...GAMEPLAY, ...CONTROLS, ...PAGE, ...HIGHLIGHT, ...(settings.developerMode ? ALL_DEV : [])]) {
     const row = SETTINGS[key], input = el(row.page.id) as HTMLInputElement;
     input.onchange = () => {
       settings[key] = "invert" in row.page ? !input.checked : input.checked;
@@ -121,6 +133,8 @@ export function renderSettingsPage(ctx: AppContext) {
         (el("time-of-day") as HTMLSelectElement).disabled = input.checked;
         (el("faster-sun-catchup") as HTMLInputElement).disabled = !input.checked;
       }
+      if (key === "highlightBuildings")
+        for (const row of Array.from(document.querySelectorAll<HTMLElement>(".setting-highlight"))) row.hidden = !input.checked;
       if (key === "tileGrid") {
         el("grid-opacity-row").hidden = !input.checked;
         el("grid-color-row").hidden = !input.checked;
@@ -139,6 +153,12 @@ export function renderSettingsPage(ctx: AppContext) {
     el("grid-opacity-value").textContent = `${opacity.value}%`;
   };
   opacity.onchange = () => ctx.update();
+  const highlight = el(SETTINGS.highlightOpacity.page.id) as HTMLInputElement;
+  highlight.oninput = () => {
+    settings.highlightOpacity = Number(highlight.value);
+    el("highlight-opacity-value").textContent = `${highlight.value}%`;
+    ctx.update();
+  };
   const color = el(SETTINGS.gridColor.page.id) as HTMLSelectElement;
   color.onchange = () => {
     settings.gridColor = color.value as GridColor;

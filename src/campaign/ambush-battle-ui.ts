@@ -355,8 +355,8 @@ export class AmbushBattlePage {
     if (this.sim.phase !== "battle" || this.menu.placing || this.spellBar?.armed) return null;
     const p = eventCell(this.renderer, e);
     if (!p.inside) return null;
-    const hit=this.at(p.fx,p.fy);
-    const b = sim.map.buildings[hit?.id??this.picked??-1];
+    // Only the building already selected by a tap can be dragged from.
+    const b = this.picked === undefined ? undefined : sim.map.buildings[this.picked];
     if (!b || !sim.intact(b)) return null;
     const controls=controlsOf(b,sim),settings=this.host.save().settings;
     if(controls==="plain" || !(controls==="troops"?settings.dragRally:settings.dragCrosshair))return null;
@@ -568,6 +568,7 @@ export class AmbushBattlePage {
       pixelPortals: settings.pixelPortals,
       sheen: settings.ultraGraphics,
       looks,
+      highlight: settings.highlightBuildings ? { alpha: settings.highlightOpacity / 100, walls: settings.highlightWalls, realm: settings.highlightRealm } : null,
       ...(this.picked !== undefined
         ? { inspect: { id: this.picked, armed: s.engine, ...(this.aimPreview?.id === this.picked ? { aim: this.aimPreview } : {}) } }
         : {}),

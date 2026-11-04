@@ -63,6 +63,13 @@ export const SETTINGS = {
   /** Lines round the Defend board's tiles: strength in percent and colour. */
   tileGrid: { kind: "toggle", default: false, page: { id: "tile-grid", label: "Tile grid lines" } },
   gridOpacity: { kind: "range", default: 30, min: 0, max: 100, step: 5, page: { id: "grid-opacity", label: "Grid line opacity", aria: "Tile grid line opacity, percent" } },
+  /** A steady gold outline round every building that can be selected, at
+   * `highlightOpacity` percent, instead of the palette's shimmer; walls and
+   * Realm pieces each may be left out. */
+  highlightBuildings: { kind: "toggle", default: false, page: { id: "highlight-buildings", label: "Always highlight selectable buildings" } },
+  highlightOpacity: { kind: "range", default: 50, min: 5, max: 100, step: 5, page: { id: "highlight-opacity", label: "Highlight opacity", aria: "Building highlight opacity, percent" } },
+  highlightWalls: { kind: "toggle", default: true, page: { id: "highlight-walls", label: "Highlight placed walls" } },
+  highlightRealm: { kind: "toggle", default: true, page: { id: "highlight-realm", label: "Highlight realm elements" } },
   gridColor: { kind: "choice", default: "gold", choices: [["white", "White"], ["brown", "Brown"], ["black", "Black"], ["gray", "Gray"], ["gold", "Gold"]], page: { id: "grid-color", label: "Grid line color" } },
   /** The synthesized knocks, chimes, horns and bells. */
   soundOff: { kind: "toggle", default: false, page: { id: "sound", label: "Sound", invert: true } },
