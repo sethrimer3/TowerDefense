@@ -128,48 +128,38 @@ const EMBER: Look = {
   accent: [0x8a2410, 0xe0501a, 0xffa040],
 };
 
-/** Sea-green stone, algae, barnacles and a wet sheen. */
+/** Wet slate for the Crystal Caves: near-black stone with a slick sheen,
+ * pale blue crystal glints in the joints and the odd violet shard. */
 const DROWNED: Look = {
-  mortar: 0x0a2123,
-  joint: (gx, gy) => (hash01(gx, gy, 421) < 0.15 ? 0x2a5530 : undefined),
-  stone: [0x123234, 0x1f4d4e, 0x2e6967, 0x468c85, 0x7cc0b2],
+  mortar: 0x07080b,
+  joint: (gx, gy) => (hash01(gx, gy, 421) < 0.05 ? 0x7cc8f5 : undefined),
+  stone: [0x0e1014, 0x181b21, 0x23272f, 0x323844, 0x515c6e],
   dress(p, b, seed) {
-    if (hash01(seed, 20) < 0.55) {
-      // A clump of weed grown out from an edge.
-      const left = hash01(seed, 21) < 0.5, n = 4 + (hash(seed, 22) % 4);
-      let x = left ? b.x0 : b.x0 + (hash(seed, 23) % Math.max(1, b.x1 - b.x0)), y = left ? b.y0 + (hash(seed, 24) % Math.max(1, b.y1 - b.y0)) : b.y1;
-      for (let k = 0; k < n; k++) {
-        p.set(x, y, pick([0x2d5a2a, 0x3f7434, 0x5a9440], hash(seed, k, 25)));
-        p.set(left ? x + 1 : x, left ? y : y - 1, 0x2d5a2a);
-        if (left) x += hash(seed, k, 27) % 2;
-        else y -= hash(seed, k, 27) % 2;
-      }
+    // The wet sheen: a short glossy streak near the lit corner.
+    if (hash01(seed, 29) < 0.6) for (let k = 0; k < 3; k++) p.set(b.x0 + 2 + k, b.y0 + 3 - k, k === 1 ? 0xb8c4d8 : 0x7a8698);
+    // Now and then a little crystal: violet or pale blue.
+    if (hash01(seed, 20) < 0.3) {
+      const [x, y] = spotIn(b, seed, 21, 2), blue = hash01(seed, 22) < 0.5;
+      p.set(x, y - 1, blue ? 0xc8f0ff : 0xe6c0ff);
+      p.set(x, y, blue ? 0x7cc8f5 : 0xb274f0);
+      p.set(x + 1, y, blue ? 0x3f8fd0 : 0x7238bc);
     }
-    for (let k = 0; k < 3; k++)
-      if (hash01(seed, k, 28) < 0.4) {
+    for (let k = 0; k < 2; k++)
+      if (hash01(seed, k, 28) < 0.3) {
         const [x, y] = spotIn(b, seed, 30 + k, 2);
-        p.set(x, y, 0xd4dcc8);
-        p.set(x + 1, y, 0x9aa894);
-        p.set(x, y + 1, 0x24403c);
+        p.set(x, y, 0x0a0b0e);
       }
-    if (hash01(seed, 29) < 0.5) for (let k = 0; k < 3; k++) p.set(b.x0 + 2 + k, b.y0 + 3 - k, 0x9fded0);
   },
   face(p, cx, seed) {
-    // The tide line, slimy weed below it, and drips.
-    for (let x = 0; x < WALL_ART; x++) {
-      const gx = cx * WALL_ART + x;
-      if (hash01(gx, 423) < 0.5) p.set(x, 3, 0x5aa89c);
-      const h = 1 + (hash(gx >> 1, 424) % 3);
-      for (let j = 0; j < h; j++) p.set(x, FACE_ROWS - 1 - j, j === h - 1 ? 0x3f7434 : 0x2d5a2a);
-    }
-    if (hash01(seed, cx, 33) < 0.5) {
-      const x = hash(seed, cx, 34) % WALL_ART;
-      p.set(x, 1, 0x7cc0b2);
-      p.set(x, 2, 0xb4ece0);
+    // Water seeping down the face, glinting.
+    for (let k = 0; k < 2; k++) {
+      if (hash01(seed, cx, k, 33) < 0.5) continue;
+      const x = hash(seed, cx, k, 34) % WALL_ART, n = 2 + (hash(seed, cx, k, 35) % 3);
+      for (let j = 0; j < n; j++) p.set(x, 1 + j, j === n - 1 ? 0xc8f0ff : 0x3a5a70);
     }
   },
-  rubble: [0x1f4d4e, 0x2e6967, 0x468c85],
-  accent: [0x2d5a2a, 0x3f7434, 0x5a9440],
+  rubble: [0x181b21, 0x23272f, 0x323844],
+  accent: [0x3f8fd0, 0x7cc8f5, 0xb274f0],
 };
 
 const SHROOM = { o: 0x1c0a14, d: 0x96305e, m: 0xe0628f, l: 0xffaccb, s: 0xeadcc6 };
