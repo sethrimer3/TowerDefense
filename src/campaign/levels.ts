@@ -1,6 +1,6 @@
 /** Stable Ambush identities, deterministic tracks and best-star progression. */
 import { decodeAmbushRanks, type AmbushRanks } from "../ambush-upgrades.ts";
-import { AREAS, type AreaId } from "../defend/areas.ts";
+import { AREAS, isTestArea, type AreaId } from "../defend/areas.ts";
 import { hash, hash01, CELLS_W, CELLS_H } from "../defend/grid.ts";
 import { dist } from "../exact.ts";
 export type LevelPoint = { x: number; y: number };
@@ -10,8 +10,8 @@ export type AmbushProgress = { stars: Partial<Record<string, Stars>>; autoSend?:
 const names = [
   ["Old Road", "Mossy Ford", "Ruin Gate"],
   ["Sandway", "Sunken Well", "Amber Pass"],
-  ["Cinder Road", "Slag Crossing", "Forge Gate"],
   ["Tidal Road", "Coral Crossing", "Temple Gate"],
+  ["Cinder Road", "Slag Crossing", "Forge Gate"],
   ["Spore Trail", "Mushroom Grove", "Hollow Gate"],
   ["Ice Road", "Frost Crossing", "Vault Gate"],
   ["Shard Trail", "Prism Crossing", "Geode Gate"],
@@ -19,7 +19,7 @@ const names = [
   ["Star Road", "Comet Crossing", "Sanctuary Gate"],
   ["Last Road", "Dark Crossing", "Nadir Gate"],
 ];
-export const AMBUSH_LEVELS: readonly AmbushLevel[] = AREAS.flatMap((area, zone) =>
+export const AMBUSH_LEVELS: readonly AmbushLevel[] = AREAS.filter((area) => !isTestArea(area)).flatMap((area, zone) =>
   Array.from({ length: 3 }, (_, index) => ({
     id: `${area.id}-${index + 1}`,
     area: area.id,
@@ -92,6 +92,7 @@ const RIVERS: Record<AreaId, number> = {
   obsidian: 0.3,
   astral: 0.35,
   nadir: 0.3,
+  magic: 0,
 };
 type Snake = { left: number; right: number; band: number; entry: "top" | "left" | "right"; turns: number; first: number; last: number; diagonal: number };
 /** A road winding down the board from its entry: runs across between `left` and `right`, each turn

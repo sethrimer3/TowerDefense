@@ -19,13 +19,13 @@ function fixture() {
   sim.breakT = 1e9; return sim;
 }
 
-test('ten areas follow the requested order, with unrestricted Nadir and repeating cycles', () => {
-  const order = ['moss','desert','ember','drowned','fungal','frozen','crystal','obsidian','astral','nadir'];
+test('ten areas and the testing zone follow the requested order, with unrestricted Nadir and repeating cycles', () => {
+  const order = ['moss','desert','drowned','ember','fungal','frozen','crystal','obsidian','astral','nadir','magic'];
   assert.deepEqual(AREAS.map(a => a.id), order);
   order.forEach((id, n) => {
     assert.equal(areaForWave(n * 20 + 1).id, id);
     assert.equal(areaForWave(n * 20 + 20).id, id);
-    assert.equal(areaForWave(n * 20 + 201).id, id);
+    assert.equal(areaForWave(n * 20 + order.length * 20 + 1).id, id);
   });
   const normal = Object.values(ENEMIES).filter(e => !e.hatched && !e.scriptedOnly).map(e => e.kind).sort();
   assert.deepEqual([...AREA_ENEMIES.nadir].sort(), normal);

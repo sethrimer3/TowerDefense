@@ -15,5 +15,7 @@ export const AREA_ENEMIES: Record<AreaId, readonly EnemyKind[]> = {
   crystal: [...shields, "mirrorKnight", "blinkImp", "siegeBeetle", "burrowingMole", "bat", "shardling", "crystalSentinel", "prismRay", "geodeCrab", "prismMoth", "shardBrood"],
   obsidian: [...walkers, "darkKnight", "necromancer", "bat", "leechSwarm", "trebuchet", "cryptHound", "graveWisp"],
   astral: ["voidSparrow", "blinkImp", "mirrorKnight", ...shields, "fortressGreater", "fortressSovereign", "boatGreater", "boatSovereign", "starWisp", "cometHound", "astralWarden", "novaMoth"],
+  // The testing zone borrows widely, none of the zones' own natives.
+  magic: ["roach", "orc", "ogre", "warlord", "bannerCaptain", "mother", "bat", "fortressHut", "fortressOutpost", "snake", "leechSwarm", "blinkImp", "voidSparrow", "mirrorKnight", "necromancer"],
   nadir: Object.values(ENEMIES).filter(e => !e.hatched && !e.scriptedOnly).map(e => e.kind),
 };
