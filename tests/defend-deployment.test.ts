@@ -124,3 +124,15 @@ test("a rally point dragged near a watch tower in range snaps onto it, only for 
   // A tower outside the range is never snapped to.
   assert.equal(rallyAim(hall, near, { ...circle, r: 1 }, [tower])!.tower, undefined);
 });
+
+test("troops still shoot an enemy in reach past their deployment range; only walking stops there", () => {
+  const sim = new DefendSim(city([["archerBarracks", -1, -1]]), zeroLevels(), 1);
+  quiet(sim);
+  run(sim, 2);
+  const archer = sim.soldiers.find((s) => s.kind === "archer")!, d = deployment(sim, archer)!;
+  archer.x = d.x + d.r - 0.5; archer.y = d.y;
+  const foe = { ...(sim as any).newEnemy("ogre", d.x + d.r + 2, d.y), hp: 1e9, maxHp: 1e9, speed: 0 };
+  sim.enemies.push(foe);
+  sim.reindexAfterDisplacement();
+  assert.equal(sim.troopTarget(archer, 4)?.id, foe.id, "an enemy beyond the range but within reach is a target");
+});

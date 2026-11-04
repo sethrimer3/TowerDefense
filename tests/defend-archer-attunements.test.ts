@@ -19,7 +19,7 @@ function scene(kind:"archerBarracks"|"rangerLodge"|"skirmishCamp"|"skyrangerLodg
   sim.enemies=[];sim.soldiers=[];sim.civilians=[];
   sim.solid.fill(0);sim.foeSolid.fill(0);sim.ownSolid.fill(0);
   const home=sim.map.buildings.length;
-  sim.map.buildings.push({...sim.keep,id:home,kind,structureUid:42,rect:{x:8.5,y:8.5,w:4,h:4}});
+  sim.map.buildings.push({...sim.keep,id:home,kind,structureUid:42});
   const topic=kind==="rangerLodge"?"rangerLodge":kind==="skirmishCamp"?"skirmishCamp":"skyrangerLodge";
   const path=kind==="rangerLodge"?"rangers":kind==="skirmishCamp"?"skirmishers":"skyranger";
   sim.bonuses={...sim.bonuses,structurePaths:rank?{42:{[topic]:{path,rank}}}:{}};
