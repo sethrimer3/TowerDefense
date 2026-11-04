@@ -20,7 +20,7 @@ type Kind = "mageGuild" | "infernoHall" | "cinderHall" | "stormHall";
 function scene(kind: Kind = "mageGuild", rank = 0) {
   const sim = new DefendSim(generateCity(fitLayout(defaultLayout()), 4), defaults().defend.levels, 1);
   sim.enemies=[];sim.soldiers=[];sim.civilians=[];sim.solid.fill(0);sim.ownSolid.fill(0);sim.foeSolid.fill(0);sim.map.type.fill(CellType.STREET);
-  const home=sim.map.buildings.length,b={...sim.keep,id:home,kind,structureUid:42};sim.map.buildings.push(b);
+  const home=sim.map.buildings.length,b={...sim.keep,id:home,kind,structureUid:42,rect:{x:8,y:18,w:4,h:4}};sim.map.buildings.push(b);
   const path=kind==="infernoHall"?"pyroclasm":kind==="cinderHall"?"cinders":"conduction";
   sim.bonuses={...sim.bonuses,structurePaths:rank?{42:{[kind]:{path,rank}}}:{}};
   const u: Soldier={id:sim.newId(),kind:"mage",home,x:10,y:20,hp:22,maxHp:22,damage:16,cd:0,target:-1,path:[],thinkT:100,flash:0};
