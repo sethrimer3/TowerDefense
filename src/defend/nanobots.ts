@@ -1,3 +1,4 @@
+import { rangeScale } from "./building-orders.ts";
 /** C4 nanobots, the cannon tower's ultimate (`nanoTower`). Very slowly, from
  * very far off, it fires a harmless shell (`sim.nanoShells`) at the nearest
  * enemy not yet infected; the shell bursts into a cloud of nanobots
@@ -46,15 +47,9 @@ const host = (e: Enemy) => e.hp > 0 && !e.fortressPart;
 /** A tower's turn, once its reload has run: a shell at the nearest enemy in
  * reach not yet infected. Returns whether it fired. */
 export function fireNanoShell(sim: DefendSim, b: Building): boolean {
-  const c = center(b.rect), range = nanoRange();
-  let best: Enemy | undefined, bestD = Infinity;
-  for (const e of sim.enemiesNear(c.x, c.y, range)) {
-    if (!host(e) || e.nano) continue;
-    const d = sq(e.x - c.x) + sq(e.y - c.y);
-    if (d < NANO_TOWER.min * NANO_TOWER.min || d >= bestD) continue;
-    best = e;
-    bestD = d;
-  }
+  const c = center(b.rect), range = nanoRange() * rangeScale(sim,b);
+  const best = sim.buildingTarget(b,range,e=>host(e)&&!e.nano&&Math.max(Math.abs(e.x-c.x),Math.abs(e.y-c.y))>=NANO_TOWER.min);
+  const bestD = best ? sq(best.x-c.x)+sq(best.y-c.y) : 0;
   if (!best) return false;
   const origin = { x: c.x, y: c.y, building: b.id };
   sim.nanoShells.push({ x0: c.x, y0: c.y - 0.6, x1: best.x, y1: best.y, t: 0, dur: 0.6 + Math.sqrt(bestD) / NANO_TOWER.speed, origin });

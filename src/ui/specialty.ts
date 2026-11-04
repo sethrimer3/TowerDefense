@@ -220,8 +220,9 @@ export function buildingSheet(save: Save, kind: PaletteItem | "wallSpikes", wear
     const hp = def.maxHp * (kind.endsWith("Tower") ? b.towerHp : b.buildingHp);
     sheet.stats.push(`${Number(hp.toFixed(1))} building HP`);
   }
+  if(kind in STRUCTURES && (isArcherTower(kind as PaletteItem)||isCannonTower(kind as PaletteItem)||["wizardTower","pyreTower","frostTower","stormTower","watchTower","wallBallista","nanoTower"].includes(kind)))sheet.stats.push("Attack range is a square, measured from the centre to each edge");
   const deploy = kind === "wallSpikes" ? 0 : deployRangeOf(kind as BuildingKind, bonuses(save));
-  return deploy ? { ...sheet, stats: [...sheet.stats, `deploys within ${Number(deploy.toFixed(1))} cells`] } : sheet;
+  return deploy ? { ...sheet, stats: [...sheet.stats, `deploys within a square ${Number(deploy.toFixed(1))} cells each way`] } : sheet;
 }
 
 function ownSheet(save: Save, kind: PaletteItem | "wallSpikes", wear?: Wear): StatSheet {

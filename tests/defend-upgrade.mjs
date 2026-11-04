@@ -21,7 +21,7 @@ mkdirSync(out, { recursive: true });
 const state = page => page.evaluate(() => JSON.parse(localStorage.getItem('towerdefense.v1')));
 const inside = (a, b) => a.x >= b.x - 1 && a.y >= b.y - 1 && a.x + a.width <= b.x + b.width + 1 && a.y + a.height <= b.y + b.height + 1;
 try {
-  for (const width of [1280, 390]) {
+  for (const width of process.env.TEST_WIDTH ? [Number(process.env.TEST_WIDTH)] : [1280, 390]) {
     const phone = width < 500;
     const context = await browser.newContext({ viewport: { width, height: phone ? 780 : 900 }, hasTouch: phone, isMobile: phone });
     const page = await context.newPage(), errors = [];
@@ -30,7 +30,7 @@ try {
     const fixture = await page.evaluate(async () => {
       const { defaults } = await import('/src/save.ts');
       const { placeCityTile } = await import('/src/defend/layout.ts');
-      const s = defaults(); s.settings.soundOff = true; s.settings.ambienceOff = true;
+      const s = defaults(); s.profile = { name: "Building tester", flag: {base:3,layers:[]} }; s.settings.soundOff = true; s.settings.ambienceOff = true;
       s.knowledge = 100;
       s.defend.owned.watchTower = 2; s.defend.owned.meleeGuild = 2; s.defend.owned.rangedGuild = 2; s.defend.owned.cityTile = 8;
       let l = s.defend.layout;
@@ -67,11 +67,12 @@ try {
 
     /** Drags palette `item` to the free legal tile nearest the keep that shows on screen. */
     const place = async (item, nth = 0) => {
+      if(process.env.DEBUG_UPGRADE)console.log('place',item);
       // Loaded first: a press held still too long opens the building's tree.
       await page.evaluate(async () => { window.__layout = await import('/src/defend/layout.ts'); });
       const from = await page.locator(`#defend-palette [data-item="${item}"]`).boundingBox();
       await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2); await page.mouse.down();
-      await page.mouse.move(from.x + from.width / 2 + 4, from.y + from.height / 2 + 4);
+      await page.mouse.move(from.x + from.width / 2 + 12, from.y + from.height / 2 + 12);
       const to = await page.evaluate(([item, nth, raise]) => {
         const { quarterSize, QUARTERS_W, QUARTERS_H } = window.__layout;
         const dp = window.__dp, r = dp.renderer, box = r.canvas.getBoundingClientRect(), session = dp.pointers.session, l = dp.host.save().layout, k = l.keep;
@@ -101,10 +102,11 @@ try {
         return dp.renderer.toClient(b.rect.x + b.rect.w / 2, b.rect.y + b.rect.h / 2);
       }, uid);
       if (phone) await page.touchscreen.tap(p.x, p.y); else await page.mouse.click(p.x, p.y);
-      await page.waitForSelector('#defend-specialty:not([hidden])');
+      if(await page.locator('.building-menu [data-bm="tree"]').count()) await page.locator('.building-menu [data-bm="tree"]').click(); await page.waitForSelector('#defend-specialty:not([hidden])');
     };
     /** Picks tree node `id` and buys it. */
     const buy = async id => {
+      if(process.env.DEBUG_UPGRADE)console.log('buy',id);
       await press(panel.locator(`[data-node="${id}"]`));
       await press(panel.locator(`[data-ug-buy="${id}"]`));
     };
@@ -202,7 +204,7 @@ try {
     // Tap a picked node again to buy it; tap a picked owned one again to sell everything after it.
     await page.evaluate(() => { window.__dp.host.game().knowledge += 500; });
     const k0 = await page.evaluate(() => window.__dp.host.game().knowledge);
-    const twice = async id => { await press(panel.locator(`[data-node="${id}"]`)); await press(panel.locator(`[data-node="${id}"]`)); await settled(); };
+    const twice = async id => { if(process.env.DEBUG_UPGRADE)console.log('twice',id); await press(panel.locator(`[data-node="${id}"]`)); await press(panel.locator(`[data-node="${id}"]`)); await settled(); };
     await twice('k:assassinDen');
     assert.equal((await placed(melee.uid)).kind, 'assassinDen', 'a second tap buys it');
     await twice('k:bloodHall');
@@ -252,7 +254,7 @@ try {
         await page.mouse.move(x, y); await page.mouse.down();
         await page.waitForTimeout(700); await page.mouse.up();
       }
-      await page.waitForSelector('#defend-specialty:not([hidden])');
+      if(await page.locator('.building-menu [data-bm="tree"]').count()) await page.locator('.building-menu [data-bm="tree"]').click(); await page.waitForSelector('#defend-specialty:not([hidden])');
     };
     const centre = b => ({ x: b.x + b.width / 2, y: b.y + b.height / 2 });
     const layoutBefore = JSON.stringify((await state(page)).defend.layout.structures);

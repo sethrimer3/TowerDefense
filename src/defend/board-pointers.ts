@@ -51,6 +51,7 @@ export type PointerHost = {
 export type BoardAim = {
   move(e: PointerEvent): void;
   end(e: PointerEvent, commit: boolean, moved: boolean): void;
+  hold?():void;
   focus?(e: PointerEvent): { x: number; y: number } | null;
 };
 
@@ -70,6 +71,7 @@ type Point = { x: number; y: number };
 export class BoardPointers {
   /** Board pointers moving the view, at their last client points. */
   private touches = new Map<number, Point>();
+  private aimHold:number|undefined;
   private aiming: { id: number; x: number; y: number; last: PointerEvent; moved: boolean; gesture: BoardAim } | null = null;
   /** The drag in progress, if any, and the icon following its pointer. */
   private held: { edit: EditSession; ghost: HTMLCanvasElement } | null = null;
@@ -141,6 +143,7 @@ export class BoardPointers {
     const aim = this.host.aim?.(e);
     if (aim) {
       e.preventDefault();
+      if(aim.hold)this.aimHold=window.setTimeout(()=>{if(this.aiming&&!this.aiming.moved){this.aiming=null;aim.hold!();}},HOLD_MS);
       this.aiming = { id: e.pointerId, x: e.clientX, y: e.clientY, last: e, moved: false, gesture: aim };
       return;
     }
@@ -152,6 +155,7 @@ export class BoardPointers {
   /** A second pointer turns whatever was happening into a pinch. */
   private join(e: PointerEvent) {
     this.tapping = null;
+    window.clearTimeout(this.aimHold);
     this.unhold();
     this.unlift();
     if (this.held && !consumable(dragIcon(this.held.edit.drag))) this.end();
@@ -196,6 +200,7 @@ export class BoardPointers {
       a.last = e;
       a.moved ||= Math.hypot(e.clientX - a.x, e.clientY - a.y) > TAP_SLOP;
       if (a.moved) {
+        window.clearTimeout(this.aimHold);
         a.gesture.move(e);
         this.lookAim(a.gesture, e);
       }
@@ -248,6 +253,7 @@ export class BoardPointers {
   }
 
   private up(e: PointerEvent) {
+    window.clearTimeout(this.aimHold);
     if (this.aiming?.id === e.pointerId) {
       const a = this.aiming;
       this.aiming = null;
@@ -294,6 +300,7 @@ export class BoardPointers {
       this.aiming = null;
       a.gesture.end(a.last, false, a.moved);
     }
+    window.clearTimeout(this.aimHold);
     this.unhold();
     this.unlift();
     this.magnify(null);

@@ -1,3 +1,4 @@
+import { ordersOf } from "./building-orders.ts";
 /** The final Wisp arrow commits to one straight ray through its captured
  * target and exits the board, leaving a timed lightning ribbon behind. */
 import { WISP, WISP_LIGHTNING } from "../knowledge-paths.ts";
@@ -42,6 +43,7 @@ export function stepWispLightning(sim:DefendSim,b:Building,w:WispArrow,candidate
       const d=(e.x-w.x)**2+(e.y-w.y)**2;
       if(d<best||(d===best&&e.id<(target?.id??Infinity))){target=e;best=d;}
     }
+    if(ordersOf(sim,b).targetMode||sim.crosshairs.has(b.id))target=candidates.find(e=>e.hp>0&&!e.untargetable);
     if(target) {
       w.ray={...wispMapRay(w,target),damage:archerDamage(sim.levels.archerDamage)*sim.bonuses.towerDamage,target:target.id};
       w.angle=Math.atan2(w.ray.b.y-w.y,w.ray.b.x-w.x);delete w.flight;

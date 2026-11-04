@@ -24,7 +24,7 @@ try {
     const fixture = await page.evaluate(async () => {
       const { defaults } = await import('/src/save.ts');
       const { placeCityTile, placeStructure } = await import('/src/defend/layout.ts');
-      const s = defaults(); s.settings.soundOff = true; s.settings.ambienceOff = true;
+      const s = defaults(); s.profile = { name: "Building tester", flag: {base:3,layers:[]} }; s.settings.soundOff = true; s.settings.ambienceOff = true;
       s.knowledge = 100000;
       s.defend.owned.musketHall = 4; s.defend.owned.cityTile = 8;
       let l = s.defend.layout;
@@ -71,7 +71,7 @@ try {
       return dp.renderer.toClient(b.rect.x + b.rect.w / 2, b.rect.y + b.rect.h / 2);
     }, hall.uid);
     if (phone) await page.touchscreen.tap(p.x, p.y); else await page.mouse.click(p.x, p.y);
-    await page.waitForSelector('#defend-specialty:not([hidden])');
+    if(await page.locator('.building-menu [data-bm="tree"]').count()) await page.locator('.building-menu [data-bm="tree"]').click(); await page.waitForSelector('#defend-specialty:not([hidden])');
     const nodes = () => panel.locator('.ug-node:not(.withering)').evaluateAll(els => els.map(e => `${e.dataset.node}=${['owned', 'next', 'locked'].find(c => e.classList.contains(c))}`));
     const tree = await nodes();
     assert.deepEqual(tree.filter(n => !n.endsWith('=owned')), ['p:volleyFire:1=next', 'p:volleyFire:2=locked', 'p:volleyFire:3=locked', 'k:gatlingNest=locked'], `${tree}`);

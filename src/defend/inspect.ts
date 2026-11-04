@@ -1,7 +1,9 @@
+import { ordersOf, rangeScale } from "./building-orders.ts";
+import { drawSquareRange, drawNearbySquare, drawCrosshairs, drawAimLine } from "./square-range-art.ts";
 import { mineRange } from "./mines.ts";
 import { MINELAYER } from "../knowledge-paths.ts";
 /** A tapped building on the DEFEND board: outlined in gold, with its reach
- * as faint circles when it shoots and the troops it trained outlined too;
+ * as faint squares when it shoots and the troops it trained outlined too;
  * a troop building also shows its deployment range and rally point.
  * Presentation only; it reads the battle (or, while building, the levels
  * and the Study's paths) and never changes it. */
@@ -25,24 +27,24 @@ const TRAINS = new Set(["meleeGuild", "rangedGuild", "barracks", "chapterHouse",
 
 /** Whether a tap on `b` picks it: the keep, the player's structures and the wall's ballistas. */
 export const inspectable = (b: Building | undefined): b is Building =>
-  !!b && (b.kind === "keep" || b.structureUid !== undefined || b.kind === "wallBallista");
+  !!b && (b.kind === "keep" || b.structureUid !== undefined || b.kind === "wallBallista" || b.kind === "gate" || !!b.piece);
 
-/** Where building `b` reaches, as circles in cells; none for what doesn't shoot. */
+/** Where building `b` reaches, as squares in cells; none for what doesn't shoot. */
 export function reachOf(b: Building, armed: Armed): Circle[] {
   const c = center(b.rect);
   const at = (r: number) => [{ x: c.x, y: c.y, r }];
   switch (b.kind) {
     case "archerTower": case "brazierTower": case "hawkTower": case "wispTower": case "chronoTower": return at(archerTowerRange(armed, b));
     case "cannonTower": case "batteryTower": case "mortarTower": case "minelayerTower": return at(cannonTowerRange(armed, b));
-    case "nanoTower": return at(nanoRange());
+    case "nanoTower": return at(nanoRange()*rangeScale(armed,b));
     case "wizardTower": case "pyreTower": case "frostTower": case "stormTower": return at(wizardReach(armed, b));
     case "watchTower": return at(watchReach(armed, b));
-    case "wallBallista": return at(wallBallistaRange(armed));
+    case "wallBallista": return at(wallBallistaRange(armed)*rangeScale(armed,b));
     case "keep": {
       // Its arrow loops' reach, and how far out its boiling oil pours.
       const out: Circle[] = [], arrows = keepArrowRange(armed), oil = keepOilReach(armed);
-      if (arrows) out.push({ x: c.x, y: c.y, r: arrows });
-      if (oil) out.push({ x: c.x, y: c.y, r: Math.max(b.rect.w, b.rect.h) / 2 + oil });
+      if (arrows) out.push({ x: c.x, y: c.y, r: arrows*rangeScale(armed,b) });
+      if (oil) out.push({ x: c.x, y: c.y, r: (Math.max(b.rect.w, b.rect.h) / 2 + oil)*rangeScale(armed,b) });
       return out;
     }
     case "darkKeep": return turretSpots(b.rect).map((s) => ({ x: s.x, y: s.y, r: TURRET.range }));
@@ -66,35 +68,12 @@ export function drawInspect(c: CanvasRenderingContext2D, px: number, map: CityMa
   const pulse = reduceMotion ? 1 : 0.8 + 0.2 * Math.sin(now / 260);
   c.save();
   // The reach: a faint wash, its edge in dashed gold.
-  const circles = reachOf(b, armed);
-  if (circles.length) {
-    c.beginPath();
-    for (const r of circles) {
-      c.moveTo((r.x + r.r) * px, r.y * px);
-      c.arc(r.x * px, r.y * px, r.r * px, 0, Math.PI * 2);
-    }
-    c.fillStyle = "rgba(242, 193, 78, 0.08)";
-    c.fill("nonzero");
-    c.setLineDash([line(6), line(4)]);
-    c.lineWidth = line(1.5);
-    c.strokeStyle = "rgba(242, 193, 78, 0.55)";
-    c.stroke();
-    c.setLineDash([]);
-  }
-  // A troop building's deployment range, in dashed pale blue, and its
-  // rally point: a blue flag at the end of a dotted line from it.
-  const deploy = deployCircle(b, armed.bonuses);
-  if (deploy) {
-    c.beginPath();
-    c.arc(deploy.x * px, deploy.y * px, deploy.r * px, 0, Math.PI * 2);
-    c.fillStyle = "rgba(140, 190, 255, 0.06)";
-    c.fill();
-    c.setLineDash([line(4), line(5)]);
-    c.lineWidth = line(1.5);
-    c.strokeStyle = "rgba(160, 205, 255, 0.6)";
-    c.stroke();
-    c.setLineDash([]);
-    const rally = aim ? aim.point : sim?.rallies.get(id);
+  for(const square of reachOf(b,armed))drawSquareRange(c,px,square,"reach");
+  const deploy=deployCircle(b,armed.bonuses,armed);
+  if(deploy) {
+    drawSquareRange(c,px,deploy,"deploy");
+    const saved=ordersOf(armed,b).rally,home=center(b.rect);
+    const rally = aim ? aim.point : sim?.rallies.get(id) ?? (saved?{x:home.x+saved.x,y:home.y+saved.y}:undefined);
     if (rally) {
       const o = center(b.rect);
       c.setLineDash([line(2), line(4)]);
@@ -110,27 +89,9 @@ export function drawInspect(c: CanvasRenderingContext2D, px: number, map: CityMa
       drawRallyFlag(c, px, rally, { t: now / 1000, reduceMotion });
     }
   }
-  if (b.kind === "minelayerTower") {
-    const origin = center(b.rect), point = aim ? aim.point : sim?.mineAims.get(id);
-    const target = point ?? origin;
-    const t = reduceMotion || !aim ? 1 : Math.min(1, Math.max(0, (now - aim.since) / 350));
-    const radius = point ? MINELAYER.scatter : MINELAYER.scatter + (mineRange() - MINELAYER.scatter) * (1 - (1 - t) ** 3);
-    c.save();
-    // Clip the target area to actual range, including crosshairs dragged to its edge.
-    c.beginPath(); c.arc(origin.x * px, origin.y * px, mineRange() * px, 0, Math.PI * 2); c.clip();
-    c.strokeStyle = "#ffc96a"; c.lineWidth = line(2);
-    c.beginPath(); c.arc(target.x * px, target.y * px, radius * px, 0, Math.PI * 2); c.stroke();
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      c.beginPath();
-      c.moveTo((target.x + dx * (radius - .45)) * px, (target.y + dy * (radius - .45)) * px);
-      c.lineTo((target.x + dx * radius) * px, (target.y + dy * radius) * px);
-      c.stroke();
-    }
-    if (point) {
-      c.setLineDash([line(3), line(4)]); c.lineWidth = line(1);
-      c.beginPath(); c.moveTo(origin.x * px, origin.y * px); c.lineTo(point.x * px, point.y * px); c.stroke();
-    }
-    c.restore();
+  if(aim&&!deploy&&aim.point) {
+    const range=reachOf(b,armed)[0];
+    if(range){drawNearbySquare(c,px,{...aim.point,r:2},range,now,reduceMotion);drawCrosshairs(c,px,aim.point,now,reduceMotion,true);drawAimLine(c,px,center(b.rect),aim.point);}
   }
   // The building: a black-edged gold frame round its cells.
   const pad = 0.15;
@@ -153,4 +114,16 @@ function frame(c: CanvasRenderingContext2D, x: number, y: number, w: number, h: 
   c.strokeStyle = colour;
   c.strokeRect(x, y, w, h);
   c.globalAlpha = 1;
+}
+
+/** Persistent crosshair areas are visible without selecting their building. */
+export function drawBuildingOrders(c:CanvasRenderingContext2D,px:number,map:CityMap,armed:Armed,now:number,reduceMotion:boolean) {
+  for(const b of map.buildings) {
+    if(b.hidden)continue;
+    const o=ordersOf(armed,b),point=o.crosshair,range=reachOf(b,armed)[0];
+    if(!point||!range)continue;
+    const home=center(b.rect),at={x:home.x+point.x,y:home.y+point.y};
+    drawNearbySquare(c,px,{...at,r:2},range,now,reduceMotion);
+    drawCrosshairs(c,px,at,now,reduceMotion);
+  }
 }

@@ -154,6 +154,13 @@ function scenarios(): Record<string, Scenario> {
       citySeed: 13, levels: levelsAt({ baitRestock: 2, baitBlast: 3, civilianCount: 3 }), seed: 6, seconds: 160, wave: 2,
       opening: [...Array<EnemyKind>(40).fill('orc'), ...Array<EnemyKind>(10).fill('bat'), ...Array<EnemyKind>(4).fill('ogre'), 'rollingCannon'],
     },
+    // A quiet repair window keeps restocking covered after square towers
+    // change the combat timing of the mixed bait scenario.
+    baitRestock: {
+      layout: city(SQUARE, [["repairShop", 1, 0], ["monsterBait", -1, 0]]),
+      citySeed: 13, levels: levelsAt({ baitRestock: 2, civilianCount: 3 }), seed: 6,
+      seconds: 100, opening: [], breakSeconds: 1000, smash: [[1, "monsterBait"]],
+    },
     // Wizard towers inside and outside the walls, flame and ice in turn.
     wizards: {
       layout: city(SQUARE, [["wizardTower", 0, -2], ["wizardTower", 1, 1], ["barracks", -1, 1]]),

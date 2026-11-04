@@ -1,3 +1,5 @@
+import { ordersOf } from "./building-orders.ts";
+import { rangeScale } from "./building-orders.ts";
 /** The Wisp tower: its stored ordinary arrows (`wisp-storm.ts`) and the
  * living fire and lightning arrows of its later ranks, with broad tangent
  * passes and swept hits.
@@ -69,7 +71,7 @@ export function stepWispTower(sim: DefendSim,b: Building,dt: number) {
     if(owner.lightning)while(owner.lightning.arrows.length<owner.lightning.capacity)spawnWisp(sim,b,owner.lightning,"lightning");
   }
   const c=center(b.rect),range=archerRange(sim.levels.archerRange);
-  const candidates=sim.enemiesNear(c.x,c.y,range).filter(e=>e.hp>0&&(e.x-c.x)**2+(e.y-c.y)**2<=range*range);
+  const candidates=sim.buildingCandidates(b,range*rangeScale(sim,b));
   stepQuiver(sim,b,owner.quiver,candidates,dt);
   if(owner.fire)stepWispPool(sim,b,owner.fire,candidates,dt,"fire");
   if(owner.lightning&&sim.intact(b))stepWispPool(sim,b,owner.lightning,candidates,dt,"lightning");
@@ -116,7 +118,7 @@ function tasselEnergy(w: WispArrow, attacking: boolean, dt: number) {
 /** Returns the time the arrow stayed alive within this interval. */
 function stepWispArrow(sim: DefendSim,b: Building,w: WispArrow,candidates: Enemy[],dt: number,offset: number): number {
   if(w.lightning)return stepWispLightning(sim,b,w,candidates,dt,offset);
-  const c=center(b.rect),range=w.range;
+  const c=center(b.rect),range=archerRange(sim.levels.archerRange)*rangeScale(sim,b);
   let remaining = dt;
   do {
     if (!w.slice && candidates.some(e => !e.untargetable&&e.hp>0)) {
@@ -128,7 +130,8 @@ function stepWispArrow(sim: DefendSim,b: Building,w: WispArrow,candidates: Enemy
         const d = (e.x-w.x)**2+(e.y-w.y)**2;
         if (e.hp>0 && (d<best || (d===best && e.id<target!.id))) { target=e; best=d; }
       }
-      const flight = target && wispFlight(w,target,c,range);
+      if(ordersOf(sim,b).targetMode||sim.crosshairs.has(b.id))target=candidates.find(e=>e.hp>0&&!e.untargetable);
+      const flight = target && wispFlight(w,target,c,range,range,true);
       if (flight) {
         w.lastTarget = target!.id;
         w.slice = {...flight,damage:archerDamage(sim.levels.archerDamage)*sim.bonuses.towerDamage,hit:new Set()};

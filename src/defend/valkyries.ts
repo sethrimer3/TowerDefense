@@ -1,3 +1,4 @@
+import { ordersOf, targetComparator } from "./building-orders.ts";
 import { fortressAreaTargets } from "./fortress.ts";
 import { groundMeleeTarget } from "./catalog.ts";
 import {chargeIdle} from "./chrono.ts";
@@ -33,7 +34,7 @@ export function stepValkyrie(sim: DefendSim, s: Soldier, dt: number) {
   s.cd -= dt;
   s.thinkT -= dt;
   const reach = stabLength(sim.levels.valkyrieReach ?? 0);
-  const near = sim.nearestEnemy(s.x, s.y, reach);
+  const near = sim.troopTarget(s,reach);
   if (near) {
     // In reach: she holds her ground until her spear is ready.
     if (s.cd <= 0) charge(sim, s, near, reach);
@@ -91,7 +92,7 @@ export function seek(sim: DefendSim, s: Soldier) {
   const inCity = (e: Enemy) => sim.map.city[cellAt(e.x, e.y)] === 1, bounds = deployment(sim, s);
   const prey = firstSorted(sim.enemies
     .filter((e) => !e.untargetable && (s.kind !== "hero" && s.kind !== "shade" || groundMeleeTarget(e)) && e.hp > 0 && inCity(e) && within(bounds, e)),
-    (a, b) => sq(a.x - s.x) + sq(a.y - s.y) - (sq(b.x - s.x) + sq(b.y - s.y)), 3);
+    targetComparator(sim,ordersOf(sim,sim.map.buildings[s.home]).targetMode??"closest",s), 3);
   for (const e of prey) {
     const path = findPath(sim.ownSolid, s, e, CITYWIDE);
     if (!path) continue;

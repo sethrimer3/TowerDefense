@@ -805,3 +805,10 @@ A connected run of living worm segments after a cut. A piece needs at least four
 
 **City return**:
 A surfaced worm head's chance to turn back toward the nearest city edge when it strays beyond a few city tiles. The chance increases with distance; a little angular variation remains, and the body follows the head's trail.
+
+
+**Building menu**: The square set of controls around one selected placed building, distinct from the build palette.
+
+**Targeting mode**: A building's rule for choosing eligible enemies: Closest, First, Strongest, Weakest or Groups.
+
+**Crosshairs**: A shooting building's chosen aim point. Enemies within the clipped four-by-four-cell nearby square take priority, using that building's targeting mode.

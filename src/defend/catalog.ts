@@ -1,3 +1,4 @@
+import type { BuildingOrders } from "./building-orders.ts";
 import { SUB } from "./grid.ts";
 import type { RepairRanks } from "../repair-upgrades.ts";
 import { BLIGHT_WORM, SMALL_BLIGHT_WORM, MEDIUM_BLIGHT_WORM } from "./blight-worm-tuning.ts";
@@ -1289,6 +1290,7 @@ export const ENEMIES: Record<EnemyKind, EnemyDef> = {
  * of the Armory's levels. Each is 1 when nothing is owned, so a run without
  * them plays exactly as before. */
 export type Bonuses = {
+  buildingOrders?: Record<string, BuildingOrders>;
   equipment?: Record<number, {hp:number;power:number}>;
   /** Swordsmen's and archers' HP. */
   troopHp: number;

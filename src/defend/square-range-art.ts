@@ -25,7 +25,7 @@ type Box = { x0: number; y0: number; x1: number; y1: number };
 type Point = { x: number; y: number };
 
 /** Whether (x, y) lies inside `s`, edges included. */
-export const inSquare = (s: Square, x: number, y: number) => Math.abs(x - s.x) <= s.r && Math.abs(y - s.y) <= s.r;
+export const inSquare = (s: Square, x: number, y: number) => x >= s.x-s.r && x <= s.x+s.r && y >= s.y-s.r && y <= s.y+s.r;
 
 /** `to`, or the furthest point toward it from `s`'s middle still inside `s`
  * (where the line from the middle to `to` crosses its edge). */

@@ -1,3 +1,4 @@
+import { rangeScale } from "./building-orders.ts";
 import { isBlightWorm } from "./blight-worm-tuning.ts";
 import { fortressAreaTargets } from "./fortress.ts";
 import {chargeIdle} from "./chrono.ts";
@@ -52,9 +53,9 @@ const paths = (sim: Armed, b?: Building) => {
 /** What a tower's reach depends on: the levels and the Study's paths. */
 type Armed = Pick<DefendSim, "levels" | "bonuses">;
 /** How far a tower's flame (or bolt) reaches. */
-export const fireReach = (sim: Armed, b?: Building) => flameRange(sim.levels.wizardFlame ?? 0) + (paths(sim, b).pyro >= 2 ? PYRO.reach : 0);
+export const fireReach = (sim: Armed, b?: Building) => (flameRange(sim.levels.wizardFlame ?? 0) + (paths(sim, b).pyro >= 2 ? PYRO.reach : 0)) * rangeScale(sim,b);
 /** How far its ice runs. */
-export const iceReach = (sim: Armed, b?: Building) => ICE_RANGE + (paths(sim, b).rime >= 2 ? RIME.reach : 0);
+export const iceReach = (sim: Armed, b?: Building) => (ICE_RANGE + (paths(sim, b).rime >= 2 ? RIME.reach : 0)) * rangeScale(sim,b);
 /** How far a wizard tower reaches with what it casts: the Frost tower
  * casts only ice, the Pyre tower only flames, otherwise it alternates. */
 export const wizardReach = (sim: Armed, b?: Building) => {
@@ -106,7 +107,7 @@ export class Wizards {
 
   private flame(sim: DefendSim, b: Building) {
     const c = center(b.rect), range = fireReach(sim, b);
-    const target = nearest(sim.enemiesNear(c.x, c.y, range), c);
+    const target = sim.buildingTarget(b,range);
     if (!target) {
       const duration=FLAME_SECONDS*(paths(sim,b).pyro>=3?PYRO.burn:1),damage=flameDps(sim.levels.wizardFlame??0)*sim.bonuses.towerDamage*PYRO.damage[paths(sim,b).pyro]*duration;
       chargeIdle(sim,c,range,damage,()=>true,()=>{this.rest.set(b.id,WIZARD_REST+duration);this.next.set(b.id,"ice");});return;
@@ -119,7 +120,7 @@ export class Wizards {
   /** Stormcalling: a chain bolt from the tower's top where a flame would be. */
   private bolt(sim: DefendSim, b: Building, rank: number) {
     const c = center(b.rect), range = fireReach(sim, b);
-    const target = nearest(sim.enemiesNear(c.x, c.y, range), c);
+    const target = sim.buildingTarget(b,range);
     if (!target) {const damage=flameDps(sim.levels.wizardFlame??0)*STORM.damage*(rank>=3?STORM.surge:1)*sim.bonuses.towerDamage;
       chargeIdle(sim,c,range,damage,()=>true,()=>{this.rest.set(b.id,WIZARD_REST);this.next.set(b.id,"ice");});return;}
     const surge = rank >= 3 ? STORM.surge : 1;
@@ -132,7 +133,7 @@ export class Wizards {
   private ice(sim: DefendSim, b: Building) {
     const c = center(b.rect);
     const range = iceReach(sim, b);
-    const target = nearest(sim.enemiesNear(c.x, c.y, range), c);
+    const target = sim.buildingTarget(b,range);
     if (!target) {const rest=paths(sim,b).ice?WIZARD_REST/2:WIZARD_REST;
       chargeIdle(sim,c,range,iceDamage(sim.levels.wizardIce??0)*sim.bonuses.towerDamage*(paths(sim,b).rime>=2?RIME.damage:1),()=>true,()=>{this.rest.set(b.id,rest);this.next.set(b.id,"flame");});return;}
     sim.frosts.push({
@@ -175,7 +176,9 @@ export function stepFlames(sim: DefendSim, wizards: Wizards, dt: number) {
   for (const f of sim.flames) {
     f.t += dt;
     if (!sim.intact(sim.map.buildings[f.tower])) f.t = f.dur;
-    const target = sim.enemies.find((e) => !e.untargetable && e.id === f.target && e.hp > 0) ?? nearest(sim.enemiesNear(f.x, f.y, f.range), f);
+    const building=sim.map.buildings[f.tower];
+    f.range=fireReach(sim,building);
+    const target = sim.buildingTarget(building,f.range);
     if (target) {
       f.target = target.id;
       const aim = toward(f.x, f.y, target.x, target.y);

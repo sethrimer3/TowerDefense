@@ -231,7 +231,7 @@ function seek(sim: DefendSim, s: Soldier): Enemy | null {
   const c = s.called!;
   s.thinkT = 0.5;
   s.path = [];
-  const prey = sim.enemiesNear(c.post.x, c.post.y, REINFORCE.leash).filter((e) => !e.untargetable && e.hp > 0);
+  const prey = sim.enemiesInSquare(c.post.x, c.post.y, REINFORCE.leash).filter((e) => !e.untargetable && e.hp > 0);
   prey.sort((a, b) => sq(a.x - s.x) + sq(a.y - s.y) - (sq(b.x - s.x) + sq(b.y - s.y)) || a.id - b.id);
   for (const e of prey.slice(0, 3)) {
     const path = findPath(sim.ownSolid, s, e, LEASHED);

@@ -1,3 +1,4 @@
+import { decodeOrders, type BuildingOrders } from "./building-orders.ts";
 /** The player-authored city layout (which tiles are city, where the keep is,
  * which quarter tiles each structure stands on) plus the rules that decide
  * what is legal. `fitLayout` turns it into exact cells, so the same layout
@@ -37,7 +38,7 @@ export type PlacedKind = Exclude<StructureKind, "keep">;
  * block). `path` is the Knowledge path this one building was upgraded along
  * and `rank` how far (both absent: plain); they move with the structure,
  * and a structure taken up keeps them in the palette (`DefendSave.kept`). */
-export type PlacedStructure = { uid: number; kind: PlacedKind; tx: number; ty: number; qx: number; qy: number; path?: PathId; rank?: number };
+export type PlacedStructure = BuildingOrders & { uid: number; kind: PlacedKind; tx: number; ty: number; qx: number; qy: number; path?: PathId; rank?: number };
 
 /** Quarter tiles to a tile, each way: structures and wall sections are
  * placed on a grid four times finer than the tiles'. */
@@ -64,20 +65,20 @@ export const SIDES: readonly Side[] = ["n", "e", "s", "w"];
 const SIDE_STEP: Record<Side, readonly [number, number]> = { n: [0, -1], e: [1, 0], s: [0, 1], w: [-1, 0] };
 /** A city gate: set in the wall on `side` of city tile (tx, ty). Wall
  * spikes stand on the same kind of spot. */
-export type GateSpot = { tx: number; ty: number; side: Side };
+export type GateSpot = BuildingOrders & { tx: number; ty: number; side: Side };
 /** A row of wall spikes, on a gate's kind of spot, with the Knowledge path
  * it was upgraded along and how far (absent: plain). */
 export type SpikeSpot = GateSpot & { path?: PathId; rank?: number };
 /** A corner of the city wall: the tile corner (vx, vy), between the four
  * tiles around it, where the wall turns through a right angle. */
-export type CornerSpot = { vx: number; vy: number };
+export type CornerSpot = BuildingOrders & { vx: number; vy: number };
 /** A wall section the player placed, a quarter of a tile across: quarter
  * (qx, qy) of the board's grid of quarter tiles (`QUARTER` to a tile each
  * way). */
 export type WallSpot = { qx: number; qy: number };
 
 export type Layout = {
-  keep: TilePos;
+  keep: TilePos & BuildingOrders;
   /** City tiles other than the keep's own tile (the keep always counts as one). */
   cityTiles: string[];
   structures: PlacedStructure[];
@@ -587,7 +588,7 @@ function keepGates(l: Layout) {
 export function placeGate(l: Layout, g: GateSpot): Layout | null {
   if (!gateOk(cityTileSet(l), g) || l.gates.some((o) => sameGate(o, g)) || l.spikes.some((o) => sameGate(o, g))) return null;
   const next = cloneLayout(l);
-  next.gates.push({ tx: g.tx, ty: g.ty, side: g.side });
+  next.gates.push({ tx:g.tx,ty:g.ty,side:g.side,...decodeOrders(g) });
   return fitLayout(next).ok ? next : null;
 }
 
@@ -601,7 +602,7 @@ export function removeGate(l: Layout, g: GateSpot): Layout {
  * stood). */
 export function moveGate(l: Layout, from: GateSpot, to: GateSpot): Layout | null {
   if (sameGate(from, to)) return l;
-  return placeGate(removeGate(l, from), to);
+  return placeGate(removeGate(l, from), { ...from, ...to });
 }
 
 // ── Wall spikes ──────────────────────────────────────────────────────────
@@ -690,7 +691,7 @@ export function cornerOutward(tiles: Set<string>, v: CornerSpot): { x: number; y
 export function placeBallista(l: Layout, v: CornerSpot): Layout | null {
   if (!cornerOk(cityTileSet(l), v) || l.ballistas.some((o) => sameCorner(o, v))) return null;
   const next = cloneLayout(l);
-  next.ballistas.push({ vx: v.vx, vy: v.vy });
+  next.ballistas.push({ vx:v.vx,vy:v.vy,...decodeOrders(v) });
   return fitLayout(next).ok ? next : null;
 }
 
@@ -702,7 +703,7 @@ export function removeBallista(l: Layout, v: CornerSpot): Layout {
 
 export function moveBallista(l: Layout, from: CornerSpot, to: CornerSpot): Layout | null {
   if (sameCorner(from, to)) return l;
-  return placeBallista(removeBallista(l, from), to);
+  return placeBallista(removeBallista(l, from), { ...from, ...to });
 }
 
 // ── Edits ────────────────────────────────────────────────────────────────
@@ -763,7 +764,7 @@ function carryTile(l: Layout, from: TilePos, to: TilePos): Layout | null {
   const next = cloneLayout(l);
   const dx = to.tx - from.tx, dy = to.ty - from.ty;
   const on = (p: TilePos) => p.tx === from.tx && p.ty === from.ty;
-  if (on(l.keep)) next.keep = { tx: to.tx, ty: to.ty };
+  if (on(l.keep)) next.keep = { ...l.keep, tx: to.tx, ty: to.ty };
   else next.cityTiles = next.cityTiles.map((k) => (k === tileKey(from.tx, from.ty) ? toKey : k));
   const carried = next.structures.filter(on);
   for (const s of carried) { s.tx += dx; s.ty += dy; s.qx += dx * QUARTER; s.qy += dy * QUARTER; }
@@ -889,7 +890,7 @@ export function moveKeep(l: Layout, tx: number, ty: number): Layout | null {
   const next = cloneLayout(l);
   next.cityTiles = next.cityTiles.filter((k) => k !== key);
   next.cityTiles.push(tileKey(l.keep.tx, l.keep.ty));
-  next.keep = { tx, ty };
+  next.keep = { ...l.keep, tx, ty };
   return fitLayout(next).ok ? next : null;
 }
 

@@ -23,7 +23,7 @@ try {
     const fixture = await page.evaluate(async () => {
       const { defaults } = await import('/src/save.ts');
       const { placeCityTile, placeStructure } = await import('/src/defend/layout.ts');
-      const s = defaults(); s.settings.soundOff = true; s.settings.ambienceOff = true;
+      const s = defaults(); s.profile = { name: "Building tester", flag: {base:3,layers:[]} }; s.settings.soundOff = true; s.settings.ambienceOff = true;
       s.knowledge = 1e7;
       s.defend.owned.revolutionary = 1; s.defend.owned.sniperLodge = 1; s.defend.owned.cityTile = 8;
       s.defend.revolutionaryRanks = { squad: 2, chain: 2, critChance: 2, critDamage: 3, splash: 2 };
@@ -69,7 +69,7 @@ try {
       return dp.renderer.toClient(b.rect.x + b.rect.w / 2, b.rect.y + b.rect.h / 2);
     }, rev.uid);
     if (phone) await page.touchscreen.tap(p.x, p.y); else await page.mouse.click(p.x, p.y);
-    await page.waitForSelector('#defend-specialty:not([hidden])');
+    if(await page.locator('.building-menu [data-bm="tree"]').count()) await page.locator('.building-menu [data-bm="tree"]').click(); await page.waitForSelector('#defend-specialty:not([hidden])');
     const tree = await panel.locator('.ug-node:not(.withering)').evaluateAll(els => els.map(e => `${e.dataset.node}=${['owned', 'next', 'locked'].find(c => e.classList.contains(c))}`));
     for (const n of ['k:sniperLodge=owned', 'k:revolutionary=owned', 'q:squad:2=owned', 'q:chain:2=owned', 'q:chain:3=next', 'q:critChance:3=next', 'q:critDamage:4=next', 'q:splash:3=next']) assert.ok(tree.includes(n), `${n} in ${tree}`);
     await press(panel.locator('[data-node="q:chain:3"]'));

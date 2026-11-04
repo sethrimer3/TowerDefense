@@ -58,7 +58,7 @@ test("archers strolling the streets and swordsmen fighting never leave their dep
   run(sim, 60, () => {
     for (const s of sim.soldiers) {
       const d = deployment(sim, s)!;
-      worst = Math.max(worst, away(s, d) - d.r);
+      worst = Math.max(worst, Math.max(Math.abs(s.x-d.x),Math.abs(s.y-d.y)) - d.r);
     }
   });
   assert.ok(sim.soldiers.some((s) => s.kind === "archer") && sim.soldiers.some((s) => s.kind === "sword"));

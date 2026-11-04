@@ -55,7 +55,7 @@ const inReach = (s: Soldier, e: Enemy, r: number) => e.hp > 0 && groundMeleeTarg
 export function stepHero(sim: DefendSim, s: Soldier, dt: number) {
   s.cd -= dt;
   s.thinkT -= dt;
-  const near = nearest(sim.enemiesNear(s.x, s.y, HERO.reach + 1).filter((e) => inReach(s, e, HERO.reach)), s, Infinity, true);
+  const near = sim.troopTarget(s,HERO.reach+1,e=>inReach(s,e,HERO.reach));
   if (near) {
     // In reach: it holds its ground until its blade is ready.
     if (s.cd <= 0) combo(sim, s, near);

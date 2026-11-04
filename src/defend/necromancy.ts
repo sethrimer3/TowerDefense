@@ -1,3 +1,4 @@
+import { inSquare } from "./square-range-art.ts";
 import {chargeIdle,chronoTarget} from "./chrono.ts";
 /** DEFEND's Necromancy, a strike spell: cast from the Skills palette onto
  * the board, it raises every enemy that died within `NECRO.radius` cells of
@@ -65,7 +66,7 @@ export function ageGraves(sim: DefendSim, dt: number) {
 
 /** The graves within the spell's reach of `at`. */
 export const gravesNear = (sim: Pick<DefendSim, "graves">, at: Point, r = NECRO.radius) =>
-  sim.graves.filter((g) => sq(g.x - at.x) + sq(g.y - at.y) <= r * r);
+  sim.graves.filter((g) => inSquare({...at,r},g.x,g.y));
 
 /** Casts the spell at `at`: raises the fallen there and starts the
  * cooldown. Returns how many warriors rose, or -1 while it cools down. */

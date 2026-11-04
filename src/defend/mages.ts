@@ -34,7 +34,7 @@ export function stepMage(sim: DefendSim, s: Soldier, dt: number) {
   s.cd -= dt;
   s.thinkT -= dt;
   const attuned = mageAttunement(sim, s.home), range = attuned.range;
-  const near = sim.nearestEnemy(s.x, s.y, range);
+  const near = sim.troopTarget(s,range);
   if (near) {
     if (attuned.family !== "plain") s.target = near.id;
     if (s.cd <= 0) {

@@ -6,8 +6,7 @@
  * piece's own sprite, each touching it edge to edge (none only at a
  * corner), so it traces the silhouette exactly; placed wall sections that
  * touch are traced as one, round their outer edge. Presentation only, on the
- * wall clock; each piece keeps its own staggered time, so they never all
- * shine at once. */
+ * wall clock; each piece keeps its own staggered time, after the palette's simultaneous opening flash. */
 import type { Building, CityMap } from "./citygen.ts";
 import { CELLS_W, cellIndex } from "./grid.ts";
 import { ART } from "./park-art.ts";

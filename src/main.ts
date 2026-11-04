@@ -162,6 +162,8 @@ const defendPage = new DefendPage(el("defend"), {
   crispZoom: () => save.settings.crispZoom,
   setCrispZoom: (value) => { save.settings.crispZoom = value; store(); },
   showEmpty: () => save.settings.showEmpty,
+  dragRally: () => save.settings.dragRally,
+  dragCrosshair: () => save.settings.dragCrosshair,
   raiseDrag: () => save.settings.raiseDrag,
   magnifier: () => save.settings.magnifier,
   tripleTapFlag: () => save.settings.tripleTapFlag,

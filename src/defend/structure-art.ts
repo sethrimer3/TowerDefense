@@ -1,3 +1,4 @@
+import { drawSquareRange } from "./square-range-art.ts";
 import { sourcePixels } from "./sprite-source.ts";
 import { flagPixels as profilePixels, type Flag } from "../profile/model.ts";
 /** DEFEND's structure art, seen from above: the keep, and the barracks and
@@ -751,15 +752,7 @@ function paintBannerIcon(c: CanvasRenderingContext2D, n: number) {
  * pole, over a faint gold ring marking the ground its troops hold. */
 export function drawWarBanner(c: CanvasRenderingContext2D, px: number, at: { x: number; y: number }, reach: number, pose: { t: number; reduceMotion: boolean }) {
   const x = at.x * px, y = at.y * px;
-  c.save();
-  c.strokeStyle = "rgba(242,210,122,0.35)";
-  c.lineWidth = Math.max(1, px * 0.1);
-  c.setLineDash([px * 0.5, px * 0.4]);
-  if (!pose.reduceMotion) c.lineDashOffset = -pose.t * px * 0.6;
-  c.beginPath();
-  c.arc(x, y, reach * px, 0, Math.PI * 2);
-  c.stroke();
-  c.restore();
+  drawSquareRange(c,px,{...at,r:reach},"banner",{march:pose.reduceMotion?undefined:pose.t});
   drawFlag(c, px, { x, y, t: pose.t, reduceMotion: pose.reduceMotion }, false);
 }
 

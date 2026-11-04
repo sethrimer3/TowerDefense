@@ -1,3 +1,4 @@
+import { drawSquareRange } from "./square-range-art.ts";
 /** What DEFEND draws over the board while the player is building: the
  * optional tile grid, and for a drag, which tiles accept the item, the hovered
  * tile, the item's ghost and an aimed bomb's reach. */
@@ -247,25 +248,13 @@ function drawBombReach(c: CanvasRenderingContext2D, px: number, bomb: { x: numbe
 }
 
 function drawRallyReach(c: CanvasRenderingContext2D, px: number, at: { x: number; y: number; r: number }) {
-  c.strokeStyle = "rgba(242,210,122,0.9)";
-  c.fillStyle = "rgba(242,210,122,0.12)";
-  c.lineWidth = Math.max(1, px * 0.12);
-  c.beginPath();
-  c.arc(at.x * px, at.y * px, at.r * px, 0, Math.PI * 2);
-  c.fill();
-  c.stroke();
+  drawSquareRange(c,px,at,"banner");
 }
 
 /** The Necromancy spell's reach, in grave green, with a pale mark over each
  * fallen enemy it would raise (unless the skulls of `graves` mark them). */
 function drawSpellReach(c: CanvasRenderingContext2D, px: number, at: NonNullable<Overlay["spell"]>, graved = false) {
-  c.strokeStyle = "rgba(141,255,166,0.9)";
-  c.fillStyle = "rgba(63,154,92,0.16)";
-  c.lineWidth = Math.max(1, px * 0.12);
-  c.beginPath();
-  c.arc(at.x * px, at.y * px, at.r * px, 0, Math.PI * 2);
-  c.fill();
-  c.stroke();
+  drawSquareRange(c,px,at,"spell");
   if (graved) return;
   const d = Math.max(2, Math.round(px * 0.25));
   for (const s of at.souls ?? []) {
@@ -300,14 +289,7 @@ function drawMeteorReach(c: CanvasRenderingContext2D, px: number, at: { x: numbe
 
 /** The Frost nova's reach, in ice blue, with a six-pointed snowflake where it bursts. */
 function drawFrostReach(c: CanvasRenderingContext2D, px: number, at: { x: number; y: number; r: number }) {
-  c.strokeStyle = "rgba(170,225,255,0.95)";
-  c.fillStyle = "rgba(90,170,230,0.16)";
-  c.lineWidth = Math.max(1, px * 0.12);
-  c.setLineDash([px * 0.25, px * 0.25]);
-  c.beginPath();
-  c.arc(at.x * px, at.y * px, at.r * px, 0, Math.PI * 2);
-  c.fill();
-  c.stroke();
+  drawSquareRange(c,px,at,"spell");
   c.setLineDash([]);
   // A pixel snowflake: a plus and an x, outlined in black.
   const k = Math.max(2, Math.round(px * 0.13)), x = Math.round(at.x * px), y = Math.round(at.y * px);
@@ -326,14 +308,7 @@ function drawFrostReach(c: CanvasRenderingContext2D, px: number, at: { x: number
  * gold pixel chevron pointing down at each spot a soldier will land on (a
  * larger one for a champion). */
 function drawReinforceReach(c: CanvasRenderingContext2D, px: number, at: NonNullable<Overlay["spell"]>) {
-  c.strokeStyle = "rgba(246,199,90,0.7)";
-  c.fillStyle = "rgba(246,199,90,0.08)";
-  c.lineWidth = Math.max(1, px * 0.08);
-  c.setLineDash([px * 0.3, px * 0.3]);
-  c.beginPath();
-  c.arc(at.x * px, at.y * px, at.r * px, 0, Math.PI * 2);
-  c.fill();
-  c.stroke();
+  drawSquareRange(c,px,at,"spell");
   c.setLineDash([]);
   const chevron: [number, number][] = [[-2, -1], [-1, 0], [0, 1], [1, 0], [2, -1]];
   for (const s of at.spots ?? []) {

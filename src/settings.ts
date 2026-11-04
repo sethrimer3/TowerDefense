@@ -51,6 +51,8 @@ export const SETTINGS = {
   /** Items dragged on the Defend board ride a few blocks above the pointer,
    * clear of the finger. Until the player sets it, on for touch screens and
    * off for a mouse (`touchFirst`). */
+  dragRally: { kind: "toggle", default: true, page: { id: "drag-rally", label: "Drag from a troop building to place its rally flag" } },
+  dragCrosshair: { kind: "toggle", default: true, page: { id: "drag-crosshair", label: "Drag from a tower to place its crosshairs" } },
   raiseDrag: { kind: "toggle", default: false, page: { id: "raise-drag", label: "Carry dragged items above the finger" } },
   /** While dragging on the Defend board (placing, aiming), a box above the
    * finger shows the board zoomed in round where the item would go. */

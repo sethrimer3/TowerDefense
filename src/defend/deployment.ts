@@ -1,3 +1,5 @@
+import { rangeScale, type OrderSource } from "./building-orders.ts";
+import { clampToSquare, inSquare, type Square } from "./square-range-art.ts";
 /** DEFEND deployment: how far a troop building's troops may go from it.
  * Each troop has a base deployment range by kind (`DEPLOY_RANGE`, stronger
  * troops further), times the Smithy's Deployment range (`Bonuses.deployRange`),
@@ -43,7 +45,8 @@ export const TOWER_SNAP = 2.5;
 
 /** A troop building's rally point; `tower`: the watch tower it was snapped onto. */
 export type Rally = Point & { tower?: number };
-export type Circle = Point & { r: number };
+export type Circle = Square;
+export type { Square };
 
 /** How far building kind `kind`'s troops deploy with `bonuses`; 0 for a
  * building that trains none. */
@@ -52,24 +55,24 @@ export function deployRangeOf(kind: BuildingKind, bonuses: Pick<Bonuses, "deploy
   return trained ? (DEPLOY_RANGE[trained] ?? 0) * (bonuses.deployRange ?? 1) : 0;
 }
 
-/** Building `b`'s deployment circle, or null for one that trains nobody. */
-export function deployCircle(b: Building, bonuses: Pick<Bonuses, "deployRange">): Circle | null {
-  const r = deployRangeOf(b.kind, bonuses);
+/** Historical API name: building `b`'s deployment square, or null for one that trains nobody. */
+export function deployCircle(b: Building, bonuses: Pick<Bonuses, "deployRange" | "buildingOrders">, source?: OrderSource): Circle | null {
+  const r = deployRangeOf(b.kind, bonuses) * rangeScale(source ?? {bonuses}, b);
   return r ? { ...center(b.rect), r } : null;
 }
 
-/** Where `s` may go: its home's deployment circle, or null when it has no
+/** Where `s` may go: its home's deployment square, or null when it has no
  * bounds (a spell's troops, a cloudborne palace's). */
 export function deployment(sim: DefendSim, s: Soldier): Circle | null {
   if (sim.scenario?.unrestricted || s.home < 0) return null;
   const b = sim.map.buildings[s.home], base = DEPLOY_RANGE[s.kind];
   if (!b || !base || sim.aloft(s.home)) return null;
   const c = center(b.rect);
-  return { x: c.x, y: c.y, r: base * (sim.bonuses.deployRange ?? 1) };
+  return { x: c.x, y: c.y, r: base * (sim.bonuses.deployRange ?? 1) * rangeScale(sim,b) };
 }
 
-/** Whether `p` lies within `pad` of circle `d` (always, without one). */
-export const within = (d: Circle | null, p: Point, pad = 0) => !d || sq(p.x - d.x) + sq(p.y - d.y) <= sq(d.r + pad);
+/** Whether `p` lies within `pad` of square `d` (always, without one). */
+export const within = (d: Circle | null, p: Point, pad = 0) => !d || inSquare({...d,r:d.r+pad},p.x,p.y);
 
 /** The war banner or rally flag, if `s` may answer it: only one standing
  * inside its deployment range. */
@@ -94,8 +97,8 @@ export function fence(sim: DefendSim, s: Soldier, x0: number, y0: number) {
   if (s.x === x0 && s.y === y0) return;
   const d = deployment(sim, s);
   if (!d) return;
-  const now = sq(s.x - d.x) + sq(s.y - d.y);
-  if (now <= sq(d.r) || now <= sq(x0 - d.x) + sq(y0 - d.y)) return;
+  const now = Math.max(Math.abs(s.x-d.x), Math.abs(s.y-d.y));
+  if (inSquare(d,s.x,s.y) || now <= Math.max(Math.abs(x0-d.x),Math.abs(y0-d.y))) return;
   s.x = x0;
   s.y = y0;
   s.path = [];
@@ -144,11 +147,12 @@ export function strollStreets(sim: DefendSim, s: Soldier): readonly number[] {
   if (!d) return sim.streets;
   let byHome = STREETS.get(sim);
   if (!byHome) STREETS.set(sim, (byHome = new Map()));
-  let list = byHome.get(s.home);
-  if (!list) byHome.set(s.home, (list = sim.streets.filter((c) => within(d, cellCenter(c)))));
+  const key = `${s.home}:${d.r}`;
+  let list = byHome.get(key);
+  if (!list) byHome.set(key, (list = sim.streets.filter((c) => within(d, cellCenter(c)))));
   return list;
 }
-const STREETS = new WeakMap<DefendSim, Map<number, number[]>>();
+const STREETS = new WeakMap<DefendSim, Map<string, number[]>>();
 
 /** Whether building `b`'s troops climb watch towers (the gunner line). */
 export const climbsTowers = (kind: BuildingKind, flat: (k: Soldier["kind"]) => boolean) => {
@@ -171,8 +175,7 @@ export function rallyAim(b: Building, p: Point, circle: Circle, towers: readonly
     if (d <= snapD && within(circle, c)) { snap = t; snapD = d; }
   }
   if (snap) return { ...center(snap.rect), tower: snap.id };
-  const d = dist(p.x - circle.x, p.y - circle.y), k = d > circle.r ? circle.r / d : 1;
-  const x = circle.x + (p.x - circle.x) * k, y = circle.y + (p.y - circle.y) * k;
+  const {x,y} = clampToSquare(circle,p);
   return { x: Math.max(0.5, Math.min(CELLS_W - 0.5, x)), y: Math.max(0.5, Math.min(CELLS_H - 0.5, y)) };
 }
 

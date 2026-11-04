@@ -27,7 +27,7 @@ try {
     const fixture = await page.evaluate(async ([kinds, WEAR]) => {
       const { defaults } = await import('/src/save.ts');
       const { placeCityTile, placeStructure } = await import('/src/defend/layout.ts');
-      const s = defaults(); s.settings.soundOff = true; s.settings.ambienceOff = true;
+      const s = defaults(); s.profile = { name: "Building tester", flag: {base:3,layers:[]} }; s.settings.soundOff = true; s.settings.ambienceOff = true;
       s.knowledge = 100000;
       for (const k of kinds) s.defend.owned[k] = 1;
       s.defend.owned.cityTile = 8;
@@ -73,7 +73,7 @@ try {
       return dp.renderer.toClient(b.rect.x + b.rect.w / 2, b.rect.y + b.rect.h / 2);
     }, hall.uid);
     if (phone) await page.touchscreen.tap(p.x, p.y); else await page.mouse.click(p.x, p.y);
-    await page.waitForSelector('#defend-specialty:not([hidden])');
+    if(await page.locator('.building-menu [data-bm="tree"]').count()) await page.locator('.building-menu [data-bm="tree"]').click(); await page.waitForSelector('#defend-specialty:not([hidden])');
     const tree = await panel.locator('.ug-node:not(.withering)').evaluateAll(els => els.map(e => `${e.dataset.node}=${['owned', 'next', 'locked'].find(c => e.classList.contains(c))}`));
     for (const n of ['k:meleeGuild=owned', 'k:spearHall=owned', 'k:phalanx=next', 'k:javelinCamp=next', 'k:lancerStable=next']) assert.ok(tree.includes(n), `${n} in ${tree}`);
     assert.equal(tree.filter(n => n.endsWith('=next')).length, 3, 'only the three branches');
@@ -91,7 +91,7 @@ try {
       return dp.renderer.toClient(b.rect.x + b.rect.w / 2, b.rect.y + b.rect.h / 2);
     }, stable.uid);
     if (phone) await page.touchscreen.tap(q.x, q.y); else await page.mouse.click(q.x, q.y);
-    await page.waitForSelector('#defend-specialty:not([hidden])');
+    if(await page.locator('.building-menu [data-bm="tree"]').count()) await page.locator('.building-menu [data-bm="tree"]').click(); await page.waitForSelector('#defend-specialty:not([hidden])');
     await page.waitForTimeout(700);
     const crown = await panel.locator('.ug-node:not(.withering)').evaluateAll(els => els.map(e => `${e.dataset.node}=${['owned', 'next', 'locked'].find(c => e.classList.contains(c))}`));
     assert.ok(crown.includes('k:valkyriePalace=next'), `the palace in ${crown}`);
