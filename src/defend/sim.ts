@@ -78,7 +78,7 @@ import { stepCityWatch } from "./city-watch.ts";
 import { cloaked, spreadVenom, stepVenom } from "./assassins.ts";
 import { nanoDeath, stepNano, type Infection, type NanoBurst, type NanoCloud, type NanoShell } from "./nanobots.ts";
 import { perched } from "./gun-sight.ts";
-import { fence, deployment, within, type Rally } from "./deployment.ts";
+import { fence, type Rally } from "./deployment.ts";
 import { hopliteGuard } from "./spears.ts";
 import { heroRises, stepHero, stepSwings, type Swing } from "./hero.ts";
 import { stepBlades, stepBleed, stepShade, type Blade } from "./shadow.ts";
@@ -1226,8 +1226,9 @@ export class DefendSim {
 
   troopTarget(s:Soldier,r:number,eligible:(e:Enemy)=>boolean=()=>true,candidates?:Enemy[]):Enemy|null {
     const home=this.map.buildings[s.home],o=home?ordersOf(this,home):{};
-    const bounds=deployment(this,s);
-    const pool=(candidates??this.enemiesNear(s.x,s.y,r)).filter(e=>!e.untargetable&&within(bounds,e)&&eligible(e));
+    // Reach, not the deployment square: troops shoot or strike whatever is in
+    // reach, even past their range; only walking keeps inside it.
+    const pool=(candidates??this.enemiesNear(s.x,s.y,r)).filter(e=>!e.untargetable&&eligible(e));
     if(!o.targetMode) return nearest(pool,s,r*r,true);
     return pool.sort(targetComparator(this,o.targetMode,s,pool))[0]??null;
   }
