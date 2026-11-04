@@ -2553,3 +2553,43 @@ nav button[data-mode] > .tab-label { min-height: 2.4em; }
   cursor: pointer;
   user-select: none;
 }
+
+/* ── The building menu (ui/building-menu.ts): a square frame of bars round
+ * a placed building, its open middle letting taps through to the board. */
+.building-menu {
+  --bm-bar: 52px;
+  --bm-button: calc(var(--bm-bar) - 12px);
+  position: absolute;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: var(--bm-bar) 1fr var(--bm-bar);
+  grid-template-rows: var(--bm-bar) 1fr var(--bm-bar);
+  pointer-events: none;
+}
+.building-menu .bm-bar { pointer-events: auto; display: flex; align-items: center; justify-content: center; min-width: 0; min-height: 0; }
+.building-menu .bm-top { grid-column: 1 / -1; grid-row: 1; position: relative; }
+.building-menu .bm-bottom { grid-column: 1 / -1; grid-row: 3; position: relative; gap: 6px; }
+.building-menu .bm-left { grid-column: 1; grid-row: 2; flex-direction: column; }
+.building-menu .bm-right { grid-column: 3; grid-row: 2; flex-direction: column; justify-content: space-between; padding: 6px 0; gap: 6px; }
+.building-menu .bm-hole { grid-column: 2; grid-row: 2; }
+.building-menu .bm-modes { display: flex; flex-direction: column; gap: 4px; }
+.building-menu .bm-button { width: var(--bm-button); height: var(--bm-button); min-width: 0; min-height: 0; padding: 0; display: grid; place-items: center; }
+.building-menu .bm-icon { width: 32px; height: 32px; image-rendering: pixelated; }
+.building-menu .bm-name {
+  position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+  max-width: calc(50% - var(--bm-button) / 2 - 18px);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px;
+}
+.building-menu .bm-range { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; min-height: 0; }
+.building-menu .bm-range-value { font-size: 12px; }
+.building-menu .bm-range input { writing-mode: vertical-lr; direction: rtl; flex: 1; min-height: 60px; width: 24px; margin: 0; }
+.building-menu .bm-price { font-size: 12px; }
+@media (max-width: 559px) {
+  .building-menu { --bm-bar: 44px; --bm-button: calc(var(--bm-bar) - 8px); }
+  .building-menu .bm-modes { gap: 3px; }
+  .building-menu .bm-name { font-size: 11px; left: 10px; }
+}
+/* While its range slider is held, the menu's other bars thin out so the
+ * square range under them shows. */
+.building-menu .bm-bar { transition: opacity 120ms; }
+.building-menu.adjusting .bm-bar:not(.bm-right) { opacity: 0.2; pointer-events: none; }
