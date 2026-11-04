@@ -20,6 +20,7 @@ import { ART, treePixels } from "./park-art.ts";
 import { hasTree, treeCanopy } from "./park-geometry.ts";
 import { TOWER as GATE_TOWER } from "./gate-art.ts";
 import { WOOD_POST, gateArtRect } from "./wood-gate-art.ts";
+import { realmRelief } from "./tower-art.ts";
 
 const W = CELLS_W * ART, H = CELLS_H * ART;
 
@@ -76,6 +77,7 @@ export function heights(map: CityMap, standing: (b: Building) => boolean, footpr
       }
     }
     else if (b.kind === "gate") gate(b, raise);
+    else if (realmRelief(b.kind, b.rect.w, b.rect.h)) relief(b, realmRelief(b.kind, b.rect.w, b.rect.h)!, raise, h);
     else {
       const v = b.kind === "wallBallista" ? HEIGHT.wall : b.kind.endsWith("Tower") ? HEIGHT.tower : HEIGHT.hall;
       const f = footprint?.(b);
@@ -158,6 +160,18 @@ function sprite(f: Footprint, v: number, raise: Raise) {
   for (let y = 0; y < f.h; y++) for (let x = 0; x < f.w; x++) if (f.mask[y * f.w + x]) raise(f.x0 + x, f.y0 + y, v);
 }
 
+/** The Mine or the Library, each pixel as high as its own art stands (the
+ * cathedral's towers and spire over its roofs), and the Mine's pit dug
+ * below the ground, so its rim and benches shade the benches under them. */
+function relief(b: Building, r: Float32Array, raise: Raise, h: Float32Array) {
+  const w = b.rect.w * ART, x0 = b.rect.x * ART, y0 = b.rect.y * ART;
+  for (let i = 0; i < r.length; i++) {
+    const x = x0 + (i % w), y = y0 + Math.floor(i / w), v = r[i];
+    if (v > 0) raise(x, y, v);
+    else if (v < 0 && x >= 0 && y >= 0 && x < W && y < H) h[y * W + x] = Math.min(h[y * W + x], v);
+  }
+}
+
 /** A wooden fence: its rails stand low and its posts a little higher. */
 function fence(b: Building, raise: Raise) {
   for (const f of b.rails ?? [b.fence!]) {
@@ -220,7 +234,7 @@ export function sunShadowMask(h: Float32Array, dx: number, dy: number): Uint8Arr
     const u = horizontal ? y - dy : x - dx, low = Math.floor(u), part = u - low;
     const a = horizontal ? sample(x - dx, low) : sample(low, y - dy);
     const b = horizontal ? sample(x - dx, low + 1) : sample(low + 1, y - dy);
-    const i = y * W + x, r = ray[i] = Math.max(0, a + (b - a) * part - drop), over = r - h[i];
+    const i = y * W + x, r = ray[i] = a + (b - a) * part - drop, over = r - h[i];
     if (over > 0) out[i] = over > .5 ? 1 : 2;
   };
   if (horizontal) {

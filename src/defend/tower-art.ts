@@ -1924,6 +1924,36 @@ function paintRepairShop(p: Pix) {
 
 // ── The Realm's economy buildings, each filling its whole city tile ──────────
 
+/** The economy buildings' relief: while `realmRelief` paints one, each part
+ * records its height (in art pixels of shadow, as `shadow-art.ts` counts
+ * them; below zero is dug into the ground), so the sun's shadows fall from
+ * the cathedral's towers onto its lower roofs and from the pit's rim and
+ * benches down into the mine, not from the sprite as one flat block. */
+let relief: Float32Array | null = null;
+function lift(p: Pix, x: number, y: number, v: number) {
+  if (relief && x >= 0 && y >= 0 && x < p.w && y < p.h) relief[y * p.w + x] = v;
+}
+const reliefs = new Map<string, Float32Array | null>();
+/** The height of each pixel of a Mine's or Library's sprite, `(cw·ART) ×
+ * (ch·ART)` of them, or null for other kinds (and for an artist's sprite,
+ * whose shapes these heights wouldn't match). */
+export function realmRelief(kind: string, cw: number, ch: number): Float32Array | null {
+  if (kind !== "mine" && kind !== "library") return null;
+  const key = `${kind}:${cw}x${ch}`;
+  let r = reliefs.get(key);
+  if (r === undefined) {
+    const w = cw * ART, h = ch * ART;
+    if (artOverride(ART_NAMES.structure(kind, cw, ch, ""), w, h)) r = null;
+    else {
+      relief = new Float32Array(w * h);
+      try { (kind === "mine" ? paintMine : paintLibrary)(pixels(new Uint32Array(w * h), w, h)); r = relief; }
+      finally { relief = null; }
+    }
+    reliefs.set(key, r);
+  }
+  return r;
+}
+
 /** The cathedral's lead roof, dark to light. */
 const LEAD = [0x343c4c, 0x4a5466, 0x606c82, 0x7c889e];
 /** Stained glass. */
@@ -1932,8 +1962,14 @@ const GLASS = [0x5b8fd9, 0xd8553f, 0xe9c46a, 0xa06ac8];
 /** A walled building under a gabled roof: a one-pixel wall lit to the upper
  * left, a dark eave line, then the roof. */
 function roofed(p: Pix, x0: number, y0: number, x1: number, y1: number, wall: readonly number[], roof: number) {
+  const along = x1 - x0 >= y1 - y0;
   for (let y = y0; y <= y1; y++)
-    for (let x = x0; x <= x1; x++) p.set(x, y, x === x0 || y === y0 ? wall[2] : x === x1 || y === y1 ? wall[0] : wall[1]);
+    for (let x = x0; x <= x1; x++) {
+      p.set(x, y, x === x0 || y === y0 ? wall[2] : x === x1 || y === y1 ? wall[0] : wall[1]);
+      // Its eaves low, the roof rising to the ridge as a house's does.
+      const inward = along ? Math.min(y - y0, y1 - y) : Math.min(x - x0, x1 - x);
+      lift(p, x, y, 3 + Math.min(2.5, inward * 0.6));
+    }
   rect(p, x0 + 1, y0 + 1, x1 - 1, y1 - 1, OUTLINE);
   return gable(p, x0 + 2, y0 + 2, x1 - 2, y1 - 2, roof);
 }
@@ -1943,6 +1979,7 @@ function roofed(p: Pix, x0: number, y0: number, x1: number, y1: number, wall: re
 function oreHeap(p: Pix, cx: number, cy: number, r: number, tones: readonly number[], glint: number) {
   disc(p, cx, cy, r, (x, y, d, dx, dy) => {
     if (hash(x, y, 71) % 7 === 0 && d < r - 1) return glint;
+    lift(p, x, y, 1.6 * Math.sqrt(Math.max(0, 1 - (d / r) ** 2)) + 0.4);
     return tones[Math.min(tones.length - 1, lit(x, y, dx, dy, d) + (d < r * 0.4 ? 1 : 0))];
   });
 }
@@ -1950,7 +1987,7 @@ function oreHeap(p: Pix, cx: number, cy: number, r: number, tones: readonly numb
 /** A four-sided pyramid roof (a tower's cap or a spire) of half width `r`
  * about (cx, cy): pale stone eaves, lead faces lit from the upper left and
  * dark hips. */
-function leadCap(p: Pix, cx: number, cy: number, r: number) {
+function leadCap(p: Pix, cx: number, cy: number, r: number, base = 0, tip = 0) {
   for (let y = Math.floor(cy - r); y <= Math.ceil(cy + r); y++)
     for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++) {
       const dx = x + 0.5 - cx, dy = y + 0.5 - cy;
@@ -1959,6 +1996,7 @@ function leadCap(p: Pix, cx: number, cy: number, r: number) {
       const hip = Math.abs(Math.abs(dx) - Math.abs(dy)) < 0.6;
       const face = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 3 : 1) : dy < 0 ? 2 : 0;
       p.set(x, y, rim ? C.pale[face >= 2 ? 3 : 1] : hip ? LEAD[0] : LEAD[face]);
+      lift(p, x, y, base + (tip - base) * (1 - Math.max(Math.abs(dx), Math.abs(dy)) / r));
     }
 }
 
@@ -1986,7 +2024,9 @@ function paintMine(p: Pix) {
     const out = Math.sqrt(Math.max(qx, 0) ** 2 + Math.max(qy, 0) ** 2) + Math.min(Math.max(qx, qy), 0) - rc;
     return -out;
   };
-  const BENCH = 4, RIM = 2, DEEP = 3;
+  const BENCH = 4, RIM = 2, DEEP = 3, STEP = 4;
+  // How far below the yard each bench's floor lies.
+  const floorOf = (ring: number) => (ring < 0 ? 0 : -(ring + 1) * STEP);
   const TERRACE = [0x8a7a5c, 0x6e6049, 0x544a39, 0x362f25];
   const ringOf = (d: number) => Math.min(DEEP, Math.floor((d - RIM) / BENCH));
   // The road: each bench carries it part way round (clockwise, from the
@@ -2017,6 +2057,10 @@ function paintMine(p: Pix) {
       const nx = depth(x + 1, y) - depth(x - 1, y), ny = depth(x, y + 1) - depth(x, y - 1);
       const sunny = nx + ny < -0.2, a = angle(x, y);
       const wall = local < 1 && (ring < DEEP || d - RIM - DEEP * BENCH < 1);
+      // The pit is dug into the ground: each bench lower than the last, the
+      // wall between halfway, so the rim and every step throw their shadow
+      // down onto the bench below.
+      lift(p, x, y, wall ? (floorOf(ring - 1) + floorOf(ring)) / 2 : floorOf(ring));
       let c: number;
       if (wall) {
         const above = TERRACE[Math.max(0, ring - 1)];
@@ -2025,8 +2069,7 @@ function paintMine(p: Pix) {
         if (ring > 0 && along(ring - 1, a) > SPAN - 0.45) c = sunny ? ROAD[0] : ROAD[1];
       } else {
         c = TERRACE[ring];
-        if (!sunny && local < 2) c = shade(c, 0.7);
-        else if (hash(x, y, 83) % 9 === 0) c = shade(c, 0.86);
+        if (hash(x, y, 83) % 9 === 0) c = shade(c, 0.86);
         if (ring < DEEP && along(ring, a) < SPAN && local >= 1 && local < 3) c = local < 2 ? ROAD[0] : ROAD[1];
         // Ore showing in the deeper benches.
         if (ring >= 2 && hash(x, y, 85) % 23 === 0) c = [0xb06a34, 0xa6a6b0, 0xe9c46a][hash(x, y, 86) % 3];
@@ -2054,6 +2097,8 @@ function paintMine(p: Pix) {
     const flat = Math.abs(Math.cos(START + ring * SPAN + t)) < 0.6;
     const w = flat ? 1 : 2, h = flat ? 2 : 1; // cells left and up of (bx, by)
     rect(p, bx - w + 1, by - h + 1, bx + 1, by + 1, 0xe0a82a);
+    const floor = floorOf(ring) + 1.2;
+    for (let y = by - h + 1; y <= by + 1; y++) for (let x = bx - w + 1; x <= bx + 1; x++) lift(p, x, y, floor);
     p.set(bx - w + 1, by - h + 1, 0xf6d070);
     p.set(bx + 1, by + 1, 0x8a5a16);
     p.set(flat ? bx : bx + 1, flat ? by + 1 : by, 0x2a2a30);
@@ -2069,6 +2114,7 @@ function paintMine(p: Pix) {
     for (let dx = 0; dx < 4; dx++) {
       const rim = dx === 0 || dy === 0 || dx === 3 || dy === 3;
       p.set(kx + dx, ky + dy, rim ? ((dx + dy) % 2 ? 0x8e3a26 : 0xb04a30) : dx === 1 && dy === 1 ? C.ember : 0x1a0e0a);
+      lift(p, kx + dx, ky + dy, 8);
     }
   // Its door and the lamp beside it.
   rect(p, hx0 + 5, hy1, hx0 + 7, hy1, C.plank[0]);
@@ -2113,14 +2159,27 @@ function paintLibrary(p: Pix) {
   // fourth course, and from the transept's.
   for (let y = top + 2; y < front - 5; y += 4) {
     if (y >= tr.y0 - 1 && y <= tr.y1 + 1) continue;
-    for (const x of [aisle.x0 - 1, aisle.x0 - 2, aisle.x1 + 1, aisle.x1 + 2]) { p.set(x, y, x < mid ? C.pale[3] : C.pale[1]); p.set(x, y + 1, C.pale[0]); }
+    for (const x of [aisle.x0 - 1, aisle.x0 - 2, aisle.x1 + 1, aisle.x1 + 2]) {
+      p.set(x, y, x < mid ? C.pale[3] : C.pale[1]); p.set(x, y + 1, C.pale[0]);
+      lift(p, x, y, 4); lift(p, x, y + 1, 4);
+    }
   }
   for (const x of [tr.x0 + 3, tr.x0 + 7, tr.x1 - 7, tr.x1 - 3])
-    for (const y of [tr.y0 - 1, tr.y1 + 1]) { p.set(x, y, y < tr.y0 ? C.pale[3] : C.pale[1]); p.set(x + 1, y, C.pale[0]); }
+    for (const y of [tr.y0 - 1, tr.y1 + 1]) { p.set(x, y, y < tr.y0 ? C.pale[3] : C.pale[1]); p.set(x + 1, y, C.pale[0]); lift(p, x, y, 4); lift(p, x + 1, y, 4); }
   for (let y = y0; y <= y1; y++)
     for (let x = x0; x <= x1; x++) {
       const k = z(x, y);
       if (!k) continue;
+      // How high each part stands: the nave and transept roofs rising to
+      // their ridges over the lower aisles and chapels.
+      const tmid = Math.floor((tr.y0 + tr.y1) / 2);
+      const round = (c: { cx: number; cy: number; r: number }) => 1 - Math.min(1, Math.sqrt((x + 0.5 - c.cx) ** 2 + (y + 0.5 - c.cy) ** 2) / c.r);
+      lift(p, x, y,
+        k === 1 ? 8 + Math.min(2, (5.5 - Math.abs(x + 0.5 - (mid + 0.5))) * 0.4) :
+        k === 2 ? 5 + Math.min(1.5, (x < mid ? x - aisle.x0 : aisle.x1 - x) * 0.5) :
+        k === 3 ? 8 + Math.min(2, (5 - Math.abs(y + 0.5 - (tmid + 0.5))) * 0.4) :
+        k === 4 ? 8 + 2 * round(apse) :
+        k === 5 ? 5 + 1.5 * round(chapels.find((c) => inside(x, y, c))!) : 11);
       // Walls: where the footprint ends, pale ashlar lit to the upper left.
       if (!z(x - 1, y) || !z(x, y - 1)) { p.set(x, y, C.pale[3]); continue; }
       if (!z(x + 1, y) || !z(x, y + 1)) { p.set(x, y, C.pale[1]); continue; }
@@ -2153,7 +2212,7 @@ function paintLibrary(p: Pix) {
     }
   // The west towers' caps and pinnacles.
   for (const t of towers) {
-    leadCap(p, (t.x0 + t.x1 + 1) / 2, (t.y0 + t.y1 + 1) / 2, (t.x1 - t.x0 + 1) / 2);
+    leadCap(p, (t.x0 + t.x1 + 1) / 2, (t.y0 + t.y1 + 1) / 2, (t.x1 - t.x0 + 1) / 2, 11, 15);
     for (const [px, py] of [[t.x0, t.y0], [t.x1, t.y0], [t.x0, t.y1], [t.x1, t.y1]]) p.set(px, py, px === t.x0 ? C.pale[3] : C.pale[2]);
   }
   // The west front between the towers: the rose window over the door.
@@ -2166,7 +2225,7 @@ function paintLibrary(p: Pix) {
   for (const c of chapels) p.set(Math.floor(c.cx), Math.floor(c.cy - c.r + 0.5), GLASS[0]);
   // The spire over the crossing, a gilded cross at its tip.
   const scx = mid + 0.5, scy = tm + 0.5;
-  leadCap(p, scx, scy, 5.5);
+  leadCap(p, scx, scy, 5.5, 10.5, 17);
   p.set(mid, tm - 1, C.gold[2]); p.set(mid - 1, tm - 1, C.gold[1]);
   p.set(mid + 1, tm - 1, C.gold[1]); p.set(mid, tm - 2, C.gold[1]); p.set(mid, tm, C.gold[0]);
 }
