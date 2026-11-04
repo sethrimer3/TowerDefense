@@ -11,7 +11,7 @@ import { ART } from "./art-scale.ts";
 import { CELLS_H, CELLS_W, hash, hash01 } from "./grid.ts";
 import type { CityMap } from "./citygen.ts";
 import {
-  crystalCavesPlan, CRYSTAL_CAVES, dustAt, SHAFT_LENGTH, SHAFT_UP, sporeAt,
+  crystalCavesPlan, CRYSTAL_CAVES, dustAt, shaftLight, sporeAt, type ShaftLight,
   type CrystalCavesPlan, type CrystalCluster, type LightShaft, type MushroomCluster,
 } from "./crystal-caves.ts";
 import { artPen } from "./pixel-fx.ts";
@@ -123,17 +123,6 @@ export function cavePixels(plan: CrystalCavesPlan): Uint32Array {
   for (const p of plan.ponds) paintPond(img, p.x * ART, p.y * ART, p.r, p.seed, false);
   for (const c of plan.crystals) paintCrystals(img, c, false);
   for (const m of plan.mushrooms) paintMushrooms(img, m, false);
-  // Daylight through the ceiling's holes: each patch lights the floor under
-  // it, warm, brighter toward its middle, dithered at its edge.
-  for (const sh of plan.shafts) {
-    const R = sh.r * ART * 1.3;
-    for (let y = Math.max(0, Math.floor(sh.y * ART - R)); y < Math.min(H, Math.ceil(sh.y * ART + R)); y++)
-      for (let x = Math.max(0, Math.floor(sh.x * ART - R)); x < Math.min(W, Math.ceil(sh.x * ART + R)); x++) {
-        const i = y * W + x, s = sunAt(sh, x, y);
-        if (s <= 0 || !out[i]) continue;
-        out[i] = sunlit(out[i], s);
-      }
-  }
   return out;
 }
 
@@ -246,6 +235,12 @@ export function sunAt(s: LightShaft, x: number, y: number) {
   return d < 0.55 ? 1 : d < 0.8 ? 0.8 : d < 0.95 ? 0.6 : d < 1.08 ? (d2 ? 0.4 : 0) : d < 1.2 && (x + 2 * y) % 4 === 0 ? 0.25 : 0;
 }
 
+/** The whole floor as a shaft's daylight would light it: what each patch
+ * shows through its shape, wherever it has slid to (empty off the floor). */
+export function sunlitFloor(floor: Uint32Array): Uint32Array {
+  return floor.map((v) => (v ? sunlit(v, 1) : 0));
+}
+
 /** Pixel `v` (RGBA) lit warm by `s` of a shaft's daylight. */
 function sunlit(v: number, s: number) {
   const ch = (c: number, warm: number) => Math.min(255, Math.round(c * (1 + 1.5 * s) + warm * s));
@@ -308,7 +303,7 @@ function columnSprite() {
   return cv;
 }
 
-export type CaveGlowOptions = { now: number; alpha: number; still: boolean; night: number; effects: boolean };
+export type CaveGlowOptions = { now: number; alpha: number; still: boolean; night: number; effects: boolean; light?: ShaftLight };
 
 export class CrystalCavesArt {
   private map: CityMap | null = null;
@@ -318,24 +313,56 @@ export class CrystalCavesArt {
   private halos = new Map<string, HTMLCanvasElement>();
   private patches: { cv: HTMLCanvasElement; x0: number; y0: number }[] = [];
   private column: HTMLCanvasElement | null = null;
+  private lit: HTMLCanvasElement | null = null;
+  private sunPatches: { cv: HTMLCanvasElement; key: string }[] = [];
 
   /** Plans `map`'s caves (and repaints their floor) when the map changes. */
   sync(map: CityMap) {
     if (map === this.map) return;
     this.map = map;
     this.plan = crystalCavesPlan(map);
-    this.floor = this.glow = null;
+    this.floor = this.glow = this.lit = null;
     this.patches = [];
+    this.sunPatches = [];
   }
 
-  /** The cavern floor over the open ground. */
-  drawFloor(c: CanvasRenderingContext2D, px: number, alpha: number) {
+  private patchSprites() {
+    if (!this.patches.length && this.plan)
+      this.patches = this.plan.shafts.map((s) => { const p = patchPixels(s); return { cv: canvasOf(p.pixels, p.size, p.size), x0: p.x0, y0: p.y0 }; });
+    return this.patches;
+  }
+
+  /** The cavern floor over the open ground, and the patches of daylight lit
+   * into it where `light` has them now (slid away from under their holes as
+   * the sun crosses the sky; only floor shows them). */
+  drawFloor(c: CanvasRenderingContext2D, px: number, alpha: number, light: ShaftLight = shaftLight()) {
     if (!this.plan || alpha <= 0 || typeof document === "undefined") return;
-    this.floor ??= canvasOf(cavePixels(this.plan), W, H);
+    if (!this.floor) {
+      const floor = cavePixels(this.plan);
+      this.floor = canvasOf(floor, W, H);
+      this.lit = canvasOf(sunlitFloor(floor), W, H);
+    }
     c.save();
     c.imageSmoothingEnabled = false;
     c.globalAlpha *= alpha;
     c.drawImage(this.floor, 0, 0, CELLS_W * px, CELLS_H * px);
+    const ox = Math.round(light.shift.x * ART), oy = Math.round(light.shift.y * ART), key = `${ox}:${oy}`;
+    c.globalAlpha *= 0.3 + 0.7 * light.day;
+    for (const [i, patch] of this.patchSprites().entries()) {
+      const size = patch.cv.width, x0 = patch.x0 + ox, y0 = patch.y0 + oy;
+      let sp = this.sunPatches[i];
+      if (!sp) sp = this.sunPatches[i] = { cv: Object.assign(document.createElement("canvas"), { width: size, height: size }), key: "" };
+      if (sp.key !== key) {
+        // The patch's shape, filled with the lit floor under where it lies.
+        const sc = sp.cv.getContext("2d")!;
+        sc.globalCompositeOperation = "copy";
+        sc.drawImage(patch.cv, 0, 0);
+        sc.globalCompositeOperation = "source-in";
+        sc.drawImage(this.lit!, -x0, -y0);
+        sp.key = key;
+      }
+      c.drawImage(sp.cv, (x0 / ART) * px, (y0 / ART) * px, (size / ART) * px, (size / ART) * px);
+    }
     c.restore();
   }
 
@@ -353,7 +380,8 @@ export class CrystalCavesArt {
     if (!plan || o.alpha <= 0 || typeof document === "undefined") return;
     this.glow ??= canvasOf(glowPixels(plan), W, H);
     this.column ??= columnSprite();
-    if (!this.patches.length) this.patches = plan.shafts.map((s) => { const p = patchPixels(s); return { cv: canvasOf(p.pixels, p.size, p.size), x0: p.x0, y0: p.y0 }; });
+    const light = o.light ?? shaftLight(), ox = Math.round(light.shift.x * ART), oy = Math.round(light.shift.y * ART);
+    this.patchSprites();
     const t = o.still ? 0 : o.now / 1000, base = c.globalAlpha * o.alpha;
     const night = Math.max(0, Math.min(1, o.night));
     c.save();
@@ -376,16 +404,16 @@ export class CrystalCavesArt {
     // The daylight: a bright patch on the floor and a soft column of light
     // rising from it toward its hole, warm by day, pale and dim by night.
     const sway = (s: LightShaft) => (o.still ? 1 : 0.9 + 0.1 * Math.sin(t * 0.21 + hash01(s.seed, 883) * 6.28));
-    const theta = Math.atan2(-SHAFT_UP.x, SHAFT_UP.y);
+    const theta = Math.atan2(-light.up.x, light.up.y);
     for (const [i, s] of plan.shafts.entries()) {
-      const k = sway(s) * (1 - 0.72 * night);
+      const k = sway(s) * (1 - 0.72 * night), fx = s.x + ox / ART, fy = s.y + oy / ART;
       c.globalCompositeOperation = "screen";
       c.globalAlpha = Math.min(1, base * 0.46 * k);
       c.save();
-      c.translate(s.x * px, s.y * px);
+      c.translate(fx * px, fy * px);
       c.rotate(theta);
       const w = s.r * px * 1.9;
-      c.drawImage(this.column, -w, -s.r * px * 0.3, 2 * w, SHAFT_LENGTH * px);
+      c.drawImage(this.column, -w, -s.r * px * 0.3, 2 * w, light.length * px);
       c.restore();
       c.globalCompositeOperation = "lighter";
       // The patch itself is lit in the floor; over the darkness it shows a
@@ -393,9 +421,9 @@ export class CrystalCavesArt {
       const patch = this.patches[i], size = (patch.cv.width / ART) * px;
       c.imageSmoothingEnabled = false;
       c.globalAlpha = Math.min(1, base * (0.06 + 0.16 * night) * sway(s));
-      c.drawImage(patch.cv, (patch.x0 / ART) * px, (patch.y0 / ART) * px, size, size);
+      c.drawImage(patch.cv, ((patch.x0 + ox) / ART) * px, ((patch.y0 + oy) / ART) * px, size, size);
       c.imageSmoothingEnabled = true;
-      halo(s.x, s.y, s.r * 2.4, night > 0.5 ? "200,220,255" : "255,236,190", 0.45 * k, hash01(s.seed, 884));
+      halo(fx, fy, s.r * 2.4, night > 0.5 ? "200,220,255" : "255,236,190", 0.45 * k, hash01(s.seed, 884));
     }
     // Pixel details: pond glints, spores and dust, on the art grid.
     c.globalCompositeOperation = "lighter";
@@ -424,7 +452,7 @@ export class CrystalCavesArt {
         for (const s of plan.shafts) {
           const k = 1 - 0.72 * night;
           for (let j = 0; j < CRYSTAL_CAVES.dust; j++) {
-            const d = dustAt(s, j, t);
+            const d = dustAt(s, j, t, light);
             if (d.show <= 0.04) continue;
             c.globalAlpha = Math.min(1, base * d.show * 0.7 * k);
             c.fillStyle = night > 0.5 ? "#dfe8ff" : "#fff2d0";

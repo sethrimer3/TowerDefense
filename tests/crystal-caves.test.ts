@@ -5,8 +5,9 @@ import { rollWeather } from "../src/defend/weather.ts";
 import { generateCity, CellType } from "../src/defend/citygen.ts";
 import { defaultLayout, fitLayout } from "../src/defend/layout.ts";
 import { cellIndex } from "../src/defend/grid.ts";
-import { crystalCavesPlan, CRYSTAL_CAVES, dustAt, hasCrystalCaves, sporeAt } from "../src/defend/crystal-caves.ts";
-import { cavePixels, columnField, glowPixels, sunAt } from "../src/defend/crystal-caves-art.ts";
+import { CAVE_CEILING, crystalCavesPlan, CRYSTAL_CAVES, dustAt, hasCrystalCaves, SHAFT_UP, shaftLight, sporeAt } from "../src/defend/crystal-caves.ts";
+import { skyAtTime } from "../src/daylight.ts";
+import { cavePixels, columnField, glowPixels, sunAt, sunlitFloor } from "../src/defend/crystal-caves-art.ts";
 
 function city() {
   const fit = fitLayout(defaultLayout());
@@ -65,7 +66,34 @@ test("the floor covers every open cell and nothing else; sunlight brightens it; 
   const s = plan.shafts[0], mid = Math.floor(s.y * 8) * W + Math.floor(s.x * 8);
   assert.equal(sunAt(s, Math.floor(s.x * 8), Math.floor(s.y * 8)), 1);
   const lum = (v: number) => (v & 0xff) + ((v >> 8) & 0xff) + ((v >> 16) & 0xff);
-  assert.ok(lum(px[mid]) > 120, "the sun patch is bright");
+  const lit = sunlitFloor(px);
+  assert.ok(lum(lit[mid]) > 120 && lum(lit[mid]) > lum(px[mid]) * 2, "the sunlit floor is bright");
   const glowing = glow.reduce((n, v) => n + (v >>> 24 ? 1 : 0), 0);
   assert.ok(glowing > 500 && glowing < glow.length * 0.05, `${glowing} glowing pixels`);
+});
+
+test("the holes' light follows the sun across the day", () => {
+  const still = shaftLight();
+  assert.deepEqual(still.up, SHAFT_UP);
+  assert.deepEqual(still.shift, { x: 0, y: 0 });
+  const at = (p: number) => shaftLight(skyAtTime(p * 5 * 60 * 1000).sun);
+  const noon = at(0.05), afternoon = at(0.33), sunset = at(0.42);
+  // Low sun: a long, slanting beam and a patch slid far from under its hole.
+  assert.ok(sunset.length > noon.length + 8, `${noon.length} → ${sunset.length}`);
+  assert.ok(Math.hypot(sunset.shift.x, sunset.shift.y) > 4 * Math.hypot(noon.shift.x, noon.shift.y));
+  assert.ok(Math.abs(noon.up.x) < 0.2 && noon.up.y < -0.97, "noon falls straight");
+  assert.ok(sunset.up.x > 0.5, "the evening sun leans the beams one way");
+  assert.ok(afternoon.shift.x < 0 && sunset.shift.x < afternoon.shift.x, "the patch slides as the sun sinks");
+  // The beam points back up from the patch toward the hole.
+  const back = -(sunset.shift.x * sunset.up.x + sunset.shift.y * sunset.up.y) / CAVE_CEILING;
+  assert.ok(back > 0);
+  // Dust follows the moved beam.
+  const plan = crystalCavesPlan(city()), s = plan.shafts[0];
+  let near = 0;
+  for (let k = 0; k < CRYSTAL_CAVES.dust; k++) {
+    const d = dustAt(s, k, 10, sunset), fx = s.x + sunset.shift.x, fy = s.y + sunset.shift.y;
+    const along = (d.x - fx) * sunset.up.x + (d.y - fy) * sunset.up.y;
+    if (along >= -1 && along <= sunset.length) near++;
+  }
+  assert.equal(near, CRYSTAL_CAVES.dust);
 });
