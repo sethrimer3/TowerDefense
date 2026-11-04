@@ -241,12 +241,14 @@ function drawWatchRadii({ c, px }: Brush, sim: DefendSim) {
   }
 }
 
-/** Civilians, with a flicker of gold over those at work. */
+/** Civilians (the masons), drawn 2 × 2 art pixels (`MASON_PX`; their body in the
+ * battle stays `CIVILIAN.size`), with a flicker of gold over those at work. */
+const MASON_PX = 2;
 function drawCivilians(b: Brush, sim: DefendSim, torches: Burning | null, unit?: (id: number) => void) {
   const { c, px } = b;
   for (const u of sim.civilians) {
     unit?.(u.id);
-    const s = Math.max(2, CIVILIAN.size * px);
+    const s = Math.max(2, MASON_PX * px / ART);
     if (!(u.flash <= 0 && drawPixel(c, "civilian", u.x * px - s / 2, u.y * px - s / 2, s))) {
       c.fillStyle = u.flash > 0 ? "#fff" : CIVILIAN.color;
       drawSprite(c,basicUnitSprite("civilian",false,u.flash>0),u.x * px - s / 2,u.y * px - s / 2,s,s);
@@ -300,7 +302,7 @@ function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null, reduced
       const thrust = foe && d > 0 && d < 2.5 ? { x: (foe.x - u.x) / d, y: (foe.y - u.y) / d } : undefined;
       const jab = thrust && since >= 0 && since < 0.2 ? Math.sin((since / 0.2) * Math.PI) : 0;
       drawWatchman(c, Math.round(u.x * px), Math.round(u.y * px), px / ART, { flash: u.flash > 0, thrust, jab });
-      if (torches) drawHandTorch(b, { x: u.x - 2.5 / ART, y: u.y, id: u.id }, sim.time, torches(u.x, u.y, u.id));
+      if (torches) drawHandTorch(b, { x: u.x - 2 / ART, y: u.y, id: u.id }, sim.time, torches(u.x, u.y, u.id));
       continue;
     }
     if (u.kind === "mage") {

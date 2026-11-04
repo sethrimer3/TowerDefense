@@ -1,5 +1,5 @@
-// The keep's guards in a real Defend page, desktop and phone: 3 × 3 watchmen
-// with spears and 2 × 2 townsfolk walking the streets while building, the
+// The keep's guards in a real Defend page, desktop and phone: 2 × 2 watchmen
+// with spears and 1 × 1 townsfolk walking the streets while building, the
 // watch mustering where they walked when a battle starts and fighting what
 // gets in. Isolated browser contexts; never touches a player's save. Needs
 // `npm run dev`. Screenshots go to test-results/ (or SHOTS).
