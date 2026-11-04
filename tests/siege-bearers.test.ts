@@ -49,6 +49,6 @@ test('Hawk and every Wisp pool refuse primary aim, but a flying Wisp still pierc
  const t=new Towers(),e={id:sim.newId(),kind:'orc' as const,x:20,y:20,hp:1,maxHp:1,cd:0,flash:0,jx:0,jy:0,distract:-1,distractT:0,rollT:0,marked:false,untargetable:true as const};sim.enemies=[e];sim.reindexAfterDisplacement();t.step(sim,0);
  assert.equal(hawkTarget([e],20,20,10),undefined);assert.ok(sim.wisps.every(w=>!w.slice&&!w.ray));
  const normal={...e,id:sim.newId(),x:25,y:20,hp:1e6,maxHp:1e6};delete (normal as {untargetable?:true}).untargetable;sim.enemies=[normal];sim.reindexAfterDisplacement();t.step(sim,0);
- const w=sim.wispOwners.get(b.id)!.arrows[0];assert.ok(w.slice);const p=w.slice.points[Math.floor(w.slice.points.length/2)];e.x=p.x;e.y=p.y;sim.enemies.push(e);sim.reindexAfterDisplacement();t.step(sim,1);
+ const w=sim.wispOwners.get(b.id)!.fire!.arrows[0];assert.ok(w.slice);const p=w.slice.points[Math.floor(w.slice.points.length/2)];e.x=p.x;e.y=p.y;sim.enemies.push(e);sim.reindexAfterDisplacement();t.step(sim,1);
  assert.ok(e.hp<=0);assert.notEqual(w.lastTarget,e.id);
 });

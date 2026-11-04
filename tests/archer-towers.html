@@ -36,7 +36,7 @@ function draw({pixel=true,reduced=false}={}){
   for(let y=162;y<532;y+=32){c.beginPath();c.moveTo(10,y);c.lineTo(380,y);c.stroke();}
   c.save();c.beginPath();c.rect(10,162,370,370);c.clip();c.translate(0,162);
   paintStructureArt(c,kinds[i],{x:3*32,y:4*32,w:64,h:64,px:32},0,0,i===2?'wispArrow':i?'sharpshooters':'fireArrows');combat(s,reduced);c.restore();
-  c.fillStyle='#d7e9e9';c.font='12px monospace';c.fillText(['Burning arrows, final three-arrow volley','Current HP lock; damage and cadence ramp','3 blue + 2 fire + 1 purple lightning arrow'][i],13,557);c.restore();
+  c.fillStyle='#d7e9e9';c.font='12px monospace';c.fillText(['Burning arrows, final three-arrow volley','Current HP lock; damage and cadence ramp','Stored arrows + 2 fire + 1 purple lightning arrow'][i],13,557);c.restore();
  });
 }
 window.archerGallery={draw,scenes,canvas,c,advance(n=1){for(let i=0;i<n;i++){for(const s of scenes){s.t.step(s.sim,1/30);s.sim.time+=1/30;}draw();}}};draw();

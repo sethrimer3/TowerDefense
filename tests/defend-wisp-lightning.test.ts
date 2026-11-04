@@ -20,7 +20,7 @@ function scene(rank=3,only=true) {
  const b={...sim.keep,kind:"wispTower" as const,rect:{x:19,y:19,w:2,h:2},structureUid:42};sim.map.buildings[b.id]=b;
  sim.bonuses={...sim.bonuses,structurePaths:rank?{42:{wispTower:{path:"wispArrow",rank}}}:{}};
  const t=new Towers();t.step(sim,0);const owner=sim.wispOwners.get(b.id)!,pool=owner.lightning;
- if(only){owner.arrows=[];owner.capacity=0;delete owner.fire;sim.wisps=sim.wisps.filter(w=>w.lightning);}
+ if(only){owner.quiver.arrows=[];owner.quiver.capacity=0;delete owner.fire;sim.wisps=sim.wisps.filter(w=>w.lightning);}
  return{sim,b,t,owner,pool,w:pool?.arrows[0]};
 }
 function enemy(sim:DefendSim,x:number,y:number,kind:Enemy["kind"]="orc") {
@@ -49,12 +49,12 @@ test("Lightning arrow is the final rank III, with the normal price, saved tier a
  assert.equal(loaded.knowledge,20000);assert.equal(loaded.defend.kept[0].rank,2);
 });
 
-test("Rank III adds exactly one purple arrow to the three blue and two larger fire arrows",()=>{
+test("Rank III adds exactly one purple arrow to the stored and two larger fire arrows",()=>{
  for(const rank of[0,1,2])assert.equal(scene(rank,false).pool,undefined);
- const s=scene(3,false);assert.equal(s.owner.arrows.length,3);assert.equal(s.owner.fire!.arrows.length,2);
+ const s=scene(3,false);assert.equal(s.owner.quiver.arrows.length,0);assert.equal(s.owner.fire!.arrows.length,2);
  assert.equal(s.pool!.capacity,1);assert.equal(s.pool!.arrows.length,1);close(s.pool!.refill,0);
- assert.equal(new Set(s.sim.wisps.map(w=>`${w.x},${w.y}`)).size,6);
- close(wispArrowScale(s.owner.fire!.arrows[0])/wispArrowScale(s.owner.arrows[0]),1.25);
+ assert.equal(new Set(s.sim.wisps.map(w=>`${w.x},${w.y}`)).size,3);
+ close(wispArrowScale(s.owner.fire!.arrows[0]),1.25);
  assert.ok(wispArrowScale(s.w!)>wispArrowScale(s.owner.fire!.arrows[0]));
 });
 
@@ -150,7 +150,7 @@ test("Source destruction stops the arrow/refill while deposited lightning finish
  s.sim.built[s.b.id]=0;s.t.step(s.sim,.2);assert.equal(s.sim.wispOwners.size,0);assert.ok(e.hp<before);
  assert.equal(s.w!.ray,undefined);s.t.step(s.sim,6);assert.equal(s.sim.wispLightningTrails.length,0);assert.equal(s.sim.wisps.length,0);
  s.sim.built[s.b.id]=s.b.cells.length;clear(s);s.t.step(s.sim,0);
- const owner=s.sim.wispOwners.get(s.b.id)!;assert.equal(owner.lightning!.arrows.length,1);assert.equal(owner.fire!.arrows.length,2);assert.equal(owner.arrows.length,3);
+ const owner=s.sim.wispOwners.get(s.b.id)!;assert.equal(owner.lightning!.arrows.length,1);assert.equal(owner.fire!.arrows.length,2);assert.equal(owner.quiver.arrows.length,0);
 });
 
 test("Lightning rendering is deterministic, finite, restrained under Reduce Motion and leaves simulation untouched",()=>{

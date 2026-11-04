@@ -39,16 +39,16 @@ test("Ambush uses DefendSim and preserves specialized arrow payloads exactly", (
   assert.deepEqual(mode.engine.arrows, reference.arrows);
   assert.ok(mode.engine.arrows.every((a) => (a.burn ?? 0) > 0));
 });
-test("Native Wisp arrows, wizard flames and cannon shells run in the free-grid engine", () => {
+test("Native Wisp arrow storms, wizard flames and cannon shells run in the free-grid engine", () => {
   for (const kind of ["wispTower", "wizardTower", "cannonTower"] as const) {
     const { mode, home } = nativeTower(kind);
     mode.engine.scenario = { ...mode.engine.scenario, passiveEnemies: true };
     const p = center(home.rect);
     mode.engine.spawnAuxiliary("ogre", p.x + (kind === "wizardTower" ? 3 : 5), p.y);
     let seen = false;
-    for (let n = 0; n < 30; n++) {
+    for (let n = 0; n < 45; n++) {
       mode.engine.step(1 / 30);
-      seen ||= kind === "wispTower" ? mode.engine.wisps.length > 0 : kind === "wizardTower" ? mode.engine.flames.length > 0 : mode.engine.shells.length > 0;
+      seen ||= kind === "wispTower" ? mode.engine.arrows.some((a) => a.release) : kind === "wizardTower" ? mode.engine.flames.length > 0 : mode.engine.shells.length > 0;
     }
     assert.ok(seen, kind);
   }

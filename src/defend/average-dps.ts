@@ -20,7 +20,7 @@ import {
 import {
   BAYONET, BELT_FEED, BERSERK, BLADE_DANCE, BOW_JAVELIN, CLUSTER, CONDUCTION, CRUSADE, CRYOMANCY, DEADEYE, DUELISTS, FIRE_ARROWS, GRENADIERS, GUNNERY,
   HALBERD, HEADHUNT, HEAVY_LANCE, LONG_SPEARS, MARKSMEN, OIL, OVERDRIVE, PIERCING, PYRO, PYROCLASM, QUICKDRAW, RICOCHET, RIME, SALVO, SET_SPEARS,
-  SHARP_MUSKETS, SIEGE_SHOT, SKIRMISH, SKYRANGER, SPEAR_WALL, STOPPING, STORM, SUPPRESS, THROWING, TRIPOD, VOLLEY, WHIRLWIND, WISP, WISP_FIRE,
+  SHARP_MUSKETS, SIEGE_SHOT, SKIRMISH, SKYRANGER, SPEAR_WALL, STOPPING, STORM, SUPPRESS, THROWING, TRIPOD, VOLLEY, WHIRLWIND, WISP_FIRE, WISP_STORM,
   WISP_LIGHTNING, type PathId,
 } from "../knowledge-paths.ts";
 import { hawkDamage, hawkReload } from "./hawk-focus.ts";
@@ -131,13 +131,12 @@ export function averageDps(kind: EstimateKind, input: AverageInput): number {
       return total / t;
     }
     case "wispTower": {
-      // A wisp sweeps the crowd, striking each enemy it passes, until its
-      // contacts run out; new ones come every `refill` seconds.
+      // Stored arrows come at the quiver's pace and all fly once an enemy
+      // is in range, so in a fight it looses one each time one is stored.
       const wisp = rank("wispArrow"),
         hit = archerDamage(L("archerDamage")) * b.towerDamage,
-        arrows = WISP.capacity[Math.min(1, wisp)],
-        pass = alongLine(archerRange(L("archerRange")), WISP.width) / (archerCooldown(L("archerRate")) * b.towerReload);
-      let dps = hit * Math.min(WISP.hits / WISP.refill, arrows * pass);
+        every = WISP_STORM.every[Math.min(1, wisp)] * archerCooldown(L("archerRate")) / archerCooldown(0) * b.towerReload;
+      let dps = hit / every;
       if (wisp >= 2) dps += hit * WISP_FIRE.scale * ((WISP_FIRE.capacity * WISP_FIRE.hits) / WISP_FIRE.refill + WISP_FIRE.trailDps * inArea(WISP_FIRE.width));
       if (wisp >= 3) dps += hit * WISP_LIGHTNING.scale * WISP_LIGHTNING.trailDps * alongLine(archerRange(L("archerRange")), WISP_LIGHTNING.width) * (Math.min(DWELL, WISP_LIGHTNING.trailLife) / WISP_LIGHTNING.refill);
       return dps;
