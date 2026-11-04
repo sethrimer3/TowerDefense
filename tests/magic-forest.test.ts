@@ -9,7 +9,7 @@ import { cellIndex } from "../src/defend/grid.ts";
 import { fireflyAt, hasMagicForest, magicForestPlan, MAGIC_FOREST } from "../src/defend/magic-forest.ts";
 import { cloverPixels, wispyTreePixels } from "../src/defend/magic-forest-art.ts";
 
-test("Drowned Temple is the third zone and the Magic Forest a testing zone after the ten", () => {
+test("the Crystal Caves (once the Drowned Temple) are the third zone and the Magic Forest a testing zone after the ten", () => {
   assert.equal(AREAS[2].id, "drowned");
   assert.equal(areaForWave(41).id, "drowned");
   assert.equal(areaForWave(61).id, "ember");
@@ -19,7 +19,7 @@ test("Drowned Temple is the third zone and the Magic Forest a testing zone after
   assert.equal(AMBUSH_LEVELS.length, 30);
   assert.ok(!AMBUSH_LEVELS.some((l) => l.area === "magic"));
   assert.equal(AMBUSH_LEVELS[6].area, "drowned");
-  assert.equal(AMBUSH_LEVELS[6].name, "Tidal Road");
+  assert.equal(AMBUSH_LEVELS[6].name, "Gravel Road");
 });
 
 function city() {

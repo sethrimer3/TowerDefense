@@ -10,7 +10,7 @@ export type AmbushProgress = { stars: Partial<Record<string, Stars>>; autoSend?:
 const names = [
   ["Old Road", "Mossy Ford", "Ruin Gate"],
   ["Sandway", "Sunken Well", "Amber Pass"],
-  ["Tidal Road", "Coral Crossing", "Temple Gate"],
+  ["Gravel Road", "Crystal Crossing", "Cavern Gate"],
   ["Cinder Road", "Slag Crossing", "Forge Gate"],
   ["Spore Trail", "Mushroom Grove", "Hollow Gate"],
   ["Ice Road", "Frost Crossing", "Vault Gate"],

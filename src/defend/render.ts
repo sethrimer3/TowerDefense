@@ -80,6 +80,8 @@ import { ForestGrass } from "./forest-grass.ts";
 import { hasForest } from "./forest.ts";
 import { MagicForestArt } from "./magic-forest-art.ts";
 import { hasMagicForest } from "./magic-forest.ts";
+import { CrystalCavesArt } from "./crystal-caves-art.ts";
+import { hasCrystalCaves } from "./crystal-caves.ts";
 
 export type DrawOptions = {
   /** How many watchmen walk the city (the keep's City watch, in Defend);
@@ -188,6 +190,7 @@ export class DefendRenderer {
   readonly forest = new ForestArt();
   readonly forestGrass = new ForestGrass();
   readonly magic = new MagicForestArt();
+  readonly caves = new CrystalCavesArt();
   /** The battle time the wizard art last advanced to. */
   private wizardTime = 0;
   private rain = new Rain();
@@ -442,6 +445,7 @@ export class DefendRenderer {
     this.drawTrees(map, sim, opts, dt);
     this.drawForest(sim, opts, dt);
     this.drawMagicForest(sim, opts);
+    this.drawCaveGlow(opts);
     this.ghosts.watch(sim, opts.now / 1000);
     this.ghosts.draw(this.ctx, this.px, opts.now / 1000, opts.reduceMotion);
     if (opts.effects ?? true) this.drawSmoke(map, sim, opts);
@@ -533,6 +537,12 @@ export class DefendRenderer {
       this.magic.sync(map);
       this.magic.drawFloor(ctx, this.px, magic);
     }
+    // The Crystal Caves' gravel, rocks, ponds, crystals and mushrooms.
+    const caves = this.cavesShare();
+    if (caves > 0) {
+      this.caves.sync(map);
+      this.caves.drawFloor(ctx, this.px, caves);
+    }
     this.river.sync(map);
     this.river.draw({
       c: ctx, px: this.px, now: opts.now, dt, rain: !!(sim && opts.weather?.rain), cold: sim?.cold ?? !!opts.weather?.snow, thawed: sim?.thawedPonds,
@@ -542,7 +552,7 @@ export class DefendRenderer {
     // tint, so night darkens them and the day's light turns over them.
     const desert = sim?.atmosphere?.mode === "sand";
     if (sim && desert) this.atmosphere.drawGround(ctx, this.px, sim, opts.reduceMotion, opts.effects ?? true, this.worldLighting ? opts.sun : undefined, !!opts.hdSand);
-    if (this.forestShare() > 0 || magic > 0 || desert) {
+    if (this.forestShare() > 0 || magic > 0 || caves > 0 || desert) {
       this.drawFaces();
       paintSpikePoints(ctx, this.px, map, sim);
     }
@@ -752,6 +762,19 @@ export class DefendRenderer {
     return now + (this.previousArea && hasMagicForest(this.previousArea) ? 1 - this.areaMix : 0);
   }
 
+  /** How much of the Crystal Caves shows, fading like the forest's. */
+  private cavesShare() {
+    const now = hasCrystalCaves(this.area) ? this.areaMix : 0;
+    return now + (this.previousArea && hasCrystalCaves(this.previousArea) ? 1 - this.areaMix : 0);
+  }
+
+  /** What glows in the Crystal Caves, over the battle's darkness. */
+  private drawCaveGlow(opts: DrawOptions) {
+    const alpha = this.cavesShare();
+    if (alpha <= 0) return;
+    this.caves.drawGlow(this.ctx, this.px, { now: opts.now, alpha, still: opts.reduceMotion, night: opts.night, effects: opts.effects ?? true });
+  }
+
   /** The Magic Forest's wispy trees over everyone, darkened like the forest's,
    * and its lightning bugs glowing over them. */
   private drawMagicForest(sim: DefendSim | null, opts: DrawOptions) {
@@ -824,7 +847,7 @@ export class DefendRenderer {
     const out = this.lighting.lights.filter((l) => this.lighting.burn(l) <= 0).length;
     // The forest's grass and the desert's dunes hide the flagstones (their
     // light, drawn over the dunes, read as squares at night).
-    const bare = sim.atmosphere?.mode === "sand" ? 0 : 1 - Math.min(1, this.forestShare() + this.magicShare());
+    const bare = sim.atmosphere?.mode === "sand" ? 0 : 1 - Math.min(1, this.forestShare() + this.magicShare() + this.cavesShare());
     if (bare > 0) this.relief.draw(this.ctx, this.px, { version: `${sim.mapVersion}:${out}`, lights: fixed }, moving, (0.6 + opts.night * 0.4) * bare);
   }
 

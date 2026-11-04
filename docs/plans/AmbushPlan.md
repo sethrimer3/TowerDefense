@@ -29,7 +29,7 @@ Almost all of this is replaced. Keep the good parts: Ambush runs the real `Defen
 
 ### Level select
 
-- When no level is running, the Ambush page shows a **level select** instead of the board: three columns, one row per zone. Each zone (`AREAS` in `src/defend/areas.ts`: Mossbound Ruins, Amber Desert, Drowned Temple, Ember Forge, Fungal Hollow, Frozen Vault, Violet Geode, Obsidian Crypt, Astral Sanctuary, Nadir) has **three levels**, so 30 levels in all. Columns are Level I, II, III; rows are zones, tinted with `areaStyle`.
+- When no level is running, the Ambush page shows a **level select** instead of the board: three columns, one row per zone. Each zone (`AREAS` in `src/defend/areas.ts`: Mossbound Ruins, Amber Desert, Crystal Caves, Ember Forge, Fungal Hollow, Frozen Vault, Violet Geode, Obsidian Crypt, Astral Sanctuary, Nadir) has **three levels**, so 30 levels in all. Columns are Level I, II, III; rows are zones, tinted with `areaStyle`.
 - Each card shows a **small preview** of the level (the generated map, road, outposts and keep), its name, and its best star rating (0 to 3 stars). Locked levels are dimmed.
 - Unlocking (default): clearing a level with any stars unlocks the next level in its zone; clearing Level III of a zone unlocks Level I of the next zone. Mossbound Ruins I is open from the start.
 
