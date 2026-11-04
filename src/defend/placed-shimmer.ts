@@ -12,6 +12,7 @@ import { CELLS_W, cellIndex } from "./grid.ts";
 import { ART } from "./park-art.ts";
 import { artPen } from "./pixel-fx.ts";
 import { pixelKey } from "./pixel-sprites.ts";
+import { ITEM_CATEGORY, type PaletteItem } from "./catalog.ts";
 
 type Rect = { x: number; y: number; w: number; h: number };
 /** A placed piece's cells, the building whose sprite it traces (none for a
@@ -280,4 +281,46 @@ function drawTrace(c: CanvasRenderingContext2D, pen: ReturnType<typeof artPen>, 
   c.fillStyle = BRIGHT;
   for (let i = end - head; i < end; i++) pen(X + ring.xs[i], Y + ring.ys[i]);
   c.globalAlpha = 1;
+}
+
+/** The Always highlight selectable buildings setting: the outline's opacity
+ * (0–1) and whether placed walls and Realm pieces (the keep, gates, wall
+ * ballistas, and the Realm palette's buildings) are included. */
+export type Highlight = { alpha: number; walls: boolean; realm: boolean };
+
+/** A highlighted piece: its shimmer target, the building it is (none for a
+ * group of wall sections), and whether it counts as a wall or Realm piece. */
+type HighlightTarget = { t: ShimmerTarget; b?: Building; group: "wall" | "realm" | "other" };
+
+const highlightCache = new WeakMap<CityMap, HighlightTarget[]>();
+/** Every building on `map` that can be selected: what the shimmer traces
+ * plus the keep. */
+export function highlightTargets(map: CityMap): HighlightTarget[] {
+  let out = highlightCache.get(map);
+  if (out) return out;
+  out = [];
+  for (const b of map.buildings) {
+    if (b.kind === "keep") out.push({ t: { rect: b.rect, phase: 0, b }, b, group: "realm" });
+    else if (b.structureUid !== undefined) out.push({ t: { rect: b.rect, phase: 0, b }, b, group: ITEM_CATEGORY[b.kind as PaletteItem] === "city" ? "realm" : "other" });
+    else if (placed(b)) out.push({ t: { rect: b.rect, phase: 0 }, b, group: "realm" });
+  }
+  for (const t of shimmerTargets(map)) if (t.cells) out.push({ t, group: "wall" });
+  highlightCache.set(map, out);
+  return out;
+}
+
+/** Draws the steady outline round every selectable building, no animation:
+ * `standing` (in battle) leaves out fallen ones; other arguments as
+ * `drawShimmer`'s. */
+export function drawHighlights(c: CanvasRenderingContext2D, px: number, map: CityMap, h: Highlight, paint: PaintAlone, looks?: Readonly<Record<number, string>>, standing?: (b: Building) => boolean) {
+  if (!(h.alpha > 0)) return;
+  c.save();
+  const pen = artPen(c, px);
+  for (const { t, b, group } of highlightTargets(map)) {
+    if ((group === "wall" && !h.walls) || (group === "realm" && !h.realm)) continue;
+    if (b && standing && !standing(b)) continue;
+    const ring = t.b ? spriteRing(t.b, looks?.[t.b.structureUid!], paint) : t.cells ? groupRing(t) : boxRing(t.rect);
+    drawTrace(c, pen, t.rect, ring, 1, h.alpha);
+  }
+  c.restore();
 }

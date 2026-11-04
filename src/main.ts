@@ -169,6 +169,7 @@ const defendPage = new DefendPage(el("defend"), {
   tripleTapFlag: () => save.settings.tripleTapFlag,
   gridLines: () => (save.settings.tileGrid ? save.settings.gridOpacity / 100 : 0),
   gridColor: () => save.settings.gridColor,
+  highlight: () => save.settings.highlightBuildings ? { alpha: save.settings.highlightOpacity / 100, walls: save.settings.highlightWalls, realm: save.settings.highlightRealm } : null,
   effects: () => !save.settings.effectsOff,
   devMode: () => save.settings.developerMode,
   allJournal: () => save.settings.developerMode && save.settings.devJournal,

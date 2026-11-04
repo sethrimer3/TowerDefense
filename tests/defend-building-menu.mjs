@@ -99,15 +99,31 @@ try {
   await page.locator('[data-bm-mode="weakest"]').click();
   await page.keyboard.press('Escape');
   const start=await point('archerTower'),end={x:start.x+40,y:start.y-35};
-  await drag(start,end,true);
+  // An unselected building pans rather than aims; once tapped, it aims.
+  await page.evaluate(()=>window.__dp.sim.crosshairs.clear());
+  await drag(start,end);
+  assert.equal(await page.evaluate(()=>window.__dp.sim.crosshairs.size),0);
+  const moved=await point('archerTower');await open('archerTower');
+  await drag(moved,{x:moved.x+40,y:moved.y-35},true);
   assert.ok(await page.evaluate(()=>window.__dp.sim.crosshairs.size));
   await page.screenshot({path:`test-results/defend-building-menu-${width}-battle.png`});
   // Setting off makes a drag pan instead of setting crosshairs.
   await page.keyboard.press('Escape');await page.locator('nav [data-tab="settings"]').click();
   await page.locator('#drag-crosshair').uncheck();assert.ok(await page.locator('[data-section="controls"] #raise-drag').count());
   await page.locator('nav [data-tab="defend"]').click();await page.evaluate(()=>window.__dp.sim.crosshairs.clear());
-  const off=await point('archerTower');await drag(off,{x:off.x+20,y:off.y-20});
+  const off=await point('archerTower');await open('archerTower');await drag(off,{x:off.x+20,y:off.y-20});
   assert.equal(await page.evaluate(()=>window.__dp.sim.crosshairs.size),0);
+  // Always highlight selectable buildings: a steady outline, sub-options shown only while on.
+  await page.keyboard.press('Escape');await page.locator('nav [data-tab="settings"]').click();
+  assert.ok(await page.locator('#highlight-opacity-row').isHidden());
+  await page.locator('#highlight-buildings').check();
+  assert.ok(await page.locator('#highlight-opacity-row').isVisible());assert.ok(await page.locator('#highlight-walls').isVisible());
+  await page.locator('#highlight-opacity').fill('100');await page.locator('#highlight-opacity').dispatchEvent('input');
+  await page.locator('#highlight-realm').uncheck();
+  const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('towerdefense.v1')).settings);
+  assert.equal(saved.highlightOpacity,100);assert.equal(saved.highlightRealm,false);assert.equal(saved.highlightBuildings,true);
+  await page.locator('nav [data-tab="defend"]').click();await page.waitForTimeout(300);
+  await page.screenshot({path:`test-results/defend-building-menu-${width}-highlight.png`});
   assert.deepEqual(errors,[]);await context.close();
  }
  for(const [width,height] of [[1280,800],[390,844]]) {

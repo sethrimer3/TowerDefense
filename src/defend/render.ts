@@ -49,7 +49,7 @@ import { garrisoned } from "./garrison-icons.ts";
 import { carriedLights, drawDamage, drawScorches, drawUnits, shadowCasters, type Brush, type Burning } from "./battle-art.ts";
 import { drawGrid, drawLifting, drawOverlay, type Overlay } from "./edit-overlay.ts";
 import { drawBuildingOrders, drawInspect, type Armed } from "./inspect.ts";
-import { drawShimmer, drawShimmerFlash, flashAlpha, closeFade } from "./placed-shimmer.ts";
+import { drawShimmer, drawShimmerFlash, drawHighlights, flashAlpha, closeFade, type Highlight } from "./placed-shimmer.ts";
 import { ART } from "./park-art.ts";
 import { drawFlag, drawWarBanner } from "./structure-art.ts";
 import { RallyFlagArt } from "./rally-flag-art.ts";
@@ -143,6 +143,9 @@ export type DrawOptions = {
   /** Now and then trace a gold line round each piece the player placed
    * (`placed-shimmer.ts`): on while building. */
   shimmer?: boolean;
+  /** The Always highlight selectable buildings setting: a steady outline
+   * round every selectable building in place of the shimmer. */
+  highlight?: Highlight | null;
 };
 
 /** The torches going out after a lost run: seconds before the first, then
@@ -467,7 +470,10 @@ export class DefendRenderer {
       if(this.shimmerOpen)this.shimmerOpened=opts.now;
       else this.shimmerClosed=opts.now;
     }
-    if(!opts.reduceMotion) {
+    if(opts.highlight) {
+      const paint=(c:CanvasRenderingContext2D,b:Building)=>paintStanding(c,ART,map,b,this.area,opts.looks);
+      drawHighlights(this.ctx,this.px,map,opts.highlight,paint,opts.looks,sim?(b)=>sim.intact(b):undefined);
+    } else if(!opts.reduceMotion) {
       const fade=this.shimmerOpen?1:closeFade((opts.now-this.shimmerClosed)/1000);
       if(fade>0) {
         const clock=this.shimmerOpen?opts.now:this.shimmerClosed;
