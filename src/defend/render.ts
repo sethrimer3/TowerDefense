@@ -1,6 +1,7 @@
 import { enemyFlying } from "./catalog.ts";
 import { CityLife } from "./city-life.ts";
 import { drawCityLife } from "./city-life-art.ts";
+import { drawMineFolk } from "./mine-folk.ts";
 import { torchLevel } from "./city-torches.ts";
 import { worldSky } from "../daylight.ts";
 import { SunShadows } from "./sun-shadows.ts";
@@ -425,6 +426,7 @@ export class DefendRenderer {
     if (sim) this.drawBattleUnits(sim, opts.weather && !(opts.sun && opts.night === 0) ? this.burning ?? (() => 1) : null, opts);
     if (this.lit) this.lighting.drawUnitShadows(this.ctx, this.px, this.cityLife.visible, .65);
     drawCityLife(this.ctx, this.px, this.cityLife, sky?.time ?? 0, opts.now, opts.reduceMotion);
+    drawMineFolk(this.ctx, this.px, map.buildings, (b) => !sim || sim.intact(b), opts.now, opts.reduceMotion);
     opts.scenery?.(this.ctx, this.px);
     this.drawTrees(map, sim, opts, dt);
     this.drawForest(sim, opts, dt);

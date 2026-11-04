@@ -1959,29 +1959,18 @@ const LEAD = [0x343c4c, 0x4a5466, 0x606c82, 0x7c889e];
 /** Stained glass. */
 const GLASS = [0x5b8fd9, 0xd8553f, 0xe9c46a, 0xa06ac8];
 
-/** A walled building under a gabled roof: a one-pixel wall lit to the upper
- * left, a dark eave line, then the roof. */
-function roofed(p: Pix, x0: number, y0: number, x1: number, y1: number, wall: readonly number[], roof: number) {
+/** A small yard building: a one-pixel wall lit to the upper left round a
+ * gabled roof, with no inner outline, so it reads at a few pixels across;
+ * eaves `eaves` high, the ridge two and a half higher. */
+function shed(p: Pix, x0: number, y0: number, x1: number, y1: number, wall: readonly number[], roof: number, eaves: number) {
   const along = x1 - x0 >= y1 - y0;
   for (let y = y0; y <= y1; y++)
     for (let x = x0; x <= x1; x++) {
-      p.set(x, y, x === x0 || y === y0 ? wall[2] : x === x1 || y === y1 ? wall[0] : wall[1]);
-      // Its eaves low, the roof rising to the ridge as a house's does.
+      p.set(x, y, x === x0 || y === y0 ? wall[3] : x === x1 || y === y1 ? wall[0] : wall[1]);
       const inward = along ? Math.min(y - y0, y1 - y) : Math.min(x - x0, x1 - x);
-      lift(p, x, y, 3 + Math.min(2.5, inward * 0.6));
+      lift(p, x, y, eaves + Math.min(2.5, inward * 0.8));
     }
-  rect(p, x0 + 1, y0 + 1, x1 - 1, y1 - 1, OUTLINE);
-  return gable(p, x0 + 2, y0 + 2, x1 - 2, y1 - 2, roof);
-}
-
-/** A heap of ore seen from above: a mound shaded as a ball, flecked with
- * the metal's glint. */
-function oreHeap(p: Pix, cx: number, cy: number, r: number, tones: readonly number[], glint: number) {
-  disc(p, cx, cy, r, (x, y, d, dx, dy) => {
-    if (hash(x, y, 71) % 7 === 0 && d < r - 1) return glint;
-    lift(p, x, y, 1.6 * Math.sqrt(Math.max(0, 1 - (d / r) ** 2)) + 0.4);
-    return tones[Math.min(tones.length - 1, lit(x, y, dx, dy, d) + (d < r * 0.4 ? 1 : 0))];
-  });
+  return gable(p, x0 + 1, y0 + 1, x1 - 1, y1 - 1, roof);
 }
 
 /** A four-sided pyramid roof (a tower's cap or a spire) of half width `r`
@@ -2000,16 +1989,16 @@ function leadCap(p: Pix, cx: number, cy: number, r: number, base = 0, tip = 0) {
     }
 }
 
-/** The Mine: one timber hall beside an open pit. The hall's shingled roof
- * and its forge chimney stand along the north with ore heaped in the yard
- * beside it; below, the pit drops in steep benches, each step's wall lit or
+/** The Mine: a yard of separate buildings beside an open pit. The
+ * barracks, warehouse, forge, smithy and workshop stand along the north;
+ * below, the pit drops in steep benches, each step's wall lit or
  * shadowed by its facing and each floor darker the deeper it lies, to a
  * pool at the bottom, and a haul road spirals down it, ramping from bench to
  * bench, with ore trucks on the way. */
 function paintMine(p: Pix) {
   const { x0, y0, x1, y1 } = frame(p.w, p.h);
   // The yard: trodden earth under the hall and round the heaps.
-  const yard = { x0, y0: y0 + 1, x1, y1: y0 + 13 };
+  const yard = { x0, y0, x1, y1: y0 + 13 };
   for (let y = yard.y0; y <= yard.y1; y++)
     for (let x = yard.x0; x <= yard.x1; x++) {
       if ((x === yard.x0 || x === yard.x1) && (y === yard.y0 || y === yard.y1)) continue;
@@ -2105,25 +2094,58 @@ function paintMine(p: Pix) {
   };
   truck(0, SPAN * 0.45);
   truck(2, SPAN * 0.3);
-  // The hall: a long timber building under brown shingles, its forge
-  // chimney of brick through the roof.
-  const hx0 = x0 + 1, hy0 = y0, hx1 = x0 + 25, hy1 = y0 + 10;
-  roofed(p, hx0, hy0, hx1, hy1, C.plank, C.plank[2]);
-  const kx = hx1 - 6, ky = hy0 + 2;
-  for (let dy = 0; dy < 4; dy++)
-    for (let dx = 0; dx < 4; dx++) {
-      const rim = dx === 0 || dy === 0 || dx === 3 || dy === 3;
-      p.set(kx + dx, ky + dy, rim ? ((dx + dy) % 2 ? 0x8e3a26 : 0xb04a30) : dx === 1 && dy === 1 ? C.ember : 0x1a0e0a);
-      lift(p, kx + dx, ky + dy, 8);
+  // The mine's buildings, each standing apart on the yard so each throws
+  // its own shadow: the barracks, the warehouse, the forge with its brick
+  // chimney, the smithy with its anvil out front, and the workshop.
+  for (const b of MINE_BUILDINGS) {
+    const bx0 = x0 + b.x0, by0 = y0 + b.y0, bx1 = x0 + b.x1, by1 = y0 + b.y1;
+    shed(p, bx0, by0, bx1, by1, b.stone ? C.stone : C.plank, b.roof, b.eaves);
+    const dx = x0 + b.door;
+    p.set(dx, by1, C.plank[0]);
+    lift(p, dx, by1, 2.5);
+    if (b.id === "forge") {
+      // The chimney: brick round a glowing flue, standing well above the roof.
+      const kx = bx1 - 4, ky = by0 + 1;
+      for (let yy = 0; yy < 3; yy++)
+        for (let xx = 0; xx < 3; xx++) {
+          const rim = xx !== 1 || yy !== 1;
+          p.set(kx + xx, ky + yy, rim ? ((xx + yy) % 2 ? 0x8e3a26 : 0xb04a30) : C.ember);
+          lift(p, kx + xx, ky + yy, 8);
+        }
+      p.set(dx + 1, by1 + 1, C.fire[1]);
     }
-  // Its door and the lamp beside it.
-  rect(p, hx0 + 5, hy1, hx0 + 7, hy1, C.plank[0]);
-  p.set(hx0 + 9, hy1 + 1, C.fire[2]);
-  // Ore heaped in the yard: copper, silver and gold.
-  oreHeap(p, x1 - 15, y0 + 5, 3.4, [0x6a3a1c, 0x8e5228, 0xb06a34, 0xd08a4a], 0xf0b070);
-  oreHeap(p, x1 - 8, y0 + 4, 3, [0x5a5a62, 0x7e7e88, 0xa6a6b0, 0xcacad2], 0xffffff);
-  oreHeap(p, x1 - 4, y0 + 9, 2.6, [0x6a5420, 0x9a7a2a, 0xc8a03a, 0xe9c46a], 0xfff4c8);
+    if (b.id === "smithy") {
+      // The anvil in the yard, on its block.
+      p.set(dx + 2, by1 + 2, C.iron[3]);
+      p.set(dx + 3, by1 + 2, C.iron[2]);
+      p.set(dx + 3, by1 + 3, C.plank[0]);
+      lift(p, dx + 2, by1 + 2, 1); lift(p, dx + 3, by1 + 2, 1); lift(p, dx + 3, by1 + 3, 0.8);
+    }
+    if (b.id === "workshop") {
+      // Timber stacked against its west wall.
+      for (let yy = by0 + 2; yy <= by1 - 1; yy++) { p.set(bx0 - 1, yy, yy % 2 ? C.plank[3] : C.plank[1]); lift(p, bx0 - 1, yy, 1.2); }
+    }
+    if (b.id === "warehouse") {
+      // Crates by its door.
+      p.set(dx + 2, by1 + 1, C.crate[3]); p.set(dx + 3, by1 + 1, C.crate[2]);
+      lift(p, dx + 2, by1 + 1, 1.2); lift(p, dx + 3, by1 + 1, 1.2);
+    }
+  }
 }
+
+/** Where the Mine's buildings stand, in art pixels in from its sprite's
+ * frame (`frame`'s x0, y0), with each one's door on its south wall: the mine
+ * folk walk between those doors (`mine-folk.ts`). The yard lane runs below
+ * them, rows `MINE_LANE` in, to the road down into the pit at `MINE_PIT`. */
+export const MINE_BUILDINGS = [
+  { id: "barracks", x0: 0, y0: 0, x1: 7, y1: 6, door: 3, stone: false, roof: 0x7a4a2a, eaves: 2.5 },
+  { id: "warehouse", x0: 10, y0: 0, x1: 17, y1: 8, door: 13, stone: true, roof: 0x5a6470, eaves: 4 },
+  { id: "forge", x0: 20, y0: 1, x1: 26, y1: 8, door: 22, stone: true, roof: 0x4a3a34, eaves: 3.5 },
+  { id: "smithy", x0: 29, y0: 0, x1: 35, y1: 6, door: 31, stone: false, roof: 0x8e3a26, eaves: 3 },
+  { id: "workshop", x0: 38, y0: 2, x1: 44, y1: 8, door: 41, stone: false, roof: 0x9a7a48, eaves: 2.5 },
+] as const;
+export const MINE_LANE = 10;
+export const MINE_PIT = { x: 28, y: 12 } as const;
 
 /** The Library: a great cathedral of pale ashlar, a little larger than the
  * keep, standing alone. Its lead roofs make a cross: the nave between lower
