@@ -62,7 +62,7 @@ try {
       before,
       "A touch tap inspects without moving the building.",
     );
-    await page.locator('#ambush [data-action="sell"]').click();
+    await page.locator('#ambush [data-bm="remove"]').click();
     assert.equal(await page.evaluate(() => window.nativeModes.ambush.sim.buildings.length), 0);
 
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(r)))));

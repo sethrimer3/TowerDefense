@@ -47,7 +47,7 @@ export class DarkKeeps {
       const key = b.id * 4 + k;
       const cd = (this.cooldown.get(key) ?? 0) - dt;
       if (cd > 0) return this.cooldown.set(key, cd);
-      const target = nearest(sim.enemiesNear(spot.x, spot.y, TURRET.range), spot);
+      const target = sim.nearestEnemyInSquare(spot.x,spot.y,TURRET.range,false);
       if (!target) {
         const damage=TURRET.damage*sim.bonuses.towerDamage;
         if(!chargeIdle(sim,spot,TURRET.range,damage,()=>true,()=>this.cooldown.set(key,TURRET.cooldown*sim.bonuses.towerReload)))this.cooldown.set(key,0);
@@ -65,7 +65,7 @@ export class DarkKeeps {
 export function stepDarkWizard(sim: DefendSim, s: Soldier, dt: number) {
   s.cd -= dt;
   s.thinkT -= dt;
-  const near = nearest(sim.enemiesNear(s.x, s.y, DARK_WIZARD.range), s, DARK_WIZARD.range * DARK_WIZARD.range, true);
+  const near = sim.troopTarget(s,DARK_WIZARD.range);
   if (near) {
     s.target = near.id;
     if (s.cd > 0) return;

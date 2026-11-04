@@ -1,3 +1,4 @@
+import { rangeScale } from "./building-orders.ts";
 /** Time fields own real shot payloads. They never enter the enemy index. */
 import { CHRONO, chronoRank } from "../chrono-upgrades.ts";
 import { archerRange, enemySize } from "./catalog.ts";
@@ -45,13 +46,27 @@ export function circleContact(a:Point,b:Point,c:Point,r:number) {
   if(length<1e-20||disc<0)return Infinity;
   const t=(-along-Math.sqrt(disc))/length;return t>=0&&t<=1?t:Infinity;
 }
+/** Slab intersection for a building's square field; circleContact remains
+ * the circular swept collision helper for moving projectiles and bodies. */
+export function squareContact(a:Point,b:Point,c:Point,r:number) {
+  let enter=0,leave=1;
+  for(const axis of ["x","y"] as const) {
+    const p=a[axis]-c[axis],d=b[axis]-a[axis];
+    if(d===0){if(Math.abs(p)>r)return Infinity;continue;}
+    let first=(-r-p)/d,last=(r-p)/d;
+    if(first>last){const swap=first;first=last;last=swap;}
+    enter=Math.max(enter,first);leave=Math.min(leave,last);
+    if(enter>leave)return Infinity;
+  }
+  return enter;
+}
 export function shotField(sim:DefendSim,shot:StoredShot,a:Point,b:Point):{id:number;t:number}|undefined {
   if(!sim.chrono.size||shot.shot.chronoReleased)return undefined;
   if(shot.kind==="arrow"&&(shot.shot.chain||shot.shot.sky||shot.shot.bowJavelin))return undefined;
   let best=Infinity,owner=-1;
   for(const[id,s]of sim.chrono){
     const building=owns(sim,id);if(!building||s.shots.length+s.queue.length>=chronoCapacity(sim))continue;
-    const t=circleContact(a,b,center(building.rect),chronoRange(sim));
+    const t=squareContact(a,b,center(building.rect),chronoRange(sim)*rangeScale(sim,building));
     if(t<best||(t===best&&t!==Infinity&&id<owner)){owner=id;best=t;}
   }
   return owner<0?undefined:{id:owner,t:best};
@@ -83,9 +98,9 @@ function release(sim:DefendSim,b:Building,s:ChronoState,payload:StoredShot) {
 export function stepChrono(sim:DefendSim,dt:number) {
   syncChrono(sim);
   for(const[id,s]of sim.chrono){
-    const b=owns(sim,id)!,c=center(b.rect),range=chronoRange(sim);
-    let target:Enemy|undefined,best=range*range;
-    for(const e of sim.enemiesNear(c.x,c.y,range)){const d=(e.x-c.x)**2+(e.y-c.y)**2;if(!e.untargetable&&e.hp>0&&(d<best||(d===best&&(!target||e.id<target.id)))){target=e;best=d;}}
+    const b=owns(sim,id)!,c=center(b.rect),range=chronoRange(sim)*rangeScale(sim,b);
+    const target=sim.buildingTarget(b,range);
+    const best=target?(target.x-c.x)*(target.x-c.x)+(target.y-c.y)*(target.y-c.y):Infinity;
     if(target){
       const angle=Math.atan2(target.y-c.y,target.x-c.x);
       if(!s.queue.length&&s.shots.length){s.queue=s.shots;s.shots=[];s.aim=angle;s.reach=Math.sqrt(best);s.fan=CHRONO.spread[chronoRank(sim.bonuses.chrono,"focus")]*Math.PI/180;s.total=s.queue.length;s.fired=0;s.timer=0;}

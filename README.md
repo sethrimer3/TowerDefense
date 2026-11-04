@@ -61,6 +61,9 @@ Each new furthest wave reached automatically selects the preceding wave for your
 
 ## How it's built
 
+Placed buildings in Defend and Ambush open a square oak menu: Upgrade tree, Remove/Sell, targeting modes, a range limit, and a rally flag or crosshairs where applicable. Battle drags aim directly; Settings → Controls can turn either shortcut off. Defend saves each building's orders as optional centre-relative offsets, so points follow moved buildings; Ambush keeps them for the current run. `building-orders.ts` owns decoding/selection and `building-controls.ts` shares clamping/live application. The original `building-menu.ts` and `square-range-art.ts` supply the visuals. Building ranges, spell areas and banner influence are squares; blasts and unit reach retain their circular geometry. The build palette alone enables the placed-piece gold shimmer.
+
+
 - `src/ui/economy-tree.ts` shares the Mine and Library Knowledge graphs, rank cards and research purchases between the Defend tile panels and the Study. Existing skills and timed research remain the source of progress.
 
 The Mine sun keeps a fixed circular silhouette on the native pixel grid as it moves. Stars render behind its opaque disc and soft halo, while terrain and foreground scenery stay in front.

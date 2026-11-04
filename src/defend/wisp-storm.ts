@@ -1,3 +1,4 @@
+import { ordersOf } from "./building-orders.ts";
 /** The Wisp tower's arrow storm. The tower gathers ordinary archer-tower
  * arrows into a quiver of up to `WISP_STORM.capacity`, each circling the
  * tower on its own wandering path, pulled toward a ring round its middle
@@ -76,6 +77,7 @@ export function stepQuiver(sim: DefendSim, b: Building, q: Quiver, candidates: E
     const d = (e.x - c.x) * (e.x - c.x) + (e.y - c.y) * (e.y - c.y);
     if (d < best || (d === best && target && e.id < target.id)) { target = e; best = d; }
   }
+  if(ordersOf(sim,b).targetMode||sim.crosshairs.has(b.id))target=candidates.find(e=>e.hp>0&&!e.untargetable);
   if (target) loose(sim, b, q, target);
 }
 

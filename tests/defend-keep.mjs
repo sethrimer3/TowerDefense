@@ -26,7 +26,7 @@ try {
     const fixture = await page.evaluate(async () => {
       const { defaults } = await import('/src/save.ts');
       const { placeCityTile } = await import('/src/defend/layout.ts');
-      const s = defaults(); s.settings.soundOff = true; s.settings.ambienceOff = true;
+      const s = defaults(); s.profile = { name: "Building tester", flag: {base:3,layers:[]} }; s.settings.soundOff = true; s.settings.ambienceOff = true;
       s.knowledge = 100; s.smithy.copper = 20;
       s.defend.owned.cityTile = 8;
       let l = s.defend.layout;
@@ -107,14 +107,14 @@ try {
     s = await state(page);
     assert.deepEqual(s.defend.layout.keep, k0, 'pressed by its tile, the keep moves back');
 
-    // A tap opens the keep's tree: three branches from the keep.
+    // A tap opens the keep's tree: four branches from the keep.
     const panel = page.locator('#defend-specialty');
     const press = async locator => phone ? locator.tap() : locator.click();
     const k = await keepAt();
     if (phone) await page.touchscreen.tap(k.x, k.y); else await page.mouse.click(k.x, k.y);
-    await page.waitForSelector('#defend-specialty:not([hidden])');
+    if(await page.locator('.building-menu [data-bm="tree"]').count()) await page.locator('.building-menu [data-bm="tree"]').click(); await page.waitForSelector('#defend-specialty:not([hidden])');
     assert.match(await panel.locator('.ug-title').textContent(), /Keep/);
-    assert.equal(await panel.locator('.ug-node.next').count(), 3, 'every branch opens from the keep');
+    assert.equal(await panel.locator('.ug-node.next').count(), 4, 'every branch opens from the keep');
     const buy = async id => {
       await press(panel.locator(`[data-node="${id}"]`));
       await press(panel.locator(`[data-ug-buy="${id}"]`));
@@ -126,7 +126,7 @@ try {
     s = await state(page);
     assert.deepEqual(s.defend.keepRanks, { bastions: 1, arrowLoops: 1, boilingOil: 1 }, 'bought side by side');
     assert.equal(s.knowledge, 100 - 12);
-    assert.equal(await panel.locator('.ug-node.next').count(), 3, 'each branch offers its next rank');
+    assert.equal(await panel.locator('.ug-node.next').count(), 4, 'each branch offers its next rank');
     await press(panel.locator('[data-node="q:arrowLoops:2"]'));
     await page.waitForTimeout(700);
     await page.screenshot({ path: `${out}/keep-${width}-tree.png` });
@@ -176,7 +176,7 @@ try {
       await page.mouse.move(kk.x, kk.y); await page.mouse.down();
       await page.waitForTimeout(700); await page.mouse.up();
     }
-    await page.waitForSelector('#defend-specialty:not([hidden])');
+    if(await page.locator('.building-menu [data-bm="tree"]').count()) await page.locator('.building-menu [data-bm="tree"]').click(); await page.waitForSelector('#defend-specialty:not([hidden])');
     assert.deepEqual((await state(page)).defend.layout.keep, k0);
     await press(panel.locator('[data-specialty-close]'));
 

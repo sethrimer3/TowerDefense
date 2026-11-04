@@ -1,3 +1,6 @@
+import { ordersOf, targetComparator } from "./building-orders.ts";
+import { deployment, within } from "./deployment.ts";
+import { inSquare } from "./square-range-art.ts";
 import { groundMeleeTarget } from "./catalog.ts";
 import { isMelee } from "./melee-facing.ts";
 /** DEFEND's war banner: a consumable the player plants anywhere on the
@@ -31,7 +34,7 @@ const LEG = 8;
 export const MARCH_SIGHT = 2.5;
 
 export const bannerReach = (sim: DefendSim) => sim.bonuses.banner?.reach ?? RALLY_REACH;
-export const bannerInfluence = (sim: DefendSim, at: Point) => !!sim.warBanner && !sim.warBanner.flag && sq(at.x - sim.warBanner.x) + sq(at.y - sim.warBanner.y) <= sq(bannerReach(sim));
+export const bannerInfluence = (sim: DefendSim, at: Point) => !!sim.warBanner && !sim.warBanner.flag && inSquare({...sim.warBanner,r:bannerReach(sim)},at.x,at.y);
 export const bannerDamage = (sim: DefendSim, s: Soldier) => s.damage * (sim.bonuses.banner && sim.bonuses.banner.damage !== 1 && bannerInfluence(sim, s) ? sim.bonuses.banner.damage : 1);
 /** Preserve health percentage on both transitions; moving the banner cannot heal. */
 export function stepBannerLife(sim: DefendSim, s: Soldier, dt: number) {
@@ -113,12 +116,13 @@ export class WarBanner {
    * it has reached the banner's ground, the nearest within `RALLY_REACH` of
    * the banner. */
   foe(sim: DefendSim, s: Soldier, sight: number): Enemy | null {
-    const eligible = (e: Enemy) => s.kind === "valkyrie" || !isMelee(s) || groundMeleeTarget(e);
-    const close = sight > 0 ? nearest(sim.enemiesNear(s.x, s.y, sight).filter(eligible), s, sight * sight, true) : null;
+    const eligible = (e: Enemy) => within(deployment(sim,s),e) && (s.kind === "valkyrie" || !isMelee(s) || groundMeleeTarget(e));
+    const close = sight > 0 ? sim.troopTarget(s,sight,eligible) : null;
     if (close) return close;
     const reach = this.reach(sim);
-    if (sq(s.x - this.x) + sq(s.y - this.y) > sq(reach)) return null;
-    return nearest(sim.enemiesNear(this.x, this.y, reach).filter(eligible), s, Infinity, true);
+    if (!inSquare({...this,r:reach},s.x,s.y)) return null;
+    const pool=sim.enemiesInSquare(this.x,this.y,reach).filter(eligible),mode=ordersOf(sim,sim.map.buildings[s.home]).targetMode;
+    return mode?pool.sort(targetComparator(sim,mode,s,pool))[0]??null:nearest(pool,s,Infinity,true);
   }
 }
 

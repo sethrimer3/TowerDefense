@@ -16,7 +16,7 @@ const out = process.env.SHOTS || 'test-results';
 mkdirSync(out, { recursive: true });
 const state = page => page.evaluate(() => JSON.parse(localStorage.getItem('towerdefense.v1')));
 try {
-  for (const width of [1280, 390]) {
+  for (const width of process.env.TEST_WIDTH ? [Number(process.env.TEST_WIDTH)] : [1280, 390]) {
     const phone = width < 500;
     const context = await browser.newContext({ viewport: { width, height: phone ? 780 : 900 }, hasTouch: phone, isMobile: phone });
     const page = await context.newPage(), errors = [];
@@ -25,7 +25,7 @@ try {
     const fixture = await page.evaluate(async () => {
       const { defaults } = await import('/src/save.ts');
       const { placeCityTile, placeWall } = await import('/src/defend/layout.ts');
-      const s = defaults(); s.settings.soundOff = true; s.settings.ambienceOff = true;
+      const s = defaults(); s.profile = { name: "Building tester", flag: {base:3,layers:[]} }; s.settings.soundOff = true; s.settings.ambienceOff = true; s.settings.crispZoom = false; // Keep both drag destinations visible on the phone.
       s.knowledge = 400; s.smithy.copper = 20;
       s.defend.owned.wallBlock = 40;
       let l = s.defend.layout;
@@ -69,6 +69,8 @@ try {
       if (phone) {
         const cdp = await context.newCDPSession(page);
         await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: a.x, y: a.y }] });
+        // Exit the pan-y palette horizontally before steering over the board.
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: a.x + 40, y: a.y }] });
         for (let i = 1; i <= 8; i++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: a.x + (b.x - a.x) * i / 8, y: a.y + (b.y - a.y) * i / 8 }] });
         if (shot) await page.screenshot({ path: shot });
         await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
@@ -108,7 +110,7 @@ try {
     const press = async locator => phone ? locator.tap() : locator.click();
     const w = await quarter(spot.qx - 3, spot.qy);
     if (phone) await page.touchscreen.tap(w.x, w.y); else await page.mouse.click(w.x, w.y);
-    await page.waitForSelector('#defend-specialty:not([hidden])');
+    if(await page.locator('.building-menu [data-bm="tree"]').count()) await page.locator('.building-menu [data-bm="tree"]').click(); await page.waitForSelector('#defend-specialty:not([hidden])');
     assert.match(await panel.locator('.ug-title').textContent(), /Walls/);
     assert.equal(await panel.locator('.ug-node.next').count(), 3, 'three branches from the walls');
     const buy = async id => {

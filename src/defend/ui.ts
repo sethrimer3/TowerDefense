@@ -1,3 +1,11 @@
+import { wallAtCell, type SpikeSpot } from "./layout.ts";
+import { STRUCTURES } from "./catalog.ts";
+import type { Building } from "./citygen.ts";
+import { PlacedBuildingMenu } from "../ui/placed-building-menu.ts";
+import { decodeOrders, layoutOrders, type BuildingOrders } from "./building-orders.ts";
+import { applyOrders, restoreOrders, aimPoint, controlsOf, clampOrders } from "./building-controls.ts";
+import { removeStructure, removeGate, removeBallista, removeWall, removeSpikes } from "./layout.ts";
+import { center } from "./pathing.ts";
 import { isEconomyBuilding, economyCard, economyLabel, economyAllocated, economySkills, startEconomyResearch } from "../ui/economy-tree.ts";
 import { cityWatch } from "../keep-upgrades.ts";
 import { musterWatch } from "./city-watch.ts";
@@ -56,7 +64,6 @@ import { paintIcon, type IconItem } from "./structure-art.ts";
 import { artLook } from "./tower-art.ts";
 import { pathBadge, pathLook, paintPathIcons } from "../ui/path-badge.ts";
 import { BoardPointers, eventCell, type BoardAim } from "./board-pointers.ts";
-import { mineAim, mineRank } from "./mines.ts";
 import { bannerFor, climbsTowers, deployCircle, rallyAim, type Rally } from "./deployment.ts";
 import { shootsFlat } from "./gun-sight.ts";
 import type { Drag } from "./drag-rules.ts";
@@ -117,6 +124,8 @@ export type DefendHost = {
   /** Whether the palette lists items the player has none of. */
   showEmpty?(): boolean;
   /** Whether dragged items ride above the pointer. */
+  dragRally?(): boolean;
+  dragCrosshair?(): boolean;
   raiseDrag?(): boolean;
   /** Whether a magnifying glass shows the board zoomed in above a drag. */
   magnifier?(): boolean;
@@ -173,6 +182,18 @@ export class DefendPage {
   });
   /** The building the player tapped (its id in the map), outlined with its
    * reach and troops, and what its reach is reckoned from before a battle. */
+  private pickedSpike:SpikeSpot|undefined;
+  private menu = new PlacedBuildingMenu({
+    board:()=>this.root.querySelector<HTMLElement>("#defend-board")!,
+    renderer:()=>this.renderer!, map:()=>this.sim?.map??this.currentMap(),
+    source:()=>this.sim??{levels:this.save.levels,bonuses:this.host.bonuses()},
+    orders:b=>decodeOrders(layoutOrders(this.save.layout,b)),
+    change:(b,o)=>this.changeOrders(b,o),
+    spec:b=>({name:this.pickedSpike?"Wall spikes":STRUCTURES[b.kind as keyof typeof STRUCTURES]?.name??b.kind,tree:true,
+      remove:this.phase==="build"&&b.kind!=="keep"&&(b.structureUid!==undefined||b.gate||b.corner||b.piece||this.pickedSpike)?{kind:"inventory"}:null}),
+    tree:b=>{const target=this.treeTarget(b);if(target)this.openSpecialty(target);},
+    remove:b=>this.removeBuilding(b),closed:()=>this.pick(null,false),
+  });
   private picked: { id: number; armed: Armed } | null = null;
   /** The picked building's aim while it is dragged: a Minelayer's
    * crosshair or a troop building's rally point (none: back to its own
@@ -237,6 +258,12 @@ export class DefendPage {
       if (this.sim?.unitTester) { this.phase = "build"; this.sim = null; this.map = null; this.weather = null; this.night = 0; this.hideBanner(); }
     }
     if (!this.built) this.build();
+    if(!this.sim) {
+      const map=this.currentMap(),source={levels:this.save.levels,bonuses:this.host.bonuses()};
+      let changed=false;
+      for(const b of map.buildings){const o=layoutOrders(this.save.layout,b);if(!o)continue;const before=JSON.stringify(decodeOrders(o));clampOrders(b,source,o);changed ||= before!==JSON.stringify(decodeOrders(o));}
+      if(changed)this.host.persist();
+    }
     this.renderChrome();
     this.relayout();
   }
@@ -396,7 +423,12 @@ export class DefendPage {
       this.spellBar.point = { x: p.fx, y: p.fy };
     });
     this.root.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") this.spellBar?.cancel();
+      if (e.key === "Escape") {this.spellBar?.cancel();}
+    });
+    document.addEventListener("keydown",e=>{if(e.key==="Escape"&&this.menu.element)this.menu.escape();});
+    document.addEventListener("pointerdown",e=>{
+      const target=e.target as Node;
+      if(this.menu.element&&!this.menu.element.contains(target)&&target!==canvas)this.menu.dismiss();
     });
     canvas.addEventListener("pointerdown", (e) => this.pointers.down(e));
     canvas.addEventListener("contextmenu", (e) => e.preventDefault());
@@ -878,7 +910,9 @@ export class DefendPage {
     this.map = null;
     const map = this.currentMap();
     // The keep's guards fight in Defend, mustering where the watchmen walked.
+    this.menu.dismiss();
     this.sim = new DefendSim(map, { ...this.save.levels }, (defendRandom("rolls")() * 2147483648) | 0, { ...this.host.bonuses(), watch: cityWatch(this.save.keepRanks) });
+    restoreOrders(this.sim);
     musterWatch(this.sim, this.renderer?.cityLife.watchmenAt() ?? []);
     this.sim.speed = Math.min(this.save.battleSpeed, this.save.speed3 ? 3 : 2);
     if (this.testerSelected && this.host.devMode()) this.sim.startUnitTester();
@@ -996,6 +1030,7 @@ export class DefendPage {
     if (fit) this.fitView();
     if (!this.renderer.canvas.width) return;
     const map = this.sim ? this.sim.map : this.currentMap();
+    this.menu.position();
     const lifting = this.phase === "build" ? this.pointers.liftProgress() : null;
     this.renderer.draw(map, this.sim, this.overlay(), {
       area: areaForWave(this.sim?.unitTester ? 1 : Math.max(this.sim?.wave ?? 1, startingWave(this.save))).id,
@@ -1018,7 +1053,8 @@ export class DefendPage {
       looks: this.looks(),
       gate: this.save.gateRanks,
       over: this.phase === "over",
-      shimmer: this.phase === "build" && !this.sim,
+      orders: {levels:this.save.levels,bonuses:this.host.bonuses()},
+      shimmer: this.phase === "build" && !this.sim && this.sideOpen.build,
       ...(lifting ? { lifting } : {}),
       ...(this.picked ? { inspect: { id: this.picked.id, armed: this.sim ?? this.picked.armed, ...(this.aimPreview?.id === this.picked.id ? { aim: this.aimPreview } : {}) } } : {}),
       hideBanner: this.phase === "over" || (this.pointers.session?.drag.from === "banner" && !!this.pointers.session.drag.placed),
@@ -1072,6 +1108,7 @@ export class DefendPage {
     if (this.phase === "sim") return this.pickUpBanner(e);
     if (this.phase !== "build") return false;
     const { cx, cy, inside } = eventCell(this.renderer!, e);
+    if(this.menu.placing)return false;
     const edit = inside ? EditSession.lift(this.currentMap(), this.save.layout, cx, cy) : null;
     if (!edit) return false;
     // A city tile lifts only once held; until then the press moves the view.
@@ -1090,29 +1127,33 @@ export class DefendPage {
    * moves it as usual. */
   private aimBuilding(e: PointerEvent): BoardAim | null {
     const sim = this.phase === "sim" ? this.sim : null;
-    if (!sim || !this.renderer || !this.picked) return null;
+    if (!sim || !this.renderer || this.menu.placing || this.spellBar?.armed) return null;
     const p = eventCell(this.renderer, e);
     if (!p.inside) return null;
     const banner = sim.warBanner;
     if (banner && !banner.flag && sim.bannerRemaining <= 0 && p.fx >= banner.x - 1 && p.fx <= banner.x + 2.2 && p.fy >= banner.y - 1.4 && p.fy <= banner.y + 1) return null;
-    const b = sim.map.buildings[this.picked.id];
+    const hit=sim.map.buildings[sim.map.owner[p.cy*CELLS_W+p.cx]];
+    const b = hit??(this.picked?sim.map.buildings[this.picked.id]:undefined);
     if (!b || !sim.intact(b)) return null;
-    const mine = b.kind === "minelayerTower" && mineRank(sim, b) >= 1;
-    const circle = mine ? null : deployCircle(b, sim.bonuses);
-    if (!mine && !circle) return null;
+    const controls=controlsOf(b,sim);
+    if(controls==="plain" || (controls==="troops" ? this.host.dragRally?.()===false : this.host.dragCrosshair?.()===false))return null;
+    const mine=controls==="shooter";
+    const circle = mine ? null : deployCircle(b,sim.bonuses,sim);
     // The crosshair or flag is a handle too, so dragging it home resets the aim.
-    const handle = mine ? sim.mineAims.get(b.id) : sim.rallies.get(b.id);
+    const handle = mine ? sim.crosshairs.get(b.id) : sim.rallies.get(b.id);
     const r = b.rect;
     const onIt = p.fx >= r.x && p.fy >= r.y && p.fx <= r.x + r.w && p.fy <= r.y + r.h;
     if (!onIt && !(handle && Math.hypot(p.fx - handle.x, p.fy - handle.y) < (mine ? 0.8 : 1.2))) return null;
     const towers = circle && climbsTowers(b.kind, shootsFlat) ? sim.map.buildings.filter((t) => t.kind === "watchTower" && sim.intact(t)) : [];
     const preview = (ev: PointerEvent) => {
       const q = eventCell(this.renderer!, ev), at = { x: q.fx, y: Math.max(0, q.fy - this.pointers.raise) };
-      const point = circle ? rallyAim(b, at, circle, towers) : mineAim(b, at);
+      const home=b.rect;
+      const point = at.x>=home.x&&at.x<=home.x+home.w&&at.y>=home.y&&at.y<=home.y+home.h?undefined:aimPoint(b,sim,sim.map,at);
       const old = this.aimPreview;
       this.aimPreview = { id: b.id, point, since: old?.id === b.id && !old.point && !point ? old.since : performance.now() };
     };
     return {
+      hold:()=>{const target=this.treeTarget(b);if(target)this.openSpecialty(target);},
       move: preview,
       // The magnifying glass centres on where the flag or crosshair rides.
       focus: (ev) => {
@@ -1127,16 +1168,10 @@ export class DefendPage {
         }
         preview(ev);
         const point = this.aimPreview?.point;
-        if (circle) {
-          this.aimPreview = null;
-          sim.setRally(b.id, point ?? null);
-          play("banner");
-          this.setMessage(point?.tower !== undefined ? "Rallied to the watch tower: its gunners climb it while it has room." : point ? "Rally point set. Drag the flag back onto its building to send its troops their own ways." : "Rally point cleared: the troops go their own ways.", 4);
-          return;
-        }
-        if (point) sim.mineAims.set(b.id, point);
-        else sim.mineAims.delete(b.id);
-        this.setMessage(point ? "Minelayer aimed. Drag the crosshair back onto its tower for random coverage." : "Minelayer: random coverage across its full range.", 4);
+        this.aimPreview=null;
+        const next=decodeOrders(layoutOrders(this.save.layout,b)),key=circle?"rally":"crosshair",c=center(b.rect);
+        if(point)next[key]={x:point.x-c.x,y:point.y-c.y};else delete next[key];
+        this.changeOrders(b,next);this.pick(b.id);play("banner");
       },
     };
   }
@@ -1205,7 +1240,7 @@ export class DefendPage {
     const s = this.save;
     if (drop.layout !== s.layout) {
       play("place");
-      this.picked = null;
+      this.picked = null;this.menu.dismiss(false);
     }
     // Moving keeps a building's upgrades; taking one up keeps them in the
     // palette (`setLayout`).
@@ -1226,12 +1261,15 @@ export class DefendPage {
       if (castStrike(this.sim, this.spellBar.armed, { x: p.fx, y: p.fy })) this.spellBar.cancel();
       return;
     }
+    const point=eventCell(this.renderer!,e);
+    if(this.menu.tap({x:point.fx,y:point.fy}))return;
     if (this.phase === "sim" && this.rallyTap(e)) return;
     this.closeSpecialty();
     const { cx, cy, inside } = eventCell(this.renderer!, e);
     const map = this.sim ? this.sim.map : this.currentMap();
     const b = inside ? map.buildings[map.owner[cy * CELLS_W + cx]] : undefined;
-    this.pick(inspectable(b) && this.picked?.id !== b.id ? b.id : null);
+    this.pickedSpike=inside?map.spikes?.find(row=>row.cells.includes(cy*CELLS_W+cx)):undefined;
+    this.pick((inspectable(b)||this.pickedSpike&&b) && this.menu.building?.id !== b!.id ? b!.id : null);
   }
 
   /** In battle, a second tap (a third with the triple tap setting) close to
@@ -1261,22 +1299,18 @@ export class DefendPage {
   /** A tapped structure or ballista, lifted in the build phase and let go
    * where it stood, is picked out. */
   private pickLifted() {
-    const drag = this.pointers.session?.drag, map = this.currentMap();
-    const side = drag && sideOfDrag(drag);
-    const target: TreeTarget | null = drag?.from === "structure" ? { uid: drag.uid } : drag?.from === "spikes" ? { spikes: drag.spikes } : side ? { side } : null;
-    const b =
-      drag?.from === "structure" ? map.buildings.find((o) => o.structureUid === drag.uid)
-      : drag?.from === "ballista" ? map.buildings.find((o) => o.corner?.vx === drag.corner.vx && o.corner.vy === drag.corner.vy)
-      : undefined;
-    // A second tap on the same building puts it down.
-    const open = this.specialty?.target, same = !!target && !!open && sameTarget(open, target);
-    if (same || (inspectable(b) && this.picked?.id === b.id)) {
-      this.closeSpecialty();
-      return this.pick(null);
-    }
-    this.pick(inspectable(b) ? b.id : null);
-    if (target) this.openSpecialty(target);
-    else this.closeSpecialty();
+    const drag=this.pointers.session?.drag,map=this.currentMap();
+    this.pickedSpike=drag?.from==="spikes"?drag.spikes:undefined;
+    const row=this.pickedSpike?map.spikes?.find(r=>sameGate(r,this.pickedSpike!)):undefined;
+    const b=drag?.from==="structure"?map.buildings.find(b=>b.structureUid===drag.uid)
+      :drag?.from==="keep"?map.buildings.find(b=>b.kind==="keep")
+      :drag?.from==="ballista"?map.buildings.find(b=>b.corner?.vx===drag.corner.vx&&b.corner?.vy===drag.corner.vy)
+      :drag?.from==="gate"?map.buildings.find(b=>b.gate&&sameGate(b.gate,drag.gate))
+      :drag?.from==="wallBlock"?map.buildings.find(b=>b.piece&&b.rect.x===drag.wall.qx*2&&b.rect.y===drag.wall.qy*2):row?map.buildings[map.owner[row.cells[0]]]:undefined;
+    this.closeSpecialty();
+    if(b)this.pick(this.menu.building?.id===b.id?null:b.id);
+    else if(drag?.from==="spikes")this.openSpecialty({spikes:drag.spikes});
+    else this.pick(null);
   }
 
   /** A press held still on a palette tile or a placed building opens its
@@ -1312,30 +1346,59 @@ export class DefendPage {
     if (this.phase === "build") this.openSpecialty(target);
   }
 
-  private pick(id: number | null) {
+  private pick(id: number | null, menu=true) {
+    if(id===null)this.pickedSpike=undefined;
     if (id !== this.picked?.id) this.aimPreview = null;
     this.picked = id === null ? null : { id, armed: { levels: { ...this.save.levels }, bonuses: this.host.bonuses() } };
+    if(menu){const b=id===null?undefined:(this.sim?.map??this.currentMap()).buildings[id];if(b)this.menu.show(b);else this.menu.dismiss(false);}
+
+  }
+
+  private changeOrders(b:Building,o:BuildingOrders) {
+    const placed=layoutOrders(this.save.layout,b);if(!placed)return;
+    for(const key of ["targetMode","rangePercent","rally","crosshair"] as const)delete placed[key];
+    Object.assign(placed,decodeOrders(o));
+    if(this.sim)applyOrders(this.sim,b,decodeOrders(placed));
+    else clampOrders(b,{levels:this.save.levels,bonuses:this.host.bonuses()},placed);
+    if(this.sim) {
+      const live=this.sim.orders.get(b.id)!;
+      for(const key of ["rally","crosshair"] as const) {if(live[key])placed[key]=live[key];else delete placed[key];}
+    }
+    if(this.picked)this.picked.armed={levels:this.save.levels,bonuses:this.host.bonuses()};
+    this.host.persist();
+  }
+  private treeTarget(b:Building):TreeTarget|null {
+    if(this.pickedSpike)return {spikes:this.pickedSpike};
+    if(b.structureUid!==undefined&&b.kind!=="keep")return {uid:b.structureUid};
+    const side=b.kind==="keep"?"keep":b.kind==="gate"?"gate":b.kind==="wallBallista"?"ballistas":b.piece?"walls":null;
+    return side?{side}:null;
+  }
+  private removeBuilding(b:Building) {
+    if(this.phase!=="build"||b.kind==="keep")return;
+    const l=this.save.layout;
+    const next=this.pickedSpike?removeSpikes(l,this.pickedSpike):b.structureUid!==undefined?removeStructure(l,b.structureUid):b.corner?removeBallista(l,b.corner):b.gate?removeGate(l,b.gate):b.piece?removeWall(l,wallAtCell(l,b.rect.x,b.rect.y)!):l;
+    setLayout(this.save,next);this.pick(null);this.host.persist();this.renderPalette();
   }
 
   // ── Each building's upgrades ──────────────────────────────────────────
   /** Shows `target`'s upgrade tree: what it has been, and every branch
    * still open to it. Only while building. */
   private openSpecialty(target: TreeTarget) {
+    this.menu.dismiss(false);
     if ("side" in target) {
-      if (this.phase !== "build") return this.closeSpecialty();
       this.specialty = { target, picked: SIDE_UI[target.side].root };
       // The keep and a tapped ballista stay picked out; the shared trees pick nothing else.
-      if (target.side === "keep") this.pick(this.currentMap().buildings.find((o) => o.kind === "keep")?.id ?? null);
+      if (target.side === "keep") this.pick(this.currentMap().buildings.find((o) => o.kind === "keep")?.id ?? null,false);
       else if (target.side !== "ballistas") this.pick(null);
       return this.renderSpecialty(true);
     }
     const kind = targetKind(this.save, target);
-    if (this.phase !== "build" || !kind) return this.closeSpecialty();
+    if (!kind) return this.closeSpecialty();
     const wear = specialtyOf(this.save, target);
     this.specialty = { target, picked: wear ? `p:${wear.path}:${wear.rank}` : `k:${kind}` };
     if ("uid" in target) {
       const b = this.currentMap().buildings.find((o) => o.structureUid === target.uid);
-      if (b && inspectable(b)) this.pick(b.id);
+      if (b && inspectable(b)) this.pick(b.id,false);
     }
     this.renderSpecialty(true);
   }
@@ -1424,7 +1487,7 @@ export class DefendPage {
     if (r.waiting) {
       // Too big for where it stood: it waits in the palette.
       this.closeSpecialty();
-      this.picked = null;
+      this.picked = null;this.menu.dismiss(false);
       this.setMessage(`${stepName(step)}: its size changed, so it waits in the palette to be placed again.`, 3);
       return;
     }
@@ -1523,7 +1586,7 @@ export class DefendPage {
     this.afterChange("coin");
     if ("waiting" in r && r.waiting) {
       this.closeSpecialty();
-      this.picked = null;
+      this.picked = null;this.menu.dismiss(false);
       this.setMessage(`${what}: no room where it stood, so it waits in the palette.`, 3);
       return;
     }
@@ -1537,10 +1600,12 @@ export class DefendPage {
   private afterChange(cue: "chime" | "unlock" | "coin") {
     const sp = this.specialty!;
     this.host.spentKnowledge?.();
+    const source={levels:this.save.levels,bonuses:this.host.bonuses()};
+    for(const b of this.currentMap().buildings){const o=layoutOrders(this.save.layout,b);if(o)clampOrders(b,source,o);}
     this.host.persist();
     play(cue);
     this.renderPalette();
-    if (this.picked) this.pick(this.currentMap().buildings.find((o) => "uid" in sp.target && o.structureUid === sp.target.uid)?.id ?? this.picked.id);
+    if (this.picked) this.pick(this.currentMap().buildings.find((o) => "uid" in sp.target && o.structureUid === sp.target.uid)?.id ?? this.picked.id,false);
   }
 
   /** Draws the upgrade tree (`focus`: move the keyboard into it). */
@@ -1549,7 +1614,7 @@ export class DefendPage {
     if (!el) return;
     const sp = this.specialty, game = this.host.game?.();
     const kind = !sp ? undefined : "side" in sp.target ? sp.target.side : targetKind(this.save, sp.target);
-    if (!sp || !kind || !game || this.phase !== "build") {
+    if (!sp || !kind || !game || this.phase === "over") {
       if (sp) this.specialty = null;
       this.treeCircle?.destroy();
       this.treeCircle = null;
@@ -1623,6 +1688,7 @@ export class DefendPage {
     el.querySelector(".ug-card")!.innerHTML = economy ? economyCard(game,kind,sp.picked,this.host.researchers?.()??0) : side ? side.card(game, sp.picked) : shared ? shared.card(game, sp.picked) : treeCardHtml(game, plainKind, wear, sp.picked);
     if(economy)el.querySelector('.ug-alloc')!.setAttribute('title',`${spent} Knowledge invested in ${name} research`);
     this.tree.set(side ? side.graph(game) : graftedGraph(game, plainKind, wear), sp.picked);
+    if(this.phase!=="build")el.querySelectorAll<HTMLButtonElement>("[data-ug-buy],[data-ug-undo],[data-ug-respec],[data-economy-buy]").forEach(button=>button.disabled=true);
     if (focus) el.querySelector<HTMLElement>(".ug-buy:not(:disabled), [data-specialty-close]")?.focus({ preventScroll: true });
   }
 

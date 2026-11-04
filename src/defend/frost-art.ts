@@ -4,7 +4,7 @@ import { pixels, sprite, drawSprite } from "./damage-art.ts";
 /** The Frost nova as it is drawn, in the city's pixel art (`ART` pixels a
  * cell, snapped to whole screen pixels):
  *
- * - **Rime:** a ragged disc of hoarfrost on the ground, dithered pale blue
+ * - **Rime:** a ragged square of hoarfrost on the ground, dithered pale blue
  *   thinning toward its edge, set with ice crystals in black outlines; baked
  *   once per size and seed, faded in as it forms and out as it melts. A
  *   wandering blizzard's rime also has snow whirling round it.
@@ -50,7 +50,7 @@ function rimeSprite(r: number, seed: number) {
   };
   // The frost: dense in the middle, broken up and dithered toward a ragged edge.
   for (let y = 0; y < d; y++) for (let x = 0; x < d; x++) {
-    const dx = x - R, dy = y - R, k = Math.sqrt(dx * dx + dy * dy) / R;
+    const dx = x - R, dy = y - R, k = Math.max(Math.abs(dx),Math.abs(dy)) / R;
     const edge = 0.82 + 0.18 * hash01(variant, Math.round(Math.atan2(dy, dx) * 6), 3);
     if (k > edge) continue;
     const n = hash01(variant, x, y);
@@ -62,7 +62,7 @@ function rimeSprite(r: number, seed: number) {
   const count = Math.max(3, Math.round(R * R / 36));
   for (let i = 0; i < count; i++) {
     const a = hash01(variant, i, 11) * Math.PI * 2, far = Math.sqrt(hash01(variant, i, 12)) * (R - 4);
-    const cx = Math.round(R + Math.cos(a) * far), cy = Math.round(R + Math.sin(a) * far);
+    const cx = Math.round(4+hash01(variant,i,11)*(2*R-8)), cy = Math.round(4+hash01(variant,i,12)*(2*R-8));
     const big = hash01(variant, i, 13) < 0.35;
     const arm = big ? 2 : 1;
     const cells: [number, number][] = [[0, 0]];

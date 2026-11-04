@@ -1,3 +1,7 @@
+import { restoreOrders } from "./building-controls.ts";
+import { rangeScale } from "./building-orders.ts";
+import { decodeOrders, orderKey, ordersOf, targetComparator, type BuildingOrders } from "./building-orders.ts";
+import { inSquare } from "./square-range-art.ts";
 import { isBlightWorm, wormTuning } from "./blight-worm-tuning.ts";
 import { stepPlasma, type PlasmaShot, type PlasmaSphere } from "./blight-plasma.ts";
 import { stepBlightLasers, type BlightLaser } from "./blight-fortress.ts";
@@ -63,7 +67,7 @@ import {
 import { CellType, type Building, type CityMap } from "./citygen.ts";
 import { atHome, escaped, Builders } from "./civilians.ts";
 import { stepEnemy, prepareCrowdAttacks, transferCrowdAttacks } from "./enemies.ts";
-import { blocked, cellAt, cellCenter, center, fillFlowField, nearestOpen, type FieldTerrain, type Point } from "./pathing.ts";
+import { blocked, cellAt, cellCenter, center, fillFlowField, nearest, nearestOpen, type FieldTerrain, type Point } from "./pathing.ts";
 import { ignite, stepArrows, stepShells, Towers } from "./towers.ts";
 import type { WispArrow, WispTowerState } from "./wisp-arrow.ts";
 import type { WispTrail } from "./wisp-trail.ts";
@@ -74,7 +78,7 @@ import { stepCityWatch } from "./city-watch.ts";
 import { cloaked, spreadVenom, stepVenom } from "./assassins.ts";
 import { nanoDeath, stepNano, type Infection, type NanoBurst, type NanoCloud, type NanoShell } from "./nanobots.ts";
 import { perched } from "./gun-sight.ts";
-import { fence, type Rally } from "./deployment.ts";
+import { fence, deployment, within, type Rally } from "./deployment.ts";
 import { hopliteGuard } from "./spears.ts";
 import { heroRises, stepHero, stepSwings, type Swing } from "./hero.ts";
 import { stepBlades, stepBleed, stepShade, type Blade } from "./shadow.ts";
@@ -453,6 +457,8 @@ export class DefendSim {
   shells: Shell[] = [];
   /** Proximity mines and directed aim, reset with each battle. */
   mines: Mine[] = [];
+  readonly orders = new Map<number, BuildingOrders>();
+  readonly crosshairs = new Map<number, {x:number;y:number}>();
   mineAims = new Map<number, { x: number; y: number }>();
   /** Troop buildings' rally points by building id, as the player aimed
    * them this battle (`deployment.ts`); not part of the replayed state. */
@@ -610,6 +616,13 @@ export class DefendSim {
     this.map = map;
     this.levels = levels;
     this.bonuses = bonuses;
+    for (const b of map.buildings) {
+      const o = decodeOrders(bonuses.buildingOrders?.[orderKey(b)]);
+      if (Object.keys(o).length) this.orders.set(b.id, o);
+      const c = center(b.rect);
+      if (o.rally) this.rallies.set(b.id, {x:c.x+o.rally.x,y:c.y+o.rally.y});
+      if (o.crosshair) { const p={x:c.x+o.crosshair.x,y:c.y+o.crosshair.y}; this.crosshairs.set(b.id,p); if(b.kind === "minelayerTower") this.mineAims.set(b.id,p); }
+    }
     this.rand = rng(seed);
     this.essenceSeed = seed;
     const n = map.buildings.length;
@@ -644,6 +657,7 @@ export class DefendSim {
       impassable: (i) => map.type[i] === CellType.WATER || this.rocks[i] === 1,
       cost: (i) => this.enterCost(i),
     };
+    restoreOrders(this);
   }
 
   /** Reconfigure a preallocated scenario lot using native HP, collision and art state. */
@@ -658,7 +672,7 @@ export class DefendSim {
     this.towers.cooldown.delete(id); this.towers.focus.delete(id); this.barracks.training.delete(id);
     this.wizards.next.delete(id); this.wizards.rest.delete(id);
     for(let corner=0;corner<4;corner++)this.darkKeeps.cooldown.delete(id*4+corner);
-    this.rallies.delete(id);this.mineAims.delete(id);
+    this.rallies.delete(id);this.mineAims.delete(id);this.crosshairs.delete(id);this.orders.delete(id);
     this.chrono.delete(id); this.wispOwners.delete(id);
     b.kind = kind; b.rect = { ...rect }; b.hidden = !active;
     b.cells = [];
@@ -1155,6 +1169,69 @@ export class DefendSim {
     return best;
   }
 
+  /** Native cell/list order, inclusive square edges. Blast queries remain circular. */
+  enemiesInSquare(x: number, y: number, r: number): Enemy[] {
+    const out: Enemy[] = [];
+    const x0=Math.max(0,Math.floor(x-r)),x1=Math.min(CELLS_W-1,Math.floor(x+r));
+    const y0=Math.max(0,Math.floor(y-r)),y1=Math.min(CELLS_H-1,Math.floor(y+r));
+    const square={x,y,r};
+    for(let cy=y0;cy<=y1;cy++) for(let cx=x0;cx<=x1;cx++)
+      for(const e of this.grid[cellIndex(cx,cy)]) if(e.hp>0 && e.fortressPart?.role!=="armor" && !(e.walker&&e.untargetable) && inSquare(square,e.x,e.y)) out.push(e);
+    return out;
+  }
+
+  nearestEnemyInSquare(x:number,y:number,r:number,lastWins=true): Enemy|null {
+    let best:Enemy|null=null,bd=Infinity;
+    for(const e of this.enemiesInSquare(x,y,r)) {
+      if(e.untargetable)continue;
+      const d=sq(e.x-x)+sq(e.y-y);
+      if(d<bd || lastWins&&d===bd){best=e;bd=d;}
+    }
+    return best;
+  }
+
+  /** Crosshair priority is evaluated after weapon eligibility, so an
+   * ineligible nearby flier cannot suppress a cannon's ordinary targets. */
+  buildingCandidates(b: Building, r: number, eligible: (e:Enemy)=>boolean = ()=>true): Enemy[] {
+    const c=center(b.rect), all=this.enemiesInSquare(c.x,c.y,r).filter(e=>!e.untargetable&&eligible(e));
+    const aim=this.crosshairs.get(b.id) ?? (b.kind==="minelayerTower"?this.mineAims.get(b.id):undefined);
+    const near=aim?all.filter(e=>inSquare({...aim,r:2},e.x,e.y)):[];
+    const pool=near.length?near:all;
+    const mode=ordersOf(this,b).targetMode??"closest";
+    // Stable sort preserves the native first-wins order of Closest.
+    if(mode==="closest") {
+      const origin=near.length?aim!:c;
+      return pool.sort((a,b)=>sq(a.x-origin.x)+sq(a.y-origin.y)-sq(b.x-origin.x)-sq(b.y-origin.y));
+    }
+    return pool.sort(targetComparator(this,mode,near.length?aim!:c,pool));
+  }
+
+  buildingTarget(b:Building,r:number,eligible?:(e:Enemy)=>boolean):Enemy|null {
+    if(ordersOf(this,b).targetMode)return this.buildingCandidates(b,r,eligible)[0]??null;
+    // The default single-target path stays allocation-free and keeps the
+    // original native first-wins tie rule, including crosshair fallback.
+    const c=center(b.rect),square={...c,r},aim=this.crosshairs.get(b.id)??(b.kind==="minelayerTower"?this.mineAims.get(b.id):undefined);
+    const nearby=aim?{...aim,r:2}:null;
+    let best:Enemy|null=null,near:Enemy|null=null,bd=Infinity,nd=Infinity;
+    const x0=Math.max(0,Math.floor(c.x-r)),x1=Math.min(CELLS_W-1,Math.floor(c.x+r));
+    const y0=Math.max(0,Math.floor(c.y-r)),y1=Math.min(CELLS_H-1,Math.floor(c.y+r));
+    for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++)for(const e of this.grid[cellIndex(x,y)]) {
+      if(!(e.hp>0)||e.untargetable||e.fortressPart?.role==="armor"||!inSquare(square,e.x,e.y)||eligible&&!eligible(e))continue;
+      const d=sq(e.x-c.x)+sq(e.y-c.y);
+      if(d<bd){best=e;bd=d;}
+      if(nearby&&inSquare(nearby,e.x,e.y)) {const d=sq(e.x-nearby.x)+sq(e.y-nearby.y);if(d<nd){near=e;nd=d;}}
+    }
+    return near??best;
+  }
+
+  troopTarget(s:Soldier,r:number,eligible:(e:Enemy)=>boolean=()=>true,candidates?:Enemy[]):Enemy|null {
+    const home=this.map.buildings[s.home],o=home?ordersOf(this,home):{};
+    const bounds=deployment(this,s);
+    const pool=(candidates??this.enemiesNear(s.x,s.y,r)).filter(e=>!e.untargetable&&within(bounds,e)&&eligible(e));
+    if(!o.targetMode) return nearest(pool,s,r*r,true);
+    return pool.sort(targetComparator(this,o.targetMode,s,pool))[0]??null;
+  }
+
   /** Enemies within `r` of a point (uses the cell index). */
   enemiesNear(x: number, y: number, r: number): Enemy[] {
     const out: Enemy[] = [];
@@ -1174,7 +1251,7 @@ export class DefendSim {
       if (b.kind !== "watchTower" || !this.intact(b)) continue;
       const p = buildingPaths(this, b), signal = pathRank(p, "watchTower", "signalFires"), spot = pathRank(p, "watchTower", "spotters");
       const c = center(b.rect), r = watchReach(this, b);
-      for (const e of this.enemiesNear(c.x, c.y, r)) {
+      for (const e of this.enemiesInSquare(c.x, c.y, r)) {
         e.marked = true;
         if (this.bonuses.structurePaths) e.markDamage = Math.max(e.markDamage ?? 2, SPOTTERS.mark[spot]);
         if (!signal) continue;
@@ -1563,7 +1640,7 @@ export class DefendSim {
 export function watchReach(sim: Pick<DefendSim, "levels" | "bonuses">, b?: Building) {
   const p = buildingPaths(sim, b);
   const spot = pathRank(p, "watchTower", "spotters"), signal = pathRank(p, "watchTower", "signalFires");
-  return watchRadius(sim.levels.watchRadius) + (spot >= 2 ? SPOTTERS.radius : 0) + (signal >= 2 ? SIGNAL.radius : 0);
+  return (watchRadius(sim.levels.watchRadius) + (spot >= 2 ? SPOTTERS.radius : 0) + (signal >= 2 ? SIGNAL.radius : 0)) * rangeScale(sim,b);
 }
 
 function maxHpOf(b: Building, levels: Levels, bonuses: Readonly<Bonuses>) {

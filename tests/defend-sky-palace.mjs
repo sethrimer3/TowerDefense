@@ -23,7 +23,7 @@ try {
     const fixture = await page.evaluate(async () => {
       const { defaults } = await import('/src/save.ts');
       const { placeCityTile, placeStructure } = await import('/src/defend/layout.ts');
-      const s = defaults(); s.settings.soundOff = true; s.settings.ambienceOff = true;
+      const s = defaults(); s.profile = { name: "Building tester", flag: {base:3,layers:[]} }; s.settings.soundOff = true; s.settings.ambienceOff = true;
       s.knowledge = 1e6; s.defend.owned.cityTile = 8; s.defend.owned.valkyriePalace = 1;
       let l = s.defend.layout;
       for (const [dx, dy] of [[0, -1], [-1, 0], [1, 0], [0, 1]]) l = placeCityTile(l, l.keep.tx + dx, l.keep.ty + dy) ?? l;
@@ -61,7 +61,7 @@ try {
       return dp.renderer.toClient(b.rect.x + b.rect.w / 2, b.rect.y + b.rect.h / 2);
     });
     if (phone) await page.touchscreen.tap(lot.x, lot.y); else await page.mouse.click(lot.x, lot.y);
-    await page.waitForSelector('#defend-specialty:not([hidden])');
+    if(await page.locator('.building-menu [data-bm="tree"]').count()) await page.locator('.building-menu [data-bm="tree"]').click(); await page.waitForSelector('#defend-specialty:not([hidden])');
     await page.waitForTimeout(800);
     await page.screenshot({ path: `${out}/sky-${width}-tree.png` });
     assert.ok(await page.locator('#defend-specialty').innerText().then(t => /Cloudborne|Heavenly host/.test(t)), 'the tree names its path');

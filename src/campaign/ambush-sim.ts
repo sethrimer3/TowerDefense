@@ -1,3 +1,5 @@
+import { applyOrders } from "../defend/building-controls.ts";
+import { decodeOrders } from "../defend/building-orders.ts";
 /** Ambush adds placement, routing and a wallet to native Defend combat. */
 import { ambushBonuses } from "../ambush-upgrades.ts";
 import { dist } from "../exact.ts";
@@ -184,7 +186,9 @@ export class AmbushSim {
     if (!b || this.phase !== "build" || !this.grid.check(b.kind, qx, qy, this.buildings, id).fits) return false;
     b.qx = qx;
     b.qy = qy;
+    const orders=decodeOrders(this.engine.orders.get(id));
     this.engine.configureLot(id, b.kind, buildingRect(b), true);
+    applyOrders(this.engine,this.map.buildings[id],orders);
     this.replan();
     return true;
   }
@@ -282,7 +286,9 @@ export class AmbushSim {
       delete b.wear;
     }
     this.bonus.structurePaths = placedBattlePaths({ defend: this.loadout() } as Save).structurePaths ?? {};
+    const orders=decodeOrders(this.engine.orders.get(id));
     if (step.type !== "path") this.engine.configureLot(id, b.kind, buildingRect(b), true, health);
+    applyOrders(this.engine,this.map.buildings[id],orders);
     this.replan();
     return true;
   }

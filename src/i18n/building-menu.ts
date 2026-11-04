@@ -3,6 +3,9 @@ import type { TranslationRow } from "./languages.ts";
 const row = <K extends string>(key: K, english: string) =>
   [key, english, english, english, english, english, english, english, english, english] as const satisfies TranslationRow;
 export const BUILDING_MENU_TEXT = [
+  row("settings.controls", "Controls"),
+  row("setting.dragRally", "Drag from a troop building to place its rally flag"),
+  row("setting.dragCrosshair", "Drag from a tower to place its crosshairs"),
   row("menu.tree", "Upgrade tree"),
   row("menu.inventory", "Back to the palette"),
   row("menu.sell", "Sell ({gold} gold)"),

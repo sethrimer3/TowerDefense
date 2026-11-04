@@ -51,6 +51,7 @@ const FAN = 2 / 3;
 const STRIKES_EACH = 3;
 
 /** Enemies a blast of radius `r` hits. */
+const inSquareArea = (r:number) => Math.min(CROWD.most,1+CROWD.density*4*r*r);
 export const inArea = (r: number) => Math.min(CROWD.most, 1 + CROWD.density * Math.PI * r * r);
 /** Enemies a line `long` cells long and `wide` either side of its middle hits. */
 export const alongLine = (long: number, wide: number) => Math.min(CROWD.most, 1 + CROWD.density * long * 2 * wide);
@@ -84,7 +85,7 @@ export function averageDps(kind: EstimateKind, input: AverageInput): number {
       const loops = keepRank(b.keep, "arrowLoops"), oil = keepRank(b.keep, "boilingOil");
       const arrows = loops ? tower(archerDamage(L("archerDamage")) * ARROW_LOOPS.damage[loops], ARROW_LOOPS.reload[loops], loops >= 3 ? chained(ARROW_LOOPS.volley) : 1) : 0;
       // Oil only reaches what stands at the walls: about half the crowd round a blast.
-      const pour = oil ? (b.towerDamage * (BOILING_OIL.damage[oil] / BOILING_OIL.every[oil] + BOILING_OIL.dps[oil]) * inArea(BOILING_OIL.reach[oil])) / 2 : 0;
+      const pour = oil ? (b.towerDamage * (BOILING_OIL.damage[oil] / BOILING_OIL.every[oil] + BOILING_OIL.dps[oil]) * inSquareArea(BOILING_OIL.reach[oil])) / 2 : 0;
       return arrows + pour;
     }
     case "wall": {
@@ -94,7 +95,7 @@ export function averageDps(kind: EstimateKind, input: AverageInput): number {
     }
     case "gate": {
       const bars = gateRank(b.gate, "portcullis"), towers = gateRank(b.gate, "gateTowers");
-      const holes = PORTCULLIS.every[bars] ? (PORTCULLIS.damage[bars] * b.towerDamage * inArea(PORTCULLIS.reach)) / 2 / PORTCULLIS.every[bars] : 0;
+      const holes = PORTCULLIS.every[bars] ? (PORTCULLIS.damage[bars] * b.towerDamage * inSquareArea(PORTCULLIS.reach)) / 2 / PORTCULLIS.every[bars] : 0;
       const bolts = towers
         ? tower(ballistaDamage(L("ballistaDamage")) * GATE_TOWERS.share[towers], GATE_TOWERS.cooldown, Math.min(GATE_TOWERS.pierce[towers], alongLine(GATE_TOWERS.range[towers], BALLISTA.width))) * (towers >= 2 ? GATE_TOWERS.twin : 1)
         : 0;

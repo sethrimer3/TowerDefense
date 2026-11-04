@@ -80,7 +80,7 @@ export function loopAt(b: Pick<Blade, "x" | "y" | "ax" | "ay" | "bx" | "by" | "l
 export function stepShade(sim: DefendSim, s: Soldier, dt: number) {
   s.cd -= dt;
   s.thinkT -= dt;
-  const near = nearest(sim.enemiesNear(s.x, s.y, SHADE.reach + 1).filter((e) => groundMeleeTarget(e) && e.hp > 0 && dist(e.x - s.x, e.y - s.y) <= SHADE.reach + enemySize(e) / 2), s, Infinity, true);
+  const near = sim.troopTarget(s,SHADE.reach+1,e=>groundMeleeTarget(e)&&dist(e.x-s.x,e.y-s.y)<=SHADE.reach+enemySize(e)/2);
   if (near) {
     // In reach: it holds its ground, its knives flying out one by one.
     if (s.cd <= 0) {

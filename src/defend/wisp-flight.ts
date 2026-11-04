@@ -9,7 +9,7 @@ const TAU = Math.PI * 2;
 const positive = (a: number) => (a % TAU + TAU) % TAU;
 
 export function wispFlight(from: Point & { angle: number }, aim: Point, home: Point, range: number,
-  limit = range): WispFlight | undefined {
+  limit = range, square=false): WispFlight | undefined {
   const radius = range * WISP.turnRadius;
   const inward = Math.atan2(home.y - aim.y, home.x - aim.x);
   let best: WispFlight | undefined;
@@ -49,7 +49,7 @@ export function wispFlight(from: Point & { angle: number }, aim: Point, home: Po
           const angle = p.angle + turn * step / radius;
           const x = p.x + (turn ? radius / turn * (Math.sin(angle) - Math.sin(p.angle)) : Math.cos(angle) * step);
           const y = p.y + (turn ? radius / turn * (Math.cos(p.angle) - Math.cos(angle)) : Math.sin(angle) * step);
-          if (Math.hypot(x - home.x, y - home.y) > limit + 1e-8) { valid = false; break; }
+          if ((square?Math.max(Math.abs(x-home.x),Math.abs(y-home.y)):Math.hypot(x - home.x, y - home.y)) > limit + 1e-8) { valid = false; break; }
           p = { x, y, angle, distance: p.distance + step }; points.push(p);
         }
       };

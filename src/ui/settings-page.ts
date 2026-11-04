@@ -8,14 +8,15 @@ import { LANGUAGES, isLanguage, t } from "../i18n/index.ts";
 
 /** The settings on the page, in order; each control comes from its row in SETTINGS. */
 /** Gameplay settings, under their own heading first. */
-const GAMEPLAY = ["showEmpty", "raiseDrag", "magnifier", "tripleTapFlag"] as const satisfies readonly SettingKey[];
+const GAMEPLAY = ["showEmpty"] as const satisfies readonly SettingKey[];
+const CONTROLS = ["dragRally", "dragCrosshair", "raiseDrag", "magnifier", "tripleTapFlag"] as const satisfies readonly SettingKey[];
 const PAGE = ["pixelArt", "legacyGraphics", "legacyWalls", "dayNightCycle", "fasterSunCatchup", "reduceMotion", "effectsOff", "simpleEnemies", "simpleTroops", "mergedOutlines", "pixelPortals", "crispZoom", "hdSand", "ultraGraphics", "tileGrid", "soundOff", "ambienceOff", "pixelFont"] as const satisfies readonly SettingKey[];
 /** The dev options, under ALL ON. */
 const DEV = ["devMode", "devTowers", "devJournal", "instantResearch"] as const satisfies readonly SettingKey[];
 /** All research unlocked: the Smithy's rows and each skill tree. */
 const RESEARCH = ["devSmithy", "devCommand", "devStewardship", "devMine", "devLibrary"] as const satisfies readonly SettingKey[];
 const ALL_DEV = DEV_OPTIONS;
-type PageKey = (typeof GAMEPLAY)[number] | (typeof PAGE)[number] | (typeof ALL_DEV)[number] | "developerMode";
+type PageKey = (typeof CONTROLS)[number] | (typeof GAMEPLAY)[number] | (typeof PAGE)[number] | (typeof ALL_DEV)[number] | "developerMode";
 
 /** One toggle's checkbox, showing its current value. */
 function checkbox(key: PageKey, ctx: AppContext): string {
@@ -89,6 +90,7 @@ export function renderSettingsPage(ctx: AppContext) {
     `<div class="page-title"><small>${t("settings.tagline")}</small><h2>${t("nav.settings")}</h2></div>` +
     `<div class="setting language-setting"><span>${t("settings.language")}</span><button id="language" class="language-current" aria-haspopup="dialog" aria-label="${t("settings.chooseLanguage")}">${LANGUAGES.find(l => l.code === settings.language)!.name} ▾</button></div><p class="hint language-note">${t("settings.languageNote")}</p>` +
     section("gameplay", t("settings.gameplay"), GAMEPLAY.map((key) => control(key, ctx)).join("")) +
+    section("controls", t("settings.controls"), CONTROLS.map((key) => control(key,ctx)).join("")) +
     section("display", t("settings.display"),
       PAGE.map((key) => control(key, ctx) + (key === "tileGrid" ? gridControls(ctx) : key === "dayNightCycle" ? daylightControls(ctx) : key === "fasterSunCatchup" ? `<p class="hint">${t("settings.fasterSunCatchupHint")}</p>` : key === "crispZoom" ? resolutionControls(ctx) : key === "ultraGraphics" ? `<p class="hint">${t("settings.ultraGraphicsHint")}</p>` : "")).join("") +
       control("developerMode", ctx)) +
@@ -109,7 +111,7 @@ export function renderSettingsPage(ctx: AppContext) {
     ctx.devChanged();
     renderSettingsPage(ctx);
   };
-  for (const key of [...GAMEPLAY, ...PAGE, ...(settings.developerMode ? ALL_DEV : [])]) {
+  for (const key of [...GAMEPLAY, ...CONTROLS, ...PAGE, ...(settings.developerMode ? ALL_DEV : [])]) {
     const row = SETTINGS[key], input = el(row.page.id) as HTMLInputElement;
     input.onchange = () => {
       settings[key] = "invert" in row.page ? !input.checked : input.checked;

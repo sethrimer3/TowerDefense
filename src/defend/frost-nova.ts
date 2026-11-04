@@ -1,3 +1,4 @@
+import { inSquare } from "./square-range-art.ts";
 import { isBlightWorm } from "./blight-worm-tuning.ts";
 import { fortressAreaTargets } from "./fortress.ts";
 /** DEFEND's Frost nova, a strike spell: cast from the Skills palette onto
@@ -122,8 +123,8 @@ export function stepFrostNova(sim: DefendSim, dt: number) {
       b.t += dt;
       if (b.hit) continue;
       b.hit = true;
-      for (const e of fortressAreaTargets(sim.enemiesNear(b.x, b.y, b.r))) {
-        if (e.hp <= 0 || dist(e.x - b.x, e.y - b.y) > b.r) continue;
+      for (const e of fortressAreaTargets(b.nova ? sim.enemiesInSquare(b.x,b.y,b.r) : sim.enemiesNear(b.x,b.y,b.r))) {
+        if (e.hp <= 0 || (!b.nova && dist(e.x - b.x, e.y - b.y) > b.r)) continue;
         if (b.nova) {
           freeze(sim, e, b.freeze);
           continue;
@@ -152,15 +153,15 @@ export function stepFrostNova(sim: DefendSim, dt: number) {
     if (blizzard) hunt(sim, f, BLIZZARD.speed[blizzard] * dt);
     const pulse = blizzard >= 2 && (f.pulse -= dt) <= 0;
     if (pulse) f.pulse += BLIZZARD.pulse;
-    for (const e of fortressAreaTargets(sim.enemiesNear(f.x, f.y, f.r))) {
-      if (e.hp <= 0 || dist(e.x - f.x, e.y - f.y) > f.r) continue;
+    for (const e of fortressAreaTargets(sim.enemiesInSquare(f.x, f.y, f.r))) {
+      if (e.hp <= 0) continue;
       if (!ENEMIES[e.kind].unyielding || isBlightWorm(e.kind)) e.chill = Math.max(e.chill ?? 0, FROST_NOVA.chill);
       sim.hurtEnemy(e, bite * dt, false);
       if (pulse) freeze(sim, e, BLIZZARD.pulseFreeze);
     }
     if (ward >= 3)
       for (const s of sim.soldiers)
-        if (s.hp > 0 && dist(s.x - f.x, s.y - f.y) <= f.r) s.hp = Math.min(s.maxHp, s.hp + s.maxHp * RIME_WARD.heal * dt);
+        if (s.hp > 0 && inSquare(f,s.x,s.y)) s.hp = Math.min(s.maxHp, s.hp + s.maxHp * RIME_WARD.heal * dt);
   }
   sim.rime = sim.rime.filter((f) => f.t < f.life);
 }

@@ -1,3 +1,4 @@
+import { ordersOf, targetComparator } from "./building-orders.ts";
 import { groundMeleeTarget } from "./catalog.ts";
 import {chargeIdle,chronoTarget} from "./chrono.ts";
 import { archerAttunement, looseBowJavelin, looseSkyArrow, skirmishTargets } from "./archer-attunements.ts";
@@ -201,14 +202,15 @@ class Patrol {
 
   covers(e: Enemy) {
     const { hc, leash } = this;
-    return (this.citywide ? inCity(this.sim, e) : sq(e.x - hc.x) + sq(e.y - hc.y) <= sq(leash)) && within(this.bounds, e, 1);
+    return (this.citywide ? inCity(this.sim, e) : Math.abs(e.x-hc.x)<=leash && Math.abs(e.y-hc.y)<=leash) && within(this.bounds, e);
   }
 
   /** Enemies it may go after, nearest `s` first (a headhunter's toughest first). */
   candidates(s: Soldier) {
-    const near = this.citywide ? this.sim.enemies.filter((e) => this.covers(e)) : this.sim.enemiesNear(this.hc.x, this.hc.y, this.leash);
-    const all = (this.bounds && !this.citywide ? near.filter((e) => within(this.bounds, e, 1)) : near).filter(groundMeleeTarget);
-    return firstSorted(all, this.toughest ? toughestFirst(s) : byDistanceFrom(s), 3);
+    const near = this.citywide ? this.sim.enemies.filter((e) => this.covers(e)) : this.sim.enemiesInSquare(this.hc.x, this.hc.y, this.leash);
+    const all = (this.bounds && !this.citywide ? near.filter((e) => within(this.bounds, e)) : near).filter(groundMeleeTarget);
+    const mode=ordersOf(this.sim,this.sim.map.buildings[s.home]).targetMode;
+    return firstSorted(all, mode?targetComparator(this.sim,mode,s,all):this.toughest ? toughestFirst(s) : byDistanceFrom(s), 3);
   }
 
   get limits(): PathLimits {
@@ -325,10 +327,10 @@ export function stepArcher(sim: DefendSim, s: Soldier, dt: number) {
   if (close) return thrust(sim, s, close, bannerDamage(sim, s));
   const charge = charges(sim, s);
   // Big game: the toughest in reach rather than the nearest.
-  const pick = (pool?: Enemy[]) => bigGame(sim, s, range, pool) ?? toughestInReach(sim, s, range, pool)
+  const pick = (pool?: Enemy[]) => (ordersOf(sim,sim.map.buildings[s.home]).targetMode?sim.troopTarget(s,range,()=>true,pool):null) ?? bigGame(sim, s, range, pool) ?? toughestInReach(sim, s, range, pool)
     ?? (pool || skyranger && s.kind === "archer"
       ? nearest(pool ?? sim.enemies, s, range * range, true)
-      : sim.nearestEnemy(s.x, s.y, range));
+      : sim.troopTarget(s,range));
   // The gunner line shoots flat: only at an enemy in clear sight.
   const flat = shootsFlat(s.kind);
   const { near, pool } = flat ? lookOut(sim, s, range, pick) : { near: pick(), pool: undefined };
@@ -420,7 +422,7 @@ function shoot(sim: DefendSim, s: Soldier, e: Enemy, range: number, pool?: Enemy
 function hunt(sim: DefendSim, s: Soldier) {
   s.thinkT = 0.6;
   const bounds = deployment(sim, s);
-  const prey = firstSorted(sim.enemies.filter((e) => !e.untargetable && e.hp > 0 && inCity(sim, e) && within(bounds, e)), byDistanceFrom(s), 3);
+  const prey = firstSorted(sim.enemies.filter((e) => !e.untargetable && e.hp > 0 && inCity(sim, e) && within(bounds, e)), targetComparator(sim,ordersOf(sim,sim.map.buildings[s.home]).targetMode??"closest",s), 3);
   const e = pathToFirst(sim, s, prey, CITYWIDE);
   if (e) s.target = e.id;
 }

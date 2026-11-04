@@ -1,3 +1,7 @@
+import { PlacedBuildingMenu } from "../ui/placed-building-menu.ts";
+import { decodeOrders } from "../defend/building-orders.ts";
+import { applyOrders, aimPoint, controlsOf } from "../defend/building-controls.ts";
+import { center } from "../defend/pathing.ts";
 /** Native board, pointer transactions and controls; rules live in AmbushSim. */
 import { BattleSound } from "../defend/battle-sound.ts";
 import { play } from "../sound.ts";
@@ -39,6 +43,16 @@ export class AmbushBattlePage {
   private last = 0;
   private paused = false;
   private picked: number | undefined;
+  private menu = new PlacedBuildingMenu({
+    board:()=>this.canvas.parentElement!,renderer:()=>this.renderer,map:()=>this.sim.map,source:()=>this.sim.engine,
+    orders:b=>decodeOrders(this.sim.engine.orders.get(b.id)),
+    change:(b,o)=>applyOrders(this.sim.engine,b,o),
+    spec:b=>({name:STRUCTURES[b.kind as StructureKind]?.name??b.kind,tree:true,remove:b.kind!=="keep"?{kind:"sell",gold:this.sim.refund(b.id)}:null}),
+    tree:b=>{this.treePicked=b.id;this.picked=b.id;this.toggleSide(true);this.refresh();},
+    remove:b=>{this.sim.remove(b.id);this.picked=undefined;this.treePicked=undefined;this.refresh();},
+    closed:()=>{this.picked=undefined;this.treePicked=undefined;this.refresh();},
+  });
+  private treePicked:number|undefined;
   private notice = "";
   private now = 0;
   /** When the flier warning went up, on the wall clock; unset while none shows. */
@@ -73,6 +87,7 @@ export class AmbushBattlePage {
       aim: (e) => this.aimBuilding(e),
       pickUp: (e) => this.lift(e),
       drop: (d) => this.drop(d),
+      hold:edit=>{if(edit.drag.from!=="structure")return false;this.picked=edit.drag.uid;this.treePicked=edit.drag.uid;this.menu.dismiss(false);this.toggleSide(true);this.refresh();return true;},
       tap: (e) => this.tap(e),
     });
     this.canvas.onpointerdown = (e) => this.pointers.down(e);
@@ -83,8 +98,10 @@ export class AmbushBattlePage {
       }
     };
     this.root.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") this.spellBar?.cancel();
+      if (e.key === "Escape") {this.spellBar?.cancel();}
     });
+    document.addEventListener("keydown",e=>{if(e.key==="Escape"&&this.menu.element)this.menu.escape();});
+    document.addEventListener("pointerdown",e=>{const target=e.target as Node;if(this.menu.element&&!this.menu.element.contains(target)&&target!==this.canvas)this.menu.dismiss();});
     this.canvas.oncontextmenu = (e) => e.preventDefault();
     this.canvas.addEventListener(
       "wheel",
@@ -111,6 +128,7 @@ export class AmbushBattlePage {
   }
   reset() {
     this.pause();
+    this.menu.dismiss(false);this.treePicked=undefined;
     this.sim = new AmbushSim(this.index, this.host.save());
     this.paused = false;
     this.picked = undefined;
@@ -175,7 +193,7 @@ export class AmbushBattlePage {
             <div class="campaign-roster defend-palette" id="ambush-palette"></div>
             <div id="ambush-inspect" hidden>
               <div class="ambush-building-details"></div>
-              <div class="campaign-inspect-actions"><button data-action="close">${t("ambush.close")}</button><button data-action="sell"></button></div>
+              <div class="campaign-inspect-actions" hidden><button data-action="close">${t("ambush.close")}</button><button data-action="sell"></button></div>
             </div>
           </div>
         </aside>
@@ -257,22 +275,29 @@ export class AmbushBattlePage {
       paintIcon(b.querySelector("canvas")!, kind);
       b.onpointerdown = (e) => {
         if (b.disabled || e.button !== 0) return;
-        this.picked = undefined;
+        this.menu.dismiss(false);this.treePicked=undefined;this.picked = undefined;
         this.pointers.begin(new AmbushDrag(kind, this.sim.grid, this.sim.buildings), e, false);
       };
     });
   }
   private lift(e: PointerEvent) {
-    if (this.spellBar?.armed || this.sim.phase !== "build") return false;
+    if (this.menu.placing || this.spellBar?.armed || this.sim.phase !== "build") return false;
     const p = this.renderer.toCell(e.clientX, e.clientY);
     const b = this.at(p.fx, p.fy);
     if (!b) return false;
     this.picked = b.id;
-    this.pointers.begin(new AmbushDrag(b.kind as PlacedKind, this.sim.grid, this.sim.buildings, b.id), e, false);
+    this.pointers.begin(new AmbushDrag(b.kind as PlacedKind, this.sim.grid, this.sim.buildings, b.id), e);
     return true;
   }
   private drop(drop: Drop) {
     if (drop.kind !== "build") return;
+    if(drop.tap) {
+      const id=this.picked;
+      if(id!==undefined&&this.menu.building?.id!==id)this.menu.show(this.sim.map.buildings[id]);
+      else {this.menu.dismiss(false);this.picked=undefined;}
+      this.treePicked=undefined;this.refresh();return;
+    }
+    this.menu.dismiss(false);this.treePicked=undefined;
     const p = drop.layout.structures[0];
     if (p) {
       const ok = p.uid < 0 ? this.sim.placeAt(p.kind, p.qx, p.qy) : this.sim.moveTo(p.uid, p.qx, p.qy);
@@ -294,9 +319,12 @@ export class AmbushBattlePage {
       this.refresh();
       return;
     }
+    if(this.menu.tap({x:p.fx,y:p.fy}))return;
     if (this.sim.phase === "battle" && this.rallyTap(e)) return;
     // A tap only picks a building or puts the panel away; buildings are dragged in from the palette, as in Defend.
-    this.picked = b?.id;
+    this.treePicked=undefined;
+    this.picked = b?.id===this.picked?undefined:b?.id;
+    if(this.picked!==undefined)this.menu.show(this.sim.map.buildings[this.picked]);else this.menu.dismiss(false);
     this.refresh();
   }
   /** In battle, as in Defend: a second tap (a third with the triple tap setting) close to the one
@@ -323,16 +351,17 @@ export class AmbushBattlePage {
   /** In battle, a press on the picked troop building (or its rally flag) drags out its rally point,
    * riding above the finger as in Defend; let go without dragging, it is a tap. */
   private aimBuilding(e: PointerEvent): BoardAim | null {
-    const sim = this.sim.engine,
-      picked = this.picked;
-    if (this.sim.phase !== "battle" || picked === undefined || this.spellBar?.armed) return null;
+    const sim = this.sim.engine;
+    if (this.sim.phase !== "battle" || this.menu.placing || this.spellBar?.armed) return null;
     const p = eventCell(this.renderer, e);
     if (!p.inside) return null;
-    const b = sim.map.buildings[picked];
+    const hit=this.at(p.fx,p.fy);
+    const b = sim.map.buildings[hit?.id??this.picked??-1];
     if (!b || !sim.intact(b)) return null;
-    const circle = deployCircle(b, sim.bonuses);
-    if (!circle) return null;
-    const handle = sim.rallies.get(b.id),
+    const controls=controlsOf(b,sim),settings=this.host.save().settings;
+    if(controls==="plain" || !(controls==="troops"?settings.dragRally:settings.dragCrosshair))return null;
+    const circle = controls==="troops"?deployCircle(b,sim.bonuses,sim):null;
+    const handle = circle?sim.rallies.get(b.id):sim.crosshairs.get(b.id),
       r = b.rect;
     const onIt = p.fx >= r.x && p.fy >= r.y && p.fx <= r.x + r.w && p.fy <= r.y + r.h;
     if (!onIt && !(handle && Math.hypot(p.fx - handle.x, p.fy - handle.y) < 1.2)) return null;
@@ -343,11 +372,13 @@ export class AmbushBattlePage {
       return { x: q.fx, y: Math.max(0, q.fy - this.pointers.raise) };
     };
     const preview = (ev: PointerEvent) => {
-      const point = rallyAim(b, at(ev), circle, towers),
+      const p=at(ev),home=b.rect;
+      const point = p.x>=home.x&&p.x<=home.x+home.w&&p.y>=home.y&&p.y<=home.y+home.h?undefined:aimPoint(b,sim,sim.map,p),
         old = this.aimPreview;
       this.aimPreview = { id: b.id, point, since: old?.id === b.id && !old.point && !point ? old.since : performance.now() };
     };
     return {
+      hold:()=>{this.menu.dismiss(false);this.picked=b.id;this.treePicked=b.id;this.toggleSide(true);this.refresh();},
       move: preview,
       focus: at,
       end: (ev, commit, moved) => {
@@ -359,7 +390,9 @@ export class AmbushBattlePage {
         preview(ev);
         const point = this.aimPreview?.point;
         this.aimPreview = null;
-        sim.setRally(b.id, point ?? null);
+        const next=decodeOrders(sim.orders.get(b.id)),key=circle?"rally":"crosshair",c=center(b.rect);
+        if(point)next[key]={x:point.x-c.x,y:point.y-c.y};else delete next[key];
+        applyOrders(sim,b,next);this.picked=b.id;this.menu.show(b);
         play("banner");
         this.notice = point ? "" : "Rally point cleared: the troops go their own ways.";
         this.refresh();
@@ -420,8 +453,8 @@ export class AmbushBattlePage {
         (s.waves[s.wave - 1]?.boss ? " · " + t("ambush.boss") : "") +
         " · " +
         t("ambush.enemiesLeft", { count: s.enemiesLeft });
-    this.root.querySelector<HTMLElement>("#ambush-inspect")!.hidden = !b;
-    this.root.querySelector<HTMLElement>("#ambush-palette")!.hidden = !!b;
+    this.root.querySelector<HTMLElement>("#ambush-inspect")!.hidden = !b||this.treePicked!==b.id;
+    this.root.querySelector<HTMLElement>("#ambush-palette")!.hidden = !!b&&this.treePicked===b.id;
     const sell = this.root.querySelector<HTMLButtonElement>('[data-action="sell"]')!;
     if (b) {
       this.panel(b);
@@ -518,6 +551,7 @@ export class AmbushBattlePage {
           return { rect: m.rect, mask: s.engine.intact(m) ? spriteFootprint(s.map, m, looks[b.id]) : null };
         }),
       );
+    this.menu.position();
     r.draw(s.map, s.engine, this.pointers.session?.overlay() ?? this.spellBar?.overlay(s.engine) ?? null, {
       area: s.level.area,
       grid: 0,

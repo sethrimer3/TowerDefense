@@ -111,8 +111,9 @@ function murderHoles(sim: DefendSim, dt: number) {
     if (!sim.ownsBuilding(b)) continue;
     if (!sim.intact(b)) continue;
     const c = center(b.rect);
-    for (const e of sim.enemiesNear(c.x, c.y, Math.max(b.rect.w, b.rect.h) / 2 + PORTCULLIS.reach + 1)) {
-      if (e.hp <= 0 || !onFoot(e) || rectDist(b.rect, e.x, e.y) > PORTCULLIS.reach + enemySize(e) / 2) continue;
+    for (const e of sim.enemiesInSquare(c.x, c.y, Math.max(b.rect.w, b.rect.h) / 2 + PORTCULLIS.reach + 1)) {
+      const r=b.rect,dx=Math.max(r.x-e.x,0,e.x-r.x-r.w),dy=Math.max(r.y-e.y,0,e.y-r.y-r.h);
+      if (e.hp <= 0 || !onFoot(e) || Math.max(dx,dy) > PORTCULLIS.reach + enemySize(e) / 2) continue;
       sim.hurtEnemy(e, damage, true, "ranged", { x: c.x, y: c.y, building: b.id }, false, rank >= 3 ? "fire" : "physical");
       if (rank >= 3 && e.hp > 0) ignite(e, PORTCULLIS.burnDps * sim.bonuses.towerDamage, PORTCULLIS.burn);
     }
@@ -145,7 +146,7 @@ function gateTowers(sim: DefendSim, dt: number) {
     gateTowerSpots(b, rank >= GATE_TOWERS.twin).forEach((at, n) => {
       const key = gateTowerKey(b, n), left = (sim.gateTowerT.get(key) ?? 0) - dt;
       if (left > 0) return void sim.gateTowerT.set(key, left);
-      const target = nearest(sim.enemiesNear(at.x, at.y, range), at, sq(range));
+      const target = sim.nearestEnemyInSquare(at.x,at.y,range,false);
       if (!target) return void sim.gateTowerT.set(key, 0);
       sim.gateTowerT.set(key, GATE_TOWERS.cooldown * sim.bonuses.towerReload);
       fireBolt(sim, at, target, key, b.id, { damage, range, pierce: GATE_TOWERS.pierce[rank], small: true });

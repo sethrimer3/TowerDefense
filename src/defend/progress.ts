@@ -1,3 +1,4 @@
+import { decodeOrders } from "./building-orders.ts";
 import { decodeRepairRanks, type RepairRanks } from "../repair-upgrades.ts";
 import { decodeChronoRanks, type ChronoRanks } from "../chrono-upgrades.ts";
 /** Persistent DEFEND state: the city layout the player designed, what they
@@ -393,7 +394,7 @@ const tileOk = (tx: unknown, ty: unknown) => int(tx, 0, TILES_W - 1) && int(ty, 
  * their tiles, and failing that the newest go back to the palette. */
 function decodeLayout(s: any, owned: Record<PaletteItem, number>, levels: Record<UpgradeId, number>, inner: boolean, legacyCompact: PlacedKind[] = [], recovered: PlacedStructure[] = []): Layout | null {
   if (!isObject(s) || !tileOk(s.keep?.tx, s.keep?.ty) || !int(s.nextUid, 1, 1e9)) return null;
-  const keep = { tx: s.keep.tx, ty: s.keep.ty };
+  const keep = { tx: s.keep.tx, ty: s.keep.ty, ...decodeOrders(s.keep) };
   const cityTiles = decodeCityTiles(s.cityTiles, tileKey(keep.tx, keep.ty));
   const decoded = decodeStructures(s.structures, s.nextUid);
   if (!cityTiles || !decoded) return null;
@@ -483,7 +484,7 @@ function decodeStructures(list: unknown, nextUid: number): { structures: PlacedS
     const placed = int(p.qx, 0, QUARTERS_W - 1) && int(p.qy, 0, QUARTERS_H - 1) && Math.floor(p.qx / QUARTER) === p.tx && Math.floor(p.qy / QUARTER) === p.ty;
     if (!placed) unplaced.push(p.uid);
     // A path is kept only if it is the structure's own.
-    structures.push({ uid: p.uid, kind: p.kind, tx: p.tx, ty: p.ty, qx: placed ? p.qx : p.tx * QUARTER, qy: placed ? p.qy : p.ty * QUARTER, ...wearOn(p.kind, p) });
+    structures.push({ uid: p.uid, kind: p.kind, tx: p.tx, ty: p.ty, qx: placed ? p.qx : p.tx * QUARTER, qy: placed ? p.qy : p.ty * QUARTER, ...wearOn(p.kind, p), ...decodeOrders(p) });
   }
   return { structures, unplaced };
 }
@@ -494,7 +495,7 @@ function decodeGates(list: unknown, cityTiles: Set<string>): GateSpot[] | null {
   const out: GateSpot[] = [];
   for (const g of list) {
     if (!isObject(g) || !tileOk(g.tx, g.ty) || !SIDES.includes(g.side)) return null;
-    const spot: GateSpot = { tx: g.tx, ty: g.ty, side: g.side };
+    const spot: GateSpot = { tx: g.tx, ty: g.ty, side: g.side, ...decodeOrders(g) };
     if (!gateOk(cityTiles, spot) || out.some((o) => sameGate(o, spot))) return null;
     out.push(spot);
   }
@@ -507,7 +508,7 @@ function decodeCorners(list: unknown, cityTiles: Set<string>): CornerSpot[] | nu
   const out: CornerSpot[] = [];
   for (const v of list) {
     if (!isObject(v) || !int(v.vx, 1, TILES_W - 1) || !int(v.vy, 1, TILES_H - 1)) return null;
-    const spot: CornerSpot = { vx: v.vx, vy: v.vy };
+    const spot: CornerSpot = { vx: v.vx, vy: v.vy, ...decodeOrders(v) };
     if (!cornerOk(cityTiles, spot) || out.some((o) => sameCorner(o, spot))) return null;
     out.push(spot);
   }

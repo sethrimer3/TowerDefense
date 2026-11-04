@@ -24,7 +24,7 @@ try {
     const fixture = await page.evaluate(async () => {
       const { defaults } = await import('/src/save.ts');
       const { placeCityTile, placeGate, placeBallista } = await import('/src/defend/layout.ts');
-      const s = defaults(); s.settings.soundOff = true; s.settings.ambienceOff = true;
+      const s = defaults(); s.profile = { name: "Building tester", flag: {base:3,layers:[]} }; s.settings.soundOff = true; s.settings.ambienceOff = true;
       s.knowledge = 100000; s.defend.owned.cityGate = 1; s.defend.owned.wallBallista = 1;
       let l = s.defend.layout;
       const k = l.keep;
@@ -71,7 +71,7 @@ try {
 
     // The gate's tree.
     await tap(await spot('gate'));
-    await page.waitForSelector('#defend-specialty:not([hidden])');
+    if(await page.locator('.building-menu [data-bm="tree"]').count()) await page.locator('.building-menu [data-bm="tree"]').click(); await page.waitForSelector('#defend-specialty:not([hidden])');
     assert.match(await panel.locator('.ug-title').textContent(), /City gate/);
     assert.equal(await panel.locator('.ug-node.next').count(), 3, 'three branches from the gate');
     await buy('q:portcullis:1');
@@ -84,7 +84,7 @@ try {
 
     // The ballistas' tree.
     await tap(await spot('wallBallista'));
-    await page.waitForSelector('#defend-specialty:not([hidden])');
+    if(await page.locator('.building-menu [data-bm="tree"]').count()) await page.locator('.building-menu [data-bm="tree"]').click(); await page.waitForSelector('#defend-specialty:not([hidden])');
     assert.match(await panel.locator('.ug-title').textContent(), /Wall ballista/);
     await buy('q:fireBolts:1');
     await buy('q:windlass:1');

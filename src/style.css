@@ -2593,3 +2593,9 @@ nav button[data-mode] > .tab-label { min-height: 2.4em; }
  * square range under them shows. */
 .building-menu .bm-bar { transition: opacity 120ms; }
 .building-menu.adjusting .bm-bar:not(.bm-right) { opacity: 0.2; pointer-events: none; }
+
+.building-menu.placing { pointer-events:none; background:none; border-color:transparent; box-shadow:none; }
+.building-menu.placing > .bm-bar { visibility:hidden; }
+.building-menu.placing .bm-aim { visibility:visible; pointer-events:auto; }
+.building-menu.placing .bm-aim button { outline:2px solid var(--brass); }
+.campaign-inspect-actions[hidden] { display:none; }

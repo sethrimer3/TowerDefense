@@ -1,3 +1,4 @@
+import { rangeScale } from "./building-orders.ts";
 import { enemyFlying } from "./catalog.ts";
 import {captureShot,shotField,chronoTarget} from "./chrono.ts";
 import { spikeKey } from "../specializations.ts";
@@ -162,8 +163,8 @@ export const wallBallistaReload = (sim: Pick<DefendSim, "levels" | "bonuses">) =
 /** A standing ballista shoots the nearest enemy in range, turning to it:
  * one bolt, or with Windlass III a fan of three. */
 export function shootBallista(sim: DefendSim, b: Building): boolean {
-  const c = center(b.rect), range = wallBallistaRange(sim);
-  const target = nearest(sim.enemiesNear(c.x, c.y, range), c, sq(range)) ?? chronoTarget(sim,c,range,true,b.id);
+  const c = center(b.rect), range = wallBallistaRange(sim) * rangeScale(sim,b);
+  const target = sim.buildingTarget(b,range) ?? chronoTarget(sim,c,range,true,b.id);
   if (!target) return false;
   const ranks = sim.bonuses.ballista;
   const heavy = ballistaRank(ranks, "heavyBolts"), fire = ballistaRank(ranks, "fireBolts"), fan = ballistaRank(ranks, "windlass") >= 3;
@@ -189,7 +190,7 @@ export function fireBolt(sim: DefendSim, from: Point, target: Point, aim: number
   const heads = o.fan ? [[dx, dy], [dx * cos - dy * sin, dx * sin + dy * cos], [dx * cos + dy * sin, -dx * sin + dy * cos]] : [[dx, dy]];
   for (const [hx, hy] of heads)
     sim.ballistaBolts.push({
-      x: from.x, y: from.y, dx: hx, dy: hy, left: o.range + 1, range: o.range + 1, pierce: o.pierce, damage: o.damage, hits: [], building, aim,
+      x: from.x, y: from.y, dx: hx, dy: hy, left: o.range / Math.max(Math.abs(hx),Math.abs(hy)) + 1, range: o.range / Math.max(Math.abs(hx),Math.abs(hy)) + 1, pierce: o.pierce, damage: o.damage, hits: [], building, aim,
       ...(o.small ? { small: true } : {}), ...o.extra,
     });
 }

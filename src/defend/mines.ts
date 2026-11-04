@@ -1,3 +1,5 @@
+import { rangeScale } from "./building-orders.ts";
+import { clampToSquare, inSquare } from "./square-range-art.ts";
 import { enemyFlying } from "./catalog.ts";
 /** Per-battle Minelayer ammunition and aim. Only this attunement draws RNG here. */
 import { dist, sq } from "../exact.ts";
@@ -19,8 +21,7 @@ export function mineAim(b: Building, p: Point): Point | undefined {
   if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return undefined;
   const r = b.rect;
   if (p.x >= r.x && p.y >= r.y && p.x <= r.x + r.w && p.y <= r.y + r.h) return undefined;
-  const c = center(r), d = dist(p.x - c.x, p.y - c.y), k = Math.min(1, mineRange() / d);
-  return { x: c.x + (p.x - c.x) * k, y: c.y + (p.y - c.y) * k };
+  return clampToSquare({...center(r),r:mineRange()},p);
 }
 
 /** Actual open ground; pond and boat water are invalid even without solidity. */
@@ -44,13 +45,14 @@ export function mineCount(sim: DefendSim, owner: number): number {
 export function fireMine(sim: DefendSim, b: Building): boolean {
   const rank = mineRank(sim, b);
   if (mineCount(sim, b.id) >= MINELAYER.cap[rank]) return false;
-  const c = center(b.rect), aim = rank ? sim.mineAims.get(b.id) : undefined;
-  const disk = aim ?? c, radius = aim ? MINELAYER.scatter : mineRange();
+  const c = center(b.rect), aim = sim.mineAims.get(b.id);
+  const reach=mineRange()*rangeScale(sim,b);
+  const disk = aim ?? c, radius = aim ? 2 : reach;
   for (let i = 0; i < MINELAYER.attempts; i++) {
     const dx = (sim.rand() * 2 - 1) * radius, dy = (sim.rand() * 2 - 1) * radius;
-    if (sq(dx) + sq(dy) > sq(radius)) continue;
+
     const x = disk.x + dx, y = disk.y + dy;
-    if (sq(x - c.x) + sq(y - c.y) > sq(mineRange()) || !mineGround(sim, x, y)) continue;
+    if (!inSquare({...c,r:reach},x,y) || !mineGround(sim, x, y)) continue;
     sim.shells.push({ x0: c.x, y0: c.y - .4, x1: x, y1: y, t: 0, dur: .45 + dist(x - c.x, y - c.y) * .07,
       damage: cannonDamage(sim.levels.cannonDamage) * sim.bonuses.towerDamage, r: cannonSplash(sim.levels.cannonDamage),
       origin: { ...c, building: b.id }, mine: { smart: rank >= 3 } });
@@ -85,7 +87,7 @@ export function stepMines(sim: DefendSim, dt: number) {
       for (let i = 0; i < steps && d > 0; i++) {
         const x = m.x + ux * travel / steps;
         const y = m.y + uy * travel / steps;
-        if (sq(x - m.origin.x) + sq(y - m.origin.y) > sq(mineRange()) || !mineGround(sim, x, y)) break;
+        if (!inSquare({...m.origin,r:mineRange()*rangeScale(sim,sim.map.buildings[m.origin.building])},x,y) || !mineGround(sim, x, y)) break;
         m.x = x; m.y = y;
       }
     }

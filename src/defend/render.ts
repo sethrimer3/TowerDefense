@@ -1,3 +1,4 @@
+import type { Building } from "./citygen.ts";
 import { enemyFlying } from "./catalog.ts";
 import { CityLife } from "./city-life.ts";
 import { drawCityLife } from "./city-life-art.ts";
@@ -47,8 +48,8 @@ import { UnitOutline, type UnitInks } from "./unit-outline.ts";
 import { garrisoned } from "./garrison-icons.ts";
 import { carriedLights, drawDamage, drawScorches, drawUnits, shadowCasters, type Brush, type Burning } from "./battle-art.ts";
 import { drawGrid, drawLifting, drawOverlay, type Overlay } from "./edit-overlay.ts";
-import { drawInspect, type Armed } from "./inspect.ts";
-import { drawShimmer } from "./placed-shimmer.ts";
+import { drawBuildingOrders, drawInspect, type Armed } from "./inspect.ts";
+import { drawShimmer, drawShimmerFlash, flashAlpha, closeFade } from "./placed-shimmer.ts";
 import { ART } from "./park-art.ts";
 import { drawFlag, drawWarBanner } from "./structure-art.ts";
 import { RallyFlagArt } from "./rally-flag-art.ts";
@@ -134,6 +135,7 @@ export type DrawOptions = {
   gate?: GateRanks;
   /** The building the player tapped (its id in the map), outlined with its
    * reach and troops. */
+  orders?: Armed;
   inspect?: { id: number; armed: Armed; aim?: { point?: { x: number; y: number; tower?: number }; since: number } };
   /** A city tile being held to lift, and how far the hold has come (0–1):
    * a gold square grows from its middle out to its edges. */
@@ -149,6 +151,9 @@ export type DrawOptions = {
 const DOUSE = { delay: 1.2, perCell: 0.16, jitter: 0.6, fade: 0.7 };
 
 export class DefendRenderer {
+  private shimmerOpen = false;
+  private shimmerOpened = 0;
+  private shimmerClosed = -Infinity;
   private readonly collapse = new CollapseView();
   readonly timings = { entityMs: 0, effectsMs: 0, terrainMs: 0 };
   readonly lighting = new DefendLighting();
@@ -457,7 +462,23 @@ export class DefendRenderer {
     this.rallyFlag.draw(this.ctx, this.px, sim, sim?.warBanner?.flag && !opts.hideBanner ? sim.warBanner : null, opts);
     if (sim?.warBanner && !sim.warBanner.flag && !opts.hideBanner) drawWarBanner(this.ctx, this.px, sim.warBanner, bannerReach(sim), { t: opts.now / 1000, reduceMotion: opts.reduceMotion });
     if (sim) this.wizard.drawFire(this.ctx, this.px);
-    if (opts.shimmer && !opts.reduceMotion) drawShimmer(this.ctx, this.px, map, opts.now, (c, b) => paintStanding(c, ART, map, b, this.area, opts.looks), opts.looks);
+    if (!!opts.shimmer !== this.shimmerOpen) {
+      this.shimmerOpen=!!opts.shimmer;
+      if(this.shimmerOpen)this.shimmerOpened=opts.now;
+      else this.shimmerClosed=opts.now;
+    }
+    if(!opts.reduceMotion) {
+      const fade=this.shimmerOpen?1:closeFade((opts.now-this.shimmerClosed)/1000);
+      if(fade>0) {
+        const clock=this.shimmerOpen?opts.now:this.shimmerClosed;
+        const paint=(c:CanvasRenderingContext2D,b:Building)=>paintStanding(c,ART,map,b,this.area,opts.looks);
+        const alpha=flashAlpha((clock-this.shimmerOpened)/1000)*fade;
+        if(alpha>0)drawShimmerFlash(this.ctx,this.px,map,alpha,paint,opts.looks);
+        else drawShimmer(this.ctx,this.px,map,clock-this.shimmerOpened-1200,paint,opts.looks,fade);
+      }
+    }
+    const orders=sim??opts.orders;
+    if(orders)drawBuildingOrders(this.ctx,this.px,map,orders,opts.now,opts.reduceMotion);
     if (opts.inspect) drawInspect(this.ctx, this.px, map, sim, opts.inspect.id, opts.inspect.armed, opts.now, opts.reduceMotion, opts.inspect.aim);
     this.drawEditing(overlay, opts.grid, opts.gridColor);
     if (opts.lifting) drawLifting(this.ctx, this.px, opts.lifting.tile, opts.lifting.t);
