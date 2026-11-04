@@ -114,10 +114,42 @@ function plan_(map: CityMap): CrystalCavesPlan {
     if (shafts.length >= CRYSTAL_CAVES.shafts) break;
     const r = range(...CRYSTAL_CAVES.shaft, hash01(cx, cy, 842)), x = cx + 0.5, y = cy + 0.5;
     if (!clearOf(map, x, y, r * 0.6)) continue;
+    // No holes under the open sky, nor so near its edge that they merge.
+    if (y - r - 4 < openingEdge(x)) continue;
     if (shafts.some((s) => (s.x - x) ** 2 + (s.y - y) ** 2 < CRYSTAL_CAVES.shaftApart ** 2)) continue;
     shafts.push({ x, y, r, seed: hash(cx, cy, 843) });
   }
   return { open, rocks, ponds, crystals, mushrooms, shafts };
+}
+
+/** The great opening in the cave's roof over the top of the board: how far
+ * down its edge comes (as a share of the board's height) and how much it
+ * wanders either way, in cells. */
+export const CAVE_OPENING = { depth: 0.36, wobble: 11, dust: 70 } as const;
+
+/** Smooth value noise along x at `period` cells, -1..1. */
+function noise1(x: number, period: number, salt: number) {
+  const u = x / period, i = Math.floor(u), f = u - i, k = f * f * (3 - 2 * f);
+  const a = hash01(i, 0, salt) * 2 - 1, b = hash01(i + 1, 0, salt) * 2 - 1;
+  return a + (b - a) * k;
+}
+
+/** How far down (cells) the opening's ragged edge comes at `x` (cells; any
+ * x, so it carries on past the board's sides): broad bays and spurs with
+ * smaller jags along them, like a broken cave mouth. Past it the roof goes
+ * on; above it is open sky. */
+export function openingEdge(x: number) {
+  const n = noise1(x, 17, 871) + 0.55 * noise1(x, 6.5, 872) + 0.3 * noise1(x, 2.4, 873) + 0.14 * noise1(x, 0.9, 874);
+  return CELLS_H * CAVE_OPENING.depth + (n / 1.99) * CAVE_OPENING.wobble;
+}
+
+/** Where dust mote `k` in the opening's light is at `t` seconds (cells),
+ * drifting slowly on the air, before `shift` (cells) moves the light. */
+export function openingDustAt(k: number, t: number) {
+  const u = (salt: number) => hash01(k, 877, salt);
+  const x = (u(1) * CELLS_W + t * (u(2) - 0.5) * 0.25 + Math.sin(t * (0.1 + u(3) * 0.15) + u(4) * 6.28) * 0.8 + CELLS_W * 4) % CELLS_W;
+  const y = u(5) * CELLS_H * (CAVE_OPENING.depth + 0.04) + Math.sin(t * (0.08 + u(6) * 0.12) + u(7) * 6.28) * 1.2;
+  return { x, y, twinkle: 0.55 + 0.45 * Math.sin(t * (1.1 + u(8) * 1.4) + u(9) * 6.28) };
 }
 
 /** Where spore `k` of mushroom cluster `m` is at `t` seconds (cells) and how
