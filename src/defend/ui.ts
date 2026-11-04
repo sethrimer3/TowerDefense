@@ -1,3 +1,4 @@
+import { isEconomyBuilding, economyCard, economyLabel, economyAllocated, economySkills, startEconomyResearch } from "../ui/economy-tree.ts";
 import { cityWatch } from "../keep-upgrades.ts";
 import { musterWatch } from "./city-watch.ts";
 import {t} from "../i18n/index.ts";
@@ -83,6 +84,9 @@ export type DefendHost = {
   /** Blight Essence from Dark One kills: add it, store and show it. */
   earnEssence?(amount: number): void;
   persist(): void;
+  clock?(): number;
+  researchers?(): number;
+  openChamber?(where: "smithy" | "study", topic?: string): void;
   reduceMotion(): boolean;
   /** The park grass and pond effects are on. */
   effects(): boolean;
@@ -178,6 +182,7 @@ export class DefendPage {
    * pixels), when, and what was picked out before it. */
   private lastTap: { x: number; y: number; at: number; taps: number; picked: { id: number; armed: Armed } | null } | null = null;
   private lastTime = 0;
+  private economyTreeState = "";
   private performance = new BattlePerformance();
   private frameTimes = new FrameTimeOverlay();
   private performanceEnd: string | null = null;
@@ -260,6 +265,13 @@ export class DefendPage {
     }
     this.fitView();
     this.placeSpecialty();
+    if (this.specialty && !("side" in this.specialty.target)) {
+      const kind = targetKind(this.save, this.specialty.target), game = this.host.game?.();
+      if (isEconomyBuilding(kind) && game) {
+        const state = `${kind}:${economySkills(kind).map(id=>game.skills[id]).join(',')}:${game.researchJob?.id??''}:${Math.floor((this.host.clock?.()??Date.now())/1000)}`;
+        if (state !== this.economyTreeState) { this.economyTreeState = state; this.renderSpecialty(); }
+      }
+    }
     if (this.specialty && !this.pointers.session?.overlay()) this.treeCircle?.frame(time, this.host.reduceMotion() || matchMedia("(prefers-reduced-motion: reduce)").matches);
     const drawing = performance.now();
     this.draw(false);
@@ -1341,6 +1353,10 @@ export class DefendPage {
     el.addEventListener("click", (e) => {
       const t = e.target as Element;
       if (t.closest("[data-specialty-close]")) return this.closeSpecialty();
+      const smithy = t.closest<HTMLButtonElement>('[data-economy-smithy]');
+      if (smithy && !smithy.disabled) return this.host.openChamber?.('smithy',smithy.dataset.economySmithy);
+      const economy = t.closest<HTMLButtonElement>('[data-economy-buy]');
+      if (economy && !economy.disabled) return this.upgrade(economy.dataset.economyBuy!);
       const buy = t.closest<HTMLButtonElement>("[data-ug-buy]");
       if (buy && !buy.disabled) return this.upgrade(buy.dataset.ugBuy!);
       const undo = t.closest<HTMLButtonElement>("[data-ug-undo]");
@@ -1370,6 +1386,16 @@ export class DefendPage {
   private upgrade(id: string) {
     const sp = this.specialty, game = this.host.game?.();
     if (!sp || !game || this.phase !== "build") return;
+    const economyKind = !("side" in sp.target) ? targetKind(this.save, sp.target) : undefined;
+    if (isEconomyBuilding(economyKind)) {
+      if (startEconomyResearch(game, economyKind, id, this.host.clock?.() ?? Date.now(), this.host.researchers?.() ?? 0)) {
+        this.host.spentKnowledge?.();
+        this.host.persist();
+        play('chime');
+        this.renderSpecialty();
+      }
+      return;
+    }
     if ("side" in sp.target) {
       const tree = SIDE_UI[sp.target.side], branch = tree.step(game, id);
       if (!branch) return;
@@ -1460,6 +1486,7 @@ export class DefendPage {
   private again(id: string) {
     const sp = this.specialty, game = this.host.game?.();
     if (!sp || !game || this.phase !== "build") return;
+    if(!("side" in sp.target)&&isEconomyBuilding(targetKind(this.save,sp.target)))return this.upgrade(id);
     if ("side" in sp.target) {
       const tree = SIDE_UI[sp.target.side];
       if (tree.step(game, id)) return this.upgrade(id);
@@ -1548,6 +1575,8 @@ export class DefendPage {
       this.tree = new UpgradeGraph(el.querySelector<HTMLElement>(".ug-host")!, {
         reduceMotion: () => this.host.reduceMotion(),
         paint: (n) => {
+          const current=this.specialty&&!("side" in this.specialty.target)?targetKind(this.save,this.specialty.target):undefined;
+          if(isEconomyBuilding(current)){n.setAttribute('aria-label',economyLabel(current,n.dataset.node!));n.title=economyLabel(current,n.dataset.node!);}
           n.querySelectorAll<HTMLCanvasElement>("canvas[data-icon]").forEach((c) => paintIcon(c, c.dataset.icon as IconItem));
           paintPathIcons(n);
         },
@@ -1570,7 +1599,8 @@ export class DefendPage {
     this.treeCircle.attach(el.querySelector<HTMLElement>(".ug-host")!);
     this.treeCircle.set(specialtyCircle(kind, wear, this.save.keepRanks, this.save.wallRanks, this.save.gateRanks, this.save.ballistaRanks, this.save.revolutionaryRanks, this.save.shadowRanks, this.save.nanoRanks, this.save.chronoRanks, this.save.repairRanks));
     const plainKind = kind as PaletteKind;
-    const spent = side ? side.allocated(game) : plainKind === "repairShop" ? sharedBranches(plainKind)!.allocated(game) : treeAllocated(plainKind, wear);
+    const economy = isEconomyBuilding(kind);
+    const spent = economy ? economyAllocated(game,kind) : side ? side.allocated(game) : plainKind === "repairShop" ? sharedBranches(plainKind)!.allocated(game) : treeAllocated(plainKind, wear);
     const plain = side ? !side.owned(game) : spent === 0 && (plainKind === "wallSpikes" || rootOf(plainKind) === plainKind);
     el.setAttribute("aria-label", `Upgrade tree: ${name}`);
     el.querySelector(".ug-title b")!.textContent = name;
@@ -1581,16 +1611,17 @@ export class DefendPage {
     respec.textContent = "Respec · free";
     respec.title = plain ? "Nothing allocated yet" : side ? `Get all ${spent.toLocaleString("en")} Knowledge back and ${side.plain}` : `Get all ${spent.toLocaleString("en")} Knowledge back and turn it back into ${plainKind === "wallSpikes" ? "a plain row of spikes" : `${mergedFrom(plainKind) ? "three" : "a"} ${ITEM_NAMES[rootOf(plainKind)]}${mergedFrom(plainKind) ? "s, two of them waiting in the palette" : ""}`}`;
     const mapBtn = el.querySelector<HTMLButtonElement>(".ug-map-toggle")!;
-    mapBtn.hidden = !!side || kind === "repairShop";
+    mapBtn.hidden = economy || !!side || kind === "repairShop";
     mapBtn.textContent = sp.map ? "Tree" : "Map";
     mapBtn.title = sp.map ? "Back to this building's upgrade tree" : "Every upgrade discovered by buildings of its line";
     el.classList.toggle("mapping", !!sp.map && !side);
     el.querySelector(".ug-title small")!.textContent = sp.map && !side ? "UPGRADE MAP" : "UPGRADE TREE";
     el.querySelector(".ug-alloc small")!.textContent = sp.map && !side ? "DISCOVERED" : "ALLOCATED";
-    respec.hidden = !!sp.map && !side;
+    respec.hidden = economy || !!sp.map && !side;
     if (sp.map && !side) return this.renderMap(el, plainKind, wear);
     const shared = side ? undefined : this.shared(sp.picked);
-    el.querySelector(".ug-card")!.innerHTML = side ? side.card(game, sp.picked) : shared ? shared.card(game, sp.picked) : treeCardHtml(game, plainKind, wear, sp.picked);
+    el.querySelector(".ug-card")!.innerHTML = economy ? economyCard(game,kind,sp.picked,this.host.researchers?.()??0) : side ? side.card(game, sp.picked) : shared ? shared.card(game, sp.picked) : treeCardHtml(game, plainKind, wear, sp.picked);
+    if(economy)el.querySelector('.ug-alloc')!.setAttribute('title',`${spent} Knowledge invested in ${name} research`);
     this.tree.set(side ? side.graph(game) : graftedGraph(game, plainKind, wear), sp.picked);
     if (focus) el.querySelector<HTMLElement>(".ug-buy:not(:disabled), [data-specialty-close]")?.focus({ preventScroll: true });
   }

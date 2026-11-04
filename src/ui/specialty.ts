@@ -1,3 +1,4 @@
+import { isEconomyBuilding, economyTree } from "./economy-tree.ts";
 import { civilianHp, rebuildSeconds, WATCHMAN } from "../defend/catalog.ts";
 import { REPAIR, REPAIR_PATHS, repairAllocated, repairCrew, respecRepair, undoRepair, upgradeRepair, type RepairRanks, type RepairPathId } from "../repair-upgrades.ts";
 import {CHRONO,CHRONO_PATHS,chronoAllocated,chronoRank,respecChrono,undoChrono,upgradeChrono,type ChronoRanks,type ChronoPathId} from "../chrono-upgrades.ts";
@@ -646,6 +647,7 @@ export const NANO_UI: SideUi = sideUi(NANO_TREE, (s) => s.defend.nanoRanks, {
 export const sharedBranches = (kind: string): SideUi | undefined => (kind === "repairShop" ? REPAIR_UI : kind === "revolutionary" ? REVOLUTIONARY_UI : kind === "shadow" ? SHADOW_UI : kind === "nanoTower" ? NANO_UI : kind === "chronoTower" ? CHRONO_UI : undefined);
 /** A building's tree with its shared branches grafted onto its node. */
 export function graftedGraph(save: Save, kind: PaletteItem | "wallSpikes", wear?: Wear): GraphNode[] {
+  if(isEconomyBuilding(kind))return economyTree(save,kind);
   const own = treeGraph(kind, wear), shared = sharedBranches(kind);
   if (kind === "repairShop" && shared) {
     const innate: GraphNode = { id: "repair:mending", parent: shared.root, state: "owned", face: '<canvas width="33" height="33" data-path-icon="hammer:verdant" aria-label="Mending (initial)"></canvas>', tag: "Initial", hue: "hue-verdant" };

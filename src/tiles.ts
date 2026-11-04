@@ -1,3 +1,4 @@
+import { isEconomyBuilding } from "./realm.ts";
 import { REPAIR_PATHS } from "./repair-upgrades.ts";
 import {CHRONO_PATHS} from "./chrono-upgrades.ts";
 /** The tile collection, as the Tiles tab shows it: everything the player
@@ -133,7 +134,7 @@ export function tileTree(save: Save, id: TileId, key?: string | null): TileTree 
   if (id === "wallBlock") return { side: "walls" };
   if (id === "cityGate") return { side: "gate" };
   if (id === "wallBallista") return { side: "ballistas" };
-  if (universal(id) || !hasTree(id)) return null;
+  if ((universal(id) || !hasTree(id)) && !isEconomyBuilding(id)) return null;
   const stack = tileStack(save, id), copy = tileCopyAt(save, stack, key);
   if (!copy) return null;
   const d = save.defend;

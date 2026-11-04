@@ -1,3 +1,4 @@
+import { economyTree, economyCard, economyLabel, isEconomyBuilding, startEconomyResearch } from "./economy-tree.ts";
 import { hasTree } from "../specializations.ts";
 import { equipmentCopy } from "../equipment.ts";
 import {t as tr, type MessageKey} from "../i18n/index.ts";
@@ -189,6 +190,16 @@ export class Ledger {
       }
       this.render();
     });
+    root.querySelectorAll<HTMLButtonElement>('[data-economy-smithy]').forEach(b=>b.onclick=()=>this.ctx.openChamber('smithy',b.dataset.economySmithy));
+    root.querySelectorAll<HTMLButtonElement>('[data-economy-buy]').forEach(b=>b.onclick=()=>{
+      if (!isEconomyBuilding(topic.id)) return;
+      if (startEconomyResearch(this.save, topic.id, b.dataset.economyBuy!, this.ctx.clock(), this.ctx.researchers())) {
+        if (!this.save.researchJob) this.ctx.researched();
+        this.ctx.update();
+        play('chime');
+        this.render();
+      }
+    });
     if (!this.holding) {
       this.holding = true;
       holdToRepeat(root, ["data-upgrade", "data-train", "data-learn", "data-learn-path"]);
@@ -246,7 +257,7 @@ export class Ledger {
    * unfolds into copies), rather than to every copy alike. */
   private individual(id: TileId) {
     if (TILE_TYPE[id] === "towers" || TILE_TYPE[id] === "units") return true;
-    if (this.kind === "smithy" || id === "repairShop") return false;
+    if (this.kind === "smithy" || id === "repairShop" || isEconomyBuilding(id)) return false;
     const target = tileTree(this.save, id, null);
     return !!target && !("side" in target);
   }
@@ -536,8 +547,8 @@ export class Ledger {
       return `<div class="banner-research"><h3>Bomb · Knowledge tree</h3><p class="ledger-note">Research Gunpowder I, II and III in order. Each rank adds 20% bomb damage. Select a node to inspect or research it.</p><div data-bomb-tree></div><div class="banner-tree-detail" aria-live="polite">${detail}</div></div>`;
     }
     if(t.id==='mine'||t.id==='library'){
-      const picked=(this.picked[t.id]??t.skills![0]) as SkillId;
-      return `<div class="banner-research"><h3>${t.name} · Knowledge tree</h3><div data-economy-tree></div><div class="banner-tree-detail">${skillCard(picked)}</div></div>`;
+      const picked=this.picked[t.id]??`k:${t.id}`;
+      return `<div class="banner-research"><h3>${t.name} · Knowledge tree</h3><div data-economy-tree></div><div class="banner-tree-detail">${economyCard(save,t.id,picked,researchers)}</div></div>`;
     }
     const skills = (t.skills ?? []).map(id => skillCard(id));
     const tree = isSpell(t.id) && pathsOf(t.id).length ? this.spellSetupHtml(t.id) + this.treeHtml(t) : "";
@@ -559,7 +570,7 @@ export class Ledger {
       onPick: select,
       paint: el => {
         const id = el.dataset.node!;
-        const label = bomb ? id === "bomb" ? "Bomb" : `Gunpowder ${ROMAN[Number(id.split(":")[1])]}`
+        const label = isEconomyBuilding(topic.id) ? economyLabel(topic.id,id) : bomb ? id === "bomb" ? "Bomb" : `Gunpowder ${ROMAN[Number(id.split(":")[1])]}`
           : `${SKILLS[id as SkillId].name}, ${skillRank(this.save, id as SkillId)} of ${SKILLS[id as SkillId].max} ranks`;
         el.setAttribute("aria-label", label);
         el.title = label;
@@ -572,11 +583,7 @@ export class Ledger {
     this.skillGraph.el.setAttribute("aria-label", `${topic.name} Knowledge tree`);
     host.append(this.skillGraph.el);
     const economy=topic.id==='mine'||topic.id==='library';
-    const economyNodes=(topic.skills??[]).map(id=>{
-      const skill=SKILLS[id],p=skillPurchase(this.save,id),parent=TREE_OF[id].nodes.find(n=>n.id===id)?.requires[0];
-      return {id,...(parent?{parent}:{}),state:p.level?'owned' as const:p.available?'next' as const:'locked' as const,face:`<span class="banner-node-glyph">${skill.icon}</span>`,tag:`${p.level}/${skill.max}`};
-    });
-    this.skillGraph.set(economy ? economyNodes : bomb ? bombTree(this.save) : bannerTree(this.save), this.picked[topic.id] ?? (economy ? topic.skills![0] : bomb ? `gunpowder:${Math.min(skillRank(this.save, "gunpowder"), 2)}` : "warBanner"));
+    this.skillGraph.set(isEconomyBuilding(topic.id) ? economyTree(this.save,topic.id) : bomb ? bombTree(this.save) : bannerTree(this.save), this.picked[topic.id] ?? (economy ? `k:${topic.id}` : bomb ? `gunpowder:${Math.min(skillRank(this.save, "gunpowder"), 2)}` : "warBanner"));
   }
 
   /** A strike spell is never placed: it casts with one researched path (or

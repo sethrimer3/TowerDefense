@@ -134,6 +134,9 @@ const defendPage = new DefendPage(el("defend"), {
   bonuses: () => bonuses(save),
   game: () => save,
   spentKnowledge: () => { store(); refreshCurrencies(); },
+  clock,
+  researchers: () => ctx.researchers(),
+  openChamber,
   earnWave: (wave) => {
     const r = payWave(save, wave);
     store();

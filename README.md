@@ -2,7 +2,7 @@
 
 The Smithy and Study open on **All**, showing the tiles you own. Select a type to unfold its individual copies, then choose a copy for its equipment or Knowledge tree. **Realm** replaces City and includes the Keep, city tiles, walls, gates, spikes, wall ballistas, Repair shops, Mine and Library. Towers, Infantry and Spells have their own collections. Shared All troops/All towers upgrade cards are retired and refunded on load.
 
-The Mine and Library now have physical city tiles. Each new player owns one of each; place them to immediately unlock their tabs and production. Each snaps to a city tile and reserves the whole tile for itself. Lifting the last copy pauses its work and retains its crew and progress. Their separate Realm tiles open their Knowledge trees and gradual Smithy upgrades for miner/librarian efficiency and power. Individual combat buildings gain their own timed armour and power ranks. [Details and migration](docs/upgrades/REALM_WORKSHOPS.md).
+The Mine and Library now have physical city tiles. Each new player owns one of each; place them to immediately unlock their tabs and production. Each snaps to a city tile and reserves the whole tile for itself. Lifting the last copy pauses its work and retains its crew and progress. Opening their city tiles shows the same connected Knowledge trees as Study → Realm, with each skill branching from the building and its ranks connected in order. Their roots also link to gradual Smithy upgrades for miner/librarian efficiency and power. Individual combat buildings gain their own timed armour and power ranks. [Details and migration](docs/upgrades/REALM_WORKSHOPS.md).
 
 
 A mobile-first city-defense game. You lay out a walled city on a 9 × 13 board, then hold it against waves that keep coming until the keep falls. The Mine produces metals for city elements and upgrades; the Library produces Knowledge for research. Smiths work timed metal upgrades; researchers work timed Knowledge upgrades. Canvas draws the board; plain DOM provides the pages. No backend, no game engine, no framework; progress is kept in `localStorage`.
@@ -60,6 +60,8 @@ The **Mage Guild** trains three attunements of troops: **Stormcallers** cast cha
 Each new furthest wave reached automatically selects the preceding wave for your next defense: reaching wave 10 starts your next run on wave 9, with a minimum of wave 1. Old saves with the former wave-1 default move to this starting wave when migrated. Use the starting-wave picker to replay earlier waves; that choice stays selected until you reach a new record. Reached-wave progress is saved separately from cleared waves and upgrade-point rewards.
 
 ## How it's built
+
+- `src/ui/economy-tree.ts` shares the Mine and Library Knowledge graphs, rank cards and research purchases between the Defend tile panels and the Study. Existing skills and timed research remain the source of progress.
 
 The Mine sun keeps a fixed circular silhouette on the native pixel grid as it moves. Stars render behind its opaque disc and soft halo, while terrain and foreground scenery stay in front.
 
