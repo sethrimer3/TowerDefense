@@ -11,7 +11,8 @@ test('areas change only across twenty-wave boundaries and repeat for endless wav
   assert.equal(areaForWave(20).id, 'moss');
   assert.equal(areaForWave(21).id, 'desert');
   assert.equal(areaForWave(40).id, 'desert');
-  assert.equal(areaForWave(41).id, 'ember');
+  assert.equal(areaForWave(41).id, 'drowned');
+  assert.equal(areaForWave(61).id, 'ember');
   for (let i = 0; i < AREAS.length * 3; i++) {
     assert.equal(areaForWave(i * WAVES_PER_AREA + 1), AREAS[i % AREAS.length]);
     assert.equal(areaForWave((i + 1) * WAVES_PER_AREA), AREAS[i % AREAS.length]);
@@ -30,7 +31,7 @@ test('dry and underground areas never rain, cold areas snow, wet areas rain more
   assert.equal(skyLabel(rollWeather(() => .5, areaForWave(101)), 0), 'Snow');
   assert.equal(skyLabel(rollWeather(() => 0, areaForWave(101)), 0), 'Blizzard');
   assert.equal(skyLabel(rollWeather(() => 0, areaForWave(21)), 0), 'Sandstorm');
-  assert.equal(skyLabel(rollWeather(() => 0, areaForWave(41)), 0), 'Clear');
+  assert.equal(skyLabel(rollWeather(() => 0, areaForWave(61)), 0), 'Clear');
 });
 
 test('terrain and ambient fades have exact endpoints and a smooth midpoint', () => {
@@ -47,7 +48,7 @@ test('terrain and ambient fades have exact endpoints and a smooth midpoint', () 
 });
 
 test('each new area ships four opaque square floors', () => {
-  for (const area of AREAS.slice(1)) for (const [file, w, h] of [
+  for (const area of AREAS.filter(a => areaArtId(a.id) !== 'moss')) for (const [file, w, h] of [
     ...[1, 2, 3, 4].map(i => [`floor-${i}`, 80, 80]),
   ] as [string, number, number][]) {
     const png = readFileSync(new URL(`../public/assets/defend/areas/${areaArtId(area.id)}/${file}.png`, import.meta.url));

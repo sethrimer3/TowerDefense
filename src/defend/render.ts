@@ -77,6 +77,8 @@ import { AtmosphereArt } from "./atmosphere-art.ts";
 import { ForestArt } from "./forest-art.ts";
 import { ForestGrass } from "./forest-grass.ts";
 import { hasForest } from "./forest.ts";
+import { MagicForestArt } from "./magic-forest-art.ts";
+import { hasMagicForest } from "./magic-forest.ts";
 
 export type DrawOptions = {
   /** How many watchmen walk the city (the keep's City watch, in Defend);
@@ -177,6 +179,7 @@ export class DefendRenderer {
   private deadParkWater: { x: number; y: number; r: number }[] = [];
   readonly forest = new ForestArt();
   readonly forestGrass = new ForestGrass();
+  readonly magic = new MagicForestArt();
   /** The battle time the wizard art last advanced to. */
   private wizardTime = 0;
   private rain = new Rain();
@@ -430,6 +433,7 @@ export class DefendRenderer {
     opts.scenery?.(this.ctx, this.px);
     this.drawTrees(map, sim, opts, dt);
     this.drawForest(sim, opts, dt);
+    this.drawMagicForest(sim, opts);
     this.ghosts.watch(sim, opts.now / 1000);
     this.ghosts.draw(this.ctx, this.px, opts.now / 1000, opts.reduceMotion);
     if (opts.effects ?? true) this.drawSmoke(map, sim, opts);
@@ -496,6 +500,12 @@ export class DefendRenderer {
       this.deadForest.draw(ctx, this.px, sim.blight, sim.time, forestTurfAt, shadedAt, this.forest.floorVersion);
       ctx.restore();
     }
+    // The Magic Forest's clovers and its trees' shadows.
+    const magic = this.magicShare();
+    if (magic > 0) {
+      this.magic.sync(map);
+      this.magic.drawFloor(ctx, this.px, magic);
+    }
     this.river.sync(map);
     this.river.draw({
       c: ctx, px: this.px, now: opts.now, dt, rain: !!(sim && opts.weather?.rain), cold: sim?.cold ?? !!opts.weather?.snow, thawed: sim?.thawedPonds,
@@ -505,7 +515,7 @@ export class DefendRenderer {
     // tint, so night darkens them and the day's light turns over them.
     const desert = sim?.atmosphere?.mode === "sand";
     if (sim && desert) this.atmosphere.drawGround(ctx, this.px, sim, opts.reduceMotion, opts.effects ?? true, this.worldLighting ? opts.sun : undefined, !!opts.hdSand);
-    if (this.forestShare() > 0 || desert) {
+    if (this.forestShare() > 0 || magic > 0 || desert) {
       this.drawFaces();
       paintSpikePoints(ctx, this.px, map, sim);
     }
@@ -709,6 +719,28 @@ export class DefendRenderer {
     return now + (this.previousArea && hasForest(this.previousArea) ? 1 - this.areaMix : 0);
   }
 
+  /** How much of the Magic Forest shows, fading like the forest's. */
+  private magicShare() {
+    const now = hasMagicForest(this.area) ? this.areaMix : 0;
+    return now + (this.previousArea && hasMagicForest(this.previousArea) ? 1 - this.areaMix : 0);
+  }
+
+  /** The Magic Forest's wispy trees over everyone, darkened like the forest's,
+   * and its lightning bugs glowing over them. */
+  private drawMagicForest(sim: DefendSim | null, opts: DrawOptions) {
+    const alpha = this.magicShare();
+    if (alpha <= 0) return;
+    const shade = this.lit && opts.weather ? (o: CanvasRenderingContext2D) => {
+      o.fillStyle = `rgba(118,118,118,${opts.weather!.rain ? 0.2 : 0.12})`;
+      o.fillRect(0, 0, this.board.W, this.board.H);
+      this.lighting.darken(o);
+    } : undefined;
+    const still = opts.reduceMotion || !(opts.effects ?? true);
+    const under = [...(sim ? beneath(sim) : []), ...this.cityLife.visible];
+    this.magic.drawTrees(this.ctx, this.px, { now: opts.now, alpha, still, under, shade });
+    this.magic.drawFireflies(this.ctx, this.px, { now: opts.now, alpha, still: opts.reduceMotion, night: opts.night });
+  }
+
   /** The forest's trees over everyone outside the walls, blown up by the
    * battle's blasts, leaning in the wind and darkened like the parks'. */
   private drawForest(sim: DefendSim | null, opts: DrawOptions, dt: number) {
@@ -765,7 +797,7 @@ export class DefendRenderer {
     const out = this.lighting.lights.filter((l) => this.lighting.burn(l) <= 0).length;
     // The forest's grass and the desert's dunes hide the flagstones (their
     // light, drawn over the dunes, read as squares at night).
-    const bare = sim.atmosphere?.mode === "sand" ? 0 : 1 - Math.min(1, this.forestShare());
+    const bare = sim.atmosphere?.mode === "sand" ? 0 : 1 - Math.min(1, this.forestShare() + this.magicShare());
     if (bare > 0) this.relief.draw(this.ctx, this.px, { version: `${sim.mapVersion}:${out}`, lights: fixed }, moving, (0.6 + opts.night * 0.4) * bare);
   }
 

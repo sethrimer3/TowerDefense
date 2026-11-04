@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { AREAS } from '../src/defend/areas.ts';
+import { AREAS, isTestArea } from '../src/defend/areas.ts';
 import { FACE_ROWS, WALL_ART, hasWallArt, wallCapPixels, wallFacePixels, wallRubbleTones } from '../src/defend/area-wall-art.ts';
 import { wallRubblePixels } from '../src/defend/damage-art.ts';
 
-const later = AREAS.slice(1).map(a => a.id);
+// The testing zone wears Mossbound's wall.
+const later = AREAS.slice(1).filter(a => !isTestArea(a)).map(a => a.id);
 const hashOf = (px: Uint32Array) => px.reduce((h, v) => (Math.imul(h, 31) + v) | 0, 7);
 
 test('every area after the first draws its own wall, Mossbound Ruins keeps its sprites', () => {

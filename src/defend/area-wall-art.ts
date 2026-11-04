@@ -387,7 +387,7 @@ const LOOKS: Partial<Record<AreaId, Look>> = {
 };
 
 /** Whether the area's wall is drawn here (every area but the first). */
-export const hasWallArt = (area: AreaId) => area === "moss" || !!LOOKS[area];
+export const hasWallArt = (area: AreaId) => area === "moss" || area === "magic" || !!LOOKS[area];
 
 /** How a cell's cap stone is cut: whole, halved either way, or a row of two
  * over one long block. The joints run along the cell's right and bottom. */
@@ -488,8 +488,9 @@ export function wallSourcePixels(area:AreaId,cx:number,cy:number,face=false){
   const w=WALL_SOURCE_ART,h=face?WALL_SOURCE_FACE:w;
   const name=ART_NAMES.wall(area,cx&7,cy&7,face);
   return sourcePixels(name,w,h,()=>{
-    const raw=area==='moss'?mossWindow(face,cx&7,cy&7):face?wallFacePixels(area,cx&7):wallCapPixels(area,cx&7,cy&7);
-    const H=area==='moss'?(face?14:16):(face?FACE_ROWS:WALL_ART),W=area==='moss'?16:WALL_ART,out=new Uint32Array(w*h);
+    const moss=area==='moss'||area==='magic';
+    const raw=moss?mossWindow(face,cx&7,cy&7):face?wallFacePixels(area,cx&7):wallCapPixels(area,cx&7,cy&7);
+    const H=moss?(face?14:16):(face?FACE_ROWS:WALL_ART),W=moss?16:WALL_ART,out=new Uint32Array(w*h);
     for(let y=0;y<h;y++)for(let x=0;x<w;x++)out[y*w+x]=raw[Math.min(H-1,Math.floor((y+.5)*H/h))*W+Math.min(W-1,Math.floor((x+.5)*W/w))];
     return out;
   });
