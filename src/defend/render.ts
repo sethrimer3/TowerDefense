@@ -65,6 +65,7 @@ import { SkyPalaceArt } from "./sky-palace-art.ts";
 import { DarkArt, darkLights } from "./dark-art.ts";
 import { raisingLights } from "./necro-art.ts";
 import { meteorLights } from "./meteor-art.ts";
+import { bulletLights } from "./projectile-art.ts";
 import { drawRime, frostLights } from "./frost-art.ts";
 import { drawLandings, reinforceLights } from "./reinforce-art.ts";
 import { ParkTrees, type Under } from "./park-trees.ts";
@@ -969,16 +970,16 @@ export class DefendRenderer {
   private drawLighting(map: CityMap, sim: DefendSim | null, weather: Weather, opts: DrawOptions) {
     const frame: LightFrame = { px: this.px, now: opts.now, reduceMotion: opts.reduceMotion, intact: standing(map, sim) };
     const empty = { carried: [], relief: [] };
-    const flames = sim ? flameLights(sim) : empty, mages = sim ? mageLights(sim) : empty, stabs = sim ? stabLights(sim) : empty, hero = sim ? heroLights(sim) : empty, dark = sim ? darkLights(sim) : empty, meteors = sim ? meteorLights(sim) : empty;
+    const flames = sim ? flameLights(sim) : empty, mages = sim ? mageLights(sim) : empty, stabs = sim ? stabLights(sim) : empty, hero = sim ? heroLights(sim) : empty, dark = sim ? darkLights(sim) : empty, meteors = sim ? meteorLights(sim) : empty, bullets = sim ? bulletLights(sim) : empty;
     const ambient = ambientFor(weather, opts.night, this.previousArea ? this.previousWeather : null, this.areaMix);
     if (opts.sun) ambient.alpha *= Math.min(1, opts.night * 3);
     this.lighting.drawLight(this.ctx, frame, ambient, {
-      torches: [...(sim ? this.carried(sim) : []), ...this.cityLife.lights(this.lighting.solarTime ?? 0), ...flames.carried, ...mages.carried, ...stabs.carried, ...hero.carried, ...dark.carried, ...meteors.carried],
+      torches: [...(sim ? this.carried(sim) : []), ...this.cityLife.lights(this.lighting.solarTime ?? 0), ...flames.carried, ...mages.carried, ...stabs.carried, ...hero.carried, ...dark.carried, ...meteors.carried, ...bullets.carried],
       solid: sim?.solid ?? this.cityLife.solid,
       version: sim?.mapVersion ?? -1,
     }, opts.sheen !== false);
     this.lighting.drawRelief(this.ctx, this.px, weather.rain ? 0.85 : 0.65);
-    if (sim) this.drawGroundRelief(map, sim, opts, [...flames.relief, ...mages.relief, ...stabs.relief, ...hero.relief, ...dark.relief, ...raisingLights(sim), ...meteors.relief, ...frostLights(sim), ...reinforceLights(sim)]);
+    if (sim) this.drawGroundRelief(map, sim, opts, [...flames.relief, ...mages.relief, ...stabs.relief, ...hero.relief, ...dark.relief, ...raisingLights(sim), ...meteors.relief, ...bullets.relief, ...frostLights(sim), ...reinforceLights(sim)]);
     this.lighting.drawFlames(this.ctx, frame);
   }
 

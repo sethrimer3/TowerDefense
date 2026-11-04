@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ARROW_DIRS, arrowDir, arrowPixels, ballPixels } from "../src/defend/projectile-art.ts";
+import { ARROW_DIRS, arrowDir, arrowPixels, ballPixels, bulletPixels, BULLET_TRAIL } from "../src/defend/projectile-art.ts";
 import { OUTLINE } from "../src/defend/pixel-fx.ts";
 
 const HEAD = "#d9dde2";
@@ -45,4 +45,29 @@ test("cannon balls are round, outline-free and lit", () => {
     assert.ok(!px.includes(OUTLINE));
     assert.ok(px.includes("#8c8c96"), "a glint");
   }
+});
+
+test("a bullet is one pale yellow pixel trailing a fading fiery tail in a thin black outline", () => {
+  const n = BULLET_TRAIL.length;
+  const { data, n: side } = bulletPixels(0, n);
+  const at = (hx: number, hy: number) => Array.from(data.slice((hy * side + hx) * 4, (hy * side + hx) * 4 + 4));
+  const cell = (ax: number) => 1 + 2 * ax; // half-cell of art pixel ax along the middle row
+  const row = cell(n);
+  // The head: opaque pale yellow, over its whole 2 × 2 half cells.
+  assert.deepEqual(at(cell(n), row), [255, 243, 166, 255]);
+  assert.deepEqual(at(cell(n) + 1, row + 1), [255, 243, 166, 255]);
+  // Ahead of it nothing but its half-pixel outline, opaque black.
+  assert.deepEqual(at(cell(n) + 2, row), [0, 0, 0, 255]);
+  assert.equal(at(cell(n) + 3, row)[3], 0);
+  // Behind it the trail, fading out pixel by pixel.
+  let last = 256;
+  for (let i = 1; i <= n; i++) {
+    const p = at(cell(n - i), row);
+    assert.ok(p[3] < last && p[3] > 0, `trail ${i} fades`);
+    assert.ok(p[0] > p[2], `trail ${i} is warm`);
+    last = p[3];
+  }
+  // A fresh bullet has no trail yet.
+  const fresh = bulletPixels(0, 0);
+  assert.equal(fresh.data[((row * side) + cell(n - 1)) * 4 + 3], 0);
 });

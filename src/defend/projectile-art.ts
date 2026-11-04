@@ -13,9 +13,11 @@ import { skyArrowView } from "./archer-attunements.ts";
  * - **Javelins** (the javelineers'): a dark ash shaft with no fletching
  *   and a long iron head, baked per heading like the arrows.
  * - **Shots** (the ranged guilds' troops): a thrown stone, grey and lit
- *   from the upper left; a sniper's bullet, a bright brass fleck; a
- *   musketman's explosive ball, black with a burning fuse spark. Each is
- *   a small outlined disc baked once.
+ *   from the upper left; a grenadier's explosive ball, black with a
+ *   burning fuse spark. Each is a small outlined disc baked once.
+ * - **Bullets** (every gun's, musket balls too): a pale yellow pixel with a
+ *   fading orange-to-dark-red trail in a thin black outline, glowing orange
+ *   at night (`bulletLights`).
  * - **Cannon shells:** an outlined iron ball with a glint, lifted along its
  *   arc over a dithered shadow on the ground, trailing three puffs of smoke.
  * - **Dragon breath:** the fire a dragon pours down at the city, puffs of
@@ -28,6 +30,8 @@ import { hash01 } from "./grid.ts";
 import { ART } from "./park-art.ts";
 import { artPen, bake, blit, FLAME, OUTLINE, puff, SMOKE } from "./pixel-fx.ts";
 import type { Arrow, DefendSim, Effect, Enemy } from "./sim.ts";
+import type { CarriedLight } from "./lighting.ts";
+import type { ReliefLight } from "./ground-relief.ts";
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -134,6 +138,10 @@ export function drawArrows(c: Ctx, px: number, sim: DefendSim, reduced = false) 
       c.save();c.globalAlpha=v.alpha;
       blit(c,px,arrowSprite(v.up?12:4),Math.round(v.x*ART-ARROW_BOX/2),Math.round(v.y*ART-ARROW_BOX/2));c.restore();continue;
     }
+    if (a.shot === "bullet" || (a.shot === "ball" && !a.grenade)) {
+      drawBullet(c, px, a);
+      continue;
+    }
     if (a.shot && a.shot !== "javelin") {
       const s = shotSprite(a.shot);
       blit(c, px, s.cv, Math.round(a.x * ART - s.size / 2), Math.round(a.y * ART - s.size / 2));
@@ -147,6 +155,96 @@ export function drawArrows(c: Ctx, px: number, sim: DefendSim, reduced = false) 
     const mx = a.x - (dx / d) * ARROW_BACK - dy/d*fan, my = a.y - (dy / d) * ARROW_BACK + dx/d*fan;
     blit(c, px, arrowSprite(dir, a.shot === "javelin"), Math.round(mx * ART - ARROW_BOX / 2), Math.round(my * ART - ARROW_BOX / 2));
   }
+}
+
+/** A gun's bullet (gunners, machine and Gatling gunners, snipers, musket
+ * balls but the grenadiers'): one pale yellow art pixel trailing
+ * `BULLET_TRAIL` pixels back the way it came, orange through dark orange
+ * to dark red, fading out, all inside a half-art-pixel black outline that
+ * fades with them. Baked per heading and trail length at two pixels an art
+ * pixel. */
+export const BULLET_HEAD = "#fff3a6";
+export const BULLET_TRAIL = ["#ffa436", "#ff8a24", "#e0661c", "#c24a16", "#902616", "#6c1610"];
+const BULLET_SIDE = 2 * BULLET_TRAIL.length + 1;
+const bulletSprites = new Map<number, HTMLCanvasElement>();
+
+/** A bullet's half-art-pixel cells, `n` each way (the trail's box and the
+ * outline round it), as [r, g, b, a] for heading `dir` of `ARROW_DIRS` with
+ * `len` trail pixels. Pure, for tests. */
+export function bulletPixels(dir: number, len: number): { data: Uint8ClampedArray<ArrayBuffer>; n: number } {
+  const mid = BULLET_TRAIL.length, n = 2 * BULLET_SIDE + 2;
+  const ang = (dir / ARROW_DIRS) * Math.PI * 2, ux = Math.cos(ang), uy = Math.sin(ang);
+  const m = Math.max(Math.abs(ux), Math.abs(uy)), sx = ux / m, sy = uy / m;
+  // Art pixels, head first; a pixel the trail rounds onto twice keeps the brighter.
+  const body = new Map<number, { rgb: number[]; a: number }>();
+  const put = (ax: number, ay: number, color: string, a: number) => {
+    const k = ay * BULLET_SIDE + ax;
+    if (!body.has(k)) body.set(k, { rgb: [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16)), a });
+  };
+  put(mid, mid, BULLET_HEAD, 1);
+  for (let i = 1; i <= len; i++) put(mid - Math.round(i * sx), mid - Math.round(i * sy), BULLET_TRAIL[i - 1], 1 - i / (BULLET_TRAIL.length + 1));
+  const data = new Uint8ClampedArray(n * n * 4), ink = new Float32Array(n * n);
+  for (const [k, p] of body) {
+    const hx = 1 + 2 * (k % BULLET_SIDE), hy = 1 + 2 * Math.floor(k / BULLET_SIDE);
+    for (let y = hy - 1; y <= hy + 2; y++) for (let x = hx - 1; x <= hx + 2; x++) ink[y * n + x] = Math.max(ink[y * n + x], p.a);
+  }
+  for (let i = 0; i < n * n; i++) if (ink[i] > 0) data[i * 4 + 3] = Math.round(ink[i] * 255);
+  for (const [k, p] of body) {
+    const hx = 1 + 2 * (k % BULLET_SIDE), hy = 1 + 2 * Math.floor(k / BULLET_SIDE);
+    for (let y = hy; y < hy + 2; y++) for (let x = hx; x < hx + 2; x++) {
+      const o = (y * n + x) * 4;
+      data[o] = p.rgb[0]; data[o + 1] = p.rgb[1]; data[o + 2] = p.rgb[2]; data[o + 3] = Math.round(p.a * 255);
+    }
+  }
+  return { data, n };
+}
+
+function bulletSprite(dir: number, len: number) {
+  const key = dir * 16 + len;
+  let cv = bulletSprites.get(key);
+  if (!cv) {
+    const { data, n } = bulletPixels(dir, len), b = bake(n, n);
+    b.c.putImageData(new ImageData(data, n, n), 0, 0);
+    bulletSprites.set(key, (cv = b.cv));
+  }
+  return cv;
+}
+
+/** Where a bullet came from on its current leg. */
+const bulletFrom = (a: Arrow) => a.chain?.from ?? a.origin;
+
+function drawBullet(c: Ctx, px: number, a: Arrow) {
+  const from = bulletFrom(a);
+  let dx = a.tx - a.x, dy = a.ty - a.y, flown = BULLET_TRAIL.length;
+  if (from) {
+    const fx = a.x - from.x, fy = a.y - from.y, d = Math.hypot(fx, fy);
+    flown = Math.floor(d * ART);
+    if (d > 1e-3) (dx = fx), (dy = fy);
+  }
+  if (dx * dx + dy * dy < 1e-8) dx = 1;
+  const len = Math.max(0, Math.min(BULLET_TRAIL.length, flown));
+  const cv = bulletSprite(arrowDir(dx, dy), len), u = px / ART;
+  // The head on the art lattice; the sprite's cells are half art pixels.
+  const hx = Math.round(a.x * ART - 0.5), hy = Math.round(a.y * ART - 0.5), o = BULLET_TRAIL.length + 0.5;
+  c.save();
+  c.imageSmoothingEnabled = false;
+  c.drawImage(cv, (hx - o) * u, (hy - o) * u, (cv.width / 2) * u, (cv.height / 2) * u);
+  c.restore();
+}
+
+/** Most bullets that light the night at once. */
+const BULLET_LIGHTS = 40;
+
+/** The bullets' small orange glow, lighting the dark round them. */
+export function bulletLights(sim: DefendSim): { carried: CarriedLight[]; relief: ReliefLight[] } {
+  const carried: CarriedLight[] = [], relief: ReliefLight[] = [];
+  for (const a of sim.arrows) {
+    if (carried.length >= BULLET_LIGHTS) break;
+    if (a.shot !== "bullet" && !(a.shot === "ball" && !a.grenade)) continue;
+    carried.push({ x: a.x, y: a.y, id: ((a.origin?.attacker ?? 0) * 31 + a.target * 7) % 100000, r: 1.1, k: 0.55 });
+    relief.push({ x: a.x, y: a.y, r: 1.3, k: 0.5, color: "#ff8a2e" });
+  }
+  return { carried, relief };
 }
 
 /** A shot's pixels: a disc `d` art pixels across in its outline, lit from
