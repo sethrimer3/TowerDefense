@@ -23,7 +23,7 @@ export function syncEquipment(entries: Equipment[]|undefined, next: Layout, prev
   const g=entries.filter(g=>g.uid===undefined&&g.kind===s.kind&&g.path===s.path&&g.rank===s.rank).sort((a,b)=>(a.slot??0)-(b.slot??0))[0];if(g){const slot=g.slot??0;g.uid=s.uid;delete g.slot;for(const o of entries)if(o.uid===undefined&&o.kind===s.kind&&(o.slot??0)>slot)o.slot!--;}
  }
 }
-export function decodeEquipment(raw: unknown, defend: DefendSave): Equipment[] {
+export function decodeEquipment(raw: unknown, defend: DefendSave, previous?: Layout): Equipment[] {
  if(!Array.isArray(raw))return [];
  const out:Equipment[]=[];
  for(const g of raw.slice(0,10000)){
@@ -31,8 +31,23 @@ export function decodeEquipment(raw: unknown, defend: DefendSave): Equipment[] {
   if(!Number.isInteger(g.hp)||g.hp<0||g.hp>50||!Number.isInteger(g.power)||g.power<0||g.power>50)continue;
   const s=defend.layout.structures.find(s=>s.uid===g.uid);
   if(s&&out.some(o=>o.uid===s.uid))continue;
-  if(!s&&(!Number.isInteger(g.slot)||g.slot<0||g.slot>=defend.owned[g.kind as PlacedKind]||out.some(o=>o.uid===undefined&&o.kind===g.kind&&o.slot===g.slot)))continue;
-  out.push({id:g.id,kind:s?.kind??g.kind,...(s?{uid:s.uid}:{slot:Number.isInteger(g.slot)&&g.slot>=0?g.slot:0}),...(s?.path?{path:s.path,rank:s.rank}:typeof g.path==="string"?{path:g.path,rank:g.rank}:{}),hp:g.hp,power:g.power});
+  // A larger economy reservation can return an old co-tenant to the
+  // collection. Insert its equipment in the same order as recovered wear,
+  // shifting existing plain palette slots rather than replacing them.
+  const old=Array.isArray(previous?.structures)?previous.structures:[];
+  const removed=old.filter(p=>p.kind===g.kind&&!defend.layout.structures.some(s=>s.uid===p.uid));
+  const worn=removed.filter(p=>p.path&&p.rank);
+  const plain=removed.filter(p=>!p.path||!p.rank);
+  const displaced=!s?removed.find(p=>p.uid===g.uid):undefined;
+  const keptCount=defend.kept.filter(k=>k.kind===g.kind).length;
+  const oldKeptCount=Math.max(0,keptCount-worn.length);
+  let slot=g.slot;
+  if(displaced){
+    if(displaced.path&&displaced.rank)slot=oldKeptCount+worn.indexOf(displaced);
+    else slot=defend.owned[g.kind as PlacedKind]-old.filter(p=>p.kind===g.kind).length+worn.length+plain.indexOf(displaced);
+  }else if(!s&&removed.length&&Number.isInteger(slot)&&slot>=oldKeptCount)slot+=worn.length;
+  if(!s&&(!Number.isInteger(slot)||slot<0||slot>=defend.owned[g.kind as PlacedKind]||out.some(o=>o.uid===undefined&&o.kind===g.kind&&o.slot===slot)))continue;
+  out.push({id:g.id,kind:s?.kind??g.kind,...(s?{uid:s.uid}:{slot}),...(s?.path?{path:s.path,rank:s.rank}:typeof g.path==="string"?{path:g.path,rank:g.rank}:{}),hp:g.hp,power:g.power});
  }
  return out;
 }

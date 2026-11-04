@@ -38,6 +38,7 @@ import {
   fitLayout,
   gateOk,
   placedCount,
+  placeCityTile,
   sameCorner,
   sameGate,
   sameWall,
@@ -349,9 +350,11 @@ export function decodeDefendSave(raw: any): DefendSave {
   if (wallRanks) d.wallRanks = wallRanks;
   const compact = Array.isArray(s.legacyCompact) ? s.legacyCompact.filter((k: unknown)=>k==='darkKeep'||k==='valkyriePalace') as PlacedKind[] : [];
   if(compact.length)d.legacyCompact=[...new Set(compact)];
-  d.layout = decodeLayout(s.layout, d.owned, d.levels, innerWalls(wallRanks), compact) ?? d.layout;
+  const recovered: PlacedStructure[]=[];
+  d.layout = decodeLayout(s.layout, d.owned, d.levels, innerWalls(wallRanks), compact, recovered) ?? d.layout;
   d.kept = Array.isArray(s.kept) ? s.kept.filter((k: any) => isObject(k) && (PLACED.includes(k.kind) || k.kind === "wallSpikes") && wearFits(k.kind, k.path, k.rank))
     .slice(0, 9999).map((k: any): Kept => ({ kind: k.kind, path: k.path, rank: k.rank })) : [];
+  for(const p of recovered)if(p.path&&p.rank)d.kept.push({kind:p.kind,path:p.path,rank:p.rank});
   trimKept(d);
   const keepRanks = decodeKeepRanks(s.keepRanks);
   if (keepRanks) d.keepRanks = keepRanks;
@@ -388,7 +391,7 @@ const tileOk = (tx: unknown, ty: unknown) => int(tx, 0, TILES_W - 1) && int(ty, 
  * player owns everything on it and its tiles join the keep. Structures that
  * no longer fit (a save from before the tile shares, say) are reshuffled on
  * their tiles, and failing that the newest go back to the palette. */
-function decodeLayout(s: any, owned: Record<PaletteItem, number>, levels: Record<UpgradeId, number>, inner: boolean, legacyCompact: PlacedKind[] = []): Layout | null {
+function decodeLayout(s: any, owned: Record<PaletteItem, number>, levels: Record<UpgradeId, number>, inner: boolean, legacyCompact: PlacedKind[] = [], recovered: PlacedStructure[] = []): Layout | null {
   if (!isObject(s) || !tileOk(s.keep?.tx, s.keep?.ty) || !int(s.nextUid, 1, 1e9)) return null;
   const keep = { tx: s.keep.tx, ty: s.keep.ty };
   const cityTiles = decodeCityTiles(s.cityTiles, tileKey(keep.tx, keep.ty));
@@ -406,8 +409,47 @@ function decodeLayout(s: any, owned: Record<PaletteItem, number>, levels: Record
   if (!walls) return null;
   const layout: Layout = { keep, cityTiles, structures, nextUid: s.nextUid, compact: [...new Set([...compactKinds(levels),...legacyCompact])], gates, spikes, ballistas, ...(walls.length ? { walls } : {}), ...(inner ? { innerWalls: true as const } : {}) };
   if (!legal(layout, owned)) return null;
-  const out = fitted(layout, unplaced);
+  const normalized=normalizeEconomyTiles(layout,owned);
+  const out = fitted(normalized, unplaced.filter(uid=>!normalized.structures.some(s=>s.uid===uid&&STRUCTURES[s.kind].wholeTile)));
+  if(fitLayout(out).ok)for(const p of layout.structures)if(!out.structures.some(s=>s.uid===p.uid))recovered.push(p);
   return fitLayout(out).ok ? out : null;
+}
+
+/** Expand older economy footprints without resetting the city or its inventory.
+ * Co-tenants return to the palette; a second economy building can use another
+ * city tile already owned, including an unused tile from the collection. */
+function normalizeEconomyTiles(layout: Layout, owned: Record<PaletteItem,number>): Layout {
+ const economy=layout.structures.filter(s=>STRUCTURES[s.kind].wholeTile);
+ if(!economy.length||fitLayout(layout).ok)return layout;
+ let next=cloneLayout(layout);next.structures=next.structures.filter(s=>!STRUCTURES[s.kind].wholeTile);
+ const reserved=new Set<string>();
+ for(const building of economy){
+  let placed:Layout|undefined;
+  const tryTile=(base:Layout,tx:number,ty:number)=>{
+   const key=tileKey(tx,ty);if(key===tileKey(base.keep.tx,base.keep.ty)||reserved.has(key))return;
+   const candidate=cloneLayout(base);
+   candidate.structures=candidate.structures.filter(s=>s.tx!==tx||s.ty!==ty);
+   candidate.structures.push({...building,tx,ty,qx:tx*QUARTER,qy:ty*QUARTER});
+   if(fitLayout(candidate).ok){placed=candidate;reserved.add(key);}
+  };
+  for(const key of [...new Set([tileKey(building.tx,building.ty),...next.cityTiles])]){
+   if(!next.cityTiles.includes(key))continue;
+   const {tx,ty}=parseTileKey(key);
+   if(key!==tileKey(building.tx,building.ty)&&next.structures.some(s=>s.tx===tx&&s.ty===ty))continue;
+   tryTile(next,tx,ty);if(placed)break;
+  }
+  if(!placed&&next.cityTiles.length<owned.cityTile){
+   const tiles=[];for(let ty=1;ty<TILES_H;ty++)for(let tx=0;tx<TILES_W;tx++)tiles.push({tx,ty});
+   tiles.sort((a,b)=>Math.abs(a.tx-building.tx)+Math.abs(a.ty-building.ty)-Math.abs(b.tx-building.tx)-Math.abs(b.ty-building.ty));
+   for(const t of tiles){
+    const expanded=placeCityTile(next,t.tx,t.ty);
+    if(!expanded||expanded.gates.length!==next.gates.length||expanded.spikes.length!==next.spikes.length||expanded.ballistas.length!==next.ballistas.length)continue;
+    tryTile(expanded,t.tx,t.ty);if(placed)break;
+   }
+  }
+  if(placed)next=placed;
+ }
+ return next;
 }
 
 /** Distinct on-board tile keys other than the keep's, or null. */

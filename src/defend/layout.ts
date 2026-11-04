@@ -271,6 +271,14 @@ export function fitLayout(l: Layout): Fit {
   };
 }
 
+/** Bodies leave a street rim, but economy buildings reserve their entire tile. */
+function placementRect(p: Placement): Rect {
+ if(STRUCTURES[p.kind].wholeTile)return {x:p.tx*SUB+1,y:p.ty*SUB+1,w:SUB-2,h:SUB-2};
+ return quarterRectCells(p.qx,p.qy,p.qw,p.qh);
+}
+const snapWholeTile = (kind: StructureKind, q: QuarterPos): QuarterPos => STRUCTURES[kind].wholeTile
+ ? {qx:Math.floor(q.qx/QUARTER)*QUARTER,qy:Math.floor(q.qy/QUARTER)*QUARTER}:q;
+
 /** Everything `fitLayout` works out before checking the streets reach every
  * structure: the city and wall masks, the wall's pieces, and the cells the
  * structures in `ps` claim, fitted in order; or why one can't stand. */
@@ -293,7 +301,7 @@ function fitBase(l: Layout, ps: Placement[]) {
   for (const g of gates) for (const i of rectCells(grow(g.inner, g.side))) clear[i] = 1;
   // `foot`: the uid + 1 of what stands on each cell; `near`: the uid + 1
   // of the building whose clear quarter round it covers the cell.
-  const cells: FitCells = { city, wall, clear, foot: new Int32Array(CELL_COUNT), near: new Int32Array(CELL_COUNT) };
+  const cells: FitCells = { city, wall, clear, foot: new Int32Array(CELL_COUNT), near: new Int32Array(CELL_COUNT), reserved: new Int32Array(CELL_COUNT) };
   const fitted: FittedStructure[] = [];
   for (const p of ps) {
     const f = fitOne(p, cityTiles, cells);
@@ -329,7 +337,7 @@ export function structureSpots(l: Layout, kind: PlacedKind, uid?: number): Quart
       const q = { qx, qy };
       const p: Placement = { uid: id, kind, ...quarterTile(q), ...q, ...size };
       if (refuseOne(p, base.cityTiles, base.cells)) continue;
-      const rect = quarterRectCells(qx, qy, size.qw, size.qh);
+      const rect = placementRect(p);
       const inside = blockTiles(p.tx, p.ty, p.span).every((k) => base.cityTiles.has(k));
       // Outside the city it stands on no street.
       if (sound && !inside) { out.push(q); continue; }
@@ -383,17 +391,18 @@ function placements(l: Layout): Placement[] {
   return out;
 }
 
-type FitCells = { city: Uint8Array; wall: Uint8Array; clear: Uint8Array; foot: Int32Array; near: Int32Array };
+type FitCells = { city: Uint8Array; wall: Uint8Array; clear: Uint8Array; foot: Int32Array; near: Int32Array; reserved: Int32Array };
 
 /** Fits one structure where it stands and claims its cells; or says why it
  * can't stand there. */
 function fitOne(p: Placement, cityTiles: Set<string>, cells: FitCells): FittedStructure | string {
   const why = refuseOne(p, cityTiles, cells);
   if (why) return why;
-  const rect = quarterRectCells(p.qx, p.qy, p.qw, p.qh);
-  const free = !huddles(p.kind);
+  const rect = placementRect(p);
+  const free = !huddles(p.kind) && !STRUCTURES[p.kind].wholeTile;
   const uid = p.uid + 1;
   for (const i of rectCells(rect)) cells.foot[i] = uid;
+  if(STRUCTURES[p.kind].wholeTile)for(const i of rectCells({x:p.tx*SUB,y:p.ty*SUB,w:SUB,h:SUB}))cells.reserved[i]=uid;
   if (free) for (const i of rectCells(structureClearance(rect))) cells.near[i] ||= uid;
   return { uid: p.uid, kind: p.kind, tx: p.tx, ty: p.ty, rect, inside: blockTiles(p.tx, p.ty, p.span).every((k) => cityTiles.has(k)) };
 }
@@ -406,15 +415,19 @@ function refuseOne(p: Placement, cityTiles: Set<string>, cells: FitCells): strin
   if (!tileInBounds(p.tx + p.span - 1, p.ty + p.span - 1)) return `The ${name} would hang off the board.`;
   const x0 = p.tx * QUARTER, y0 = p.ty * QUARTER, x1 = (p.tx + p.span) * QUARTER, y1 = (p.ty + p.span) * QUARTER;
   if (p.qx < x0 || p.qy < y0 || p.qx + p.qw > x1 || p.qy + p.qh > y1) return p.span > 1 ? `The ${name} must fit inside a 2 × 2 block of tiles.` : `The ${name} must fit inside one tile.`;
+  if(def.wholeTile&&(p.qx!==x0||p.qy!==y0))return `The ${name} snaps to a whole city tile.`;
+  if(def.wholeTile)for(const i of rectCells({x:p.tx*SUB,y:p.ty*SUB,w:SUB,h:SUB}))
+    if(cells.foot[i]||cells.reserved[i])return `The ${name} needs a city tile of its own.`;
   const tiles = blockTiles(p.tx, p.ty, p.span);
   const inside = tiles.every((k) => cityTiles.has(k));
   if (!inside && tiles.some((k) => cityTiles.has(k))) return `The ${name} can't straddle the city limits.`;
   if (!inside && !def.outsideOk) return `${def.name} must be inside the city limits.`;
-  const rect = quarterRectCells(p.qx, p.qy, p.qw, p.qh);
-  const free = !huddles(p.kind);
+  const rect = placementRect(p);
+  const free = !huddles(p.kind) && !STRUCTURES[p.kind].wholeTile;
   for (const i of rectCells(rect)) {
     if (cells.wall[i]) return `The ${name} can't stand on the wall.`;
     if (!!cells.city[i] !== inside) return `The ${name} can't straddle the city limits.`;
+    if (cells.reserved[i]) return `That city tile is reserved by the Mine or Library.`;
     if (cells.foot[i]) return `There's something standing there already.`;
     if (cells.clear[i]) return `The ${name} would block a city gate.`;
     if (free && cells.near[i]) return `Buildings need a clear square between them.`;
@@ -814,6 +827,7 @@ export function settle(l: Layout, uids: number[]): Layout {
 /** Place a new structure at quarter `q` (its top left quarter), which takes
  * the next uid (wearing `wear`'s path and rank: a kept copy placed again). */
 export function placeStructureAt(l: Layout, kind: PlacedKind, q: QuarterPos, wear?: { path: PathId; rank: number }): Layout | null {
+  q=snapWholeTile(kind,q);
   const next = cloneLayout(l);
   next.structures.push({ uid: l.nextUid, kind, ...quarterTile(q), ...q, ...(wear ? { path: wear.path, rank: wear.rank } : {}) });
   next.nextUid++;
@@ -849,6 +863,7 @@ export function removeStructure(l: Layout, uid: number): Layout {
 export function moveStructureTo(l: Layout, uid: number, q: QuarterPos): Layout | null {
   const s = l.structures.find((p) => p.uid === uid);
   if (!s) return null;
+  q=snapWholeTile(s.kind,q);
   if (s.qx === q.qx && s.qy === q.qy) return l;
   const next = removeStructure(l, uid);
   next.structures.push({ ...s, ...quarterTile(q), ...q });

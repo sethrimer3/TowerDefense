@@ -3,7 +3,7 @@
  * the carried item and the layout each makes, what the board shows while it
  * is held, and what releasing it does. The page only feeds it pointer
  * positions in cells and applies the result. */
-import { BOMB_RADIUS } from "./catalog.ts";
+import { STRUCTURES, BOMB_RADIUS } from "./catalog.ts";
 import { dist } from "../exact.ts";
 import { RALLY_REACH } from "./war-banner.ts";
 import { NECRO } from "./necromancy.ts";
@@ -132,7 +132,8 @@ export class EditSession {
     if (this.open) return this.open;
     const kind = carriedKind(this.drag);
     const open = new Uint8Array(QUARTERS_W * QUARTERS_H);
-    const { qw, qh } = quarterSize(kind, this.layout.compact.includes(kind));
+    const size = quarterSize(kind, this.layout.compact.includes(kind));
+    const qw=STRUCTURES[kind].wholeTile?4:size.qw,qh=STRUCTURES[kind].wholeTile?4:size.qh;
     for (const q of structureSpots(this.layout, kind, this.drag.from === "structure" ? this.drag.uid : undefined)) {
       for (let y = q.qy; y < q.qy + qh; y++) open.fill(1, y * QUARTERS_W + q.qx, y * QUARTERS_W + q.qx + qw);
     }
@@ -179,7 +180,7 @@ export class EditSession {
     const hover = this.tile;
     const next = hover ? this.layoutAt(hover) : undefined;
     if (carriesStructure(this.drag))
-      return { legal: new Set(), hover: null, ghost: next ? dropGhost(this.drag, next, hover!) : null, quarters: hover ? { rect: structureRect(this.drag, this.layout, hover), fits: !!next, clear: !huddles(carriedKind(this.drag)) } : null, open: this.openQuarters() };
+      return { legal: new Set(), hover: null, ghost: next ? dropGhost(this.drag, next, hover!) : null, quarters: hover ? { rect: structureRect(this.drag, this.layout, hover), fits: !!next, clear: !huddles(carriedKind(this.drag)) && !STRUCTURES[carriedKind(this.drag)].wholeTile } : null, open: this.openQuarters() };
     if (carriesWall(this.drag))
       return { legal: new Set(), hover: null, ghost: next ? dropGhost(this.drag, next, hover!) : null, walls: { legal: new Set(this.legal.keys()), hover, fits: !!next } };
     if (carriesGate(this.drag))

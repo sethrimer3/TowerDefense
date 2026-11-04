@@ -1,3 +1,4 @@
+import { SUB } from "./grid.ts";
 import type { RepairRanks } from "../repair-upgrades.ts";
 import { BLIGHT_WORM, SMALL_BLIGHT_WORM, MEDIUM_BLIGHT_WORM } from "./blight-worm-tuning.ts";
 import type { ChronoRanks } from "../chrono-upgrades.ts";
@@ -161,6 +162,8 @@ export type StructureDef = {
   maxHp: number;
   /** Can be placed on ground outside the city limits. */
   outsideOk: boolean;
+  /** Reserves a whole city tile; the body leaves a one-cell street rim. */
+  wholeTile?: boolean;
   description: string;
 };
 
@@ -168,8 +171,8 @@ export type StructureDef = {
 export type TileSpan = 1 | 2;
 
 export const STRUCTURES: Record<StructureKind, StructureDef> = {
-  mine: { kind: "mine", name: "Mine", w: 4, h: 4, maxHp: 250, outsideOk: false, description: "Place in the city to open the Mine and Smithy and put the miners to work." },
-  library: { kind: "library", name: "Library", w: 4, h: 4, maxHp: 250, outsideOk: false, description: "Place in the city to open the Library and Study and put the librarians to work." },
+  mine: { kind: "mine", name: "Mine", w: 6, h: 6, wholeTile: true, maxHp: 250, outsideOk: false, description: "Place in the city to open the Mine and Smithy and put the miners to work." },
+  library: { kind: "library", name: "Library", w: 6, h: 6, wholeTile: true, maxHp: 250, outsideOk: false, description: "Place in the city to open the Library and Study and put the librarians to work." },
   repairShop: { kind: "repairShop", name: "Repair shop", w: 4, h: 2, maxHp: 160, outsideOk: false, description: "Two masons come out of this workshop to repair and rebuild every building and tower. Its tree teaches Wall masonry for walls and gates, larger crews, critical repair priorities and a retreating bow. Repairs restore a percentage of maximum HP." },
   keep: {
     kind: "keep",
@@ -602,6 +605,7 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
  * building-specific upgrade is owned (`compact`). */
 export function footprint(kind: StructureKind, compact: boolean): { w: number; h: number; span: TileSpan } {
   const def = STRUCTURES[kind];
+  if(def.wholeTile)return {w:SUB,h:SUB,span:1};
   const f = compact && def.compact ? def.compact : def;
   return { w: f.w, h: f.h, span: f.span ?? 1 };
 }

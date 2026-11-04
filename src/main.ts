@@ -274,6 +274,7 @@ document.addEventListener("click", (e) => {
 
 function store() {
   if(equipmentLayout!==save.defend.layout){syncEquipment(save.equipment,save.defend.layout,equipmentLayout);equipmentLayout=save.defend.layout;}
+  refreshRealmAccess();
   save.dayClock = dayClock.elapsed;
   save.mine = minePage.snapshot(clock());
   save.library = libraryPage.snapshot(clock());
@@ -315,16 +316,19 @@ function refreshCurrencies() {
   show("upgrade-points", save.upgradePoints);
   show("essence", save.essence);
 }
-/** Saves and refreshes the currency bar. */
-function update() {
-  store();
-  refreshCurrencies();
-  combatTab.render(combatMode, tab === "defend");
+/** Placement persists directly from Defend, so update access on every save. */
+function refreshRealmAccess() {
   for (const id of ['mine','library'] as const) {
     const button=document.querySelector<HTMLButtonElement>(`nav [data-tab="${id}"]`)!;
     const unlocked=realmActive(save,id);button.disabled=!unlocked;
     button.title=unlocked?'':`Place the ${id==='mine'?'Mine':'Library'} tile in your city to unlock this tab.`;
   }
+}
+/** Saves and refreshes the currency bar. */
+function update() {
+  store();
+  refreshCurrencies();
+  combatTab.render(combatMode, tab === "defend");
   if (shownLegacyGraphics !== save.settings.legacyGraphics) {
     shownLegacyGraphics = save.settings.legacyGraphics;
     const icon = document.querySelector<HTMLElement>('nav [data-tab="settings"] > span')!;

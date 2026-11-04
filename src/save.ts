@@ -146,7 +146,7 @@ export function decode(raw: string | null): Save {
   d.trainingJobs = decodeJobs(s.trainingJobs, d.training);
   d.trainingClock = num(s.trainingClock, 0);
   d.defend = decodeDefendSave(s.defend);
-  const equipment=decodeEquipment(s.equipment,d.defend);if(equipment.length)d.equipment=equipment;
+  const equipment=decodeEquipment(s.equipment,d.defend,s.defend?.layout);if(equipment.length)d.equipment=equipment;
   // Advanced carpentry was a Repair shop skill before masons mended every
   // building and tower from the start: its Knowledge comes back.
   if (s.defend?.repairRanks?.advancedCarpentry === 1) d.knowledge += RETIRED_REPAIR_KNOWLEDGE;
