@@ -1924,18 +1924,10 @@ function paintRepairShop(p: Pix) {
 
 // ── The Realm's economy buildings, each filling its whole city tile ──────────
 
-/** Grass, gravel and hedges for the Library's grounds, dark to light. */
-const LAWN = [0x2c5422, 0x3a6a2c, 0x4c8236, 0x63993f];
-const HEDGE = [0x1a3416, 0x24481e, 0x33602a, 0x467a36];
-const GRAVEL = [0x8a7c64, 0xa49478, 0xbcae90];
-/** The cathedral's lead roof, dark to light, and its pale ashlar. */
+/** The cathedral's lead roof, dark to light. */
 const LEAD = [0x343c4c, 0x4a5466, 0x606c82, 0x7c889e];
-const FLOWERS = [0xd8553f, 0xe9c46a, 0xf2efe6, 0xa06ac8, 0xe88aa8];
-
-/** A tree's crown seen from above, lit from the upper left. */
-function crown(p: Pix, cx: number, cy: number, r: number, tones: readonly number[]) {
-  disc(p, cx, cy, r, (x, y, d, dx, dy) => (d > r - 0.8 ? tones[0] : tones[Math.min(tones.length - 1, 1 + lit(x, y, dx, dy, d))]));
-}
+/** Stained glass. */
+const GLASS = [0x5b8fd9, 0xd8553f, 0xe9c46a, 0xa06ac8];
 
 /** A walled building under a gabled roof: a one-pixel wall lit to the upper
  * left, a dark eave line, then the roof. */
@@ -1955,210 +1947,226 @@ function oreHeap(p: Pix, cx: number, cy: number, r: number, tones: readonly numb
   });
 }
 
-/** The Mine: a mining camp round an open pit, as in the Mine tab. The
- * barracks' long shingled roof and the forge with its brick chimney along
- * the north, the warehouse and the smithy's open shed down the west, ore
- * heaped copper, silver and gold in the yard by a cart on its rails, and
- * the pit stepped down in terraces to the shaft, the timber headframe and
- * its wheel standing over it. */
+/** A four-sided pyramid roof (a tower's cap or a spire) of half width `r`
+ * about (cx, cy): pale stone eaves, lead faces lit from the upper left and
+ * dark hips. */
+function leadCap(p: Pix, cx: number, cy: number, r: number) {
+  for (let y = Math.floor(cy - r); y <= Math.ceil(cy + r); y++)
+    for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++) {
+      const dx = x + 0.5 - cx, dy = y + 0.5 - cy;
+      if (Math.abs(dx) > r || Math.abs(dy) > r) continue;
+      const rim = Math.abs(dx) > r - 1 || Math.abs(dy) > r - 1;
+      const hip = Math.abs(Math.abs(dx) - Math.abs(dy)) < 0.6;
+      const face = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 3 : 1) : dy < 0 ? 2 : 0;
+      p.set(x, y, rim ? C.pale[face >= 2 ? 3 : 1] : hip ? LEAD[0] : LEAD[face]);
+    }
+}
+
+/** The Mine: one timber hall beside an open pit. The hall's shingled roof
+ * and its forge chimney stand along the north with ore heaped in the yard
+ * beside it; below, the pit drops in steep benches, each step's wall lit or
+ * shadowed by its facing and each floor darker the deeper it lies, to a
+ * pool at the bottom, and a haul road spirals down it, ramping from bench to
+ * bench, with ore trucks on the way. */
 function paintMine(p: Pix) {
   const { x0, y0, x1, y1 } = frame(p.w, p.h);
-  const W = x1 - x0, H = y1 - y0;
-  const X = (f: number) => x0 + Math.round(W * f), Y = (f: number) => y0 + Math.round(H * f);
-  // Trodden earth, speckled with grit and spoil.
-  for (let y = y0; y <= y1; y++)
-    for (let x = x0; x <= x1; x++) {
+  // The yard: trodden earth under the hall and round the heaps.
+  const yard = { x0, y0: y0 + 1, x1, y1: y0 + 13 };
+  for (let y = yard.y0; y <= yard.y1; y++)
+    for (let x = yard.x0; x <= yard.x1; x++) {
+      if ((x === yard.x0 || x === yard.x1) && (y === yard.y0 || y === yard.y1)) continue;
       const t = hash(x, y, 81) % 11;
       p.set(x, y, t === 0 ? C.dirt[0] : t < 3 ? C.dirt[2] : t === 3 ? C.stone[1] : C.dirt[1]);
     }
-  // The open pit: terraces stepping down to the shaft, each ring darker,
-  // its upper left rim lit and its lower right in shadow.
-  const pcx = X(0.66), pcy = Y(0.66), pr = Math.min(W, H) * 0.31;
-  const TERRACE = [0x9a8f7a, 0x7a705e, 0x5a5244, 0x3c362c, 0x221e18];
-  disc(p, pcx, pcy, pr, (x, y, d, dx, dy) => {
-    const ring = Math.min(4, Math.floor(((pr - d) / pr) * 5));
-    const lip = (pr - d) / pr * 5 - ring < 0.22;
-    const sun = -(dx + dy) > 0;
-    let c = TERRACE[ring];
-    // Each step's face: its far (lower right) side lit by the sun, its near
-    // side in the shadow of the rim above.
-    if (lip) c = sun ? shade(c, 0.55) : shade(c, 1.35);
-    if (d > pr - 1) c = OUTLINE;
-    else if (hash(x, y, 83) % 9 === 0) c = shade(c, 0.85);
-    return c;
-  });
-  // The haul road spiralling down the terraces.
-  for (let k = 0; k <= 40; k++) {
-    const t = k / 40, a = Math.PI * (0.85 + 1.25 * t), r = pr * (0.9 - 0.62 * t);
-    const x = Math.round(pcx + Math.cos(a) * r), y = Math.round(pcy + Math.sin(a) * r);
-    p.set(x, y, shade(TERRACE[Math.min(4, Math.floor(t * 4))], 1.35));
-  }
-  // The headframe: two splayed timber legs over the shaft braced to a
-  // back leg, and the iron sheave wheel at its head.
-  const hx = Math.round(pcx) - 1, hy = Math.round(pcy) - 1;
-  for (let k = 1; k <= 6; k++) {
-    p.set(hx - k, hy - k + 1, C.plank[3]); p.set(hx - k + 1, hy - k + 1, C.plank[1]);
-    p.set(hx + k, hy - k + 1, C.plank[2]); p.set(hx + k + 1, hy - k + 1, C.plank[0]);
-    if (k <= 4) { p.set(hx, hy - k - 2, C.plank[2]); p.set(hx + 1, hy - k - 2, C.plank[0]); }
-  }
-  rect(p, hx - 6, hy - 6, hx + 7, hy - 6, C.plank[1]);
-  disc(p, hx + 1, hy - 6.5, 2.7, (_x, _y, d) => (d > 1.9 ? C.iron[3] : d > 1 ? C.iron[1] : C.iron[3]));
-  // The shaft at the pit's heart, its collar timbered.
-  rect(p, Math.round(pcx) - 3, Math.round(pcy) - 3, Math.round(pcx) + 2, Math.round(pcy) + 2, C.plank[1]);
-  rect(p, Math.round(pcx) - 2, Math.round(pcy) - 2, Math.round(pcx) + 1, Math.round(pcy) + 1, 0x0e0b08);
-  // The barracks: a long hall under brown shingles, across the north.
-  roofed(p, x0, y0, X(0.52), Y(0.27), C.plank, C.plank[2]);
-  // The forge: a stone hall under slate with its brick chimney smoking.
-  const fx0 = X(0.6), fy1 = Y(0.3);
-  roofed(p, fx0, y0, x1, fy1, C.stone, 0x5a5c62);
-  const cx = x1 - 6, cy = y0 + 3;
-  for (let dy = 0; dy < 4; dy++)
-    for (let dx = 0; dx < 4; dx++) {
-      const rim = dx === 0 || dy === 0 || dx === 3 || dy === 3;
-      p.set(cx + dx, cy + dy, rim ? ((dx + dy) % 2 ? 0x8e3a26 : 0xb04a30) : dx === 1 && dy === 1 ? C.ember : 0x1a0e0a);
-    }
-  // The warehouse: a timber store under red tiles down the west.
-  const wy0 = Y(0.33), wy1 = Y(0.62);
-  roofed(p, x0, wy0, X(0.24), wy1, C.plank, C.red);
-  // The smithy's open shed: a lean-to roof over the anvil and the quench.
-  const sx0 = X(0.28), sy0 = Y(0.34), sx1 = X(0.45), sy1 = Y(0.52);
-  for (let y = sy0; y <= sy1; y++)
-    for (let x = sx0; x <= sx1; x++) p.set(x, y, y === sy0 ? C.plank[3] : y === sy1 ? C.plank[0] : (y - sy0) % 2 ? C.plank[1] : C.plank[2]);
-  rect(p, sx0 + 2, sy1 - 3, sx0 + 5, sy1 - 2, C.iron[1]);
-  rect(p, sx0 + 2, sy1 - 3, sx0 + 4, sy1 - 3, C.iron[3]);
-  disc(p, sx1 - 2.5, sy1 - 2.5, 1.6, (_x, _y, d) => (d > 1 ? C.plank[0] : C.rune));
-  // The ore yard: heaps of copper, silver and gold ore, a full cart and
-  // the rails running east to the pit's edge.
-  const oy = Y(0.82);
-  oreHeap(p, X(0.08), oy, 3.4, [0x6a3a1c, 0x8e5228, 0xb06a34, 0xd08a4a], 0xf0b070);
-  oreHeap(p, X(0.2), oy + 2, 3, [0x5a5a62, 0x7e7e88, 0xa6a6b0, 0xcacad2], 0xffffff);
-  oreHeap(p, X(0.14), oy - 5, 2.6, [0x6a5420, 0x9a7a2a, 0xc8a03a, 0xe9c46a], 0xfff4c8);
-  const ry = Y(0.7);
-  for (let x = X(0.06); x <= Math.round(pcx - pr + 1); x++) {
-    if (x % 3 === 0) { p.set(x, ry - 1, C.plank[0]); p.set(x, ry + 2, C.plank[0]); }
-    p.set(x, ry, C.iron[2]); p.set(x, ry + 1, C.iron[2]);
-  }
-  const kx = X(0.27);
-  rect(p, kx, ry - 2, kx + 5, ry + 3, C.iron[1]);
-  rect(p, kx + 1, ry - 1, kx + 4, ry + 2, 0x8e5228);
-  p.set(kx + 2, ry, 0xd08a4a); p.set(kx + 3, ry + 1, C.gold[1]);
-  // A lamp post at the pit's edge and a few crates of supplies.
-  p.set(X(0.4), Y(0.6), C.fire[2]);
-  for (const [bx, by] of [[X(0.03), Y(0.66)], [X(0.4), Y(0.9)]]) {
-    rect(p, bx, by, bx + 2, by + 2, C.crate[2]);
-    p.set(bx, by, C.crate[4]); p.set(bx + 2, by + 2, C.crate[0]);
-  }
-}
-
-/** The Library: a great cathedral of pale ashlar in the grounds of a
- * university. Its lead roof is a cross, the nave running north to a round
- * apse and the transept across it, buttressed along its walls, with a
- * spire over the crossing; a gravel walk between trees leads up to its west
- * door, a parterre of hedges and flower beds lies to one side, and a
- * cloister's arcade rings a green quad with a fountain on the other. */
-function paintLibrary(p: Pix) {
-  const { x0, y0, x1, y1 } = frame(p.w, p.h);
-  const W = x1 - x0, H = y1 - y0;
-  const X = (f: number) => x0 + Math.round(W * f), Y = (f: number) => y0 + Math.round(H * f);
-  // The lawn.
-  for (let y = y0; y <= y1; y++)
+  // The pit: a rounded box, its depth in from the edge stepping down in
+  // benches three pixels wide, a pixel of wall and two of floor.
+  const cx = (x0 + x1 + 1) / 2, cy = (y0 + 12 + y1 + 1) / 2, hx = (x1 - x0 + 1) / 2, hy = (y1 - y0 - 12 + 1) / 2, rc = 9;
+  const depth = (x: number, y: number) => {
+    const qx = Math.abs(x + 0.5 - cx) - (hx - rc), qy = Math.abs(y + 0.5 - cy) - (hy - rc);
+    const out = Math.sqrt(Math.max(qx, 0) ** 2 + Math.max(qy, 0) ** 2) + Math.min(Math.max(qx, qy), 0) - rc;
+    return -out;
+  };
+  const BENCH = 4, RIM = 2, DEEP = 3;
+  const TERRACE = [0x8a7a5c, 0x6e6049, 0x544a39, 0x362f25];
+  const ringOf = (d: number) => Math.min(DEEP, Math.floor((d - RIM) / BENCH));
+  // The road: each bench carries it part way round (clockwise, from the
+  // north), and it ramps down through the wall into the next.
+  const TURN = Math.PI * 2, SPAN = TURN * 0.5, START = TURN * 0.04;
+  const angle = (x: number, y: number) => {
+    const a = Math.atan2(x + 0.5 - cx, -(y + 0.5 - cy) * (hx / hy));
+    return a < 0 ? a + TURN : a;
+  };
+  const along = (ring: number, a: number) => {
+    let t = a - (START + ring * SPAN);
+    t -= Math.floor(t / TURN) * TURN;
+    return t;
+  };
+  const ROAD = [0xd6ccb2, 0xb8ad94];
+  for (let y = y0 + 12; y <= y1; y++)
     for (let x = x0; x <= x1; x++) {
-      const t = hash(x, y, 91) % 13;
-      p.set(x, y, t === 0 ? LAWN[0] : t < 3 ? LAWN[3] : t < 7 ? LAWN[2] : LAWN[1]);
-    }
-  const mid = Math.round((x0 + x1) / 2);
-  // The gravel walk from the south edge to the door, and round the church.
-  for (let y = Y(0.7); y <= y1; y++) for (let x = mid - 2; x <= mid + 2; x++) p.set(x, y, GRAVEL[(x === mid - 2 ? 2 : x === mid + 2 ? 0 : 1)]);
-  for (let x = X(0.06); x <= X(0.94); x++) for (let y = Y(0.66); y <= Y(0.66) + 1; y++) p.set(x, y, GRAVEL[y === Y(0.66) ? 2 : 1]);
-  // The parterre: hedged beds of flowers round a small sundial.
-  const gx0 = X(0.04), gy0 = Y(0.72), gx1 = X(0.36), gy1 = y1 - 1;
-  for (let y = gy0; y <= gy1; y++)
-    for (let x = gx0; x <= gx1; x++) {
-      const edge = x === gx0 || y === gy0 || x === gx1 || y === gy1, cross = x === Math.round((gx0 + gx1) / 2) || y === Math.round((gy0 + gy1) / 2);
-      if (edge) p.set(x, y, x === gx0 || y === gy0 ? HEDGE[3] : HEDGE[1]);
-      else if (cross) p.set(x, y, GRAVEL[1]);
-      else p.set(x, y, hash(x, y, 93) % 3 === 0 ? FLOWERS[hash(x, y, 94) % FLOWERS.length] : HEDGE[2]);
-    }
-  disc(p, (gx0 + gx1 + 1) / 2, (gy0 + gy1 + 1) / 2, 1.3, (_x, _y, d) => (d > 0.8 ? C.pale[1] : C.pale[3]));
-  // The cloister: an arcaded walk round a green quad with a fountain.
-  const qx0 = X(0.64), qy0 = Y(0.72), qx1 = x1, qy1 = y1;
-  for (let y = qy0; y <= qy1; y++)
-    for (let x = qx0; x <= qx1; x++) {
-      const ring = Math.min(x - qx0, y - qy0, qx1 - x, qy1 - y);
-      if (ring === 0) p.set(x, y, x === qx0 || y === qy0 ? C.pale[3] : C.pale[1]);
-      else if (ring === 1) p.set(x, y, LEAD[(x === qx0 + 1 || y === qy0 + 1) ? 3 : 1]);
-      else if (ring === 2) p.set(x, y, (x + y) % 2 ? C.pale[2] : C.pale[0]);
-      else p.set(x, y, hash(x, y, 95) % 5 === 0 ? LAWN[3] : LAWN[2]);
-    }
-  disc(p, (qx0 + qx1 + 1) / 2, (qy0 + qy1 + 1) / 2, 2.4, (_x, _y, d) => (d > 1.7 ? C.pale[2] : d > 0.8 ? C.sky[1] : C.sky[2]));
-  // Trees along the walk.
-  for (const [tx, ty] of [[mid - 5, Y(0.78)], [mid + 5, Y(0.78)], [mid - 5, Y(0.92)], [mid + 5, Y(0.92)]]) crown(p, tx, ty, 2.6, HEDGE);
-  // The cathedral's footprint: the nave, the transept and the apse.
-  const nw = Math.round(W * 0.15), nx0 = mid - nw, nx1 = mid + nw, ny0 = Y(0.1), ny1 = Y(0.64);
-  const tx0 = X(0.1), tx1 = X(0.9), ty0 = Y(0.2), ty1 = Y(0.38);
-  const apse = { cx: mid + 0.5, cy: ny0 + 0.5, r: nw + 0.5 };
-  const inChurch = (x: number, y: number) =>
-    (x >= nx0 && x <= nx1 && y >= ny0 && y <= ny1) || (x >= tx0 && x <= tx1 && y >= ty0 && y <= ty1) ||
-    (y < ny0 && (x + 0.5 - apse.cx) ** 2 + (y + 0.5 - apse.cy) ** 2 <= apse.r ** 2);
-  // Buttresses: stone piers standing out from the walls every few pixels.
-  for (let y = ny0 + 2; y <= ny1 - 1; y += 4) {
-    if (y >= ty0 - 1 && y <= ty1 + 1) continue;
-    for (const x of [nx0 - 1, nx0 - 2, nx1 + 1, nx1 + 2]) { p.set(x, y, x < mid ? C.pale[3] : C.pale[1]); p.set(x, y + 1, C.pale[0]); }
-  }
-  for (let x = tx0 + 2; x <= tx1 - 2; x += 4) {
-    if (x >= nx0 - 1 && x <= nx1 + 1) continue;
-    for (const y of [ty0 - 1, ty1 + 1]) { p.set(x, y, y < ty0 ? C.pale[3] : C.pale[1]); p.set(x + 1, y, C.pale[0]); }
-  }
-  // Walls: the footprint's edge in pale ashlar, lit to the upper left.
-  for (let y = y0; y <= y1; y++)
-    for (let x = x0; x <= x1; x++) {
-      if (!inChurch(x, y)) continue;
-      const edge = !inChurch(x - 1, y) || !inChurch(x + 1, y) || !inChurch(x, y - 1) || !inChurch(x, y + 1);
-      if (edge) p.set(x, y, !inChurch(x - 1, y) || !inChurch(x, y - 1) ? C.pale[3] : C.pale[1]);
-    }
-  // The roofs: lead, the nave's and transept's ridges meeting at the
-  // crossing, each slope shaded by its facing, with seams of lead sheets.
-  for (let y = y0; y <= y1; y++)
-    for (let x = x0; x <= x1; x++) {
-      if (!inChurch(x, y)) continue;
-      const edge = !inChurch(x - 1, y) || !inChurch(x + 1, y) || !inChurch(x, y - 1) || !inChurch(x, y + 1);
-      if (edge) continue;
-      const inNave = x >= nx0 && x <= nx1 && !(y >= ty0 && y <= ty1);
-      const inApse = y < ny0;
+      const d = depth(x, y);
+      if (d < 0) continue;
+      if (d < RIM) {
+        // The lip: open ground round the pit.
+        const t = hash(x, y, 81) % 11;
+        p.set(x, y, d < 1 ? C.dirt[0] : t < 3 ? C.dirt[2] : C.dirt[1]);
+        continue;
+      }
+      const ring = ringOf(d), local = d - RIM - ring * BENCH;
+      // The wall's facing: the way the depth climbs, toward the middle.
+      const nx = depth(x + 1, y) - depth(x - 1, y), ny = depth(x, y + 1) - depth(x, y - 1);
+      const sunny = nx + ny < -0.2, a = angle(x, y);
+      const wall = local < 1 && (ring < DEEP || d - RIM - DEEP * BENCH < 1);
       let c: number;
-      if (inApse) {
-        const dx = x + 0.5 - apse.cx, dy = y + 0.5 - apse.cy;
-        c = LEAD[Math.min(3, lit(x, y, dx, dy, Math.sqrt(dx * dx + dy * dy)) + 0)];
-      } else if (inNave) {
-        const ridge = x === mid;
-        c = ridge ? OUTLINE : x < mid ? LEAD[2] : LEAD[1];
-        if (!ridge && (y - ny0) % 4 === 0) c = shade(c, 0.82);
+      if (wall) {
+        const above = TERRACE[Math.max(0, ring - 1)];
+        c = sunny ? shade(above, 1.35) : shade(above, 0.42);
+        // A ramp cuts down through the wall where the road above turns in.
+        if (ring > 0 && along(ring - 1, a) > SPAN - 0.45) c = sunny ? ROAD[0] : ROAD[1];
       } else {
-        const tmid = Math.round((ty0 + ty1) / 2);
-        c = y === tmid ? OUTLINE : y < tmid ? LEAD[3] : LEAD[0];
-        if (y !== tmid && (x - tx0) % 4 === 0) c = shade(c, 0.82);
+        c = TERRACE[ring];
+        if (!sunny && local < 2) c = shade(c, 0.7);
+        else if (hash(x, y, 83) % 9 === 0) c = shade(c, 0.86);
+        if (ring < DEEP && along(ring, a) < SPAN && local >= 1 && local < 3) c = local < 2 ? ROAD[0] : ROAD[1];
+        // Ore showing in the deeper benches.
+        if (ring >= 2 && hash(x, y, 85) % 23 === 0) c = [0xb06a34, 0xa6a6b0, 0xe9c46a][hash(x, y, 86) % 3];
       }
       p.set(x, y, c);
     }
-  // Stained glass glowing in the transept's ends and the west front.
-  for (const [gx, gy] of [[tx0, Math.round((ty0 + ty1) / 2)], [tx1, Math.round((ty0 + ty1) / 2)]]) {
-    p.set(gx, gy - 1, 0x5b8fd9); p.set(gx, gy, 0xd8553f); p.set(gx, gy + 1, 0xe9c46a);
-  }
-  for (let x = mid - 2; x <= mid + 2; x++) p.set(x, ny1, [0x5b8fd9, 0xa06ac8, 0xe9c46a, 0xa06ac8, 0x5b8fd9][x - mid + 2]);
-  // The west door, at the head of the walk.
-  rect(p, mid - 1, ny1 + 1, mid + 1, ny1 + 1, C.plank[0]);
-  // The spire over the crossing: a four-sided pyramid lit from the upper
-  // left, a gilded cross at its tip.
-  const scx = mid + 0.5, scy = Math.round((ty0 + ty1) / 2) + 0.5, sr = Math.min(nw, (ty1 - ty0) / 2) + 1.5;
-  for (let y = Math.floor(scy - sr); y <= Math.ceil(scy + sr); y++)
-    for (let x = Math.floor(scx - sr); x <= Math.ceil(scx + sr); x++) {
-      const dx = x + 0.5 - scx, dy = y + 0.5 - scy;
-      if (Math.abs(dx) > sr || Math.abs(dy) > sr) continue;
-      const rim = Math.abs(dx) > sr - 1 || Math.abs(dy) > sr - 1;
-      const diag = Math.abs(Math.abs(dx) - Math.abs(dy)) < 0.6;
-      const face = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 3 : 1) : dy < 0 ? 2 : 0;
-      p.set(x, y, rim ? C.pale[face >= 2 ? 3 : 1] : diag ? LEAD[0] : LEAD[face]);
+  // A pool of seepage at the bottom.
+  const bottom = (x: number, y: number) => depth(x, y) - RIM - DEEP * BENCH >= 2;
+  for (let y = y0 + 12; y <= y1; y++)
+    for (let x = x0; x <= x1; x++)
+      if (bottom(x, y) && Math.abs(x + 0.5 - cx) < 6) p.set(x, y, bottom(x - 1, y - 1) && Math.abs(x - 0.5 - cx) < 6 ? C.sky[0] : C.sky[1]);
+  // The road comes in over the lip from the yard.
+  const ax = Math.round(cx + Math.sin(START) * hx) , ay = y0 + 12;
+  for (let y = ay - 1; y <= ay + RIM; y++) { p.set(ax - 1, y, ROAD[0]); p.set(ax, y, ROAD[0]); p.set(ax + 1, y, ROAD[1]); }
+  // Ore trucks on the road: yellow dump bodies, a dark cab.
+  const truck = (ring: number, t: number) => {
+    let best = -1, bx = 0, by = 0;
+    for (let y = y0 + 12; y <= y1; y++)
+      for (let x = x0; x <= x1; x++) {
+        const d = depth(x, y);
+        if (d < RIM || ringOf(d) !== ring || d - RIM - ring * BENCH < 1.5) continue;
+        const off = Math.abs(along(ring, angle(x, y)) - t);
+        if (best < 0 || off < best) { best = off; bx = x; by = y; }
+      }
+    const flat = Math.abs(Math.cos(START + ring * SPAN + t)) < 0.6;
+    const w = flat ? 1 : 2, h = flat ? 2 : 1; // cells left and up of (bx, by)
+    rect(p, bx - w + 1, by - h + 1, bx + 1, by + 1, 0xe0a82a);
+    p.set(bx - w + 1, by - h + 1, 0xf6d070);
+    p.set(bx + 1, by + 1, 0x8a5a16);
+    p.set(flat ? bx : bx + 1, flat ? by + 1 : by, 0x2a2a30);
+  };
+  truck(0, SPAN * 0.45);
+  truck(2, SPAN * 0.3);
+  // The hall: a long timber building under brown shingles, its forge
+  // chimney of brick through the roof.
+  const hx0 = x0 + 1, hy0 = y0, hx1 = x0 + 25, hy1 = y0 + 10;
+  roofed(p, hx0, hy0, hx1, hy1, C.plank, C.plank[2]);
+  const kx = hx1 - 6, ky = hy0 + 2;
+  for (let dy = 0; dy < 4; dy++)
+    for (let dx = 0; dx < 4; dx++) {
+      const rim = dx === 0 || dy === 0 || dx === 3 || dy === 3;
+      p.set(kx + dx, ky + dy, rim ? ((dx + dy) % 2 ? 0x8e3a26 : 0xb04a30) : dx === 1 && dy === 1 ? C.ember : 0x1a0e0a);
     }
-  p.set(mid, Math.round(scy) - 1, C.gold[2]); p.set(mid - 1, Math.round(scy) - 1, C.gold[1]);
-  p.set(mid + 1, Math.round(scy) - 1, C.gold[1]); p.set(mid, Math.round(scy) - 2, C.gold[1]); p.set(mid, Math.round(scy), C.gold[0]);
+  // Its door and the lamp beside it.
+  rect(p, hx0 + 5, hy1, hx0 + 7, hy1, C.plank[0]);
+  p.set(hx0 + 9, hy1 + 1, C.fire[2]);
+  // Ore heaped in the yard: copper, silver and gold.
+  oreHeap(p, x1 - 15, y0 + 5, 3.4, [0x6a3a1c, 0x8e5228, 0xb06a34, 0xd08a4a], 0xf0b070);
+  oreHeap(p, x1 - 8, y0 + 4, 3, [0x5a5a62, 0x7e7e88, 0xa6a6b0, 0xcacad2], 0xffffff);
+  oreHeap(p, x1 - 4, y0 + 9, 2.6, [0x6a5420, 0x9a7a2a, 0xc8a03a, 0xe9c46a], 0xfff4c8);
+}
+
+/** The Library: a great cathedral of pale ashlar, a little larger than the
+ * keep, standing alone. Its lead roofs make a cross: the nave between lower
+ * aisles running north to a round apse ringed with chapels, the transept
+ * across it, flying buttresses springing over the aisles, twin towers at the
+ * west front either side of the rose window and the door, and a spire over
+ * the crossing with a gilded cross. */
+function paintLibrary(p: Pix) {
+  const { x0, y0, x1, y1 } = frame(p.w, p.h);
+  const mid = Math.floor((x0 + x1) / 2);
+  // Zones: 1 the nave, 2 an aisle, 3 the transept, 4 the apse, 5 a chapel,
+  // 6 a tower.
+  const nave = { x0: mid - 5, x1: mid + 5 }, aisle = { x0: mid - 8, x1: mid + 8 };
+  const top = y0 + 9, front = y1 - 4;
+  const tr = { x0: x0 + 3, x1: x1 - 3, y0: y0 + 15, y1: y0 + 24 };
+  const apse = { cx: mid + 0.5, cy: top + 0.5, r: 5.6 };
+  const chapels = [-0.85, 0, 0.85].map((a) => ({ cx: mid + 0.5 + Math.sin(a) * 7.6, cy: top + 0.5 - Math.cos(a) * 7.6, r: 2.6 }));
+  const towers = [{ x0: mid - 10, x1: mid - 4 }, { x0: mid + 4, x1: mid + 10 }].map((t) => ({ ...t, y0: front - 5, y1: front + 1 }));
+  const inside = (x: number, y: number, c: { cx: number; cy: number; r: number }) => (x + 0.5 - c.cx) ** 2 + (y + 0.5 - c.cy) ** 2 <= c.r * c.r;
+  const zone = (x: number, y: number) => {
+    for (const t of towers) if (x >= t.x0 && x <= t.x1 && y >= t.y0 && y <= t.y1) return 6;
+    if (x >= tr.x0 && x <= tr.x1 && y >= tr.y0 && y <= tr.y1) return 3;
+    if (y >= top && y <= front) {
+      if (x >= nave.x0 && x <= nave.x1) return 1;
+      if (x >= aisle.x0 && x <= aisle.x1) return 2;
+    }
+    if (y < top && inside(x, y, apse)) return 4;
+    if (y < top + 2 && chapels.some((c) => inside(x, y, c))) return 5;
+    return 0;
+  };
+  const z = (x: number, y: number) => (x < x0 || x > x1 || y < y0 || y > y1 ? 0 : zone(x, y));
+  // Buttresses: stone piers standing out from the aisles' walls, every
+  // fourth course, and from the transept's.
+  for (let y = top + 2; y < front - 5; y += 4) {
+    if (y >= tr.y0 - 1 && y <= tr.y1 + 1) continue;
+    for (const x of [aisle.x0 - 1, aisle.x0 - 2, aisle.x1 + 1, aisle.x1 + 2]) { p.set(x, y, x < mid ? C.pale[3] : C.pale[1]); p.set(x, y + 1, C.pale[0]); }
+  }
+  for (const x of [tr.x0 + 3, tr.x0 + 7, tr.x1 - 7, tr.x1 - 3])
+    for (const y of [tr.y0 - 1, tr.y1 + 1]) { p.set(x, y, y < tr.y0 ? C.pale[3] : C.pale[1]); p.set(x + 1, y, C.pale[0]); }
+  for (let y = y0; y <= y1; y++)
+    for (let x = x0; x <= x1; x++) {
+      const k = z(x, y);
+      if (!k) continue;
+      // Walls: where the footprint ends, pale ashlar lit to the upper left.
+      if (!z(x - 1, y) || !z(x, y - 1)) { p.set(x, y, C.pale[3]); continue; }
+      if (!z(x + 1, y) || !z(x, y + 1)) { p.set(x, y, C.pale[1]); continue; }
+      let c: number;
+      if (k === 1) {
+        // The nave's roof, its ridge north and south, lead sheets seamed.
+        c = x === mid ? OUTLINE : x < mid ? LEAD[2] : LEAD[1];
+        if (x !== mid && (y - top) % 4 === 0) c = shade(c, 0.82);
+        // The clerestory: the nave's walls stand above the aisles' roofs.
+        if (x === nave.x0) c = C.pale[3];
+        if (x === nave.x1) c = C.pale[1];
+      } else if (k === 2) {
+        // The aisles' lean-to roofs, sloping outward, and the flying
+        // buttresses leaping over them.
+        c = x < mid ? LEAD[3] : LEAD[0];
+        if ((y - top) % 4 === 2) c = x < mid ? C.pale[2] : C.pale[1];
+        else if ((y - top) % 2 === 0) c = shade(c, 0.86);
+      } else if (k === 3) {
+        const tmid = Math.floor((tr.y0 + tr.y1) / 2);
+        c = y === tmid ? OUTLINE : y < tmid ? LEAD[3] : LEAD[0];
+        if (y !== tmid && (x - tr.x0) % 4 === 0) c = shade(c, 0.82);
+      } else if (k === 4 || k === 5) {
+        // The apse and its chapels: half cones of lead, their ribs dark.
+        const cc = k === 4 ? apse : chapels.find((h) => inside(x, y, h))!;
+        const dx = x + 0.5 - cc.cx, dy = y + 0.5 - cc.cy, d = Math.sqrt(dx * dx + dy * dy);
+        c = LEAD[lit(x, y, dx, dy, d)];
+        if (k === 4 && d > 1 && Math.abs(Math.atan2(dx, -dy)) % 0.7 < 0.12) c = LEAD[0];
+      } else c = LEAD[1];
+      p.set(x, y, c);
+    }
+  // The west towers' caps and pinnacles.
+  for (const t of towers) {
+    leadCap(p, (t.x0 + t.x1 + 1) / 2, (t.y0 + t.y1 + 1) / 2, (t.x1 - t.x0 + 1) / 2);
+    for (const [px, py] of [[t.x0, t.y0], [t.x1, t.y0], [t.x0, t.y1], [t.x1, t.y1]]) p.set(px, py, px === t.x0 ? C.pale[3] : C.pale[2]);
+  }
+  // The west front between the towers: the rose window over the door.
+  for (let x = nave.x0 + 1; x <= nave.x1 - 1; x++) p.set(x, front, GLASS[Math.abs(x - mid) % GLASS.length]);
+  p.set(mid, front, C.gold[1]);
+  rect(p, mid - 1, front + 1, mid + 1, front + 1, C.plank[0]);
+  // Stained glass in the transept's ends and round the apse.
+  const tm = Math.floor((tr.y0 + tr.y1) / 2);
+  for (const gx of [tr.x0, tr.x1]) for (let k = -2; k <= 2; k++) p.set(gx, tm + k, GLASS[(k + 4) % GLASS.length]);
+  for (const c of chapels) p.set(Math.floor(c.cx), Math.floor(c.cy - c.r + 0.5), GLASS[0]);
+  // The spire over the crossing, a gilded cross at its tip.
+  const scx = mid + 0.5, scy = tm + 0.5;
+  leadCap(p, scx, scy, 5.5);
+  p.set(mid, tm - 1, C.gold[2]); p.set(mid - 1, tm - 1, C.gold[1]);
+  p.set(mid + 1, tm - 1, C.gold[1]); p.set(mid, tm - 2, C.gold[1]); p.set(mid, tm, C.gold[0]);
 }
