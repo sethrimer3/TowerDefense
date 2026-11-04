@@ -120,6 +120,8 @@ export class Ledger {
     this.subject = s.id;
     this.topics[s.id] = topicId;
     this.openTile = (topicId === "walls" ? "cityTile" : topicId === "battle" ? "bomb" : topicId) as TileId;
+    // A shared topic shows its upgrades at once; an individual one waits for a copy.
+    this.copyKey = this.individual(this.openTile) ? null : "";
   }
 
   render() {
@@ -168,6 +170,15 @@ export class Ledger {
       this.openTile = this.openTile === id ? null : id; this.copyKey = null;
       const topic = this.current().topics.find(t => id === 'keep' ? t.id === 'keep' : (topicItems(t).includes(id as never) || t.icon === id || (id === 'bomb' && t.id === 'battle') || (id === 'warBanner' && t.id === 'warBanner')));
       if (topic) this.topics[this.subject] = topic.id;
+      // Shared upgrades (the keep, walls, gates, Mine, Library, spells...)
+      // serve every copy alike, so they open at once without unfolding.
+      if (this.openTile && !this.individual(this.openTile)) {
+        this.copyKey = "";
+        if (this.kind === "study" && id !== "mine" && id !== "library") {
+          const target = tileTree(this.save, id, null);
+          if (target) { this.openTile = null; this.copyKey = null; this.render(); this.ctx.openTree(target); return; }
+        }
+      }
       this.render();
     });
     root.querySelectorAll<HTMLButtonElement>('[data-ledger-copy]').forEach(b=>b.onclick=()=>{
@@ -231,13 +242,22 @@ export class Ledger {
     return topicItems(t).reduce((n, item) => n + this.save.defend.owned[item], 0);
   }
 
+  /** Whether a kind's upgrades belong to each copy on its own (so its stack
+   * unfolds into copies), rather than to every copy alike. */
+  private individual(id: TileId) {
+    if (TILE_TYPE[id] === "towers" || TILE_TYPE[id] === "units") return true;
+    if (this.kind === "smithy" || id === "repairShop") return false;
+    const target = tileTree(this.save, id, null);
+    return !!target && !("side" in target);
+  }
+
   private galleryHtml(subject: Subject) {
     const ids = new Set(subject.topics.flatMap(t=>topicItems(t)));
     const stacks = tileStacks(this.save,'all').filter(s=>subject.id==='all'||(s.id==='keep'?subject.id==='realm':ids.has(s.id as never)||subject.id==='spells'&&s.type==='consumables'));
-    return `<div class="ledger-collection"><p class="ledger-note">Choose a tile, then choose the individual copy to upgrade.</p><div class="tiles-grid ledger-tiles">${stacks.map(stack=>{
-      const id=stack.id, open=this.openTile===id;
-      const button=`<button class="tile type-${stack.type} ${open?'open':''}" data-ledger-stack="${id}" aria-expanded="${open}" aria-label="${TILE_NAMES[id]}, ${stack.count} owned"><span class="tile-face"><canvas width="48" height="48" data-icon="${id==='warBanner'?'banner':id}"></canvas></span><span class="tile-name">${TILE_NAMES[id]}</span><b class="tile-count">×${stack.count}</b></button>`;
-      if(!open)return button;
+    return `<div class="ledger-collection"><p class="ledger-note">Choose a tile. Towers and troop buildings unfold into their copies, each upgraded on its own.</p><div class="tiles-grid ledger-tiles">${stacks.map(stack=>{
+      const id=stack.id, open=this.openTile===id, unfolds=this.individual(id);
+      const button=`<button class="tile type-${stack.type} ${open?'open':''}" data-ledger-stack="${id}" ${unfolds?`aria-expanded="${open}"`:`aria-pressed="${open}"`} aria-label="${TILE_NAMES[id]}, ${stack.count} owned"><span class="tile-face"><canvas width="48" height="48" data-icon="${id==='warBanner'?'banner':id}"></canvas></span><span class="tile-name">${TILE_NAMES[id]}</span><b class="tile-count">×${stack.count}</b></button>`;
+      if(!open||!unfolds)return button;
       const copies=tileCopies(this.save,stack).map(c=>`<button class="tile type-${stack.type}" data-ledger-copy="${c.key}" aria-pressed="${this.copyKey===c.key}"><span class="tile-face"><canvas width="48" height="48" data-icon="${id==='warBanner'?'banner':id}"></canvas></span><span class="tile-name">${TILE_NAMES[id]} ${c.index+1}</span><small>${c.placed?'Placed':'In collection'}</small></button>`).join('');
       return `${button}<div class="ledger-copies tiles-detail" role="group" aria-label="${TILE_NAMES[id]} copies"><div class="tiles-grid">${copies}</div></div>`;
     }).join('')}</div></div>`;

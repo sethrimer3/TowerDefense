@@ -48,11 +48,15 @@ try{
   await workshop.locator('[data-ledger-stack=watchTower]').click();
   await workshop.locator('[data-ledger-copy]').nth(1).click();
   assert.equal(await page.evaluate(()=>window.realmFixture.opened.length),1);
-  await workshop.locator('[data-ledger-stack=mine]').click();await workshop.locator('[data-ledger-copy]').click();
+  await workshop.locator('[data-ledger-stack=mine]').click();
+  assert.equal(await workshop.locator('[data-ledger-copy]').count(),0);
   assert.equal(await workshop.locator('[data-economy-tree] .ug-host').count(),1);
   await workshop.locator('[data-subject=realm]').click();
   assert.equal(await workshop.locator('[data-ledger-stack=watchTower]').count(),0);
   assert.equal(await workshop.locator('[data-ledger-stack=keep]').count(),1);
+  // A shared tree (the keep's) opens at once in Defend, without unfolding copies.
+  await workshop.locator('[data-ledger-stack=keep]').click();
+  assert.deepEqual(await page.evaluate(()=>window.realmFixture.opened.at(-1)),{side:'keep'});
   const fixture=await page.evaluate(async()=>{
    const {defaults}=await import('/src/save.ts');const {placeCityTile,placeStructure}=await import('/src/defend/layout.ts');
    const s=defaults();s.profile={name:'Realm tester',flag:{base:12,layers:[]}};s.settings.reduceMotion=true;
@@ -72,7 +76,6 @@ try{
   assert.equal(await page.locator('#mine-chamber [data-subject=city]').count(),0);
   await page.locator('#mine-chamber [data-subject=realm]').click();
   await page.locator('#mine-chamber [data-ledger-stack=mine]').click();
-  await page.locator('#mine-chamber [data-ledger-copy]').click();
   assert.equal(await page.locator('#mine-chamber [data-train=minerPower]').count(),1);
   await page.screenshot({path:`work/realm-smithy-${width}.png`});
   assert.deepEqual(errors,[]);
