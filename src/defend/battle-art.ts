@@ -22,7 +22,7 @@ import { boatLights, drawBoat } from "./boat-art.ts";
  * Every painter takes a `Brush`: the board's context and its pixels per cell. */
 import { hash01 } from "./grid.ts";
 import { HOPLITE, JAVELINEER, LANCER, SPEARMAN, ARCHER_UNIT, ASSASSIN_UNIT, BRAWLER, CIVILIAN, DARK_WIZARD, ENEMIES, FIRE_MAGE, GATLING_GUNNER, GUNNER, MACHINE_GUNNER, MUSKETEER, RAIL_SNIPER, ROCKETEER, SLINGER, SNIPER, SOLDIER, VALKYRIE, WATCHMAN, watchRadius, type EnemyDef } from "./catalog.ts";
-import { drawWatchman } from "./city-life-art.ts";
+import { drawWatchman, drawWatchTorch } from "./city-life-art.ts";
 import type { Building } from "./citygen.ts";
 import { center } from "./pathing.ts";
 import { paintKeepFlash } from "./structure-art.ts";
@@ -302,6 +302,13 @@ function drawSoldiers(b: Brush, sim: DefendSim, reduced = false, unit?: (id: num
       const thrust = foe && d > 0 && d < 2.5 ? { x: (foe.x - u.x) / d, y: (foe.y - u.y) / d } : undefined;
       const jab = thrust && since >= 0 && since < 0.2 ? Math.sin((since / 0.2) * Math.PI) : 0;
       drawWatchman(c, Math.round(u.x * px), Math.round(u.y * px), px / ART, { flash: u.flash > 0, thrust, jab });
+<<<<<<< HEAD
+=======
+      if (torches) {
+        const on = torches(u.x, u.y, u.id);
+        if (on > 0) drawWatchTorch(c, Math.round(u.x * px), Math.round(u.y * px), px / ART, Math.min(1, on), Math.sin(sim.time * 17 + u.id * 1.7) * 0.5 + 0.5);
+      }
+>>>>>>> origin/claude/project-thread-64p6se
       continue;
     }
     if (u.kind === "mage") {
