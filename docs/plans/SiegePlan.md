@@ -4,7 +4,7 @@ Siege is the attack mode. The player's infantry buildings muster below a generat
 
 This plan turns Seth's 2026-10-27 Siege brief into ordered work for an AI agent: ranks and an entry screen, bots that look like players, castles generated from native towers, units and upgrades at a difficulty measured in defensive DPS, ranks anchored to the maxed-out DPS ceiling, name plates on the board, and a mana experiment for strike spells. It also keeps the earlier shared items and known gaps.
 
-Read this whole file, [AmbushPlan.md](AmbushPlan.md#architecture-guidelines)'s architecture guidelines, AGENTS.md (the Siege paragraph and the Player profile, Strike spells and Upgrade tree sections) and `docs/design/SIEGE_MATCHMAKING.md` before starting a phase. Tick each phase here as it lands.
+Read this whole file, [AmbushPlan.md](AmbushPlan.md#architecture-guidelines)'s architecture guidelines, `docs/architecture/siege.md`, `shell-ui.md` (Player profile), `defend-play.md` (Strike spells) and `defend-buildings.md` (upgrade trees) and `docs/design/SIEGE_MATCHMAKING.md` before starting a phase. Tick each phase here as it lands.
 
 ## Seth's brief (2026-10-27, verbatim intent)
 
@@ -123,7 +123,7 @@ Two parchment name plates drawn over the board, outside the sim, as DOM over the
 7. **One MMR in the UI.** Remove "defense rating" wording everywhere in game. The two-scale text in `SIEGE_MATCHMAKING.md` is rewritten in phase 6.
 8. **Look and text:** theme tokens, pixel art with black outlines, `t()` messages for every new label in all nine catalogs (English text with English fallback is fine for long text, per `docs/LOCALIZATION.md`).
 9. **Mobile first.** Every phase has a browser script at 390 × 844 and 1280 × 800 with an isolated save, a valid seeded profile and screenshots in `test-results/`.
-10. **Keep AGENTS.md current** (the Siege paragraph, new modules and commands) and tick phases here.
+10. **Keep `docs/architecture/siege.md` and AGENTS.md current** (new modules and commands) and tick phases here.
 
 ## Implementation order
 

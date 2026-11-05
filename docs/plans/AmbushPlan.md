@@ -120,7 +120,7 @@ These matter more than any single feature. Follow them throughout.
 7. **Styling.** All new UI uses `theme.css` tokens (`--wood`, `--stone`, `--parchment`, `--brass-nails`, `--ink`) and `var(--font)`. The level select is parchment cards on wood, not a plain grid of buttons. Pixel art has crisp black outlines.
 8. **Localisation.** New labels ("Outpost 1", "Keep", "Send next wave", "Auto-send", "Level select", star texts) go through `t()` with English entries in `src/i18n/` and `data-i18n` on text-only labels. Longer descriptions may stay English, as elsewhere.
 9. **Mobile first.** Every screen must work at 390 × 844 and 1280 × 800. The side panel's fixed header must not push the board off a phone screen; on phones the build menu is the slide-in palette Defend already uses.
-10. **Docs as you go.** Each PR updates AGENTS.md's Combat tab and campaigns paragraph, `CONTEXT.md` (new terms: Outpost, Star rating, Level select, Track) and `docs/design/AMBUSH_ECONOMY.md` when prices change. Tick this plan's phases as they land.
+10. **Docs as you go.** Each PR updates the Combat tab and campaigns paragraph in `docs/architecture/ambush.md`, `CONTEXT.md` (new terms: Outpost, Star rating, Level select, Track) and `docs/design/AMBUSH_ECONOMY.md` when prices change. Tick this plan's phases as they land.
 11. **Test every phase** in Node (pure modules, sim behaviour, saves) and with one browser script at desktop and phone width (`node tests/ambush-*.mjs`, isolated saves, screenshots in `test-results/`). Run `npm test` and `npm run build` before each commit.
 
 ## Implementation order

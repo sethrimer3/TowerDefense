@@ -6,3 +6,6 @@ playwright-report/
 *.local
 dist-snapshot/
 art/export/
+.claude/run-logs/
+.claude/test-logs/
+CODEMAP.md
