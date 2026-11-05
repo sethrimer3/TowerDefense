@@ -7,6 +7,10 @@ import { BattleSound } from "../defend/battle-sound.ts";
 import { play } from "../sound.ts";
 import { sparksOver } from "../ui/flourish.ts";
 import { stepName } from "../specializations.ts";
+import { offerText, stepFace, stepKey } from "./ambush-offer.ts";
+import { setMenuGold } from "../ui/building-menu.ts";
+import { paintPathIcons } from "../ui/path-badge.ts";
+import type { IconItem } from "../defend/structure-art.ts";
 import { artLook } from "../defend/tower-art.ts";
 import type { AmbushBuilding } from "./ambush-sim.ts";
 import { SpellBar } from "../ui/spell-bar.ts";
@@ -49,10 +53,18 @@ export class AmbushBattlePage {
     change:(b,o)=>applyOrders(this.sim.engine,b,o),
     spec:b=>({name:STRUCTURES[b.kind as StructureKind]?.name??b.kind,tree:true,remove:b.kind!=="keep"?{kind:"sell",gold:this.sim.refund(b.id)}:null}),
     tree:b=>{this.treePicked=b.id;this.picked=b.id;this.toggleSide(true);this.refresh();},
+    upgrades:b=>this.sim.buildings.some(o=>o.id===b.id)?this.sim.upgrades(b.id).map(o=>{
+      const key=stepKey(o.step);
+      return {id:key,face:stepFace(o.step),label:stepName(o.step),cost:o.cost,locked:!o.ready,picked:this.offer?.uid===b.id&&this.offer.key===key};
+    }):undefined,
+    upgrade:(b,key)=>this.tapUpgrade(b.id,key),
     remove:b=>{this.sim.remove(b.id);this.picked=undefined;this.treePicked=undefined;this.refresh();},
     closed:()=>{this.picked=undefined;this.treePicked=undefined;this.refresh();},
   });
   private treePicked:number|undefined;
+  /** The top bar upgrade tapped once, whose card the sidebar shows: tapped again, it is bought. */
+  private offer:{uid:number;key:string}|undefined;
+  private offerKey="";
   private notice = "";
   private now = 0;
   /** When the flier warning went up, on the wall clock; unset while none shows. */
@@ -191,6 +203,7 @@ export class AmbushBattlePage {
           </div>
           <div class="ambush-side-content">
             <div class="campaign-roster defend-palette" id="ambush-palette"></div>
+            <div id="ambush-offer" class="ambush-offer" hidden></div>
             <div id="ambush-inspect" hidden>
               <div class="ambush-building-details"></div>
               <div class="campaign-inspect-actions" hidden><button data-action="close">${t("ambush.close")}</button><button data-action="sell"></button></div>
@@ -453,8 +466,13 @@ export class AmbushBattlePage {
         (s.waves[s.wave - 1]?.boss ? " · " + t("ambush.boss") : "") +
         " · " +
         t("ambush.enemiesLeft", { count: s.enemiesLeft });
-    this.root.querySelector<HTMLElement>("#ambush-inspect")!.hidden = !b||this.treePicked!==b.id;
-    this.root.querySelector<HTMLElement>("#ambush-palette")!.hidden = !!b&&this.treePicked===b.id;
+    const offer = this.liveOffer();
+    this.root.querySelector<HTMLElement>("#ambush-inspect")!.hidden = !b||this.treePicked!==b.id||!!offer;
+    this.root.querySelector<HTMLElement>("#ambush-offer")!.hidden = !offer;
+    this.root.querySelector(".ambush-side")?.classList.toggle("offering", !!offer);
+    this.root.querySelector<HTMLElement>("#ambush-palette")!.hidden = (!!b&&this.treePicked===b.id)||!!offer;
+    this.offerPanel(offer);
+    if (this.menu.element) setMenuGold(this.menu.element, s.gold);
     const sell = this.root.querySelector<HTMLButtonElement>('[data-action="sell"]')!;
     if (b) {
       this.panel(b);
@@ -468,6 +486,69 @@ export class AmbushBattlePage {
     this.root.querySelector<HTMLButtonElement>('[data-action="pause"]')!.disabled = s.phase !== "battle";
     this.root.querySelector<HTMLButtonElement>('[data-action="speed"]')!.textContent = s.speed + "×";
     this.spellBar?.update(s.engine, s.phase === "battle", this.host.save().settings.reduceMotion, s.perks.cooldown);
+  }
+  /** The tapped upgrade while its building's menu is still open, and what the sim offers for it now. */
+  private liveOffer() {
+    const o = this.offer;
+    if (!o || this.menu.building?.id !== o.uid) return undefined;
+    const b = this.sim.buildings.find((x) => x.id === o.uid),
+      offer = b && this.sim.upgrades(b.id).find((x) => stepKey(x.step) === o.key);
+    return b && offer ? { b, offer } : undefined;
+  }
+  /** A top bar upgrade tapped: the first tap shows its card in the sidebar, the second buys it. */
+  private tapUpgrade(uid: number, key: string) {
+    const offer = this.sim.upgrades(uid).find((o) => stepKey(o.step) === key);
+    if (!offer) return;
+    if (this.offer?.uid === uid && this.offer.key === key) {
+      if (this.sim.upgrade(uid, offer.step)) {
+        play("coin");
+        this.offer = undefined;
+        this.notice = "";
+        if (this.menu.building?.id === uid) this.menu.updateUpgrades();
+        else this.menu.show(this.sim.map.buildings[uid]);
+        if (!this.host.save().settings.reduceMotion) sparksOver(this.menu.element?.querySelector(".bm-hole") ?? null, "gold");
+      } else this.notice = !offer.ready ? offer.reason : t("menu.shortGold");
+    } else {
+      this.offer = { uid, key };
+      this.treePicked = undefined;
+      this.notice = "";
+      this.toggleSide(true);
+      if (this.menu.building?.id === uid) this.menu.updateUpgrades();
+      else this.menu.show(this.sim.map.buildings[uid]);
+    }
+    this.refresh();
+  }
+  /** The sidebar's card for the tapped upgrade: its sprite, cost, "Tap again to buy", what it is and what changes. */
+  private offerPanel(live: ReturnType<AmbushBattlePage["liveOffer"]>) {
+    const el = this.root.querySelector<HTMLElement>("#ambush-offer")!;
+    if (!live) {
+      this.offerKey = "";
+      return;
+    }
+    const { b, offer } = live,
+      key = [b.id, b.kind, b.wear?.path, b.wear?.rank, stepKey(offer.step)].join(":");
+    if (key !== this.offerKey) {
+      this.offerKey = key;
+      const text = offerText(b.kind, b.wear, offer.step);
+      el.innerHTML =
+        `<div class="ambush-offer-face">${stepFace(offer.step, 64)}</div>` +
+        `<strong class="ambush-offer-name">${text.title}</strong>` +
+        `<p class="ambush-offer-cost">${iconImg("coin")}<b>${offer.cost}</b></p>` +
+        `<button type="button" class="ambush-offer-buy" data-offer-buy></button>` +
+        (text.description ? `<p class="ambush-offer-about">${text.description}</p>` : "") +
+        `<ul class="ambush-offer-changes">${text.changes.map((c) => `<li>${c}</li>`).join("")}</ul>`;
+      el.querySelectorAll<HTMLCanvasElement>("canvas[data-icon]").forEach((c) => paintIcon(c, c.dataset.icon as IconItem));
+      paintPathIcons(el);
+      el.querySelector<HTMLButtonElement>("[data-offer-buy]")!.onclick = () => this.tapUpgrade(b.id, stepKey(offer.step));
+    }
+    const short = offer.cost > this.sim.gold,
+      active = ["build", "battle"].includes(this.sim.phase),
+      label = !offer.ready ? offer.reason : !active ? "" : short ? t("menu.shortGold") : t("menu.tapToBuy"),
+      buy = el.querySelector<HTMLButtonElement>("[data-offer-buy]")!;
+    el.classList.toggle("short", short);
+    if (buy.textContent !== label) buy.textContent = label;
+    buy.hidden = !label;
+    buy.disabled = !offer.ready || short || !active;
   }
   private panel(b: AmbushBuilding) {
     const detail = this.root.querySelector<HTMLElement>(".ambush-building-details")!;
