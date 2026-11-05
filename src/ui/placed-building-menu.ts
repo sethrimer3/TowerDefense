@@ -1,7 +1,7 @@
 /** DOM lifecycle and gestures for the supplied square building menu. The
  * host owns saves and battle rules; this controller owns no animation loop. */
 import { t } from "../i18n/index.ts";
-import { buildingMenuHtml, buildingMenuBox, placeBuildingMenu, setMenuRange, snapRange, type MenuControls, type BuildingMenuSpec } from "./building-menu.ts";
+import { buildingMenuHtml, buildingMenuBox, placeBuildingMenu, setMenuRange, snapRange, typeModeName, type MenuControls, type BuildingMenuSpec } from "./building-menu.ts";
 import { controlsOf, aimPoint } from "../defend/building-controls.ts";
 import { center } from "../defend/pathing.ts";
 import type { Building, CityMap } from "../defend/citygen.ts";
@@ -46,6 +46,8 @@ export class PlacedBuildingMenu {
         else next.targetMode=button.dataset.bmMode as BuildingOrders["targetMode"];
         this.host.change(b,next);
         for(const radio of Array.from(el.querySelectorAll<HTMLElement>("[data-bm-mode]")))radio.setAttribute("aria-checked",String(radio===button));
+        const reduced=document.documentElement.classList.contains("reduce-motion")||matchMedia("(prefers-reduced-motion: reduce)").matches;
+        typeModeName(el,button,button.getAttribute("aria-label") ?? "",reduced);
       }
       if(button.dataset.bm==="tree") {this.dismiss(false);this.host.tree(b);}
       if(button.dataset.bm==="remove") {this.dismiss(false);this.host.remove(b);}

@@ -63,6 +63,12 @@ try {
   await page.locator('[data-bm-mode="strongest"]').click();
   const slider=page.locator('[data-bm="range"]');await slider.fill('50');await slider.dispatchEvent('input');
   assert.equal(await page.locator('[data-bm="range-value"]').textContent(),'50%');
+  // The picked mode's name pops up beside its button (whole at once under Reduce Motion), and
+  // the 50% range leaves its full reach as a dotted ghost; the buttons float on 60% brick.
+  assert.equal(await page.locator('.bm-mode-name').textContent(),'Strongest');
+  const look=await page.locator('.building-menu').evaluate(el=>({top:getComputedStyle(el.querySelector('.bm-top')).backgroundImage,brick:getComputedStyle(el.querySelector('.bm-button'),'::before').opacity,icon:getComputedStyle(el.querySelector('.bm-icon')).opacity}));
+  assert.equal(look.top,'none');assert.equal(look.brick,'0.6');assert.equal(look.icon,'1');
+  await page.screenshot({path:`test-results/defend-building-menu-${width}-mode.png`});
   await page.locator('[data-bm="aim"]').click();
   assert.ok(await page.locator('.building-menu.placing').count());
   const far=await page.locator('#defend-canvas').evaluate(el=>{const r=el.getBoundingClientRect();return {x:r.right-20,y:r.top+65};});
