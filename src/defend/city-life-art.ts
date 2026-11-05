@@ -1,7 +1,5 @@
 import type { CityLife } from './city-life.ts';
 import { ART } from './art-scale.ts';
-import { torchLevel } from './city-torches.ts';
-import { getTorchFlicker } from '../lighting.ts';
 import { hash01 } from './grid.ts';
 /** A watchman's body colour (one flat square) and spear (shaft, iron head). */
 export const WATCHMAN_ART = { body: '#3f5f8f', shaft: '#7a5232', head: '#c9d0d3', ink: '#152539' } as const;
@@ -22,16 +20,6 @@ export function drawCityLife(c: CanvasRenderingContext2D, px: number, life: City
     const x=glide(p.x*px),y=glide(p.y*px);
     if(p.role==='watchman') drawWatchman(c,x,y,dot,{ring:true});
     else drawTownsfolk(c,x,y,dot,p.id);
-    // Torch in the free hand: townsfolk's right, a watchman's left (the spear is in the right).
-    const on=torchLevel(time,p.id);
-    if(on>0&&p.role==='watchman') { drawWatchTorch(c,x,y,dot,on,getTorchFlicker({x:p.id,y:17},now,reduced),true); continue; }
-    const tx=dot;
-    if(on>0) {
-      const f=getTorchFlicker({x:p.id,y:17},now,reduced);
-      c.globalAlpha=on;c.fillStyle='#5c3922';c.fillRect(x+tx,y-dot*.3,dot*.5,dot*1.4);
-      c.fillStyle='#df7931';c.fillRect(x+tx-dot*.3,y-dot*f,dot,dot*f);
-      c.fillStyle='#ffe3a2';c.fillRect(x+tx,y-dot*f,dot*.5,dot*.7*f);c.globalAlpha=1;
-    }
   }
   c.restore();
 }
@@ -66,18 +54,6 @@ export function watchmanRects(x: number, y: number, dot: number, thrust?: {x:num
   const sy=thrust.y>=0?1:-1, x0=x+h/2;
   const near=sy>0?y+out-dot:y-out-len+dot;
   return { body, shaft:{x:x0,y:near,w:h,h:len}, head:{x:x0,y:sy>0?near+len:near-dot,w:h,h:dot} };
-}
-/** A watchman's torch in his left hand, drawn in half art pixels: a half-pixel handle one pixel long under a
- *  half-pixel flame, `on` its strength and `f` (0 to 1) its flicker. `ring` adds the half-pixel navy outline
- *  (the battle's unit contours outline the keep's guards instead). */
-export function drawWatchTorch(c: CanvasRenderingContext2D, x: number, y: number, dot: number, on: number, f: number, ring = false) {
-  const h=dot/2, tx=x-WATCHMAN_PX/2*dot-dot, flame=dot*(.6+.4*f);
-  c.globalAlpha=on;
-  if(ring) { c.fillStyle=WATCHMAN_ART.ink; c.fillRect(tx-h,y-flame-h,h+2*h,flame+dot+2*h); }
-  c.fillStyle='#5c3922';c.fillRect(tx,y,h,dot);
-  c.fillStyle='#df7931';c.fillRect(tx,y-flame,h,flame);
-  c.fillStyle='#ffe3a2';c.fillRect(tx,y-flame,h,flame/2);
-  c.globalAlpha=1;
 }
 /** Draws a watchman; `ring` adds the navy ring round body and spear (the battle's
  *  own unit contours ring the keep's guards instead), `flash` paints them white when struck. */
