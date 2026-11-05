@@ -36,11 +36,23 @@ export type BuildingMenuSpec = {
   aimSet?: boolean;
   /** Whether the upgrade tree button shows (default true). */
   tree?: boolean;
+  /** The building's next upgrades, shown on the top bar in place of the
+   * tree button (Ambush), each with its cost above it. */
+  upgrades?: MenuUpgrade[];
   /** The remove button: back to the palette, sold for gold, or none. */
   remove?: { kind: "inventory" } | { kind: "sell"; gold: number } | null;
   /** Why remove can't be pressed now, if it can't (shown as its tooltip). */
   removeBlocked?: string;
 };
+
+/** An upgrade offered on the menu's top bar: `id` its hook
+ * (`data-bm-upgrade`), `face` its sprite's markup, `cost` in gold. `picked`
+ * marks the one tapped once (tap again to buy); `locked` one that can't be
+ * bought for another reason than gold. */
+export type MenuUpgrade = { id: string; face: string; label: string; cost: number; picked?: boolean; locked?: boolean };
+
+/** Room kept above the menu for the upgrades' costs, in CSS pixels. */
+export const MENU_COST_ROOM = 18;
 
 /** The menu's size on screen: `bar` the oak bars' thickness, `min` the
  * smallest square a menu with controls is. */
@@ -56,14 +68,14 @@ export const MENU_SIZE = {
 /** Where the menu stands round a building at `rect` (CSS pixels in the
  * board's view, `view` its size): a square centred on it, its open middle
  * at least as big as the building, shifted inward to stay on screen. */
-export function buildingMenuBox(rect: { x: number; y: number; w: number; h: number }, view: { w: number; h: number }, controls: MenuControls) {
+export function buildingMenuBox(rect: { x: number; y: number; w: number; h: number }, view: { w: number; h: number }, controls: MenuControls, headroom = 0) {
   const s = view.w < MENU_SIZE.phoneBelow ? MENU_SIZE.phone : MENU_SIZE.desktop;
   const hole = Math.ceil(Math.max(rect.w, rect.h) + 8);
   const fit = Math.min(view.w, view.h) - 2 * MENU_SIZE.margin;
   const size = Math.min(Math.max(hole + 2 * s.bar, controls === "plain" ? 0 : s.min), Math.max(fit, 3 * s.bar));
   const cx = rect.x + rect.w / 2, cy = rect.y + rect.h / 2;
-  const clamp = (v: number, span: number) => Math.min(Math.max(v, MENU_SIZE.margin), Math.max(MENU_SIZE.margin, span - size - MENU_SIZE.margin));
-  return { left: Math.round(clamp(cx - size / 2, view.w)), top: Math.round(clamp(cy - size / 2, view.h)), size: Math.round(size), bar: s.bar };
+  const clamp = (v: number, span: number, low = MENU_SIZE.margin) => Math.min(Math.max(v, low), Math.max(low, span - size - MENU_SIZE.margin));
+  return { left: Math.round(clamp(cx - size / 2, view.w)), top: Math.round(clamp(cy - size / 2, view.h, MENU_SIZE.margin + headroom)), size: Math.round(size), bar: s.bar };
 }
 
 /** `percent` snapped onto the slider's steps. */
@@ -81,7 +93,11 @@ const button = (hook: string, icon: MenuIcon, label: string, extra = "") =>
  * `"remove"`, `"aim"`, `"range"` (the slider), and `data-bm-mode` on each
  * mode button. */
 export function buildingMenuHtml(spec: BuildingMenuSpec): string {
-  const tree = spec.tree !== false ? button('data-bm="tree"', "tree", t("menu.tree")) : "";
+  const tree = spec.upgrades
+    ? `<div class="bm-upgrades">${spec.upgrades.map((u) =>
+        `<span class="bm-upgrade${u.locked ? " locked" : ""}" data-cost="${u.cost}"><span class="bm-cost" aria-hidden="true">${u.cost}</span>` +
+        `<button type="button" class="bm-button" data-bm-upgrade="${esc(u.id)}" title="${esc(u.label)}" aria-label="${esc(t("menu.upgrade", { name: u.label, gold: u.cost }))}" aria-pressed="${!!u.picked}">${u.face}</button></span>`).join("")}</div>`
+    : spec.tree !== false ? button('data-bm="tree"', "tree", t("menu.tree")) : "";
   const remove = spec.remove
     ? button('data-bm="remove"', spec.remove.kind === "sell" ? "sell" : "inventory",
         spec.remove.kind === "sell" ? t("menu.sell", { gold: spec.remove.gold }) : t("menu.inventory"),
@@ -150,6 +166,14 @@ export function typeModeName(menu: HTMLElement, button: HTMLElement, name: strin
   timers.push(window.setTimeout(() => tag.classList.add("fading"), whole + MODE_NAME.hold));
   timers.push(window.setTimeout(() => tag.remove(), whole + MODE_NAME.hold + 400));
   typing.set(menu, timers);
+}
+
+/** Marks each top bar upgrade the wallet's `gold` can't pay for (its cost shown red). */
+export function setMenuGold(menu: HTMLElement, gold: number) {
+  for (const u of Array.from(menu.querySelectorAll<HTMLElement>(".bm-upgrade[data-cost]"))) {
+    const short = Number(u.dataset.cost) > gold;
+    if (u.classList.contains("short") !== short) u.classList.toggle("short", short);
+  }
 }
 
 /** Positions `menu` (the `.building-menu` element) by `box`. */
