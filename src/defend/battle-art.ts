@@ -22,7 +22,7 @@ import { boatLights, drawBoat } from "./boat-art.ts";
  * Every painter takes a `Brush`: the board's context and its pixels per cell. */
 import { hash01 } from "./grid.ts";
 import { HOPLITE, JAVELINEER, LANCER, SPEARMAN, ARCHER_UNIT, ASSASSIN_UNIT, BRAWLER, CIVILIAN, DARK_WIZARD, ENEMIES, FIRE_MAGE, GATLING_GUNNER, GUNNER, MACHINE_GUNNER, MUSKETEER, RAIL_SNIPER, ROCKETEER, SLINGER, SNIPER, SOLDIER, VALKYRIE, WATCHMAN, watchRadius, type EnemyDef } from "./catalog.ts";
-import { drawWatchman, drawWatchTorch } from "./city-life-art.ts";
+import { drawWatchman } from "./city-life-art.ts";
 import type { Building } from "./citygen.ts";
 import { center } from "./pathing.ts";
 import { paintKeepFlash } from "./structure-art.ts";
@@ -127,8 +127,9 @@ function enemyInk(e: Enemy) {
   return NEUTRAL_UNIT_INK;
 }
 
-/** Units, projectiles and effects. With `torches`, units carry a torch,
- * lit while it still burns. */
+/** Units, projectiles and effects. Units carry no drawn torch: their glow
+ * is the lighting's hand-torch light alone, the torch implied (`torches` is
+ * unused here, kept for callers). */
 export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, healthbars = false, timing?: { entityMs: number }, simple: Simple = {}, outline?: UnitOutline, sides?: UnitInks, contours?: { defer?: boolean }) {
   // Track the wave peak even when the setting is off.
   if (!healthbars) trackHealthbarPeak(sim);
@@ -164,7 +165,7 @@ export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, hea
   const rimFor = sides && outline ? (color: string) => outline.ink(color) : undefined;
   try {
     if (!sides) for(const soldier of sim.soldiers)if(soldier.raidEnemy){u.c.save();u.c.strokeStyle='#d66e58';u.c.lineWidth=Math.max(1,b.px*.12);u.c.beginPath();u.c.ellipse(soldier.x*b.px,soldier.y*b.px,b.px*.5,b.px*.25,0,0,Math.PI*2);u.c.stroke();u.c.restore();}
-    drawCivilians(u, sim, torches, unit);
+    drawCivilians(u, sim, unit);
     if (simple.troops) {
       const troops = sim.soldiers.filter(o => !garrisoned(o));
       if (contours) {
@@ -174,7 +175,7 @@ export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, hea
       }
       else if (sides && simple.merged === false) for (const soldier of troops) { unit?.(soldier.id); drawSimpleTroops(u, [soldier], rims ?? undefined, sides); }
       else drawSimpleTroops(u, troops, layers?.rims, sides, rimFor);
-    } else swords = drawSoldiers(u, sim, torches, simple.reduceMotion, unit, sides);
+    } else swords = drawSoldiers(u, sim, simple.reduceMotion, unit, sides);
     if (contours) {
       const groups = new Map<string | undefined, Enemy[]>();
       for (const enemy of sim.enemies) if (!enemy.raidProxy && wormBodyVisible(enemy)) { const ink = sides!.ink(enemy.id); const group = groups.get(ink); if (group) group.push(enemy); else groups.set(ink, [enemy]); }
@@ -244,7 +245,7 @@ function drawWatchRadii({ c, px }: Brush, sim: DefendSim) {
 /** Civilians (the masons), drawn 2 × 2 art pixels (`MASON_PX`; their body in the
  * battle stays `CIVILIAN.size`), with a flicker of gold over those at work. */
 const MASON_PX = 2;
-function drawCivilians(b: Brush, sim: DefendSim, torches: Burning | null, unit?: (id: number) => void) {
+function drawCivilians(b: Brush, sim: DefendSim, unit?: (id: number) => void) {
   const { c, px } = b;
   for (const u of sim.civilians) {
     unit?.(u.id);
@@ -259,7 +260,6 @@ function drawCivilians(b: Brush, sim: DefendSim, torches: Burning | null, unit?:
       c.fillRect(u.x * px - dot / 2, u.y * px - s / 2 - dot * 5, dot, dot * 3);
       c.fillRect(u.x * px - dot / 2, u.y * px - s / 2 - dot, dot, dot);
     }
-    if (torches) drawHandTorch(b, { x: u.x + CIVILIAN.size * 0.6, y: u.y - CIVILIAN.size * 0.4, id: u.id }, sim.time, torches(u.x, u.y, u.id));
     if (u.state === "working" && Math.floor(sim.time * 6) % 2) {
       if (u.jobKind === "sand") {
         c.fillStyle = "#b8874c";
@@ -281,7 +281,7 @@ function drawCivilians(b: Brush, sim: DefendSim, torches: Burning | null, unit?:
  * shade (`shade-art.ts`).
  * Returns the swordsmen's swings, whose swords and trails draw over the
  * enemies. */
-function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null, reduced = false, unit?: (id: number) => void, sides?: UnitInks) {
+function drawSoldiers(b: Brush, sim: DefendSim, reduced = false, unit?: (id: number) => void, sides?: UnitInks) {
   const { c, px } = b;
   const swords: { x: number; y: number; swing: Swing; ink?: string; id?: number }[] = [];
   for (const u of sim.soldiers) {
@@ -302,10 +302,6 @@ function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null, reduced
       const thrust = foe && d > 0 && d < 2.5 ? { x: (foe.x - u.x) / d, y: (foe.y - u.y) / d } : undefined;
       const jab = thrust && since >= 0 && since < 0.2 ? Math.sin((since / 0.2) * Math.PI) : 0;
       drawWatchman(c, Math.round(u.x * px), Math.round(u.y * px), px / ART, { flash: u.flash > 0, thrust, jab });
-      if (torches) {
-        const on = torches(u.x, u.y, u.id);
-        if (on > 0) drawWatchTorch(c, Math.round(u.x * px), Math.round(u.y * px), px / ART, Math.min(1, on), Math.sin(sim.time * 17 + u.id * 1.7) * 0.5 + 0.5);
-      }
       continue;
     }
     if (u.kind === "mage") {
@@ -341,7 +337,6 @@ function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null, reduced
     }
     if (isGuildTroop(u.kind)) {
       drawGuildTroop(b, sim, u, reduced);
-      if (torches && u.cloak !== 0) drawHandTorch(b, { x: u.x + SOLDIER.size * 0.65, y: u.y - SOLDIER.size * 0.45, id: u.id }, sim.time, torches(u.x, u.y, u.id));
       continue;
     }
     const archer = u.kind === "archer";
@@ -353,7 +348,6 @@ function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null, reduced
     if (!archer) drawMeleeCape(c, px, u, sim, reduced, x, y);
     if (u.flash <= 0 && drawPixel(c, archer ? "archer" : "swordsman", x * px - s / 2, y * px - s / 2, s)) {
       if (swing) swords.push({ x, y, swing, id: u.id, ...(sides ? { ink: sides.ink(u.id) } : {}) });
-      if (torches) drawHandTorch(b, { x: x + SOLDIER.size * 0.65, y: y - SOLDIER.size * 0.45, id: u.id }, sim.time, torches(u.x, u.y, u.id));
       continue;
     }
 
@@ -365,7 +359,6 @@ function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null, reduced
       c.fillRect(x * px - s / 2 - Math.max(1, s * 0.3), y * px - s / 2, Math.max(1, s * 0.2), s);
     }
     if (swing) swords.push({ x, y, swing, id: u.id, ...(sides ? { ink: sides.ink(u.id) } : {}) });
-    if (torches) drawHandTorch(b, { x: x + SOLDIER.size * 0.65, y: y - SOLDIER.size * 0.45, id: u.id }, sim.time, torches(u.x, u.y, u.id));
   }
   return swords;
 }
@@ -676,20 +669,6 @@ function drawSwordTrail({ c, px }: Brush, x: number, y: number, sw: Swing) {
       dot(c, (x + ux * r) * px, (y + uy * r) * px, d);
     }
   }
-  c.globalAlpha = 1;
-}
-
-/** A unit's hand torch, held at `at`: the stick, and while it `burns` a
- * flickering pixel or two of flame. */
-function drawHandTorch({ c, px }: Brush, at: { x: number; y: number; id: number }, t: number, burns: number) {
-  const s = Math.max(1, px * 0.14);
-  const f = Math.sin(t * 17 + at.id * 1.7) * 0.5 + 0.5;
-  c.fillStyle = "#5a3b1e";
-  c.fillRect(at.x * px - s / 2, at.y * px, s, s * 1.6);
-  if (burns <= 0) return;
-  c.globalAlpha = burns;
-  c.fillStyle = f > 0.5 ? "#ffe6a8" : "#ffb35c";
-  c.fillRect(at.x * px - s / 2, at.y * px - s * (1 + f * 0.5), s, s * (1 + f * 0.5));
   c.globalAlpha = 1;
 }
 
