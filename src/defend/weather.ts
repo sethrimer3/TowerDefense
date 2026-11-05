@@ -31,8 +31,10 @@ export const NIGHT_FADE_SECONDS = 2.5;
 type Ambient = { rgb: [number, number, number]; alpha: number; glow: number };
 const CLOUDY: Ambient = { rgb: [28, 35, 48], alpha: 0.3, glow: 0.55 };
 const RAIN: Ambient = { rgb: [28, 35, 48], alpha: 0.36, glow: 0.62 };
-const NIGHT: Ambient = { rgb: [8, 12, 34], alpha: 0.66, glow: 0.9 };
-const NIGHT_RAIN: Ambient = { rgb: [7, 10, 24], alpha: 0.72, glow: 0.95 };
+// Night is about half as dark as it once was (0.66 / 0.72), so the board
+// stays readable while the deep blue still says night.
+const NIGHT: Ambient = { rgb: [8, 12, 34], alpha: 0.34, glow: 0.9 };
+const NIGHT_RAIN: Ambient = { rgb: [7, 10, 24], alpha: 0.38, glow: 0.95 };
 
 /** Darkness overlay for the lighting pass — colour, opacity, and how strong
  * the warm glow is against it — blended by how far night has fallen (0–1). */
