@@ -125,6 +125,33 @@ export function setMenuRange(menu: HTMLElement, range: number) {
   if (value) value.textContent = `${r}%`;
 }
 
+/** How the mode's name types out beside its button: a letter every
+ * `letter` ms, held `hold` ms once whole, then faded out (CSS). */
+export const MODE_NAME = { letter: 45, hold: 1100 };
+const typing = new WeakMap<HTMLElement, number[]>();
+
+/** Pops the targeting mode's `name` up to the right of its `button` in
+ * gold with a black pixel outline, one letter at a time (all at once when
+ * `reduced`), then fades it away. A new pick replaces the last. */
+export function typeModeName(menu: HTMLElement, button: HTMLElement, name: string, reduced: boolean) {
+  for (const id of typing.get(menu) ?? []) clearTimeout(id);
+  const modes = button.closest<HTMLElement>(".bm-modes") ?? menu;
+  modes.querySelector(".bm-mode-name")?.remove();
+  const tag = document.createElement("span");
+  tag.className = "bm-mode-name";
+  tag.setAttribute("aria-hidden", "true");
+  tag.style.top = `${button.offsetTop + button.offsetHeight / 2}px`;
+  modes.append(tag);
+  const timers: number[] = [];
+  const letters = Array.from(name);
+  if (reduced) tag.textContent = name;
+  else letters.forEach((_, i) => timers.push(window.setTimeout(() => { tag.textContent = letters.slice(0, i + 1).join(""); }, i * MODE_NAME.letter)));
+  const whole = reduced ? 0 : letters.length * MODE_NAME.letter;
+  timers.push(window.setTimeout(() => tag.classList.add("fading"), whole + MODE_NAME.hold));
+  timers.push(window.setTimeout(() => tag.remove(), whole + MODE_NAME.hold + 400));
+  typing.set(menu, timers);
+}
+
 /** Positions `menu` (the `.building-menu` element) by `box`. */
 export function placeBuildingMenu(menu: HTMLElement, box: ReturnType<typeof buildingMenuBox>) {
   menu.style.left = `${box.left}px`;

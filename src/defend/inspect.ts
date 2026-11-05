@@ -1,5 +1,5 @@
 import { ordersOf, rangeScale } from "./building-orders.ts";
-import { drawSquareRange, drawNearbySquare, drawCrosshairs, drawAimLine } from "./square-range-art.ts";
+import { drawSquareRange, drawFullReach, drawNearbySquare, drawCrosshairs, drawAimLine } from "./square-range-art.ts";
 import { mineRange } from "./mines.ts";
 import { MINELAYER } from "../knowledge-paths.ts";
 /** A tapped building on the DEFEND board: outlined in gold, with its reach
@@ -68,9 +68,15 @@ export function drawInspect(c: CanvasRenderingContext2D, px: number, map: CityMa
   const pulse = reduceMotion ? 1 : 0.8 + 0.2 * Math.sin(now / 260);
   c.save();
   // The reach: a faint wash, its edge in dashed gold.
-  for(const square of reachOf(b,armed))drawSquareRange(c,px,square,"reach");
+  // Turned down from 100%, the full reach shows as a faint dotted ghost.
+  const scaled=rangeScale(armed,b),ghost=scaled<1&&b.kind!=="darkKeep";
+  for(const square of reachOf(b,armed)) {
+    if(ghost)drawFullReach(c,px,{...square,r:square.r/scaled},"reach");
+    drawSquareRange(c,px,square,"reach");
+  }
   const deploy=deployCircle(b,armed.bonuses,armed);
   if(deploy) {
+    if(scaled<1)drawFullReach(c,px,{...deploy,r:deploy.r/scaled},"deploy");
     drawSquareRange(c,px,deploy,"deploy");
     const saved=ordersOf(armed,b).rally,home=center(b.rect);
     const rally = aim ? aim.point : sim?.rallies.get(id) ?? (saved?{x:home.x+saved.x,y:home.y+saved.y}:undefined);

@@ -6,6 +6,8 @@
  *   deployment area (pale blue), a strike spell's area (violet) or the war
  *   banner's influence (crimson): a faint wash and a dashed, black-edged
  *   edge one art pixel thick, its corners solid.
+ * - `drawFullReach`: the full (100%) reach as a faint dotted ghost while a
+ *   building's range is turned down.
  * - `drawNearbySquare`: the gold square round placed crosshairs inside which
  *   enemies are picked first, clipped to the tower's own range, gently
  *   pulsing.
@@ -93,6 +95,19 @@ export function drawSquareRange(c: CanvasRenderingContext2D, px: number, s: Squa
   const period = DASH.on + DASH.off, shift = opts.march === undefined ? 0 : Math.floor(opts.march * 8) % period;
   const lit = ring(b, (along, side) => along < DASH.corner || along >= side - DASH.corner + 1 || (along + shift) % period < DASH.on);
   inkAndColour(artPen(c, px), c, lit, look.edge);
+  c.restore();
+}
+
+/** A building's reach at 100%, shown while a smaller range is set: a thin,
+ * faint dotted edge (one art pixel lit in three) in `style`'s colour, no
+ * wash and no black edge, so it reads as a ghost of the full square. */
+export function drawFullReach(c: CanvasRenderingContext2D, px: number, s: Square, style: RangeStyle) {
+  const b = { x0: s.x - s.r, y0: s.y - s.r, x1: s.x + s.r, y1: s.y + s.r };
+  const pen = artPen(c, px), pxs = ring(b, (along) => along % 3 === 0);
+  c.save();
+  c.globalAlpha = 0.6;
+  c.fillStyle = RANGE_STYLES[style].edge;
+  for (let i = 0; i < pxs.length; i += 2) pen(pxs[i], pxs[i + 1]);
   c.restore();
 }
 
