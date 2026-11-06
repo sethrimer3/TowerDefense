@@ -53,6 +53,10 @@ export const SETTINGS = {
    * off for a mouse (`touchFirst`). */
   dragRally: { kind: "toggle", default: true, page: { id: "drag-rally", label: "Drag from a troop building to place its rally flag" } },
   dragCrosshair: { kind: "toggle", default: true, page: { id: "drag-crosshair", label: "Drag from a tower to place its crosshairs" } },
+  /** How the building menu sizes as the board zooms: the camera frames the
+   * picked building's range, the menu shrinks gently zoomed out, or it keeps
+   * one size on screen (`MenuSizing` in `ui/building-menu.ts`). */
+  menuSizing: { kind: "choice", default: "frame", choices: [["frame", "Camera frames the range"], ["grow", "Menu shrinks gently as you zoom out"], ["fixed", "Menu keeps one size"]], page: { id: "menu-sizing", label: "Building menu size" } },
   raiseDrag: { kind: "toggle", default: false, page: { id: "raise-drag", label: "Carry dragged items above the finger" } },
   /** While dragging on the Defend board (placing, aiming), a box above the
    * finger shows the board zoomed in round where the item would go. */

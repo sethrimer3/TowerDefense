@@ -49,6 +49,7 @@ export class AmbushBattlePage {
   private picked: number | undefined;
   private menu = new PlacedBuildingMenu({
     board:()=>this.canvas.parentElement!,renderer:()=>this.renderer,map:()=>this.sim.map,source:()=>this.sim.engine,
+    sizing:()=>this.host.save().settings.menuSizing,
     orders:b=>decodeOrders(this.sim.engine.orders.get(b.id)),
     change:(b,o)=>applyOrders(this.sim.engine,b,o),
     spec:b=>({name:STRUCTURES[b.kind as StructureKind]?.name??b.kind,tree:true,remove:b.kind!=="keep"?{kind:"sell",gold:this.sim.refund(b.id)}:null}),
