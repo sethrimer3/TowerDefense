@@ -341,6 +341,8 @@ export class DefendRenderer {
 
   /** Zoom by `factor`, keeping the board point under the client point fixed. */
   zoomAt(clientX: number, clientY: number, factor: number) {
+    this.glide = null;
+    this.moves++;
     const p = this.toCanvas(clientX, clientY);
     this.want = Math.max(1, Math.min(DefendRenderer.MAX_ZOOM, this.want * factor));
     const s = this.snap(this.want);
@@ -351,8 +353,82 @@ export class DefendRenderer {
     this.clampCam();
   }
 
+  /** Counts the player's own pans and zooms, so a framing glide knows whether
+   * the view was moved since (the building menu then leaves it there). */
+  moves = 0;
+  /** A camera glide in progress (the building menu framing a range): from
+   * one view to another over `ms`, stepped at the start of each `draw`. */
+  private glide: { from: CameraView; to: CameraView; t0: number; ms: number } | null = null;
+
+  /** The camera as it stands, to glide back to later. */
+  view(): CameraView {
+    return { s: this.cam.s, x: this.cam.x, y: this.cam.y, want: this.want };
+  }
+
+  /** The view centring board point (`fx`, `fy`, cells) zoomed so `cells`
+   * cells span `css` CSS pixels, within the zoom's limits and the board. */
+  framing(fx: number, fy: number, cells: number, css: number): CameraView {
+    const r = this.canvas.getBoundingClientRect(), k = this.canvas.width / (r.width || 1);
+    const want = Math.max(1, Math.min(DefendRenderer.MAX_ZOOM, (css * k) / (Math.max(cells, 0.01) * this.px)));
+    const s = this.snap(want), { W, H } = this.board, o = this.overscroll;
+    let x = clampAxis(this.canvas.width / 2 - fx * this.px * s, this.canvas.width, W * s, o);
+    let y = clampAxis(this.canvas.height / 2 - fy * this.px * s, this.canvas.height, H * s, o);
+    if (this.crisp) { x = Math.round(x); y = Math.round(y); }
+    return { s, x, y, want };
+  }
+
+  /** Canvas pixels the camera may show past the board's edges (the dark
+   * beyond), so a framed building by the edge still has room for its menu. */
+  private overscroll = 0;
+  /** Lets the camera pan `css` CSS pixels past the board's edges. */
+  setOverscroll(css: number) {
+    const r = this.canvas.getBoundingClientRect();
+    this.overscroll = Math.max(0, css) * (this.canvas.width / (r.width || 1));
+  }
+  /** Takes the overscroll away, gliding the view back onto the board over `ms`. */
+  settle(ms: number) {
+    this.overscroll = 0;
+    const { W, H } = this.board, v = this.view();
+    v.x = clampAxis(v.x, this.canvas.width, W * v.s);
+    v.y = clampAxis(v.y, this.canvas.height, H * v.s);
+    if (this.crisp) { v.x = Math.round(v.x); v.y = Math.round(v.y); }
+    this.glideTo(v, ms);
+  }
+
+  /** Eases the camera to `to` over `ms` (at once for 0). */
+  glideTo(to: CameraView, ms: number) {
+    if (ms <= 0) { this.glide = null; this.setView(to); return; }
+    this.glide = { from: this.view(), to, t0: performance.now(), ms };
+  }
+
+  private setView(v: CameraView) {
+    this.cam.s = v.s;
+    this.cam.x = v.x;
+    this.cam.y = v.y;
+    this.want = v.want;
+  }
+
+  /** Moves a glide on to now; `draw` calls it, and so may anything placed over the board first. */
+  stepGlide() {
+    const g = this.glide;
+    if (!g) return;
+    const t = Math.min(1, (performance.now() - g.t0) / g.ms), e = 1 - (1 - t) * (1 - t) * (1 - t);
+    if (t >= 1) { this.glide = null; this.setView(g.to); this.clampCam(); return; }
+    // Zoom eases in log space so it feels even; the board point at the
+    // view's middle travels in a straight line between the two views.
+    const s = g.from.s * Math.pow(g.to.s / g.from.s, e);
+    const w = this.canvas.width / 2, h = this.canvas.height / 2;
+    const cx0 = (w - g.from.x) / g.from.s, cy0 = (h - g.from.y) / g.from.s;
+    const cx1 = (w - g.to.x) / g.to.s, cy1 = (h - g.to.y) / g.to.s;
+    this.cam.s = s;
+    this.cam.x = w - (cx0 + (cx1 - cx0) * e) * s;
+    this.cam.y = h - (cy0 + (cy1 - cy0) * e) * s;
+  }
+
   /** Pan by a client-pixel delta. */
   panBy(dx: number, dy: number) {
+    this.glide = null;
+    this.moves++;
     const r = this.canvas.getBoundingClientRect();
     this.cam.x += (dx / r.width) * this.canvas.width;
     this.cam.y += (dy / r.height) * this.canvas.height;
@@ -360,6 +436,8 @@ export class DefendRenderer {
   }
 
   resetCam() {
+    this.glide = null;
+    this.moves++;
     this.cam.s = this.want = 1;
     this.cam.x = this.cam.y = 0;
     this.clampCam();
@@ -367,8 +445,8 @@ export class DefendRenderer {
 
   private clampCam() {
     const { W, H } = this.board;
-    this.cam.x = clampAxis(this.cam.x, this.canvas.width, W * this.cam.s);
-    this.cam.y = clampAxis(this.cam.y, this.canvas.height, H * this.cam.s);
+    this.cam.x = clampAxis(this.cam.x, this.canvas.width, W * this.cam.s, this.overscroll);
+    this.cam.y = clampAxis(this.cam.y, this.canvas.height, H * this.cam.s, this.overscroll);
     // Art pixels start on whole device pixels.
     if (this.crisp) {
       this.cam.x = Math.round(this.cam.x);
@@ -377,6 +455,7 @@ export class DefendRenderer {
   }
 
   draw(map: CityMap, sim: DefendSim | null, overlay: Overlay | null, opts: DrawOptions) {
+    this.stepGlide();
     const sky = worldSky();
     this.worldLighting = !!sky;
     if (sky) opts = { ...opts, sun: sky.sun, tint: sky.tint, night: sky.night, weather: opts.weather ?? { rain: false, clear: true } };
@@ -1069,13 +1148,17 @@ export class DefendRenderer {
 
 }
 
+/** A camera position: zoom, offset (canvas pixels) and the zoom asked for. */
+export type CameraView = { s: number; x: number; y: number; want: number };
+
 /** What shows around the board when the view is wider or taller than it. */
 const BEYOND = "#0b0907";
 
 /** A camera offset along one axis: centred when the board (`board` canvas
- * pixels at this zoom) is narrower than the view, else kept on the board. */
-function clampAxis(at: number, view: number, board: number) {
-  return board <= view ? (view - board) / 2 : Math.min(0, Math.max(view - board, at));
+ * pixels at this zoom) is narrower than the view, else kept on the board,
+ * or within `over` pixels past its edges. */
+function clampAxis(at: number, view: number, board: number, over = 0) {
+  return board <= view ? (view - board) / 2 : Math.min(over, Math.max(view - board - over, at));
 }
 
 /** The keep's rect while it stands (its banner flies over it), else null. */

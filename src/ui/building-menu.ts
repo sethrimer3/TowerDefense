@@ -65,11 +65,27 @@ export const MENU_SIZE = {
   margin: 8,
 };
 
+/** The bar width and smallest size the menu takes in a view this wide. */
+export const menuBars = (view: { w: number }) => (view.w < MENU_SIZE.phoneBelow ? MENU_SIZE.phone : MENU_SIZE.desktop);
+
+/** How the menu sizes as the board zooms (Settings' Building menu size):
+ * `frame` glides the camera so the building's range fills the menu's open
+ * middle, `grow` shrinks the menu gently as the view zooms out, `fixed`
+ * keeps it one size on screen. */
+export type MenuSizing = "frame" | "grow" | "fixed";
+/** `grow`: the menu's scale at zoom `s` (1 fits the board, `max` fully in):
+ * full size zoomed in, shrinking by the fifth root as the view zooms out,
+ * never below `MENU_GROW.least`. */
+export const MENU_GROW = { power: 0.2, least: 0.7 };
+export const growScale = (s: number, max: number) => Math.max(MENU_GROW.least, Math.min(1, Math.pow(s / max, MENU_GROW.power)));
+/** `frame`: how long the camera glides to and from a picked building. */
+export const FRAME_MS = 320;
+
 /** Where the menu stands round a building at `rect` (CSS pixels in the
  * board's view, `view` its size): a square centred on it, its open middle
  * at least as big as the building, shifted inward to stay on screen. */
-export function buildingMenuBox(rect: { x: number; y: number; w: number; h: number }, view: { w: number; h: number }, controls: MenuControls, headroom = 0) {
-  const s = view.w < MENU_SIZE.phoneBelow ? MENU_SIZE.phone : MENU_SIZE.desktop;
+export function buildingMenuBox(rect: { x: number; y: number; w: number; h: number }, view: { w: number; h: number }, controls: MenuControls, headroom = 0, scale = 1) {
+  const base = menuBars(view), s = { bar: Math.round(base.bar * scale), min: base.min * scale };
   const hole = Math.ceil(Math.max(rect.w, rect.h) + 8);
   const fit = Math.min(view.w, view.h) - 2 * MENU_SIZE.margin;
   const size = Math.min(Math.max(hole + 2 * s.bar, controls === "plain" ? 0 : s.min), Math.max(fit, 3 * s.bar));

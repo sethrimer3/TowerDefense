@@ -72,3 +72,11 @@ test('the palette flash holds, then fades out; closing fades the traces', () => 
   assert.equal(closeFade(0), 1);
   assert.equal(closeFade(SHIMMER_FLASH.close), 0);
 });
+
+test('grow sizing: standard zoomed in, gently smaller zoomed out, never below the floor', async () => {
+  const { growScale, MENU_GROW } = await import('../src/ui/building-menu.ts');
+  assert.equal(growScale(6, 6), 1);
+  assert.ok(growScale(3, 6) < 1 && growScale(3, 6) > growScale(1, 6));
+  assert.equal(growScale(1, 6), MENU_GROW.least);
+  assert.equal(growScale(0.01, 6), MENU_GROW.least);
+});

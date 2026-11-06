@@ -3,6 +3,7 @@ import { wallAtCell, type SpikeSpot } from "./layout.ts";
 import { STRUCTURES } from "./catalog.ts";
 import type { Building } from "./citygen.ts";
 import { PlacedBuildingMenu } from "../ui/placed-building-menu.ts";
+import type { MenuSizing } from "../ui/building-menu.ts";
 import { decodeOrders, layoutOrders, type BuildingOrders } from "./building-orders.ts";
 import { applyOrders, restoreOrders, aimPoint, controlsOf, clampOrders } from "./building-controls.ts";
 import { removeStructure, removeGate, removeBallista, removeWall, removeSpikes } from "./layout.ts";
@@ -126,6 +127,8 @@ export type DefendHost = {
   showEmpty?(): boolean;
   /** Whether dragged items ride above the pointer. */
   dragRally?(): boolean;
+  /** Settings' Building menu size. */
+  menuSizing?(): MenuSizing;
   /** The Always highlight selectable buildings setting, null while off. */
   highlight?(): Highlight | null;
   dragCrosshair?(): boolean;
@@ -189,6 +192,7 @@ export class DefendPage {
   private menu = new PlacedBuildingMenu({
     board:()=>this.root.querySelector<HTMLElement>("#defend-board")!,
     renderer:()=>this.renderer!, map:()=>this.sim?.map??this.currentMap(),
+    sizing:()=>this.host.menuSizing?.()??"fixed",
     source:()=>this.sim??{levels:this.save.levels,bonuses:this.host.bonuses()},
     orders:b=>decodeOrders(layoutOrders(this.save.layout,b)),
     change:(b,o)=>this.changeOrders(b,o),

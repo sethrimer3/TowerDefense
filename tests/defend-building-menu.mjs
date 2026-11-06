@@ -13,7 +13,7 @@ try {
   await page.goto(base);await page.waitForSelector('#defend-start');
   const fixture=await page.evaluate(async()=>{
    const {defaults}=await import('/src/save.ts');const {placeCityTile,placeStructure}=await import('/src/defend/layout.ts');
-   const s=defaults();s.profile={name:"Menu tester",flag:{base:3,layers:[]}};s.settings.soundOff=true;s.settings.ambienceOff=true;s.settings.raiseDrag=false;s.settings.magnifier=true;s.settings.reduceMotion=true;
+   const s=defaults();s.profile={name:"Menu tester",flag:{base:3,layers:[]}};s.settings.soundOff=true;s.settings.ambienceOff=true;s.settings.raiseDrag=false;s.settings.magnifier=true;s.settings.reduceMotion=true;s.settings.menuSizing="fixed";
    s.defend.owned.cityTile=10;s.defend.owned.archerTower=2;s.defend.owned.barracks=2;s.defend.owned.meleeGuild=1;s.defend.keepRanks={arrowLoops:1};
    let l=s.defend.layout;const {tx,ty}=l.keep;
    for(const [dx,dy]of [[-1,0],[1,0],[0,-1],[-1,-1],[1,-1]])l=placeCityTile(l,tx+dx,ty+dy)||l;

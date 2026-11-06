@@ -59,6 +59,14 @@ function resolutionControls(ctx: AppContext) {
     `<p class="hint">${t("settings.resolutionHint")}</p>`;
 }
 
+/** How the building menu sizes as the board zooms. */
+function menuSizingControls(ctx: AppContext) {
+  const row = SETTINGS.menuSizing, value = ctx.save().settings.menuSizing;
+  return `<label class="setting setting-grid" id="menu-sizing-row">${t("setting.menuSizing")}<select id="${row.page.id}">` +
+    row.choices.map(([v]) => `<option value="${v}" ${value === v ? "selected" : ""}>${t(`settings.menuSizing.${v}`)}</option>`).join("") + `</select></label>` +
+    `<p class="hint">${t("settings.menuSizingHint")}</p>`;
+}
+
 /** Disabling the cycle uses the selected, persistent time of day. */
 function daylightControls(ctx: AppContext) {
   const settings = ctx.save().settings;
@@ -102,7 +110,7 @@ export function renderSettingsPage(ctx: AppContext) {
     `<div class="page-title"><small>${t("settings.tagline")}</small><h2>${t("nav.settings")}</h2></div>` +
     `<div class="setting language-setting"><span>${t("settings.language")}</span><button id="language" class="language-current" aria-haspopup="dialog" aria-label="${t("settings.chooseLanguage")}">${LANGUAGES.find(l => l.code === settings.language)!.name} ▾</button></div><p class="hint language-note">${t("settings.languageNote")}</p>` +
     section("gameplay", t("settings.gameplay"), GAMEPLAY.map((key) => control(key, ctx)).join("")) +
-    section("controls", t("settings.controls"), CONTROLS.map((key) => control(key,ctx)).join("")) +
+    section("controls", t("settings.controls"), menuSizingControls(ctx) + CONTROLS.map((key) => control(key,ctx)).join("")) +
     section("display", t("settings.display"),
       PAGE.map((key) => control(key, ctx) + (key === "tileGrid" ? gridControls(ctx) : key === "highlightBuildings" ? highlightControls(ctx) : key === "dayNightCycle" ? daylightControls(ctx) : key === "fasterSunCatchup" ? `<p class="hint">${t("settings.fasterSunCatchupHint")}</p>` : key === "crispZoom" ? resolutionControls(ctx) : key === "ultraGraphics" ? `<p class="hint">${t("settings.ultraGraphicsHint")}</p>` : "")).join("") +
       control("developerMode", ctx)) +
@@ -167,6 +175,11 @@ export function renderSettingsPage(ctx: AppContext) {
   const resolution = el(SETTINGS.resolution.page.id) as HTMLSelectElement;
   resolution.onchange = () => {
     settings.resolution = Number(resolution.value) as typeof settings.resolution;
+    ctx.update();
+  };
+  const sizing = el(SETTINGS.menuSizing.page.id) as HTMLSelectElement;
+  sizing.onchange = () => {
+    settings.menuSizing = sizing.value as typeof settings.menuSizing;
     ctx.update();
   };
   el("erase").onclick = () => confirmErase(ctx);
