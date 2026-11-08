@@ -175,7 +175,7 @@ That's a really interesting three-layer economy idea. Let me think through names
 
 **User:**
 
-Um resistance Um, courage or Yeah, something like that where it's like Um, The are, they won, so they have courage, and those can be used to unlock special upgrades like the land generation one that we just talked about
+Um resistance Um, courage or Yeah, something like that where it's like Um, They are, they won, so they have courage, and those can be used to unlock special upgrades like the land generation one that we just talked about
 
 **Assistant:**
 
