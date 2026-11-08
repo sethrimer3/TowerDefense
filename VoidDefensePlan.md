@@ -74,28 +74,28 @@ The following corrections were informed by another inspection of the current rep
 
 ### Reuse the existing Ambush mode's live construction rules
 
-- **Key donor: \`src/campaign/ambush-sim.ts\`.** Unlike the original Defend build-first flow, \`AmbushSim.placeAt\` and \`remove\` explicitly operate during both build and battle phases; \`moveTo\` is pre-battle only. Its \`price\`, \`refund\`, \`configureLot\`, grid check and path replanning are concrete patterns for tower placement while the Void is already growing.
-- Review \`src/campaign/ambush-grid.ts\`, \`src/campaign/ambush-sim.ts\`, and campaign input handlers before designing the Void placement API. **Extract the transaction and legality concepts, not \`AmbushSim\` itself**, because Ambush wraps the old wave/keep-oriented \`DefendSim\`.
+- **Key donor: `src/campaign/ambush-sim.ts`.** Unlike the original Defend build-first flow, `AmbushSim.placeAt` and `remove` explicitly operate during both build and battle phases; `moveTo` is pre-battle only. Its `price`, `refund`, `configureLot`, grid check and path replanning are concrete patterns for tower placement while the Void is already growing.
+- Review `src/campaign/ambush-grid.ts`, `src/campaign/ambush-sim.ts`, and campaign input handlers before designing the Void placement API. **Extract the transaction and legality concepts, not `AmbushSim` itself**, because Ambush wraps the old wave/keep-oriented `DefendSim`.
 - Default in-combat semantics for the first implementation: build and sell during combat, move only during the preparation phase (unless a new relocation technology is deliberately introduced). Apply payment and grid changes atomically, with replay-safe commands and one authoritative source of affordability.
 
 ### Reuse Ambush's reward bookkeeping, not its medieval upgrades
 
-- **Key donors: \`src/campaign/levels.ts\` and \`src/ambush-upgrades.ts\`.** \`recordStars\` pays only the increase above a level's previous best; \`ambushPool\` derives unspent stars by subtracting allocations; \`buyAmbush\`, \`undoAmbush\`, \`respecAmbush\` and \`decodeAmbushRanks\` cover purchases, full refund and malformed-save overspending. \`src/campaign/ambush-star-tree.ts\` already presents such progression through the same elastic \`UpgradeGraph\`.
+- **Key donors: `src/campaign/levels.ts` and `src/ambush-upgrades.ts`.** `recordStars` pays only the increase above a level's previous best; `ambushPool` derives unspent stars by subtracting allocations; `buyAmbush`, `undoAmbush`, `respecAmbush` and `decodeAmbushRanks` cover purchases, full refund and malformed-save overspending. `src/campaign/ambush-star-tree.ts` already presents such progression through the same elastic `UpgradeGraph`.
 - Copy these **accounting invariants** into Void-specific pure functions. Use a map-ID keyed entitlement ledger, separate from spendable Sparks allocations. No refunded upgrade may erase a Spark that was earned, and no corrupted save may grant more purchased power than its recorded lifetime earnings.
 - **Resolved first-release policy for the two play styles:** save best survival percentages, badges and attempts separately for **Build Under Siege** and **Build & Watch**. However, **each map has only one shared Sparks entitlement**, the maximum tier reached in *either* mode. Increasing that maximum awards only the difference. Both modes can progress; playing both cannot double-pay Sparks. Under Siege can have separate challenge/prestige badges rather than a second rare-currency wallet. Revisit only after playtesting.
 
 ### The current elastic graph is a single-parent presentation tree
 
-- \`src/ui/upgrade-graph.ts\` gives every \`GraphNode\` at most one \`parent\`. \`layout\` and \`webLayout\` compute tree/radial positions, while \`set(nodes,picked,web?)\` allows the complete layout to remain known even with hidden nodes. It does **not** directly represent a many-parent technology prerequisite network.
+- `src/ui/upgrade-graph.ts` gives every `GraphNode` at most one `parent`. `layout` and `webLayout` compute tree/radial positions, while `set(nodes,picked,web?)` allows the complete layout to remain known even with hidden nodes. It does **not** directly represent a many-parent technology prerequisite network.
 - Implement **logical AND/OR prerequisite rules as a separate validated DAG**. Give each node one **visual parent** for springs and use extra cross-link rendering for secondary prerequisite edges. Ensure refund cascades are derived from *logical* dependencies and refuse cycles, unknown node IDs, overspending and unreachable allocations.
-- \`src/ui/economy-tree.ts\` and \`src/ui/specialty.ts\` already demonstrate shared ranks, cross-component tree presentation and grafting. Reuse their UI conventions, but **do not inherit** the per-placed-building path/rank storage.
+- `src/ui/economy-tree.ts` and `src/ui/specialty.ts` already demonstrate shared ranks, cross-component tree presentation and grafting. Reuse their UI conventions, but **do not inherit** the per-placed-building path/rank storage.
 - The existing graph performs pairwise body separation while settling. Test **50, 150 and 300 nodes** (physics cost, DOM cost, pan/zoom, touch hitboxes) before committing to a very large graph. Add spatial-neighbor forces, sleeping settled sections, optional label virtualization and stable layout hints if required, while keeping **one continuous network** visible/accessible on one screen.
 
 ### Unit guidance and gesture infrastructure need adapters
 
-- \`src/defend/building-orders.ts\` already supports per-building \`rally\`, \`crosshair\`, target selection and range settings, including validated coordinates. It stores orders relative to their source buildings so moving a building preserves local intent. This is a natural basis for the new reticles, but add world-space conversion and a **multi-point wall blueprint** rather than forcing complex shapes into one coordinate.
-- \`src/defend/board-pointers.ts\`, \`edit-session.ts\`, \`drag-rules.ts\` and \`layout.ts\` reference legacy quarter tiles and grid geometry. Preserve gesture semantics, camera transforms, ghost previews and transaction testing **through geometry-neutral adapters**; do not paste these modules into a much larger city unchanged.
-- On the 72x104 fine-cell original board, \`src/defend/grid.ts\` has **7,488 cells**. The proposed 192x256 and 256x384 prototypes have **49,152 (6.6x)** and **98,304 (13.1x)** cells. Render at the correct art-pixel scale, not fractional physical pixels. High-zoom hitboxes and overview LOD must remain usable.
+- `src/defend/building-orders.ts` already supports per-building `rally`, `crosshair`, target selection and range settings, including validated coordinates. It stores orders relative to their source buildings so moving a building preserves local intent. This is a natural basis for the new reticles, but add world-space conversion and a **multi-point wall blueprint** rather than forcing complex shapes into one coordinate.
+- `src/defend/board-pointers.ts`, `edit-session.ts`, `drag-rules.ts` and `layout.ts` reference legacy quarter tiles and grid geometry. Preserve gesture semantics, camera transforms, ghost previews and transaction testing **through geometry-neutral adapters**; do not paste these modules into a much larger city unchanged.
+- On the 72x104 fine-cell original board, `src/defend/grid.ts` has **7,488 cells**. The proposed 192x256 and 256x384 prototypes have **49,152 (6.6x)** and **98,304 (13.1x)** cells. Render at the correct art-pixel scale, not fractional physical pixels. High-zoom hitboxes and overview LOD must remain usable.
 
 ### Damage rendering must change before the city becomes huge
 
@@ -104,9 +104,9 @@ The following corrections were informed by another inspection of the current rep
 
 ### The Mine/Library idle economy must be cut off at the app boundary
 
-- \`src/main.ts\` builds both original pages, computes \`awayMs\`, constructs \`WelcomeBack\`, calls \`minePage.advance\` and \`libraryPage.advance\`, runs \`idleTimers\`, and settles wall-clock \`settleTraining\`, \`settleForge\` and \`settleResearch\`. \`src/away.ts\` and several save fields exist specifically to accrue offline work.
-- **Hiding tabs does not disable the old economy.** Give Void Defense its own bootstrap/service boundary (separate entrypoint or strictly gated app mode) that never instantiates the old Mine/Library simulation and settlement loop. Keep the old \`towerdefense.v1\` save unmodified while the new \`voiddefense.v1\` is developed; retain a recoverable original entrypoint through migration. After validation, make Void Defense the primary launch experience.
-- **No offline accumulation means:** suspend the Void simulation and Operations animations on hidden/pagehide; save progress, reset foreground frame accumulators on return, never compute Supplies/Essence/research gains from elapsed \`Date.now()\`, never run a welcome-back payout, and never use background-tab processing to advance rewards. Restart or restore an interrupted active battle according to an explicit policy, with no fabricated progress.
+- `src/main.ts` builds both original pages, computes `awayMs`, constructs `WelcomeBack`, calls `minePage.advance` and `libraryPage.advance`, runs `idleTimers`, and settles wall-clock `settleTraining`, `settleForge` and `settleResearch`. `src/away.ts` and several save fields exist specifically to accrue offline work.
+- **Hiding tabs does not disable the old economy.** Give Void Defense its own bootstrap/service boundary (separate entrypoint or strictly gated app mode) that never instantiates the old Mine/Library simulation and settlement loop. Keep the old `towerdefense.v1` save unmodified while the new `voiddefense.v1` is developed; retain a recoverable original entrypoint through migration. After validation, make Void Defense the primary launch experience.
+- **No offline accumulation means:** suspend the Void simulation and Operations animations on hidden/pagehide; save progress, reset foreground frame accumulators on return, never compute Supplies/Essence/research gains from elapsed `Date.now()`, never run a welcome-back payout, and never use background-tab processing to advance rewards. Restart or restore an interrupted active battle according to an explicit policy, with no fabricated progress.
 
 ### The finite-energy Void needs two separate budgets and abuse tests
 
@@ -583,7 +583,7 @@ Do not silently lock these without a prototype:
 - Exact energy spending for resisted attacks and for creature spawns; determine in balance testing.
 - Whether post-loss Void Essence is based primarily on territory-time, defended matter, combat impact or a capped combination.
 - The precise relationship between Supplies, strike charges and material synthesis's energy cost.
-- Whether Build & Watch awards the same Sparks as Under Siege, fewer Sparks, or only distinct cosmetic records. The one-time claim ledger must prevent duplicative farming.
+- The first-release mode reward policy is set to **one shared maximum-tier Sparks entitlement per map** across both modes, with separate best-result records. Reconsider only if playtesting shows it harms the intended difficulty/reward balance; never allow double claiming.
 - Whether both Operations zones are in one scrollable side-view canvas or two panels on one Operations tab.
 - Whether late Void intelligence uses a local commander, networked crystals or both.
 - Whether optional angled view is worth the technical/art complexity at all.
