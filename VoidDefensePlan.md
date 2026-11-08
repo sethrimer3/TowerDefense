@@ -57,6 +57,7 @@ The repository currently uses **TypeScript + Vite + Canvas 2D + DOM UI**, determ
 | Original Mine | `src/mine/sim.ts`, `src/mine/render.ts`, `src/mine/world.ts`, `src/away.ts` | Use inspiration for tiny worker motion, assembly/construction animation, and pixel rendering. **Do not reuse the huge falling-sand mining economy, metal currencies, or offline catch-up**. |
 | Original Library | `src/library/sim.ts`, `src/library/lab-render.ts`, `src/library/lab.ts` | Reuse research-lab presentation ideas and evolving samples. Replace library chores, researchers-per-hour Knowledge, and old timers with lightweight scientific vignettes. |
 | Shell/profile/save | `src/main.ts`, `src/ui/dom.ts`, `src/ui/shell.ts`, `src/profile/model.ts`, `src/profile/editor.ts`, `src/save.ts`, `src/settings.ts` | Reuse UI patterns and defensive save decoding; make new profile mode setting, futuristic shell, clear new currency bar and new versioned save. |
+| Ambush live construction and star progression | `src/campaign/ambush-sim.ts`, `src/campaign/levels.ts`, `src/ambush-upgrades.ts`, `src/campaign/ambush-star-tree.ts` | **Strongest behavioral donors** for in-battle placement, once-per-map best-star awards, free respec, and an elastic star-funded tree. Adapt to new physics and currencies. |
 | Tests and build | `AGENTS.md`, `docs/architecture/*.md`, `tests/`, `package.json` | Follow existing deterministic unit tests, pointer goldens, performance scripts, mobile browser QA, and `npm run build`. |
 
 **Important specific codebase facts:**
@@ -66,6 +67,59 @@ The repository currently uses **TypeScript + Vite + Canvas 2D + DOM UI**, determ
 - `src/ui/upgrade-graph.ts` is **presentation-only** (accepts graph nodes, dispatches picks), making it especially suited to reuse. Global node definitions, unlock state, affordability and refunds belong outside it.
 - Existing Mine/Library subsystems and `src/main.ts` integrate offline "owed time", welcome-back catch-up, ore/Knowledge accumulation, and workshop tasks. Removing offline economy requires **removing these hookups too**, not merely hiding the tabs.
 - `src/profile/model.ts` currently stores name and flag. Extend or wrap the Void profile with a mode choice; do not assume existing player profiles already have this field.
+
+## 2A. Additional code-level findings from the second review
+
+The following corrections were informed by another inspection of the current repository and should guide execution of the phases below. These **supplement and, where more specific, supersede** the initial architectural assumptions.
+
+### Reuse the existing Ambush mode's live construction rules
+
+- **Key donor: \`src/campaign/ambush-sim.ts\`.** Unlike the original Defend build-first flow, \`AmbushSim.placeAt\` and \`remove\` explicitly operate during both build and battle phases; \`moveTo\` is pre-battle only. Its \`price\`, \`refund\`, \`configureLot\`, grid check and path replanning are concrete patterns for tower placement while the Void is already growing.
+- Review \`src/campaign/ambush-grid.ts\`, \`src/campaign/ambush-sim.ts\`, and campaign input handlers before designing the Void placement API. **Extract the transaction and legality concepts, not \`AmbushSim\` itself**, because Ambush wraps the old wave/keep-oriented \`DefendSim\`.
+- Default in-combat semantics for the first implementation: build and sell during combat, move only during the preparation phase (unless a new relocation technology is deliberately introduced). Apply payment and grid changes atomically, with replay-safe commands and one authoritative source of affordability.
+
+### Reuse Ambush's reward bookkeeping, not its medieval upgrades
+
+- **Key donors: \`src/campaign/levels.ts\` and \`src/ambush-upgrades.ts\`.** \`recordStars\` pays only the increase above a level's previous best; \`ambushPool\` derives unspent stars by subtracting allocations; \`buyAmbush\`, \`undoAmbush\`, \`respecAmbush\` and \`decodeAmbushRanks\` cover purchases, full refund and malformed-save overspending. \`src/campaign/ambush-star-tree.ts\` already presents such progression through the same elastic \`UpgradeGraph\`.
+- Copy these **accounting invariants** into Void-specific pure functions. Use a map-ID keyed entitlement ledger, separate from spendable Sparks allocations. No refunded upgrade may erase a Spark that was earned, and no corrupted save may grant more purchased power than its recorded lifetime earnings.
+- **Resolved first-release policy for the two play styles:** save best survival percentages, badges and attempts separately for **Build Under Siege** and **Build & Watch**. However, **each map has only one shared Sparks entitlement**, the maximum tier reached in *either* mode. Increasing that maximum awards only the difference. Both modes can progress; playing both cannot double-pay Sparks. Under Siege can have separate challenge/prestige badges rather than a second rare-currency wallet. Revisit only after playtesting.
+
+### The current elastic graph is a single-parent presentation tree
+
+- \`src/ui/upgrade-graph.ts\` gives every \`GraphNode\` at most one \`parent\`. \`layout\` and \`webLayout\` compute tree/radial positions, while \`set(nodes,picked,web?)\` allows the complete layout to remain known even with hidden nodes. It does **not** directly represent a many-parent technology prerequisite network.
+- Implement **logical AND/OR prerequisite rules as a separate validated DAG**. Give each node one **visual parent** for springs and use extra cross-link rendering for secondary prerequisite edges. Ensure refund cascades are derived from *logical* dependencies and refuse cycles, unknown node IDs, overspending and unreachable allocations.
+- \`src/ui/economy-tree.ts\` and \`src/ui/specialty.ts\` already demonstrate shared ranks, cross-component tree presentation and grafting. Reuse their UI conventions, but **do not inherit** the per-placed-building path/rank storage.
+- The existing graph performs pairwise body separation while settling. Test **50, 150 and 300 nodes** (physics cost, DOM cost, pan/zoom, touch hitboxes) before committing to a very large graph. Add spatial-neighbor forces, sleeping settled sections, optional label virtualization and stable layout hints if required, while keeping **one continuous network** visible/accessible on one screen.
+
+### Unit guidance and gesture infrastructure need adapters
+
+- \`src/defend/building-orders.ts\` already supports per-building \`rally\`, \`crosshair\`, target selection and range settings, including validated coordinates. It stores orders relative to their source buildings so moving a building preserves local intent. This is a natural basis for the new reticles, but add world-space conversion and a **multi-point wall blueprint** rather than forcing complex shapes into one coordinate.
+- \`src/defend/board-pointers.ts\`, \`edit-session.ts\`, \`drag-rules.ts\` and \`layout.ts\` reference legacy quarter tiles and grid geometry. Preserve gesture semantics, camera transforms, ghost previews and transaction testing **through geometry-neutral adapters**; do not paste these modules into a much larger city unchanged.
+- On the 72x104 fine-cell original board, \`src/defend/grid.ts\` has **7,488 cells**. The proposed 192x256 and 256x384 prototypes have **49,152 (6.6x)** and **98,304 (13.1x)** cells. Render at the correct art-pixel scale, not fractional physical pixels. High-zoom hitboxes and overview LOD must remain usable.
+
+### Damage rendering must change before the city becomes huge
+
+- The existing Defend renderer and rendering docs describe full city-layer repaint/invalidation paths in response to damage, which are too expensive when dozens of structures erode each second on a large map. Borrow **camera/lighting concepts**, but move terrain/city rendering to dirty-chunk updates, spatially culled particles, bounded glows and explicit DPR constraints.
+- Test under simultaneous erosion, tower fire, mobile zoom and construction, not just a static beautiful skyline. A large city that only performs well before combat fails the central design requirement.
+
+### The Mine/Library idle economy must be cut off at the app boundary
+
+- \`src/main.ts\` builds both original pages, computes \`awayMs\`, constructs \`WelcomeBack\`, calls \`minePage.advance\` and \`libraryPage.advance\`, runs \`idleTimers\`, and settles wall-clock \`settleTraining\`, \`settleForge\` and \`settleResearch\`. \`src/away.ts\` and several save fields exist specifically to accrue offline work.
+- **Hiding tabs does not disable the old economy.** Give Void Defense its own bootstrap/service boundary (separate entrypoint or strictly gated app mode) that never instantiates the old Mine/Library simulation and settlement loop. Keep the old \`towerdefense.v1\` save unmodified while the new \`voiddefense.v1\` is developed; retain a recoverable original entrypoint through migration. After validation, make Void Defense the primary launch experience.
+- **No offline accumulation means:** suspend the Void simulation and Operations animations on hidden/pagehide; save progress, reset foreground frame accumulators on return, never compute Supplies/Essence/research gains from elapsed \`Date.now()\`, never run a welcome-back payout, and never use background-tab processing to advance rewards. Restart or restore an interrupted active battle according to an explicit policy, with no fabricated progress.
+
+### The finite-energy Void needs two separate budgets and abuse tests
+
+- Distinguish **remaining reservoir energy** (how much total work this scenario can do) from **work per simulation tick** (how aggressively the current frontier progresses). Work should be distributed over all legitimate contact edges, so sacrificial land islands really divide pressure.
+- Use deterministic fractional-work accumulation when the exposed perimeter is very large so per-edge rounding does not stop all expansion. Measure conservation and make allocation independent of iteration order and arbitrary chunk boundaries.
+- Land islands must displace actual Void, count only while still attackable and carry a meaningful material/Supplies/strike cost. Specifically test one-pixel island spam, walls that never erode, portal duplication of energy, and no-contact deadlocks. Retain the perimeter-diversion strategy without enabling a free infinite stall.
+- Specify standard-mode resolution when energy empties: cease expansion and new spawns, deterministically finish/clear remaining creature attacks, then end the battle within a bounded transition.
+
+### Prove progression in the first vertical slice, not only in Phase 9
+
+By the end of **Phase 8**, add a tiny testable permanent-upgrade kernel, for example three Void Essence upgrades for starting Supplies, Matter Cannon output, and mason throughput. Show a failed run awarding Essence, a purchase that improves a retry, and a full between-run refund. Build the complete enormous elastic UI in Phase 9 after these economy invariants work.
+
+---
 
 ## 3. Technical architecture target
 
@@ -238,7 +292,7 @@ Suggested graph sectors connected within **one continuous draggable/zoomable can
 - On first save/profile creation, after name/flag (if retained), present:
   - **Build Under Siege** — "Recommended: build and adapt in real time as the Void consumes the city. The intended, more demanding experience."
   - **Build & Watch** — "Prepare your defenses, then unleash the Void and watch the battle unfold. A calmer planning-focused experience."
-- Both share the main tech wallet but have **separate map best-survival and Sparks achievements**, or a clearly documented reward policy that prevents repeatedly claiming the same map's scarce currency in both modes. Recommended: per-map/per-mode best records, **single claimed Spark milestone pool per map** awarded according to best eligible challenge, while easy-mode achievement is tracked separately. Implement exactly one documented policy before rewards ship; test it.
+- Both share the main tech wallet. Record map best-survival, tier badge and attempt count **separately by mode**, but for the first release use **one shared Sparks entitlement per map**, equal to the highest tier earned in either mode. Award only the increase over the existing entitlement. Under Siege can earn separate challenge/prestige badges. Test switching modes cannot produce duplicate Sparks.
 - Modes can be changed **between runs**, never midway through a run. Under Siege has active placement and income. Build & Watch permits a placement phase with a defined starting/preparation budget then locks placement during attack; don't enable infinite free prep-income. Both should share combat physics for comparable results.
 - **Endless** is an independent mode with run records, not a third main map difficulty setting.
 
@@ -271,7 +325,7 @@ Suggested graph sectors connected within **one continuous draggable/zoomable can
 
 ### Required tests
 - Procedural map repeatability; world bounds and independent district generation.
-- Frontier conservation, contact perimeter, finite energy, disconnected islands, delayed second portal, error conditions and anti-stall termination.
+- Frontier conservation, deterministic fractional-work budget, contact perimeter, finite energy, disconnected islands, one-pixel island spam, blocked fronts, delayed second portal, error conditions and anti-stall termination.
 - Destruction/scoring invariants: no score inflation from newly created land, original baseline remains fixed, thresholds paid only once, preservation after repair.
 - Tower costs, placement legality, drag cancellations, strikes and aim previews, touch zoom/pan.
 - Unit job selection/hauling, no inaccessible infinite-path loops, resource caps and optional synthetic matter costs.
@@ -323,7 +377,7 @@ For each phase below:
 **Inspect:** `src/main.ts`, `src/save.ts`, `src/settings.ts`, `src/profile/model.ts`, `src/profile/editor.ts`, `src/ui/dom.ts`, `src/ui/shell.ts`.
 
 **Build:**
-- Add an independently loadable Void Defense page with a placeholder board using existing app shell patterns.
+- Add an independently loadable Void Defense page with a placeholder board using existing app shell patterns. Create an explicit bootstrap boundary so the old Mine/Library `advance`, away-time and timed research/forge settlements are not invoked by the new game.
 - Introduce explicit run state, progression state, profile/mode, settings and new save key/version.
 - First-profile prompt for the two modes. Preserve existing name/flag controls when useful.
 - Add a futuristic basic HUD with Supplies, Void Essence, Sparks of Defiance (each shown in relevant contexts).
@@ -368,10 +422,10 @@ For each phase below:
 **Gate:** With no defenses the Void consumes the city; additional sacrificial land slows the city's own erosion; finite energy can run out; win/loss is deterministic.
 
 ### Phase 5 — First placeable towers and during-battle interaction
-**Inspect:** `src/defend/board-pointers.ts`, `edit-session.ts`, `drag-rules.ts`, `src/ui/spell-bar.ts`, `src/defend/catalog.ts`.
+**Inspect:** `src/campaign/ambush-sim.ts`, `src/campaign/ambush-grid.ts`, `src/defend/board-pointers.ts`, `edit-session.ts`, `drag-rules.ts`, `src/ui/spell-bar.ts`, `src/defend/catalog.ts`.
 
 **Build:**
-- New placement legality for small tower footprints, occupied road/terrain masks, collisions, resource cost and focus highlighting.
+- New placement legality for small tower footprints, occupied road/terrain masks, collisions, resource cost and focus highlighting. Model the during-battle transaction after `AmbushSim.placeAt`/`remove`, with no assumption that legacy `DefendPage` permits active placement; separate the command from rendering.
 - Tower palette, drag ghost, selection, refund/sell policy, range outlines, touch magnifier, smart hitboxes.
 - Matter Cannon fires real land particles which create/rescue terrain.
 - Initial barrier/repair behavior or simple shielding prototype.
@@ -407,7 +461,7 @@ For each phase below:
 
 **Build:**
 - Supplies start amount; periodic income from remaining/developed buildings; costs for structures and strikes.
-- Void Essence event accounting/anti-abort constraints; post-run results and awards.
+- Void Essence event accounting/anti-abort constraints; post-run results and awards. Include three simple functional permanent upgrades and free respec in a minimal non-graph menu, proving failure -> earn -> upgrade -> retry before Phase 9 builds the full network.
 - Original city baseline, preservation percentage, configurable Sparks thresholds, once-per-map claim ledger.
 - If a building is destroyed and repaired, score restoration cannot exceed original baseline.
 - Ensure post-run progression earnings remain available after total loss.
@@ -418,10 +472,10 @@ For each phase below:
 **Inspect:** `src/ui/upgrade-graph.ts`, `branch-art.ts`, `tree-motes.ts`, `specializations.ts`, `knowledge-paths.ts`, `ui/specialty.ts`.
 
 **Build:**
-- One screen for all tower, unit, economy, command and strike progression; explicit node catalog and global modifier evaluator.
+- One screen for all tower, unit, economy, command and strike progression; explicit node catalog and global modifier evaluator. Represent logical multi-prerequisite rules independently of the graph renderer's single visual parent, and draw validated secondary-dependency connections.
 - Begin with 30–50 useful nodes as an *MVP network* but structure layout and data for 100–300+ without separate per-tower trees.
 - Nodes for unlocks, upgrade branches, late technology and Spark breakpoints. Purchasing a tower-type unlock changes future palette.
-- Preserve springy elastic movement, faded hidden branches, touch/pan/zoom. Add inspect/search/focus if necessary for size.
+- Preserve springy elastic movement, faded hidden branches, touch/pan/zoom. Benchmark the current pairwise settling algorithm at 50/150/300 nodes, and optimize neighbor forces/layout and DOM visibility as needed; add inspect/search/focus if necessary for size.
 - Full no-penalty refund of Essence and Sparks with dependent-node reversal; block any modification during combat.
 - Test state after saving, upgrading, respec, and reopening the game.
 
@@ -446,7 +500,7 @@ For each phase below:
 - **Lab:** sample chambers, nebula specimens, scanning equipment, animated monitors, tiny researchers, room growth tied to research/unlock milestones.
 - **Bay:** giant turret under construction, 1x2 engineers, welds/gantries, test fire, modules added as weapon branches are purchased.
 - Simple finite-state/cosmetic motion and directly derived tech-state scene variants. **No hours-per-resource, ore mining, offline catch-up, idle bank, or per-character production task management**.
-- Remove/disable old Mine/Library navigation and away-time hooks for the new game only, without destroying original game saves or code needed during transition.
+- Remove/disable old Mine/Library navigation and away-time hooks for the new game only, without destroying original game saves or code needed during transition. Do not calculate any new-game production from wall-clock time, hidden-tab time or a delayed welcome-back payout.
 
 **Gate:** Scenes reflect unlock progress, show scale contrast (enormous turret/tiny engineers), and are animated but **economically inert while closed, hidden, or unattended**.
 
@@ -456,7 +510,7 @@ For each phase below:
 **Build:**
 - First-profile mode picker; change mode between battles.
 - Build Under Siege: free in-combat placement for Supplies. Build & Watch: preconstruction with strict budget, then observation with placement locked.
-- Multiple map configurations (edge, central, two origins, delayed second portal) and reliable achievement tracking policy.
+- Multiple map configurations (edge, central, two origins, delayed second portal) and the one-shared-Sparks-entitlement-per-map policy. Keep separate best results/attempts by play style, matching Section 2A.
 - Seeded level map replay, preview thumbnails, player best percentage and Sparks earned; optional stars/spark icons and mode distinction.
 - Endless survival as alternate episode type with own records.
 
