@@ -7,7 +7,7 @@ The Mine and Library now have physical city tiles. Each new player owns one of e
 
 A mobile-first city-defense game. You lay out a walled city on a 9 × 13 board, then hold it against waves that keep coming until the keep falls. The Mine produces metals for city elements and upgrades; the Library produces Knowledge for research. Smiths work timed metal upgrades; researchers work timed Knowledge upgrades. Canvas draws the board; plain DOM provides the pages. No backend, no game engine, no framework; progress is kept in `localStorage`.
 
-Play it on GitHub Pages: <https://sethrimer3.github.io/TowerDefense/>
+Play it on GitHub Pages: <https://sethrimer3.github.io/VoidDefense/>
 
 ## Run
 

@@ -4,7 +4,7 @@ This file provides guidance to AI coding agents (Claude Code, Codex, etc.) when 
 
 ## Project
 
-Tower Defense: a mobile-first city-defense game in TypeScript + Vite. No backend, no game engine, no framework. Canvas draws the board; the DOM (built as HTML template strings in `src/ui/` and `src/defend/ui.ts`) provides controls, stats, and pages. All state persists in `localStorage` under `towerdefense.v1`. Deployed to GitHub Pages at `https://sethrimer3.github.io/TowerDefense/`.
+Tower Defense: a mobile-first city-defense game in TypeScript + Vite. No backend, no game engine, no framework. Canvas draws the board; the DOM (built as HTML template strings in `src/ui/` and `src/defend/ui.ts`) provides controls, stats, and pages. All state persists in `localStorage` under `towerdefense.v1`. Deployed to GitHub Pages at `https://sethrimer3.github.io/VoidDefense/`.
 
 ## Commands
 
