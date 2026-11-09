@@ -164,7 +164,9 @@ export class PlacedBuildingMenu {
     renderer.stepGlide();
     // Framed, the menu's open middle wraps the range square rather than the building.
     const r=(sizing==="frame"&&this.framed?framedRange(this.building,this.host.source()):null)??this.building.rect;
-    const a=renderer.toClient(r.x,r.y),z=renderer.toClient(r.x+r.w,r.y+r.h);
+    // Opposite corners, ordered on screen (a turned board swaps them round).
+    const p=renderer.toClient(r.x,r.y),q=renderer.toClient(r.x+r.w,r.y+r.h);
+    const a={x:Math.min(p.x,q.x),y:Math.min(p.y,q.y)},z={x:Math.max(p.x,q.x),y:Math.max(p.y,q.y)};
     const scale=sizing==="grow"?growScale(renderer.cam.s,DefendRenderer.MAX_ZOOM):1;
     placeBuildingMenu(this.element,buildingMenuBox({x:a.x-board.left,y:a.y-board.top,w:z.x-a.x,h:z.y-a.y},{w:board.width,h:board.height},this.controls,this.headroom,scale));
   }

@@ -1,3 +1,4 @@
+import { landscape, turned } from "../ui/landscape.ts";
 import type { Highlight } from "./placed-shimmer.ts";
 import { wallAtCell, type SpikeSpot } from "./layout.ts";
 import { STRUCTURES } from "./catalog.ts";
@@ -401,7 +402,7 @@ export class DefendPage {
       <div class="defend-city" id="defend-city">
         <div class="defend-stage" id="defend-stage">
           <aside class="defend-side" id="defend-side" aria-label="Palette"><div class="defend-palette" id="defend-palette"></div></aside>
-          <div class="defend-board" id="defend-board"><canvas id="defend-canvas" aria-label="City defense board. Scroll or pinch to zoom, drag to pan."></canvas>
+          <div class="defend-board" id="defend-board"><canvas id="defend-canvas" class="board-turn" aria-label="City defense board. Scroll or pinch to zoom, drag to pan."></canvas>
             <div class="defend-specialty" id="defend-specialty" role="dialog" aria-label="Specialization" hidden></div>
             <div class="defend-banner" id="defend-banner" role="dialog" aria-label="The keep has fallen" hidden></div>
             <div class="defend-message" id="defend-message" aria-live="polite"></div>
@@ -858,6 +859,13 @@ export class DefendPage {
     const stage = this.root.querySelector<HTMLElement>("#defend-stage");
     const board = this.root.querySelector<HTMLElement>("#defend-board");
     if (!this.renderer || !stage || !board || !stage.offsetParent) return;
+    // A turned board (landscape) lies across the stage: its canvas's width
+    // runs down the screen, where the palette slides in below it.
+    if (turned(this.renderer.canvas)) {
+      const frame = board.offsetHeight - board.clientHeight;
+      this.renderer.resize(stage.clientHeight - frame, board.clientWidth);
+      return;
+    }
     const frame = board.offsetWidth - board.clientWidth;
     this.renderer.resize(stage.clientWidth - frame, board.clientHeight);
   }
@@ -869,6 +877,8 @@ export class DefendPage {
   }
 
   private navHeight() {
+    // In landscape the tabs stand beside the page, not under it.
+    if (landscape()) return 0;
     return document.querySelector("nav")?.getBoundingClientRect().height ?? 80;
   }
 

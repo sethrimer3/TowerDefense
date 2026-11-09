@@ -3,6 +3,10 @@ import "./theme.css";
 import "./loading.css";
 import { LoadingScreen } from "./ui/loading-screen.ts";
 import { within, mayAutoReload } from "./ui/boot-guard.ts";
+import { watchLandscape } from "./ui/landscape.ts";
+
+// The layout follows the window's shape before anything else lays out.
+watchLandscape();
 
 // Read only the two visual preferences needed before the save module loads.
 try {

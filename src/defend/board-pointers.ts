@@ -238,14 +238,16 @@ export class BoardPointers {
     // The item rides `raise` cells above the pointer, kept on the board so
     // its top rows stay in reach; the pointer still says whether it is over
     // the board or the palette.
-    const raise = this.raise;
-    const fy = c.inside ? Math.max(0, c.fy - raise) : c.fy - raise;
-    const ghost = renderer.toClient(c.fx, fy);
-    this.held.ghost.style.left = `${e.clientX}px`;
-    this.held.ghost.style.top = `${e.clientY + ghost.y - renderer.toClient(c.fx, c.fy).y}px`;
-    this.magnify({ x: e.clientX, y: e.clientY }, c.inside ? { x: c.fx, y: fy } : null);
+    // "Above" is up on screen: north, or east on a board shown turned.
+    const raise = this.raise, up = renderer.screenUp;
+    let fx = c.fx + up.x * raise, fy = c.fy + up.y * raise;
+    if (c.inside) { fy = Math.max(0, fy); fx = Math.min(CELLS_W - 1e-6, fx); }
+    const ghost = renderer.toClient(fx, fy), under = renderer.toClient(c.fx, c.fy);
+    this.held.ghost.style.left = `${e.clientX + ghost.x - under.x}px`;
+    this.held.ghost.style.top = `${e.clientY + ghost.y - under.y}px`;
+    this.magnify({ x: e.clientX, y: e.clientY }, c.inside ? { x: fx, y: fy } : null);
     return {
-      cellX: c.fx,
+      cellX: fx,
       cellY: fy,
       overBoard: c.inside,
       overPalette: !!(document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest?.(this.host.paletteSelector ?? "#defend-palette"),

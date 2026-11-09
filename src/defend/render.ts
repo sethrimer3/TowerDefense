@@ -1,3 +1,4 @@
+import { clientDelta, clientToLocal, localSize, localToClient, turned } from "../ui/landscape.ts";
 import type { Building } from "./citygen.ts";
 import { enemyFlying } from "./catalog.ts";
 import { CityLife } from "./city-life.ts";
@@ -322,8 +323,8 @@ export class DefendRenderer {
 
   /** Client (CSS) point → canvas pixels. */
   private toCanvas(clientX: number, clientY: number) {
-    const r = this.canvas.getBoundingClientRect();
-    return { x: ((clientX - r.left) / r.width) * this.canvas.width, y: ((clientY - r.top) / r.height) * this.canvas.height };
+    const p = clientToLocal(this.canvas, clientX, clientY);
+    return { x: (p.x / p.w) * this.canvas.width, y: (p.y / p.h) * this.canvas.height };
   }
 
   /** Client point → board position in cells (through the camera). */
@@ -334,9 +335,15 @@ export class DefendRenderer {
 
   /** Board position in cells → client (CSS) point, through the camera. */
   toClient(fx: number, fy: number) {
-    const r = this.canvas.getBoundingClientRect();
+    const { w, h } = localSize(this.canvas);
     const x = fx * this.px * this.cam.s + this.cam.x, y = fy * this.px * this.cam.s + this.cam.y;
-    return { x: r.left + (x / (this.canvas.width || 1)) * r.width, y: r.top + (y / (this.canvas.height || 1)) * r.height };
+    return localToClient(this.canvas, (x / (this.canvas.width || 1)) * w, (y / (this.canvas.height || 1)) * h);
+  }
+
+  /** The board's direction (in cells) that shows as up on screen: north,
+   * or east while the board is shown turned (`landscape.ts`). */
+  get screenUp() {
+    return turned(this.canvas) ? { x: 1, y: 0 } : { x: 0, y: -1 };
   }
 
   /** Zoom by `factor`, keeping the board point under the client point fixed. */
@@ -368,7 +375,7 @@ export class DefendRenderer {
   /** The view centring board point (`fx`, `fy`, cells) zoomed so `cells`
    * cells span `css` CSS pixels, within the zoom's limits and the board. */
   framing(fx: number, fy: number, cells: number, css: number): CameraView {
-    const r = this.canvas.getBoundingClientRect(), k = this.canvas.width / (r.width || 1);
+    const k = this.canvas.width / localSize(this.canvas).w;
     const want = Math.max(1, Math.min(DefendRenderer.MAX_ZOOM, (css * k) / (Math.max(cells, 0.01) * this.px)));
     const s = this.snap(want), { W, H } = this.board, o = this.overscroll;
     let x = clampAxis(this.canvas.width / 2 - fx * this.px * s, this.canvas.width, W * s, o);
@@ -382,8 +389,7 @@ export class DefendRenderer {
   private overscroll = 0;
   /** Lets the camera pan `css` CSS pixels past the board's edges. */
   setOverscroll(css: number) {
-    const r = this.canvas.getBoundingClientRect();
-    this.overscroll = Math.max(0, css) * (this.canvas.width / (r.width || 1));
+    this.overscroll = Math.max(0, css) * (this.canvas.width / localSize(this.canvas).w);
   }
   /** Takes the overscroll away, gliding the view back onto the board over `ms`. */
   settle(ms: number) {
@@ -429,9 +435,9 @@ export class DefendRenderer {
   panBy(dx: number, dy: number) {
     this.glide = null;
     this.moves++;
-    const r = this.canvas.getBoundingClientRect();
-    this.cam.x += (dx / r.width) * this.canvas.width;
-    this.cam.y += (dy / r.height) * this.canvas.height;
+    const { w, h } = localSize(this.canvas), d = clientDelta(this.canvas, dx, dy);
+    this.cam.x += (d.x / w) * this.canvas.width;
+    this.cam.y += (d.y / h) * this.canvas.height;
     this.clampCam();
   }
 
