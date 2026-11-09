@@ -147,6 +147,37 @@ export class VoidApp {
       };
     });
 
+    window.addEventListener("keydown", (e) => {
+      if (this.tab !== "battle") return;
+      if (e.key === "Escape") {
+        this.activeTool = { kind: "none" };
+        this.hoverPreview = null;
+        this.selectedTowerUid = null;
+        this.renderPalette();
+        this.refreshHUD();
+        return;
+      }
+      const strikeOrder: StrikeId[] = [
+        "landfall",
+        "containmentPulse",
+        "genesis",
+        "orbitalReinforcement",
+        "seismicFrame",
+      ];
+      const idx = Number(e.key) - 1;
+      if (idx >= 0 && idx < strikeOrder.length) {
+        const s = strikeOrder[idx];
+        if (this.sim.tech.unlockedStrikes.has(s) && this.sim.combat.strikeCooldowns[s] <= 0 && this.sim.phase === "battle") {
+          this.activeTool =
+            this.activeTool.kind === "castStrike" && this.activeTool.strike === s
+              ? { kind: "none" }
+              : { kind: "castStrike", strike: s };
+          this.hoverPreview = null;
+          this.renderPalette();
+        }
+      }
+    });
+
     this.renderPalette();
     this.renderSectorsPage();
     this.refreshHUD();
@@ -228,16 +259,23 @@ export class VoidApp {
         return;
       }
 
+      if (prev && this.activeTool.kind === "drawBlueprint" && this.pointers.has(e.pointerId)) {
+        const dx = e.clientX - prev.x;
+        const dy = e.clientY - prev.y;
+        if (Math.hypot(dx, dy) > 4) this.panMoved = true;
+      }
+
       this.updateHover(e);
     });
 
     canvas.addEventListener("pointerup", (e) => {
       this.pointers.delete(e.pointerId);
       this.loupePointer = null;
-      if (this.panMoved) {
+      if (this.panMoved && this.activeTool.kind === "none") {
         this.panMoved = false;
         return;
       }
+      this.panMoved = false;
       this.commitBoardTapOrDrop(e);
     });
 
@@ -358,9 +396,19 @@ export class VoidApp {
       return;
     }
 
-    // Default tap: select tower under cursor or clear selection
+    // Default tap: select tower under cursor or clear selection (generous 2.5-cell hitbox around tower center for tiny sprites)
     if (this.sim.world.grid.inBounds(cx, cy)) {
-      const uid = this.sim.world.towerAt[this.sim.world.grid.index(cx, cy)];
+      let uid = this.sim.world.towerAt[this.sim.world.grid.index(cx, cy)];
+      if (uid < 0) {
+        let bestD = 3.2;
+        for (const t of this.sim.combat.towers) {
+          const d = Math.hypot(fx - (t.x + t.w * 0.5), fy - (t.y + t.h * 0.5));
+          if (d <= bestD) {
+            bestD = d;
+            uid = t.uid;
+          }
+        }
+      }
       this.selectedTowerUid = uid >= 0 ? uid : null;
       this.refreshHUD();
     }
@@ -399,15 +447,22 @@ export class VoidApp {
       </button>`;
 
     towerPal.querySelectorAll<HTMLButtonElement>("[data-pick-tower]").forEach((btn) => {
-      btn.onclick = () => {
+      const startTowerPick = (fromDrag: boolean, e?: PointerEvent) => {
         const t = btn.dataset.pickTower as TowerTypeId;
-        if (this.activeTool.kind === "placeTower" && this.activeTool.type === t) {
+        if (!fromDrag && this.activeTool.kind === "placeTower" && this.activeTool.type === t) {
           this.activeTool = { kind: "none" };
         } else {
           this.activeTool = { kind: "placeTower", type: t };
         }
         this.hoverPreview = null;
         this.renderPalette();
+        if (fromDrag && e) {
+          this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        }
+      };
+      btn.onclick = () => startTowerPick(false);
+      btn.onpointerdown = (e) => {
+        if (e.button === 0 && !btn.disabled) startTowerPick(true, e);
       };
     });
 
@@ -445,15 +500,22 @@ export class VoidApp {
       .join("");
 
     strikePal.querySelectorAll<HTMLButtonElement>("[data-pick-strike]").forEach((btn) => {
-      btn.onclick = () => {
+      const startStrikePick = (fromDrag: boolean, e?: PointerEvent) => {
         const s = btn.dataset.pickStrike as StrikeId;
-        if (this.activeTool.kind === "castStrike" && this.activeTool.strike === s) {
+        if (!fromDrag && this.activeTool.kind === "castStrike" && this.activeTool.strike === s) {
           this.activeTool = { kind: "none" };
         } else {
           this.activeTool = { kind: "castStrike", strike: s };
         }
         this.hoverPreview = null;
         this.renderPalette();
+        if (fromDrag && e) {
+          this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        }
+      };
+      btn.onclick = () => startStrikePick(false);
+      btn.onpointerdown = (e) => {
+        if (e.button === 0 && !btn.disabled) startStrikePick(true, e);
       };
     });
   }
@@ -638,6 +700,7 @@ export class VoidApp {
                     <strong>${sc.name}</strong>
                     <span class="void-sector-stars">${sc.endless ? "∞" : "★".repeat(stars) + "☆".repeat(3 - stars)}</span>
                   </header>
+                  <canvas class="void-sector-thumb" width="96" height="54" data-sector-thumb="${sc.id}"></canvas>
                   <p>${sc.subtitle}</p>
                   <div class="void-sector-stats">
                     ${
@@ -701,6 +764,35 @@ export class VoidApp {
       btn.onclick = () => {
         this.startNewRun(btn.dataset.launchSector as ScenarioId);
       };
+    });
+
+    secPage.querySelectorAll<HTMLCanvasElement>("[data-sector-thumb]").forEach((canvas) => {
+      const scId = canvas.dataset.sectorThumb as ScenarioId;
+      const sc = SCENARIOS.find((s) => s.id === scId);
+      if (!sc) return;
+      const c = canvas.getContext("2d")!;
+      c.fillStyle = "#141924";
+      c.fillRect(0, 0, 96, 54);
+      // Draw stylized metropolitan avenues & blocks
+      c.fillStyle = "#262f3f";
+      for (let y = 4; y < 50; y += 10) {
+        for (let x = 4; x < 92; x += 14) {
+          c.fillRect(x, y, 11, 7);
+        }
+      }
+      // Draw portal breach craters
+      for (const p of sc.portals) {
+        const px = Math.round(p.xFrac * 96);
+        const py = Math.round(p.yFrac * 54);
+        const r = Math.max(4, Math.round((p.radius / sc.worldW) * 96));
+        c.fillStyle = p.activateAtSeconds > 0 ? "rgba(255, 120, 50, 0.35)" : "#0b0719";
+        c.beginPath();
+        c.arc(px, py, r, 0, Math.PI * 2);
+        c.fill();
+        c.strokeStyle = p.activateAtSeconds > 0 ? "#ff7733" : "#b85cff";
+        c.lineWidth = 1.2;
+        c.stroke();
+      }
     });
 
     const classicBtn = secPage.querySelector<HTMLButtonElement>("[data-open-classic]");

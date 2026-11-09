@@ -34,6 +34,7 @@ export class VoidTechTreeView {
   private readonly circle = new MagicCircle();
   private picked = "commandCore";
   private filterSector: TechSector | "" = "";
+  private searchQuery = "";
 
   constructor(
     private readonly host: HTMLElement,
@@ -59,6 +60,7 @@ export class VoidTechTreeView {
                 .join("")}
             </select>
           </label>
+          <input type="search" data-tech-search placeholder="Search tech..." aria-label="Search technology nodes" />
           <button type="button" data-tech-fit>Fit View</button>
           <button type="button" data-tech-respec class="danger-btn">Refund All</button>
         </div>
@@ -102,6 +104,19 @@ export class VoidTechTreeView {
       this.graph.refit(true);
     };
 
+    this.host.querySelector<HTMLInputElement>("[data-tech-search]")!.oninput = (e) => {
+      this.searchQuery = (e.target as HTMLInputElement).value.trim().toLowerCase();
+      if (this.searchQuery) {
+        const match = TECH_NODES.find(
+          (n) =>
+            n.name.toLowerCase().includes(this.searchQuery) ||
+            n.description.toLowerCase().includes(this.searchQuery),
+        );
+        if (match) this.picked = match.id;
+      }
+      this.render();
+    };
+
     this.host.querySelector<HTMLButtonElement>("[data-tech-fit]")!.onclick = () => {
       this.graph.refit(true);
     };
@@ -140,7 +155,13 @@ export class VoidTechTreeView {
       const unlocked = prerequisitesMet(n, wallet.ranks);
       const state: "owned" | "next" | "locked" =
         rank > 0 ? "owned" : unlocked ? "next" : "locked";
-      const dimmed = this.filterSector && n.sector !== this.filterSector && n.id !== "commandCore";
+      const dimmedBySector = this.filterSector && n.sector !== this.filterSector && n.id !== "commandCore";
+      const dimmedBySearch =
+        this.searchQuery &&
+        !n.name.toLowerCase().includes(this.searchQuery) &&
+        !n.description.toLowerCase().includes(this.searchQuery) &&
+        n.id !== "commandCore";
+      const dimmed = dimmedBySector || dimmedBySearch;
       const nextCost = rank < maxRank ? n.costs[rank] : n.costs[maxRank - 1];
       const currSymbol = n.currency === "sparks" ? "★" : "❖";
       const tag =
