@@ -143,7 +143,7 @@ export class VoidTechTreeView {
     const alloc = allocatedCurrencies(wallet.ranks);
 
     const poolsEl = this.host.querySelector<HTMLElement>("[data-tech-pools]")!;
-    poolsEl.innerHTML = `<span class="badge-essence">❖ ${avail.essence} Void Essence</span> <span class="badge-sparks">★ ${avail.sparks} Sparks of Defiance</span>`;
+    poolsEl.innerHTML = `<span class="badge-essence">${avail.essence} Void Essence</span> · <span class="badge-sparks">${avail.sparks} Sparks of Defiance</span>`;
 
     const respecBtn = this.host.querySelector<HTMLButtonElement>("[data-tech-respec]")!;
     respecBtn.disabled = inBattle || (alloc.essence === 0 && alloc.sparks === 0);
@@ -163,13 +163,13 @@ export class VoidTechTreeView {
         n.id !== "commandCore";
       const dimmed = dimmedBySector || dimmedBySearch;
       const nextCost = rank < maxRank ? n.costs[rank] : n.costs[maxRank - 1];
-      const currSymbol = n.currency === "sparks" ? "★" : "❖";
+      const currSymbol = n.currency === "sparks" ? " SPK" : " ESS";
       const tag =
         n.id === "commandCore"
           ? "CORE"
           : rank >= maxRank
             ? `MAX (${rank}/${maxRank})`
-            : `${rank}/${maxRank} · ${nextCost}${currSymbol}`;
+            : `${rank}/${maxRank} - ${nextCost}${currSymbol}`;
       const face =
         n.icon === "keep"
           ? `<canvas width="32" height="32" data-icon="keep"></canvas>`
@@ -191,6 +191,10 @@ export class VoidTechTreeView {
       this.picked,
       TECH_NODES.map((n) => ({ id: n.id, parent: n.parent })),
     );
+    if (!this.hasFittedVisible && this.host.clientWidth > 0) {
+      this.hasFittedVisible = true;
+      this.graph.refit(true);
+    }
 
     this.circle.set({
       topic: "voidTech",
@@ -213,7 +217,7 @@ export class VoidTechTreeView {
     const nextCost = rank < maxRank ? node.costs[rank] : 0;
     const canAfford =
       node.currency === "sparks" ? avail.sparks >= nextCost : avail.essence >= nextCost;
-    const currLabel = node.currency === "sparks" ? "Sparks of Defiance ★" : "Void Essence ❖";
+    const currLabel = node.currency === "sparks" ? "Sparks of Defiance" : "Void Essence";
 
     const reqNames = [
       ...(node.parent ? [TECH_BY_ID.get(node.parent)?.name ?? node.parent] : []),
@@ -244,7 +248,7 @@ export class VoidTechTreeView {
             ? `<button type="button" data-card-buy ${
                 inBattle || !met || !canAfford ? "disabled" : ""
               }>Research Rank ${rank + 1} (${nextCost} ${
-                node.currency === "sparks" ? "★" : "❖"
+                node.currency === "sparks" ? "Sparks" : "Essence"
               })</button>`
             : `<button type="button" disabled>Max Rank Reached</button>`
         }

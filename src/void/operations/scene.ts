@@ -43,7 +43,7 @@ export class ResistanceOperationsView {
       <div class="void-ops-canvas-wrap">
         <canvas class="void-ops-canvas" width="320" height="160"></canvas>
       </div>
-      <footer class="void-ops-status" data-ops-status></footer>
+      <div class="void-ops-status" data-ops-status></div>
     `;
 
     this.canvas = this.host.querySelector<HTMLCanvasElement>(".void-ops-canvas")!;

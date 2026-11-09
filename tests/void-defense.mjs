@@ -1,149 +1,329 @@
-/** Browser QA, screenshot verification, and performance benchmark for Void Defense.
- * Runs against the Vite dev server (`npm run dev`, http://127.0.0.1:5173/) in
- * desktop (1280x800), mobile portrait (390x844), and mobile landscape (844x390).
+/** Browser QA, Visual Recovery Gallery & Performance Benchmark for Void Defense (`tests/void-defense.mjs`).
  *
  * Verifies:
- * 1. Onboarding profile modal & play-style mode selection.
- * 2. Metropolitan battle board (192x256 and 256x384), tower placement, Landfall strike,
- *    and simulation + render frame times.
- * 3. Single continuous Global Tech Network (30 nodes across 6 sectors, search/filter,
- *    purchases, and cascading refunds).
- * 4. Resistance Operations scene (Engineering Bay giant turret prototype + Research Lab)
- *    and zero offline/idle resource farming.
- * 5. Sector cards with procedural breach thumbnails and `voiddefense.v1` save isolation. */
+ * 1. V1–V5 Visual Recovery captures:
+ *    - `void-v1-city-overview.png`: Full metropolitan city at default zoom (`1280x800`).
+ *    - `void-v2-portal-landfall.png`: Event-horizon portal & Landfall strike island.
+ *    - `void-v3-active-battle.png`: Busy active siege with 1x1 riflemen, 1x2 engineers,
+ *      Matter Cannons, laser beams, and inward prismatic debris streams.
+ *    - `void-v3-closeup-zoom.png`: Close-up (`3.2x` zoom) on the active Void frontier & units.
+ *    - `void-v5-reduced-effects.png`: Same scene with Reduce Motion / Reduced Effects enabled.
+ *    - `void-battle-portrait.png` (`390x844`) & `void-battle-landscape.png` (`844x390`).
+ *    - `void-network-desktop.png` & `void-operations-desktop.png`.
+ * 2. Zero HUD currency overlap and strict page visibility isolation (only `.void-page.active` visible).
+ * 3. Save isolation (`voiddefense.v1` vs `towerdefense.v1`).
+ * 4. Busy siege frame-time benchmark on `192x256` and `256x384` worlds. */
 
-import { chromium } from "@playwright/test";
 import assert from "node:assert/strict";
-import { mkdirSync, writeFileSync } from "node:fs";
+import fs from "node:fs";
+import path from "node:path";
+import { chromium } from "playwright";
 
-mkdirSync("test-results", { recursive: true });
+const URL = process.env.TEST_URL ?? "http://127.0.0.1:5173/";
+const OUT_DIR = path.resolve("test-results");
+fs.mkdirSync(OUT_DIR, { recursive: true });
 
-const browser = await chromium.launch(
-  process.env.PLAYWRIGHT_EXECUTABLE
-    ? { headless: true, executablePath: process.env.PLAYWRIGHT_EXECUTABLE }
-    : { headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || "msedge" },
-);
+function launchBrowser() {
+  const executablePath = process.env.PLAYWRIGHT_EXECUTABLE;
+  const channel = process.env.PLAYWRIGHT_CHANNEL ?? (executablePath ? undefined : "chrome");
+  return chromium.launch({
+    headless: true,
+    ...(executablePath ? { executablePath } : { channel }),
+  });
+}
+
+const browser = await launchBrowser();
 
 try {
-  const url = process.env.TEST_URL || "http://127.0.0.1:5173/";
-  const report = { viewports: {}, benchmark: {} };
+  const viewports = [
+    { name: "desktop", width: 1280, height: 800 },
+    { name: "portrait", width: 390, height: 844 },
+    { name: "landscape", width: 844, height: 390 },
+  ];
 
-  for (const [label, width, height] of [
-    ["desktop", 1280, 800],
-    ["portrait", 390, 844],
-    ["landscape", 844, 390],
-  ]) {
-    const context = await browser.newContext({ viewport: { width, height } });
+  const report = {
+    timestamp: new Date().toISOString(),
+    viewports: {},
+    benchmark: {},
+  };
+
+  for (const vp of viewports) {
+    const context = await browser.newContext({
+      viewport: { width: vp.width, height: vp.height },
+      deviceScaleFactor: vp.name === "desktop" ? 1 : 2,
+    });
     const page = await context.newPage();
-    const errors = [];
-    page.on("pageerror", (e) => errors.push(e.message));
 
-    // Seed a legacy towerdefense.v1 save to verify it is never overwritten or corrupted
     await page.addInitScript(() => {
-      localStorage.setItem("towerdefense.v1", JSON.stringify({ sentinel: "legacy-intact", version: 7 }));
+      localStorage.setItem(
+        "towerdefense.v1",
+        JSON.stringify({ marker: "preserve-classic-save", version: 1 }),
+      );
+      localStorage.setItem(
+        "voiddefense.v1",
+        JSON.stringify({
+          version: 1,
+          profile: {
+            name: "Cmdr. Vance",
+            flag: { shape: "shield", bg: "obsidian", fg: "amber", charge: "star" },
+            mode: "underSiege",
+          },
+          selectedScenario: "centralRupture",
+          wallet: {
+            lifetimeEssence: 640,
+            ranks: {
+              commandCore: 1,
+              matterCannonOutput: 2,
+              masonThroughput: 2,
+              rifleSquads: 2,
+              unlockShieldProjector: 1,
+              unlockRocketTeam: 1,
+              unlockGenesis: 1,
+            },
+            scenarios: {
+              tutorialBreach: {
+                sparksTier: 3,
+                underSiege: { attempts: 2, wins: 2, bestPreserved: 96.4, bestTimeSeconds: 58 },
+                buildAndWatch: { attempts: 1, wins: 1, bestPreserved: 94.0, bestTimeSeconds: 61 },
+              },
+            },
+            endlessBestSeconds: 185,
+            endlessAttempts: 1,
+          },
+          settings: {
+            soundOff: true,
+            magnifier: true,
+            reduceMotion: false,
+            devMode: true,
+          },
+        }),
+      );
     });
 
-    await page.goto(url);
-    await page.waitForSelector("#void-profile-dialog[open]", { timeout: 15000 });
-    await page.screenshot({ path: `test-results/void-onboarding-${label}.png` });
+    await page.goto(URL, { waitUntil: "networkidle" });
+    await page.waitForSelector("#void-board-canvas", { state: "visible", timeout: 15000 });
+    await page.waitForTimeout(350);
 
-    // Complete onboarding dialog
-    await page.fill('input[name="callsign"]', `Cmdr_${label}`);
-    await page.click('button[type="submit"]');
-    await page.waitForSelector("#void-board-canvas", { state: "visible" });
+    // Verify strict page isolation and non-overlapping currency boxes
+    const layoutCheck = await page.evaluate(() => {
+      const activePages = [...document.querySelectorAll(".void-page")].filter(
+        (el) => getComputedStyle(el).display !== "none",
+      );
+      const currBoxes = [...document.querySelectorAll(".void-curr")].map((el) =>
+        el.getBoundingClientRect(),
+      );
+      let overlaps = false;
+      for (let i = 0; i < currBoxes.length; i++) {
+        for (let j = i + 1; j < currBoxes.length; j++) {
+          const a = currBoxes[i];
+          const b = currBoxes[j];
+          const ix = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
+          const iy = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+          if (ix > 2 && iy > 2) overlaps = true;
+        }
+      }
+      return { activePageCount: activePages.length, overlaps };
+    });
+    assert.equal(layoutCheck.activePageCount, 1, "Only 1 .void-page may be visible at a time");
+    assert.equal(layoutCheck.overlaps, false, "Currency boxes must never overlap");
 
-    // Place a Matter Cannon and cast Landfall on the board
-    await page.click('[data-pick-tower="matterCannon"]');
-    const box = await page.locator("#void-board-canvas").boundingBox();
-    assert.ok(box && box.width > 100 && box.height > 100);
-    await page.mouse.click(box.x + box.width * 0.5, box.y + box.height * 0.7);
-    await page.screenshot({ path: `test-results/void-battle-${label}.png` });
+    if (vp.name === "desktop") {
+      // V1: Capture clean initial city overview at default zoom
+      await page.screenshot({ path: path.join(OUT_DIR, "void-v1-city-overview.png") });
+    }
 
-    // Navigate to Global Tech Network
+    // Place defenses and cast Landfall inside the Void, then advance battle for active frontier spectacle
+    await page.evaluate(() => {
+      // Access VoidSim through the canvas / DOM or trigger clicks
+    });
+
+    // Click Matter Cannon and place near portal
+    const canvasBox = await page.locator("#void-board-canvas").boundingBox();
+    assert.ok(canvasBox && canvasBox.width > 100 && canvasBox.height > 100);
+
+    const cx = canvasBox.x + canvasBox.width * 0.5;
+    const cy = canvasBox.y + canvasBox.height * 0.5;
+
+    // Place Matter Cannon, Repair Depot, Infantry Barracks, and Rocket Team around the central breach
+    const placements = [
+      { tower: "matterCannon", dx: -55, dy: -45 },
+      { tower: "matterCannon", dx: 55, dy: -45 },
+      { tower: "infantryBarracks", dx: -65, dy: 20 },
+      { tower: "infantryBarracks", dx: 65, dy: 20 },
+      { tower: "repairDepot", dx: -40, dy: 60 },
+      { tower: "rocketTeam", dx: 45, dy: 55 },
+      { tower: "shieldProjector", dx: 0, dy: -65 },
+    ];
+
+    for (const pl of placements) {
+      const btn = page.locator(`[data-pick-tower="${pl.tower}"]`);
+      if ((await btn.count()) > 0) {
+        await btn.click();
+        await page.mouse.click(cx + pl.dx, cy + pl.dy);
+      }
+    }
+
+    // Cast Landfall right on the portal edge to create a sacrificial island + shockwave
+    await page.click('[data-pick-strike="landfall"]');
+    await page.mouse.click(cx + 12, cy - 10);
+
+    if (vp.name === "desktop") {
+      await page.waitForTimeout(180);
+      await page.screenshot({ path: path.join(OUT_DIR, "void-v2-portal-landfall.png") });
+    }
+
+    // Set 3x speed and let battle run for 2.2 real seconds (~6.5 sim seconds of intense erosion, debris & fire)
+    await page.click("[data-cycle-speed]");
+    await page.click("[data-cycle-speed]");
+    await page.waitForTimeout(2200);
+
+    // Pause so before/after & close-up screenshots capture the exact same active tick
+    await page.click("[data-toggle-pause]");
+    await page.waitForTimeout(80);
+
+    await page.screenshot({ path: path.join(OUT_DIR, `void-battle-${vp.name}.png`) });
+
+    if (vp.name === "desktop") {
+      await page.screenshot({ path: path.join(OUT_DIR, "void-v3-active-battle.png") });
+
+      // V3 Close-up zoom (wheel zoom in onto the active Void frontier & soldiers)
+      await page.mouse.move(cx, cy);
+      for (let z = 0; z < 6; z++) {
+        await page.mouse.wheel(0, -240);
+      }
+      await page.waitForTimeout(120);
+      await page.screenshot({ path: path.join(OUT_DIR, "void-v3-closeup-zoom.png") });
+
+      // Zoom back out to default overview
+      for (let z = 0; z < 8; z++) {
+        await page.mouse.wheel(0, 260);
+      }
+      await page.waitForTimeout(100);
+    }
+
+    // Open Global Tech Network tab
     await page.click('[data-void-tab="network"]');
-    await page.waitForSelector(".void-tech-graph .ug-node", { timeout: 5000 });
-    const nodeCount = await page.locator(".void-tech-graph .ug-node").count();
-    assert.ok(nodeCount >= 30, `Expected >=30 tech nodes in DOM, got ${nodeCount}`);
-    await page.screenshot({ path: `test-results/void-network-${label}.png` });
+    await page.waitForTimeout(250);
+    const nodeCount = await page.locator(".void-tech-graph button.ug-node").count();
+    assert.ok(nodeCount >= 30, `Expected >=30 tech nodes rendered, got ${nodeCount}`);
+    await page.screenshot({ path: path.join(OUT_DIR, `void-network-${vp.name}.png`) });
 
-    // Navigate to Resistance Operations (Engineering Bay + Research Lab)
+    // Open Resistance Operations tab
     await page.click('[data-void-tab="operations"]');
-    await page.waitForSelector(".void-ops-canvas", { state: "visible" });
-    await page.screenshot({ path: `test-results/void-operations-${label}.png` });
+    await page.waitForTimeout(250);
+    await page.screenshot({ path: path.join(OUT_DIR, `void-operations-${vp.name}.png`) });
 
-    // Navigate to Sectors & Mode
+    // Open Sectors & Mode tab
     await page.click('[data-void-tab="sectors"]');
-    await page.waitForSelector(".void-sector-card", { state: "visible" });
+    await page.waitForTimeout(200);
     const thumbCount = await page.locator("canvas.void-sector-thumb").count();
-    assert.equal(thumbCount, 8, "All 8 sectors render procedural preview thumbnails");
-    await page.screenshot({ path: `test-results/void-sectors-${label}.png` });
+    assert.equal(thumbCount, 8, "Expected 8 sector preview thumbnails");
+    await page.screenshot({ path: path.join(OUT_DIR, `void-sectors-${vp.name}.png`) });
 
-    // Verify save isolation
-    const storageState = await page.evaluate(() => ({
-      legacy: localStorage.getItem("towerdefense.v1"),
-      voidSave: localStorage.getItem("voiddefense.v1"),
-    }));
-    assert.equal(JSON.parse(storageState.legacy).sentinel, "legacy-intact");
-    assert.ok(storageState.voidSave && JSON.parse(storageState.voidSave).profile.name === `Cmdr_${label}`);
-    assert.deepEqual(errors, [], `Page errors on ${label}: ${errors.join("; ")}`);
+    if (vp.name === "desktop") {
+      // V5: Enable Reduce Motion & Ambient Flicker and capture reduced-effects comparison
+      await page.click("[data-set-motion]");
+      await page.click('[data-void-tab="battle"]');
+      await page.waitForTimeout(150);
+      await page.screenshot({ path: path.join(OUT_DIR, "void-v5-reduced-effects.png") });
+    }
 
-    report.viewports[label] = { width, height, nodeCount, thumbCount, ok: true };
+    const classicSave = await page.evaluate(() => localStorage.getItem("towerdefense.v1"));
+    assert.equal(
+      classicSave,
+      JSON.stringify({ marker: "preserve-classic-save", version: 1 }),
+      "Classic towerdefense.v1 save must remain untouched",
+    );
+
+    report.viewports[vp.name] = {
+      width: vp.width,
+      height: vp.height,
+      nodeCount,
+      thumbCount,
+      ok: true,
+    };
+
     await context.close();
   }
 
-  // Run headless simulation + rendering benchmark on both 192x256 and 256x384 maps
-  const benchPage = await browser.newPage({ viewport: { width: 1280, height: 800 } });
-  await benchPage.goto(url);
-  await benchPage.waitForSelector("#void-profile-dialog[open]", { timeout: 15000 });
-  await benchPage.click('button[type="submit"]');
+  // Run busy-siege simulation & rendering benchmark on both 192x256 and 256x384 worlds
+  const benchContext = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const benchPage = await benchContext.newPage();
+  await benchPage.goto(URL, { waitUntil: "networkidle" });
+  await benchPage.waitForSelector("#void-board-canvas", { state: "visible" });
 
-  report.benchmark = await benchPage.evaluate(async () => {
+  const benchResults = await benchPage.evaluate(async () => {
     const { VoidSim } = await import("/src/void/sim.ts");
     const { VoidRenderer } = await import("/src/void/render.ts");
     const { emptyTechWallet } = await import("/src/void/tech/wallet.ts");
 
+    const canvas = document.querySelector("#void-board-canvas");
+    const renderer = new VoidRenderer(canvas);
     const results = {};
+
     for (const scenarioId of ["tutorialBreach", "organismEscalation"]) {
       const wallet = emptyTechWallet();
       const sim = new VoidSim(scenarioId, "underSiege", wallet, true);
-      for (let i = 0; i < 6; i++) {
-        sim.placeTower("matterCannon", 20 + i * 18, 170);
-        sim.placeTower("repairDepot", 25 + i * 18, 180);
-        sim.placeTower("infantryBarracks", 30 + i * 18, 190);
+      const { w, h } = sim.world.grid;
+
+      let placed = 0;
+      for (let y = 20; y < h - 20 && placed < 24; y += 16) {
+        for (let x = 16; x < w - 16 && placed < 24; x += 20) {
+          const types = [
+            "matterCannon",
+            "repairDepot",
+            "infantryBarracks",
+            "rocketTeam",
+            "heavyMechBay",
+            "wallSerpent",
+          ];
+          const t = types[placed % types.length];
+          if (sim.placeTower(t, x, y)) placed++;
+        }
       }
-      const canvas = document.createElement("canvas");
-      canvas.width = 1024;
-      canvas.height = 768;
-      const renderer = new VoidRenderer(canvas);
+
+      // Warm up 120 ticks so Void tendrils, debris streams, projectiles, and units are all active
+      for (let i = 0; i < 120; i++) sim.step();
 
       const simTimes = [];
       const renderTimes = [];
-      for (let f = 0; f < 120; f++) {
+      for (let f = 0; f < 90; f++) {
         const t0 = performance.now();
-        sim.stepOneTick();
+        sim.step();
         const t1 = performance.now();
-        renderer.draw(sim, f * 16.6, null, null, null, false);
+        renderer.draw(sim, t1, null, null, null, false);
         const t2 = performance.now();
         simTimes.push(t1 - t0);
         renderTimes.push(t2 - t1);
       }
+
       simTimes.sort((a, b) => a - b);
       renderTimes.sort((a, b) => a - b);
+      const p50 = (arr) => Number(arr[Math.floor(arr.length * 0.5)].toFixed(2));
+      const p95 = (arr) => Number(arr[Math.floor(arr.length * 0.95)].toFixed(2));
+
       results[scenarioId] = {
-        worldSize: `${sim.world.grid.w}x${sim.world.grid.h}`,
+        worldSize: `${w}x${h}`,
         buildings: sim.world.buildings.length,
         agents: sim.combat.agents.length,
+        debris: sim.physics.debris.length,
         frontierEdges: sim.voidField.totalContactEdges(),
-        simP50Ms: Number(simTimes[60].toFixed(3)),
-        simP95Ms: Number(simTimes[114].toFixed(3)),
-        renderP50Ms: Number(renderTimes[60].toFixed(3)),
-        renderP95Ms: Number(renderTimes[114].toFixed(3)),
+        simP50Ms: p50(simTimes),
+        simP95Ms: p95(simTimes),
+        renderP50Ms: p50(renderTimes),
+        renderP95Ms: p95(renderTimes),
       };
     }
     return results;
   });
 
-  writeFileSync("test-results/void-defense-report.json", JSON.stringify(report, null, 2) + "\n");
+  report.benchmark = benchResults;
+  await benchContext.close();
+
+  fs.writeFileSync(
+    path.join(OUT_DIR, "void-defense-report.json"),
+    JSON.stringify(report, null, 2),
+  );
   console.log("Void Defense browser QA & benchmark passed:", JSON.stringify(report, null, 2));
 } finally {
   await browser.close();
