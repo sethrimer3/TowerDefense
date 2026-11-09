@@ -47,12 +47,31 @@ Tracks the ordered phases, acceptance gates, and measured browser benchmarks fro
   - Styled cyber-industrial orange/amber/steel UI vs starry midnight-violet Void (`src/void/void.css`), updated `AGENTS.md`, `CONTEXT.md`, `README.md`, `docs/architecture/void-defense.md`, and `docs/architecture/commands.md`.
   - Verified all unit tests (`npm test`), production build (`npm run build`), and browser QA & performance benchmarks (`node tests/void-defense.mjs`).
 
+## Visual Quality Recovery Milestone (`V0`–`V5`)
+
+- [x] **V0 — Reproducibility & 55.5s Run State Diagnosis**
+  - Tagged rollback snapshot `visual-recovery-pre-v1` (`2012904`).
+  - Diagnosed why `docs/void-defense/images/current-void-defense.webp` showed `99.7%` preserved at `55.5s` with `2440 / 3200` Void Reservoir: `VoidField.microWorkPerHp` had a `Math.max(100, base)` clamp combined with high cell HP (`45..240`) and low `baseGrowthRate` (`36/s`), limiting unopposed erosion to ~1 cell/s while `nodeSpawnEnergyCost` (`85`) and organism spawns drained the reservoir.
+  - Recalibrated `MATERIAL_RESISTANCE` (`street: 18, building: 30, skyscraper: 45` vs `reclaimed: 180, wall: 520, barrier: 440`) and scenario reservoirs/growth rates (`src/void/config.ts`, `src/void/maps.ts`, `src/void/void-field.ts`) so unopposed Void visibly devours city blocks while Resistance defenses and sacrificial Landfall islands contain and exhaust the reservoir.
+- [x] **V1 — Metropolitan City Composition (`test-results/void-v1-city-overview.png`)**
+  - Replaced uniform dark-gray rectangular blocks with 6 distinct architectural styles (`glassTower`, `artDecoSetback`, `cyberArcology`, `foundryComplex`, `solarTerrace`, `civicDome`), non-rectangular building footprints (L-shaped, U-courtyards, chamfered octagons, twin-tower skybridge notches), 7 rooftop features (`helipad`, `spire`, `reactorDome`, `coolingTowers`, `skyGarden`, `solarArray`, `commsArray`), multi-step directional NW drop-shadows, and detailed arterial avenues with sidewalks, streetlamps, lane dividers, and crosswalks.
+- [x] **V2 — Portal & Void Art Pass (`test-results/void-v2-portal-landfall.png`)**
+  - Built abyssal black singularity portals with concentric & tilted elliptical prismatic event-horizon rings (`#ff38b8`, `#ffd6ff`, `#48e5ff`, `#ff8c29`) and lensed star streaks.
+  - Implemented multi-octave cosmic nebula/starfield Void interior, sizzling magenta/orange frontier rims, and irregular disease-like expansion along spatial cosmic veins and street conduits.
+- [x] **V3 — Pixel-Scale Life, Action & Destructibility (`test-results/void-v3-active-battle.png`, `test-results/void-v3-closeup-zoom.png`)**
+  - Added curved inward prismatic/ember debris streamlines (`DebrisFragment`) accelerating toward active portals, expanding matter-impact `ShockwaveEffect` rings, moving `1×2` street traffic/emergency shuttles, `1×1` riflemen with muzzle flashes and laser beams, `1×2` engineers with cyan welding arcs and carried matter bricks, `2×2` heavy mechs, and parabolic Matter Cannon shells with trails.
+- [x] **V4 — Command Console Interface**
+  - Fixed `.sparks` and `.void-page` CSS selector collisions (`src/void/void.css`, `src/void/ui.ts`) that previously caused the Sparks badge to float over the canvas and background tabs to remain visible.
+  - Built a riveted gunmetal-steel & amber LED Command Console HUD with visual progress gauges (`City Preserved %` and `Void Reservoir`), custom `20×20` pixel-art mini-canvas icons (`paintCardIcon`) on every tower and strike card, and zero text overlap across desktop and mobile viewports.
+- [ ] **V5 — Standardized Visual Acceptance Captures & Benchmarks (`test-results/void-v5-reduced-effects.png`)**
+  - Captured standardized before/after and reduced-effects screenshots via `node tests/void-defense.mjs` (awaiting user visual review to close gate).
+
 ## Browser QA & Performance Benchmark Results (`tests/void-defense.mjs`)
 
-- **Viewports Verified**: Desktop (`1280×800`), Mobile Portrait (`390×844`), and Mobile Landscape (`844×390`) — all 30 tech nodes, 8 sector thumbnails, Operations canvas, and Settings tab verified with screenshots saved to `test-results/`.
-- **Standard Sector (`tutorialBreach`, `192×256`, 745 buildings, 42 agents, 100 frontier edges)**:
-  - Simulation step: `p50 = 0.4 ms`, `p95 = 0.6 ms`
-  - Canvas render: `p50 = 0.2 ms`, `p95 = 0.7 ms`
-- **Large Sector (`organismEscalation`, `256×384`, 1,494 buildings, 42 agents, 250 frontier edges)**:
-  - Simulation step: `p50 = 0.9 ms`, `p95 = 1.6 ms`
-  - Canvas render: `p50 = 0.4 ms`, `p95 = 1.3 ms`
+- **Viewports Verified**: Desktop (`1280×800`), Mobile Portrait (`390×844`), and Mobile Landscape (`844×390`) — all 33 tech nodes, 8 sector thumbnails, Operations canvas, and Settings tab verified with screenshots saved to `test-results/`.
+- **Standard Sector (`tutorialBreach`, `192×256`, 686 buildings, 40 agents, 226 debris particles, 558 frontier edges)**:
+  - Simulation step: `p50 = 0.5 ms`, `p95 = 1.0 ms`
+  - Canvas render: `p50 = 2.5 ms`, `p95 = 39.4 ms`
+- **Large Sector (`organismEscalation`, `256×384`, 1,318 buildings, 40 agents, 629 debris particles, 1,170 frontier edges)**:
+  - Simulation step: `p50 = 1.9 ms`, `p95 = 2.2 ms`
+  - Canvas render: `p50 = 8.7 ms`, `p95 = 53.9 ms`

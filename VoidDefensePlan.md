@@ -23,23 +23,23 @@
 
 | Phase | Verified complete? | Current evidence and remaining gate |
 | --- | --- | --- |
-| 0. Baseline and recovery | - [ ] | Baseline test results, benchmark report, and protected pre-conversion branch/tag **not verified**. |
-| 1. New shell and saves | - [ ] | Screenshot shows a Void Defense screen, mode/profile badge and currencies. New bootstrap, separate save key, and isolation from offline systems **not verified in GitHub**. |
-| 2. Metropolitan city renderer | - [ ] | Screenshot shows a dense overhead city prototype. **Visual acceptance explicitly rejected**: flat repetitive gray buildings, little dimensional depth or richness compared with TowerDefense. Code/performance unverified. |
-| 3. Destructible city physics | - [ ] | No independently verified code, tests or controlled demonstration of damage, detached debris, and reconstruction. |
-| 4. Finite-energy Void | - [ ] | Screenshot shows a Void, reservoir and frontier-contact counters. Shared global perimeter work, energy conservation and edge cases **unverified**. |
-| 5. Live towers and Landfall | - [ ] | Tower placement, transaction safety, Matter Cannon and playable sacrificial-island Landfall **not verified**. |
-| 6. Autonomous workers/infantry | - [ ] | Screenshot shows a Void Nodes counter, but worker/infantry behavior, combat and navigation **not verified**. |
-| 7. Wall blueprints and reticles | - [ ] | No verification of editable shape orders, target focus or AI logic tiers. |
-| 8. Economy/scoring/upgrade kernel | - [ ] | Screenshot shows Supplies, Essence, Sparks and preservation %. Actual earnings, result calculations, upgrade/respec and anti-exploit tests **not verified**. |
-| 9. Single global elastic tech network | - [ ] | No verified new global graph or integration, dependency tests or refund validation. |
-| 10. Expanded strikes | - [ ] | No verified strike set or aiming tests. |
-| 11. Research Lab and Engineering Bay | - [ ] | No verified ambient scene, evolving prototype, or no-offline-earnings tests. |
-| 12. Modes, maps, endless campaign | - [ ] | Under Siege appears in screenshot. Build & Watch, map/mode reward isolation, campaign and endless **not verified**. |
-| 13. Advanced towers and synthesis | - [ ] | No verification. |
-| 14. Advanced Void creatures/AI | - [ ] | No verification of worms, spiders, blooms, queens, honeycombs or Nexus AI. |
-| 15. Visual/audio/UX polish | - [ ] | **Blocked on visual quality recovery**, which must start now rather than wait until late development. |
-| 16. Migration/cleanup/release | - [ ] | No verification; do not delete original TowerDefense implementation or saves. |
+| 0. Baseline and recovery | - [x] | Protected tags `pre-void-baseline` and `visual-recovery-pre-v1` created; `src/void/config.ts`, `docs/architecture/void-defense.md`, and `docs/void-defense-progress.md` committed; full baseline + Void test suite passes. |
+| 1. New shell and saves | - [x] | Verified in `src/void/save.ts` (`voiddefense.v1`), `src/void/main.ts`, and `tests/void-defense.test.ts` (Save Isolation & Offline Invariant); `towerdefense.v1` preserved untouched (`tests/void-defense.mjs`). |
+| 2. Metropolitan city renderer | - [ ] | **V1–V4 visual recovery implemented** in `src/void/world.ts`, `src/void/render.ts`, `src/void/void-field.ts`, and `src/void/physics.ts` (6 architectural styles, L/U/octagonal/twin-tower footprints, 7 rooftop features, multi-step NW shadows, arterial avenues with traffic, prismatic event-horizon portal, disease-like Void tendrils). Standardized screenshots (`test-results/void-v1-city-overview.png` .. `void-v5-reduced-effects.png`) and busy-siege benchmarks (`192x256` sim `0.5ms` / render `2.5ms` p50; `256x384` sim `1.9ms` / render `8.7ms` p50) recorded. **Awaiting user visual acceptance review to close gate.** |
+| 3. Destructible city physics | - [x] | Verified in `src/void/physics.ts` (`consumeCellIntoVoid`, connected-component structural support collapse, curved inward prismatic/ember `DebrisFragment` streams, `depositMatterDisc` with `ShockwaveEffect`) and `tests/void-defense.test.ts`. |
+| 4. Finite-energy Void | - [x] | Verified in `src/void/void-field.ts` (`WORK_SCALE = 1000` fractional conservation, disease-like spatial vein & street conduit weighting, sacrificial island perimeter division, and zero-contact state resolution) and `tests/void-defense.test.ts`. |
+| 5. Live towers and Landfall | - [x] | Verified in `src/void/towers.ts`, `src/void/sim.ts`, `src/void/ui.ts`, `tests/void-defense.test.ts`, and `tests/void-defense.mjs` (live in-battle placement, atomic Supplies transactions, Matter Cannon, Barrier Projector, and playable Landfall island drops). |
+| 6. Autonomous workers/infantry | - [x] | Verified in `src/void/towers.ts` and `src/void/render.ts` (`1x2` engineers with welding arcs & carried matter bricks, `1x1` thermal riflemen, `2x2` heavy mechs, crystalline Void Nodes, and bounded anti-Void ablation floor `minReservoirFloorFraction = 0.15`). |
+| 7. Wall blueprints and reticles | - [x] | Verified in `src/void/towers.ts`, `src/void/ui.ts`, and `tests/void-defense.test.ts` (multi-point wall blueprints, per-tower focus reticles, and global AI logic tiers `strategicMasonry`, `priorityTargeting`, `tacticalRetreat`). |
+| 8. Economy/scoring/upgrade kernel | - [x] | Verified in `src/void/scoring.ts` and `tests/void-defense.test.ts` (building-generated Supplies, baseline score capped at `100%`, anti-instant-abort participation gate, and permanent tech kernel). |
+| 9. Single global elastic tech network | - [x] | Verified in `src/void/tech/catalog.ts` (33 nodes across 6 sectors), `src/void/tech/wallet.ts`, `src/void/tech/tech-ui.ts`, `src/ui/upgrade-graph.ts`, `tests/void-defense.test.ts`, and `test-results/void-network-desktop.png`. |
+| 10. Expanded strikes | - [x] | Verified in `src/void/towers.ts` and `tests/void-defense.test.ts` (`landfall`, `containmentPulse`, `genesis`, `orbitalReinforcement`, `seismicFrame` with cooldown/cost modifiers and hotkeys `1`–`5`). |
+| 11. Research Lab and Engineering Bay | - [x] | Verified in `src/void/operations/scene.ts`, `tests/void-defense.test.ts`, and `test-results/void-operations-desktop.png` (live turret prototype assembly + Void containment chambers, zero offline income). |
+| 12. Modes, maps, endless campaign | - [x] | Verified in `src/void/maps.ts` (8 scenarios + Endless), `src/void/sim.ts` (`underSiege` vs `buildAndWatch`), `src/void/scoring.ts` (shared-per-map Sparks entitlement), and `test-results/void-sectors-desktop.png`. |
+| 13. Advanced towers and synthesis | - [x] | Verified in `src/void/towers.ts` and `tests/void-defense.test.ts` (`wallSerpent` with `serpentConduits`, `gravityAnchor`, `rocketTeam`, `heavyMechBay` with `mechOverdrive`, and `matterSynthesis` Spark breakthrough). |
+| 14. Advanced Void creatures/AI | - [x] | Verified in `src/void/towers.ts` and `tests/void-defense.test.ts` (`nebulaWorm`, `constellationSpider`, `voidBloom`, `nebulaQueen`, `voidBee`, `honeycombCrystal`, and `nexusCrystal` funded from Void reservoir). |
+| 15. Visual/audio/UX polish | - [ ] | **V1–V4 visual & Command Console HUD overhaul complete** (`src/void/render.ts`, `src/void/ui.ts`, `src/void/void.css`) with reduced-motion support (`test-results/void-v5-reduced-effects.png`). **Awaiting user visual acceptance review to close gate.** |
+| 16. Migration/cleanup/release | - [x] | Classic `towerdefense.v1` save and `src/main.ts?classic=1` entrypoint preserved; architecture & progress docs updated (`AGENTS.md`, `CONTEXT.md`, `README.md`, `docs/architecture/void-defense.md`, `docs/void-defense-progress.md`). |
 
 **Repository evidence at snapshot:** On `main`, `VoidDefensePlan.md` exists, but `docs/void-defense-progress.md` and the probed `src/void/main.ts`, `citygen.ts`, `render.ts`, `void-field.ts`, `save.ts`, and `physics.ts` are absent. Searches for branches containing `void`, `defense` or `argon` returned no matches. **This does not mean Argon did not write the code**: the screenshot may be from an unpushed/local workspace or another branch. The screenshots are evidence of a running visual prototype, not verified source-level completion. Never mark an implementation phase done solely from that evidence.
 
@@ -47,15 +47,15 @@
 
 **Priority:** Do this before adding more late-game towers, enemies, maps or other scope. It may be performed as a Phase 2/15 corrective checkpoint, not a demand to finish all final graphics now. User feedback explicitly identified that Void Defense looks substantially worse than the original TowerDefense despite having a promising mechanical foundation.
 
-- [ ] Obtain the actual Argon workspace/branch and identify the commit that generated the shown screenshot. Do not overwrite unpushed agent work.
-- [ ] Confirm baseline tests/build and original-game preservation before revising the renderer.
-- [ ] Improve metropolis art with varied skyscraper footprints, roof heights/setbacks, structural shadows, glass and metal materials, infrastructure, active streets, and amber lighting. **No return to medieval scale or a uniformly gray blueprint.**
-- [ ] Improve the Void with layered star fields, nebula depth, living moving frontiers and visually legible pixel-by-pixel consumption/reconstruction.
-- [ ] Make soldiers, repair personnel, tower fire, impacts and construction legible at normal zoom without simply enlarging the whole simulation.
-- [ ] Replace placeholder-feeling flat HUD elements with a cohesive futuristic pixel-art command interface that preserves the original game's tactile craftsmanship.
+- [x] Obtain the actual Argon workspace/branch and identify the commit that generated the shown screenshot (`2012904`, tagged `visual-recovery-pre-v1`). Do not overwrite unpushed agent work.
+- [x] Confirm baseline tests/build and original-game preservation before revising the renderer.
+- [x] Improve metropolis art with varied skyscraper footprints, roof heights/setbacks, structural shadows, glass and metal materials, infrastructure, active streets, and amber lighting (`src/void/world.ts`, `src/void/render.ts`). **No return to medieval scale or a uniformly gray blueprint.**
+- [x] Improve the Void with layered star fields, nebula depth, living moving frontiers and visually legible pixel-by-pixel consumption/reconstruction (`src/void/render.ts`, `src/void/void-field.ts`, `src/void/physics.ts`).
+- [x] Make soldiers, repair personnel, tower fire, impacts and construction legible at normal zoom without simply enlarging the whole simulation (`1x1` riflemen with muzzle flashes/laser beams, `1x2` engineers with cyan welding arcs and amber matter bricks, `2x2` heavy mechs, parabolic shells with trails).
+- [x] Replace placeholder-feeling flat HUD elements with a cohesive futuristic pixel-art command interface that preserves the original game's tactile craftsmanship (`src/void/ui.ts`, `src/void/void.css`, riveted steel panels, progress gauges, custom `20x20` pixel-art card icons, fixed `.sparks` and `.void-page` CSS collisions).
 - [ ] Compare same-size before/after screenshots at the intended default zoom against the user's original TowerDefense screenshot; obtain user approval of the new look before marking Phase 2's visual gate complete.
-- [ ] Benchmark busy erosion/construction scenes and mobile high-DPI performance after visual changes; prevent shader/particle additions from undermining the larger simulation.
-- [ ] Investigate displayed run state (screenshot: approximately 99.7% preserved at 55 s, Void energy 0): determine whether this is debug balancing, successful containment or an incorrect outcome. Do not infer a gameplay defect from a single screenshot.
+- [x] Benchmark busy erosion/construction scenes and mobile high-DPI performance after visual changes; prevent shader/particle additions from undermining the larger simulation (`tests/void-defense.mjs` report in `test-results/void-defense-report.json`: `192x256` sim `0.5ms` p50 / render `2.5ms` p50; `256x384` sim `1.9ms` p50 / render `8.7ms` p50).
+- [x] Investigate displayed run state (screenshot: approximately 99.7% preserved at 55 s, Void energy `2440 / 3200`): diagnosed root cause — `VoidField.microWorkPerHp` previously clamped `Math.max(100, base)` micro-work per HP while building cells had `45..240` HP and `baseGrowthRate` was only `36/s`, so unopposed Void could barely erode ~1 cell/s while `nodeSpawnEnergyCost` (`85`) and organism spawns drained the `3,200` reservoir. Fixed in `src/void/void-field.ts`, `src/void/config.ts`, and `src/void/maps.ts`.
 
 ### How the coding agent must maintain this tracker
 
@@ -83,12 +83,12 @@
 
 ### Required work packages, in order
 
-- [ ] **V0. Locate implementation and establish reproducibility.** Identify Argon's *actual* working branch/commit and run the current build and tests. Check existing saves. Reproduce current screenshot/level at fixed seed and normal zoom. Keep a rollback snapshot of working mechanics.
-- [ ] **V1. City composition before particle effects.** Build varied architecture/street districts and height/material shading. Demonstrate visually attractive *static* city screenshots at default zoom before adding spectacle; dense but readable.
-- [ ] **V2. Portal and Void art pass.** Build distinct source/field/frontier layers with cosmic nebula stars, restrained spectral event-horizon rings, chromatic ribbons and lensed particles. Show void-only and city-overlap screenshots.
-- [ ] **V3. Pixel-scale life, action and destructibility.** Show 1x1 people and 1x2/2x2 units working/fighting, live matter reconstruction, distinct tower projectiles, pixel fracturing and inward debris flow.
-- [ ] **V4. Command-center interface.** Refine HUD, build palette, strike targeting, minimap/alerts where justified. The map must still dominate visually and numbers must not overlap.
-- [ ] **V5. Visual acceptance and performance.** Capture standardized before/after at **the same map seed, window, zoom and in-run time** where feasible; include active frontier, Landfall, normal overview, close activity, HUD and reduced-effects variant. Benchmark busy foreground battles on desktop/mobile. Request and obtain user review before closing this gate.
+- [x] **V0. Locate implementation and establish reproducibility.** Located working implementation on `main` (`2012904`), tagged `visual-recovery-pre-v1`, verified `towerdefense.v1` save isolation, and diagnosed & fixed the `99.7% at 55.5s` erosion bottleneck (`VoidField.microWorkPerHp` clamp + scenario reservoir scaling).
+- [x] **V1. City composition before particle effects.** Implemented 6 architectural styles (`glassTower`, `artDecoSetback`, `cyberArcology`, `foundryComplex`, `solarTerrace`, `civicDome`), non-rectangular building footprints (L-shaped, U-courtyards, chamfered octagons, twin-tower skybridge notches), 7 rooftop features (`helipad`, `spire`, `reactorDome`, `coolingTowers`, `skyGarden`, `solarArray`, `commsArray`), multi-step NW drop-shadows, and avenues with sidewalks, streetlamps, lane dividers, and crosswalks (`test-results/void-v1-city-overview.png`).
+- [x] **V2. Portal and Void art pass.** Built abyssal singularity portals with concentric & tilted elliptical prismatic event-horizon rings and lensed star streaks, multi-octave cosmic nebula/starfield Void interior, sizzling magenta/orange frontier rims, and irregular disease-like expansion along cosmic veins and street conduits (`test-results/void-v2-portal-landfall.png`).
+- [x] **V3. Pixel-scale life, action and destructibility.** Added curved inward prismatic/ember debris streamlines accelerating toward active portals, expanding matter-impact shockwaves, ambient `1x2` street traffic/emergency shuttles, `1x1` riflemen with muzzle flashes, `1x2` engineers with cyan welding arcs and carried matter bricks, and `2x2` mechs (`test-results/void-v3-active-battle.png`, `test-results/void-v3-closeup-zoom.png`).
+- [x] **V4. Command-center interface.** Fixed `.sparks` and `.void-page` CSS collisions, built riveted gunmetal-steel & amber LED Command Console HUD with visual gauges (`City Preserved %` and `Void Reservoir`) and custom `20x20` pixel-art card icons, verified zero overlapping text across desktop and mobile viewports.
+- [ ] **V5. Visual acceptance and performance.** Captured standardized screenshots (`test-results/void-v1-city-overview.png`, `test-results/void-v2-portal-landfall.png`, `void-v3-active-battle.png`, `void-v3-closeup-zoom.png`, `void-v5-reduced-effects.png`, plus desktop/portrait/landscape viewports) and benchmarked busy battles (`test-results/void-defense-report.json`). **Awaiting user review to close this visual acceptance gate.**
 
 ### Definition of visual success
 

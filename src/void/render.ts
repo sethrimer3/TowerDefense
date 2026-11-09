@@ -1137,14 +1137,14 @@ export class VoidRenderer {
       if (preview.kind === "tower") {
         const spec = TOWER_SPECS[preview.type];
         c.fillStyle = preview.valid ? "rgba(255, 174, 56, 0.48)" : "rgba(255, 68, 68, 0.48)";
-        c.fillRect(preview.x, preview.y, spec.footprint, spec.footprint);
+        c.fillRect(preview.x, preview.y, spec.w, spec.h);
         c.strokeStyle = preview.valid ? "#ffbe3b" : "#ff4444";
         c.lineWidth = 0.35;
-        c.strokeRect(preview.x, preview.y, spec.footprint, spec.footprint);
+        c.strokeRect(preview.x, preview.y, spec.w, spec.h);
         c.beginPath();
         c.arc(
-          preview.x + spec.footprint * 0.5,
-          preview.y + spec.footprint * 0.5,
+          preview.x + spec.w * 0.5,
+          preview.y + spec.h * 0.5,
           spec.range,
           0,
           Math.PI * 2,
@@ -1177,17 +1177,9 @@ export class VoidRenderer {
 
     // 16. Touch/drag magnifying glass (`Loupe`)
     if (showMagnifier && pointerForLoupe) {
-      const r = this.canvas.getBoundingClientRect();
-      this.loupe.draw(
-        this.canvas,
-        r,
-        pointerForLoupe.clientX,
-        pointerForLoupe.clientY,
-        pointerForLoupe.cellX,
-        pointerForLoupe.cellY,
-        this.px,
-        this.cam,
-      );
+      const pt = { x: pointerForLoupe.clientX, y: pointerForLoupe.clientY };
+      this.loupe.show(pt, pt);
+      this.loupe.draw(this.canvas);
     } else {
       this.loupe.hide();
     }
