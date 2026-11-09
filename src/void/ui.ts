@@ -22,10 +22,129 @@ import { STRIKE_SPECS, TOWER_SPECS } from "./towers.ts";
 
 export type VoidTab = "battle" | "network" | "operations" | "sectors";
 
+/** Paints a crisp 20x20 pixel-art icon for each tower, strike, or blueprint card. */
+function paintCardIcon(canvas: HTMLCanvasElement, kind: string): void {
+  const c = canvas.getContext("2d")!;
+  c.clearRect(0, 0, 20, 20);
+  c.imageSmoothingEnabled = false;
+
+  // Base gunmetal plate
+  c.fillStyle = "#161d29";
+  c.fillRect(1, 1, 18, 18);
+  c.strokeStyle = "#3a4860";
+  c.lineWidth = 1;
+  c.strokeRect(1.5, 1.5, 17, 17);
+
+  switch (kind) {
+    case "matterCannon":
+      c.fillStyle = "#526075";
+      c.fillRect(4, 11, 12, 5);
+      c.fillStyle = "#ff9e38";
+      c.fillRect(6, 6, 8, 6);
+      c.fillStyle = "#ffd166";
+      c.fillRect(8, 3, 4, 4);
+      break;
+    case "repairDepot":
+      c.fillStyle = "#3d526b";
+      c.fillRect(4, 5, 12, 11);
+      c.fillStyle = "#ffd15c";
+      c.fillRect(9, 6, 2, 8);
+      c.fillRect(6, 9, 8, 2);
+      break;
+    case "infantryBarracks":
+      c.fillStyle = "#4a3228";
+      c.fillRect(4, 9, 12, 7);
+      c.fillStyle = "#ff7b24";
+      c.fillRect(5, 5, 3, 5);
+      c.fillRect(9, 4, 3, 6);
+      c.fillRect(13, 5, 3, 5);
+      break;
+    case "constructorHub":
+      c.fillStyle = "#48586e";
+      c.fillRect(4, 12, 12, 4);
+      c.fillStyle = "#ffbe3b";
+      c.fillRect(6, 4, 2, 9);
+      c.fillRect(6, 4, 9, 2);
+      c.fillStyle = "#48e5ff";
+      c.fillRect(13, 7, 3, 3);
+      break;
+    case "shieldProjector":
+      c.strokeStyle = "#48e5ff";
+      c.lineWidth = 1.5;
+      c.beginPath();
+      c.arc(10, 10, 6, 0, Math.PI * 2);
+      c.stroke();
+      c.fillStyle = "#7afcff";
+      c.fillRect(8, 8, 4, 4);
+      break;
+    case "wallSerpent":
+      c.fillStyle = "#48e5ff";
+      c.fillRect(4, 13, 4, 3);
+      c.fillRect(7, 9, 4, 4);
+      c.fillRect(10, 5, 5, 4);
+      c.fillStyle = "#ffd166";
+      c.fillRect(13, 4, 3, 3);
+      break;
+    case "gravityAnchor":
+      c.fillStyle = "#6c88ff";
+      c.fillRect(7, 4, 6, 12);
+      c.fillStyle = "#b8c8ff";
+      c.fillRect(4, 8, 12, 4);
+      break;
+    case "rocketTeam":
+      c.fillStyle = "#ff6b2b";
+      c.fillRect(8, 4, 4, 9);
+      c.fillStyle = "#ffd166";
+      c.fillRect(6, 13, 8, 3);
+      break;
+    case "heavyMechBay":
+      c.fillStyle = "#ff9e30";
+      c.fillRect(5, 4, 10, 10);
+      c.fillStyle = "#263244";
+      c.fillRect(7, 6, 6, 5);
+      c.fillStyle = "#48e5ff";
+      c.fillRect(8, 7, 4, 2);
+      break;
+    case "blueprint":
+      c.strokeStyle = "#ffbe3b";
+      c.lineWidth = 1.5;
+      c.beginPath();
+      c.moveTo(4, 14);
+      c.lineTo(9, 6);
+      c.lineTo(16, 11);
+      c.stroke();
+      c.fillStyle = "#ffffff";
+      c.fillRect(3, 13, 3, 3);
+      c.fillRect(8, 5, 3, 3);
+      c.fillRect(14, 10, 3, 3);
+      break;
+    case "landfall":
+    case "genesis":
+      c.fillStyle = "#59166e";
+      c.fillRect(3, 3, 14, 14);
+      c.fillStyle = "#ff9e38";
+      c.fillRect(6, 6, 8, 8);
+      c.fillStyle = "#ffd166";
+      c.fillRect(8, 8, 4, 4);
+      break;
+    case "containmentPulse":
+      c.strokeStyle = "#48e5ff";
+      c.lineWidth = 1.5;
+      c.strokeRect(4, 4, 12, 12);
+      c.fillStyle = "#ff42b8";
+      c.fillRect(8, 8, 4, 4);
+      break;
+    default:
+      c.fillStyle = "#ff9e38";
+      c.fillRect(6, 6, 8, 8);
+      break;
+  }
+}
+
 export class VoidApp {
   private tab: VoidTab = "battle";
   sim: VoidSim;
-  private renderer!: VoidRenderer;
+  renderer!: VoidRenderer;
   private techView!: VoidTechTreeView;
   private opsView!: ResistanceOperationsView;
 
@@ -66,23 +185,26 @@ export class VoidApp {
       <main class="void-shell">
         <header class="void-topbar">
           <div class="void-brand">
-            <span class="void-emblem">◈</span>
+            <span class="void-emblem" aria-hidden="true"></span>
             <div>
               <strong>VOID DEFENSE</strong>
               <small data-top-scenario></small>
             </div>
           </div>
           <div class="void-currencies">
-            <div class="void-curr supplies" title="Supplies: runtime construction & strike resource earned from surviving city blocks">
-              <span>⚡ Supplies</span>
+            <div class="void-curr void-curr--supplies" title="Supplies: runtime construction & strike resource earned from surviving city blocks">
+              <i class="void-curr-gem void-curr-gem--supplies" aria-hidden="true"></i>
+              <span>Supplies</span>
               <b data-curr-supplies>0</b>
             </div>
-            <div class="void-curr essence" title="Void Essence: repeatable between-run technology resource">
-              <span>❖ Essence</span>
+            <div class="void-curr void-curr--essence" title="Void Essence: repeatable between-run technology resource">
+              <i class="void-curr-gem void-curr-gem--essence" aria-hidden="true"></i>
+              <span>Essence</span>
               <b data-curr-essence>0</b>
             </div>
-            <div class="void-curr sparks" title="Sparks of Defiance: rare milestone breakthroughs (1 shared entitlement per sector)">
-              <span>★ Sparks</span>
+            <div class="void-curr void-curr--sparks" title="Sparks of Defiance: rare milestone breakthroughs (1 shared entitlement per sector)">
+              <i class="void-curr-gem void-curr-gem--sparks" aria-hidden="true"></i>
+              <span>Sparks</span>
               <b data-curr-sparks>0</b>
             </div>
           </div>
@@ -96,29 +218,36 @@ export class VoidApp {
             <div class="void-inspector" data-tower-inspector hidden></div>
             <div class="void-outcome-banner" data-outcome-banner hidden></div>
           </div>
-          <footer class="void-battle-dock">
-            <div class="void-palette" data-tower-palette></div>
-            <div class="void-strikes" data-strike-palette></div>
+          <div class="void-battle-dock" role="toolbar" aria-label="Tactical Deployment Console">
+            <div class="void-dock-group">
+              <span class="void-dock-label">TOWERS</span>
+              <div class="void-palette" data-tower-palette></div>
+            </div>
+            <div class="void-dock-group">
+              <span class="void-dock-label">ORBITAL STRIKES</span>
+              <div class="void-strikes" data-strike-palette></div>
+            </div>
             <div class="void-run-controls" data-run-controls></div>
-          </footer>
+          </div>
         </section>
 
         <section id="void-page-network" class="void-page"></section>
         <section id="void-page-operations" class="void-page"></section>
         <section id="void-page-sectors" class="void-page"></section>
 
-        <nav class="void-nav" aria-label="Resistance Navigation">
-          <button type="button" data-void-tab="battle" class="selected">⚔ Defense Feed</button>
-          <button type="button" data-void-tab="network">◈ Global Tech Network</button>
-          <button type="button" data-void-tab="operations">⚙ Resistance Ops</button>
-          <button type="button" data-void-tab="sectors">🗺 Sectors & Mode</button>
-        </nav>
+        <div class="void-nav" role="tablist" aria-label="Resistance Navigation">
+          <button type="button" data-void-tab="battle" class="selected">Defense Feed</button>
+          <button type="button" data-void-tab="network">Global Tech Network</button>
+          <button type="button" data-void-tab="operations">Resistance Ops</button>
+          <button type="button" data-void-tab="sectors">Sectors & Mode</button>
+        </div>
       </main>
       <dialog id="void-profile-dialog" class="void-dialog"></dialog>
     `;
 
     const canvas = this.root.querySelector<HTMLCanvasElement>("#void-board-canvas")!;
     this.renderer = new VoidRenderer(canvas);
+    this.renderer.reduceEffects = this.save.settings.reduceMotion;
     this.bindBoardPointers(canvas);
 
     this.techView = new VoidTechTreeView(
@@ -167,7 +296,11 @@ export class VoidApp {
       const idx = Number(e.key) - 1;
       if (idx >= 0 && idx < strikeOrder.length) {
         const s = strikeOrder[idx];
-        if (this.sim.tech.unlockedStrikes.has(s) && this.sim.combat.strikeCooldowns[s] <= 0 && this.sim.phase === "battle") {
+        if (
+          this.sim.tech.unlockedStrikes.has(s) &&
+          this.sim.combat.strikeCooldowns[s] <= 0 &&
+          this.sim.phase === "battle"
+        ) {
           this.activeTool =
             this.activeTool.kind === "castStrike" && this.activeTool.strike === s
               ? { kind: "none" }
@@ -212,6 +345,7 @@ export class VoidApp {
     this.selectedTowerUid = null;
     this.activeTool = { kind: "none" };
     this.hoverPreview = null;
+    this.renderer.reduceEffects = this.save.settings.reduceMotion;
     this.renderer.resetCam(this.sim.world.grid.w, this.sim.world.grid.h);
     this.persist();
     this.renderPalette();
@@ -396,7 +530,6 @@ export class VoidApp {
       return;
     }
 
-    // Default tap: select tower under cursor or clear selection (generous 2.5-cell hitbox around tower center for tiny sprites)
     if (this.sim.world.grid.inBounds(cx, cy)) {
       let uid = this.sim.world.towerAt[this.sim.world.grid.index(cx, cy)];
       if (uid < 0) {
@@ -431,9 +564,9 @@ export class VoidApp {
             <button type="button" class="void-pal-btn ${active ? "selected" : ""}" data-pick-tower="${type}" ${
               lockedByMode ? "disabled" : ""
             } title="${spec.name}: ${spec.description}">
-              <span class="void-pal-swatch" style="background:${spec.color}"></span>
+              <canvas class="void-card-icon" width="20" height="20" data-card-icon="${type}"></canvas>
               <b>${spec.shortName}</b>
-              <small>${price}⚡</small>
+              <small>${price} SUP</small>
             </button>
           `;
         })
@@ -441,7 +574,7 @@ export class VoidApp {
       `<button type="button" class="void-pal-btn ${
         this.activeTool.kind === "drawBlueprint" ? "selected" : ""
       }" data-pick-blueprint title="Draw a polyline wall blueprint for your 1x2 Engineers to construct">
-        <span class="void-pal-swatch" style="background:#9ea7b0"></span>
+        <canvas class="void-card-icon" width="20" height="20" data-card-icon="blueprint"></canvas>
         <b>Wall Plan</b>
         <small>Draw</small>
       </button>`;
@@ -481,19 +614,19 @@ export class VoidApp {
 
     const unlockedStrikes = [...this.sim.tech.unlockedStrikes];
     strikePal.innerHTML = unlockedStrikes
-      .map((s) => {
+      .map((s, idx) => {
         const spec = STRIKE_SPECS[s];
         const price = this.sim.strikePrice(s);
         const cd = Math.ceil(this.sim.combat.strikeCooldowns[s]);
         const active =
           this.activeTool.kind === "castStrike" && this.activeTool.strike === s;
         return `
-          <button type="button" class="void-pal-btn strike ${active ? "selected" : ""}" data-pick-strike="${s}" ${
+          <button type="button" class="void-pal-btn void-pal-btn--strike ${active ? "selected" : ""}" data-pick-strike="${s}" ${
             cd > 0 || this.sim.phase !== "battle" ? "disabled" : ""
-          } title="${spec.name}: ${spec.description}">
-            <span class="void-pal-swatch" style="background:${spec.color}"></span>
+          } title="${spec.name} [Hotkey ${idx + 1}]: ${spec.description}">
+            <canvas class="void-card-icon" width="20" height="20" data-card-icon="${s}"></canvas>
             <b>${spec.shortName}</b>
-            <small>${cd > 0 ? `${cd}s` : `${price}⚡`}</small>
+            <small>${cd > 0 ? `${cd}s` : `${price} SUP`}</small>
           </button>
         `;
       })
@@ -518,17 +651,20 @@ export class VoidApp {
         if (e.button === 0 && !btn.disabled) startStrikePick(true, e);
       };
     });
+
+    this.root.querySelectorAll<HTMLCanvasElement>("[data-card-icon]").forEach((c) => {
+      paintCardIcon(c, c.dataset.cardIcon || "");
+    });
   }
 
   refreshHUD(): void {
     const avail = availableCurrencies(this.save.wallet);
     this.root.querySelector("[data-top-scenario]")!.textContent =
-      `${this.sim.scenario.name} · ${this.sim.mode === "underSiege" ? "Build Under Siege" : "Build & Watch"}`;
+      `${this.sim.scenario.name} - ${this.sim.mode === "underSiege" ? "Build Under Siege" : "Build & Watch"}`;
     this.root.querySelector("[data-curr-supplies]")!.textContent = String(Math.floor(this.sim.supplies));
     this.root.querySelector("[data-curr-essence]")!.textContent = String(avail.essence);
     this.root.querySelector("[data-curr-sparks]")!.textContent = `${avail.sparks} / ${totalEarnedSparks(this.save.wallet)}`;
 
-    // Profile bar
     const profBar = this.root.querySelector<HTMLElement>("[data-profile-bar]")!;
     const p = this.save.profile;
     profBar.innerHTML = p
@@ -537,18 +673,29 @@ export class VoidApp {
     profBar.querySelector<HTMLButtonElement>("[data-edit-profile]")!.onclick = () =>
       this.openProfileDialog(false);
 
-    // Battle status bar
+    // Tactical Telemetry Bar with visual progress gauges
     const { preservedPercent } = this.sim.world.computePreservedBaseline();
-    const energyText = Number.isFinite(this.sim.voidField.energyRemaining)
+    const isFiniteVoid = Number.isFinite(this.sim.voidField.energyRemaining);
+    const energyPct = isFiniteVoid
+      ? Math.max(0, Math.min(100, (this.sim.voidField.energyRemaining / Math.max(1, this.sim.voidField.initialEnergy)) * 100))
+      : 100;
+    const energyText = isFiniteVoid
       ? `${Math.ceil(this.sim.voidField.energyRemaining)} / ${this.sim.voidField.initialEnergy}`
-      : "∞ (Endless)";
+      : "Endless";
     const statusEl = this.root.querySelector<HTMLElement>("[data-battle-status]")!;
     statusEl.innerHTML = `
-      <span>City Preserved: <b>${preservedPercent.toFixed(1)}%</b></span>
-      <span>Void Reservoir: <b>${energyText}</b></span>
-      <span>Frontier Contacts: <b>${this.sim.voidField.totalContactEdges()}</b></span>
-      <span>Void Nodes: <b>${this.sim.voidField.nodes.length}</b></span>
-      <span>Time: <b>${this.sim.elapsedSeconds.toFixed(1)}s</b></span>
+      <div class="void-stat-module">
+        <span>City Preserved: <b>${preservedPercent.toFixed(1)}%</b></span>
+        <span class="void-gauge"><i style="width:${preservedPercent.toFixed(1)}%"></i></span>
+      </div>
+      <div class="void-stat-module">
+        <span>Void Reservoir: <b>${energyText}</b></span>
+        <span class="void-gauge void-gauge--void"><i style="width:${energyPct.toFixed(1)}%"></i></span>
+      </div>
+      <div class="void-stat-pill">Frontier Contacts: <b>${this.sim.voidField.totalContactEdges()}</b></div>
+      <div class="void-stat-pill">Void Nodes: <b>${this.sim.voidField.nodes.length}</b></div>
+      <div class="void-stat-pill">Units: <b>${this.sim.combat.agents.length}</b></div>
+      <div class="void-stat-pill">Time: <b>${this.sim.elapsedSeconds.toFixed(1)}s</b></div>
     `;
 
     // Run controls
@@ -556,11 +703,11 @@ export class VoidApp {
     ctrlEl.innerHTML = `
       ${
         this.sim.phase === "prep"
-          ? `<button type="button" class="primary-btn" data-start-battle>▶ Unleash Void (Start Watch)</button>`
-          : `<button type="button" data-toggle-pause>${this.sim.paused ? "▶ Resume" : "⏸ Pause"}</button>`
+          ? `<button type="button" class="primary-btn" data-start-battle>Unleash Void (Start Watch)</button>`
+          : `<button type="button" data-toggle-pause>${this.sim.paused ? "Resume" : "Pause"}</button>`
       }
-      <button type="button" data-cycle-speed>${this.sim.speed}× Speed</button>
-      <button type="button" data-retry-run>↻ Retry</button>
+      <button type="button" data-cycle-speed>${this.sim.speed}x Speed</button>
+      <button type="button" data-retry-run>Retry</button>
     `;
 
     const startBtn = ctrlEl.querySelector<HTMLButtonElement>("[data-start-battle]");
@@ -618,9 +765,9 @@ export class VoidApp {
     insp.innerHTML = `
       <strong>${spec.name} #${t.uid}</strong>
       <span>HP: ${Math.ceil(t.hp)}/${t.maxHp}</span>
-      <button type="button" data-insp-reticle>⊕ Set Focus Reticle</button>
-      <button type="button" data-insp-sell class="danger-btn" ${canModify ? "" : "disabled"}>Sell (+${refund}⚡)</button>
-      <button type="button" data-insp-close>✕</button>
+      <button type="button" data-insp-reticle>Set Focus Reticle</button>
+      <button type="button" data-insp-sell class="danger-btn" ${canModify ? "" : "disabled"}>Sell (+${refund} SUP)</button>
+      <button type="button" data-insp-close>X</button>
     `;
     insp.querySelector<HTMLButtonElement>("[data-insp-reticle]")!.onclick = () => {
       this.activeTool = { kind: "setReticle", towerUid: t.uid };
@@ -644,11 +791,11 @@ export class VoidApp {
       return;
     }
     banner.hidden = false;
-    const title = outcome.status === "won" ? "BREACH CONTAINED — VICTORY" : "METROPOLIS LOST — DEFEAT";
+    const title = outcome.status === "won" ? "BREACH CONTAINED - VICTORY" : "METROPOLIS LOST - DEFEAT";
     banner.innerHTML = `
       <h2>${title}</h2>
-      <p>Original City Preserved: <b>${outcome.preservedPercent.toFixed(1)}%</b> · Duration: <b>${outcome.elapsedSeconds}s</b></p>
-      <p>Rewards Earned: <b>+${outcome.voidEssenceAwarded} ❖ Void Essence</b> · <b>+${outcome.sparksAwarded} ★ Sparks of Defiance</b> (Tier ${outcome.sparksTier}/3)</p>
+      <p>Original City Preserved: <b>${outcome.preservedPercent.toFixed(1)}%</b> - Duration: <b>${outcome.elapsedSeconds}s</b></p>
+      <p>Rewards Earned: <b>+${outcome.voidEssenceAwarded} Void Essence</b> - <b>+${outcome.sparksAwarded} Sparks of Defiance</b> (Tier ${outcome.sparksTier}/3)</p>
       ${
         !outcome.participated && outcome.status === "lost"
           ? `<small class="void-warn">Instant abort / zero defense activity detected: meaningful participation is required to harvest Void Essence on defeat.</small>`
@@ -683,7 +830,7 @@ export class VoidApp {
               <p>Prepare your defenses beforehand with a fixed starting budget, then unleash the Void and watch your containment plan unfold.</p>
             </button>
           </div>
-          <small>Note: Best survival percentages and attempt counts are tracked separately per mode. Each sector has <b>one shared Sparks of Defiance entitlement</b> (up to 3 ★), equal to the highest tier reached in either mode.</small>
+          <small>Note: Best survival percentages and attempt counts are tracked separately per mode. Each sector has <b>one shared Sparks of Defiance entitlement</b> (up to 3 Sparks), equal to the highest tier reached in either mode.</small>
         </section>
 
         <section class="void-sector-list">
@@ -698,7 +845,7 @@ export class VoidApp {
                 <article class="void-sector-card ${this.save.selectedScenario === sc.id ? "active" : ""}">
                   <header>
                     <strong>${sc.name}</strong>
-                    <span class="void-sector-stars">${sc.endless ? "∞" : "★".repeat(stars) + "☆".repeat(3 - stars)}</span>
+                    <span class="void-sector-stars">${sc.endless ? "ENDLESS" : `${stars}/3 SPARKS`}</span>
                   </header>
                   <canvas class="void-sector-thumb" width="96" height="54" data-sector-thumb="${sc.id}"></canvas>
                   <p>${sc.subtitle}</p>
@@ -727,7 +874,7 @@ export class VoidApp {
         </section>
         ${
           this.onSwitchToClassic
-            ? `<footer class="void-classic-switch"><button type="button" data-open-classic>Switch to Classic Medieval TowerDefense (Legacy Save Intact)</button></footer>`
+            ? `<div class="void-classic-switch"><button type="button" data-open-classic>Switch to Classic Medieval TowerDefense (Legacy Save Intact)</button></div>`
             : ""
         }
       </div>
@@ -743,6 +890,7 @@ export class VoidApp {
     };
     secPage.querySelector<HTMLInputElement>("[data-set-motion]")!.onchange = (e) => {
       this.save.settings.reduceMotion = (e.target as HTMLInputElement).checked;
+      this.renderer.reduceEffects = this.save.settings.reduceMotion;
       this.persist();
     };
     secPage.querySelector<HTMLInputElement>("[data-set-dev]")!.onchange = (e) => {
@@ -771,26 +919,29 @@ export class VoidApp {
       const sc = SCENARIOS.find((s) => s.id === scId);
       if (!sc) return;
       const c = canvas.getContext("2d")!;
-      c.fillStyle = "#141924";
+      c.fillStyle = "#121824";
       c.fillRect(0, 0, 96, 54);
-      // Draw stylized metropolitan avenues & blocks
-      c.fillStyle = "#262f3f";
+      // Draw stylized metropolitan avenues & multi-hue skyscrapers
       for (let y = 4; y < 50; y += 10) {
         for (let x = 4; x < 92; x += 14) {
+          c.fillStyle = (x + y) % 3 === 0 ? "#2b4a6b" : "#4a3d33";
           c.fillRect(x, y, 11, 7);
+          c.fillStyle = "#ffbe55";
+          c.fillRect(x + 2, y + 2, 2, 1);
+          c.fillRect(x + 6, y + 4, 2, 1);
         }
       }
-      // Draw portal breach craters
+      // Draw portal breach craters with prismatic rings
       for (const p of sc.portals) {
         const px = Math.round(p.xFrac * 96);
         const py = Math.round(p.yFrac * 54);
-        const r = Math.max(4, Math.round((p.radius / sc.worldW) * 96));
-        c.fillStyle = p.activateAtSeconds > 0 ? "rgba(255, 120, 50, 0.35)" : "#0b0719";
+        const r = Math.max(5, Math.round((p.radius / sc.worldW) * 96));
+        c.fillStyle = p.activateAtSeconds > 0 ? "rgba(255, 120, 50, 0.35)" : "#04020a";
         c.beginPath();
         c.arc(px, py, r, 0, Math.PI * 2);
         c.fill();
-        c.strokeStyle = p.activateAtSeconds > 0 ? "#ff7733" : "#b85cff";
-        c.lineWidth = 1.2;
+        c.strokeStyle = p.activateAtSeconds > 0 ? "#ff8c29" : "#ff38b8";
+        c.lineWidth = 1.4;
         c.stroke();
       }
     });
@@ -824,9 +975,9 @@ export class VoidApp {
             <p>Prepare your defenses, then unleash the Void and watch the battle unfold. A calmer planning-focused experience.</p>
           </button>
         </fieldset>
-        <footer>
+        <div class="void-dialog-actions">
           <button type="submit" class="primary-btn">Confirm & Enter Command</button>
-        </footer>
+        </div>
       </form>
     `;
 
