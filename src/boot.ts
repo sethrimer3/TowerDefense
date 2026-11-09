@@ -38,13 +38,26 @@ async function boot() {
     // Give the wall a painted frame before evaluating the game's larger modules.
     // A hidden tab runs no animation frames, so a timer stands in for them.
     await within(new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))), 200, undefined);
-    const game = await import("./main.ts");
-    await within(document.fonts.ready.then(() => undefined, () => undefined), FONT_WAIT_MS, undefined);
-    await loading.complete();
-    started = true;
-    clearTimeout(slow);
-    clearTimeout(stall);
-    game.startGame();
+    const useClassic = new URLSearchParams(location.search).get("classic") === "1";
+    if (useClassic) {
+      const game = await import("./main.ts");
+      await within(document.fonts.ready.then(() => undefined, () => undefined), FONT_WAIT_MS, undefined);
+      await loading.complete();
+      started = true;
+      clearTimeout(slow);
+      clearTimeout(stall);
+      game.startGame();
+    } else {
+      const voidGame = await import("./void/main.ts");
+      await within(document.fonts.ready.then(() => undefined, () => undefined), FONT_WAIT_MS, undefined);
+      await loading.complete();
+      started = true;
+      clearTimeout(slow);
+      clearTimeout(stall);
+      voidGame.startVoidGame(() => {
+        location.search = "?classic=1";
+      });
+    }
   } catch (error) {
     console.error("Game startup failed", error);
     if (started) return;

@@ -116,10 +116,17 @@ export class UpgradeGraph {
   private minS = 0.2;
   private drag: { id: string; pointer: number; x0: number; y0: number; moved: boolean; pan?: { x: number; y: number } } | null = null;
   private pinch = new Map<number, { x: number; y: number }>();
+  private secondaryEdges: readonly [string, string][] = [];
 
   constructor(
     host: HTMLElement,
-    private readonly opts: { reduceMotion: () => boolean; onPick: (id: string) => void; paint: (el: HTMLElement) => void },
+    private readonly opts: {
+      reduceMotion: () => boolean;
+      onPick: (id: string) => void;
+      paint: (el: HTMLElement) => void;
+      /** Opt-in spatial-grid neighbor culling for large 100-300+ node networks. */
+      spatialCulling?: boolean;
+    },
   ) {
     this.el = host;
     host.classList.add("ug");
@@ -145,6 +152,11 @@ export class UpgradeGraph {
     this.el.removeEventListener("pointercancel", this.up);
     this.el.removeEventListener("wheel", this.wheel);
     this.el.innerHTML = "";
+  }
+
+  /** Sets optional secondary prerequisite cross-links (`[fromId, toId]`) for multi-parent DAGs. */
+  setSecondaryEdges(edges: readonly [string, string][]) {
+    this.secondaryEdges = edges;
   }
 
   /** The tree as it is now: new nodes sprout, gone ones wither. `web`, the
@@ -267,6 +279,21 @@ export class UpgradeGraph {
   private step(dt: number) {
     if (!dt) return;
     const live = [...this.bodies.values()].filter((b) => b.dying < 0);
+    let buckets: Map<number, Body[]> | null = null;
+    if (this.opts.spatialCulling && live.length > 48) {
+      buckets = new Map();
+      for (const b of live) {
+        const gx = Math.floor(b.x / 52) & 0xffff;
+        const gy = Math.floor(b.y / 52) & 0xffff;
+        const key = (gx << 16) | gy;
+        let arr = buckets.get(key);
+        if (!arr) {
+          arr = [];
+          buckets.set(key, arr);
+        }
+        arr.push(b);
+      }
+    }
     for (const b of live) {
       let ax = (b.hx - b.x) * 9, ay = (b.hy - b.y) * 9;
       const p = b.n.parent ? this.bodies.get(b.n.parent) : undefined;
@@ -276,15 +303,33 @@ export class UpgradeGraph {
         ax += (p.x + rx - b.x) * 16;
         ay += (p.y + ry - b.y) * 16;
       }
-      for (const o of live) {
-        // A parent and its child keep apart by their branch, so a sprouting
-        // child doesn't shove its parent out of place.
-        if (o === b || o.n.id === b.n.parent || o.n.parent === b.n.id) continue;
-        const dx = b.x - o.x, dy = b.y - o.y, d2 = dx * dx + dy * dy;
-        if (d2 > 2500 || d2 < 0.01) continue;
-        const d = Math.sqrt(d2), f = (50 - d) * 30;
-        ax += (dx / d) * f;
-        ay += (dy / d) * f;
+      if (buckets) {
+        const cx = Math.floor(b.x / 52), cy = Math.floor(b.y / 52);
+        for (let ox = -1; ox <= 1; ox++) {
+          for (let oy = -1; oy <= 1; oy++) {
+            const cell = buckets.get(((cx + ox) & 0xffff) << 16 | ((cy + oy) & 0xffff));
+            if (!cell) continue;
+            for (const o of cell) {
+              if (o === b || o.n.id === b.n.parent || o.n.parent === b.n.id) continue;
+              const dx = b.x - o.x, dy = b.y - o.y, d2 = dx * dx + dy * dy;
+              if (d2 > 2500 || d2 < 0.01) continue;
+              const d = Math.sqrt(d2), f = (50 - d) * 30;
+              ax += (dx / d) * f;
+              ay += (dy / d) * f;
+            }
+          }
+        }
+      } else {
+        for (const o of live) {
+          // A parent and its child keep apart by their branch, so a sprouting
+          // child doesn't shove its parent out of place.
+          if (o === b || o.n.id === b.n.parent || o.n.parent === b.n.id) continue;
+          const dx = b.x - o.x, dy = b.y - o.y, d2 = dx * dx + dy * dy;
+          if (d2 > 2500 || d2 < 0.01) continue;
+          const d = Math.sqrt(d2), f = (50 - d) * 30;
+          ax += (dx / d) * f;
+          ay += (dy / d) * f;
+        }
       }
       b.vx = (b.vx + ax * dt) * Math.exp(-7 * dt);
       b.vy = (b.vy + ay * dt) * Math.exp(-7 * dt);
@@ -387,6 +432,19 @@ export class UpgradeGraph {
         layers[state === "owned" ? 4 : state === "next" ? 3 : state === "withering" ? 2 : 1].push(stroke);
       }
       if (b.dying < 0) this.trails(b, at, layers);
+    }
+    for (const [fromId, toId] of this.secondaryEdges) {
+      const a = this.bodies.get(fromId), b = this.bodies.get(toId);
+      if (!a || !b || a.dying >= 0 || b.dying >= 0) continue;
+      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2 - 14;
+      const bothOwned = a.n.state === "owned" && b.n.state === "owned";
+      layers[bothOwned ? 3 : 1].push({
+        a: at(a.x, a.y),
+        c: at(mx, my),
+        b: at(b.x, b.y),
+        tone: bothOwned ? TONES.owned : TONES.next,
+        dash: bothOwned ? 2 : 4,
+      });
     }
     this.art.draw(layers.flat());
     const ctx = this.canvas.getContext("2d");

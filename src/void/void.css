@@ -1,0 +1,591 @@
+/** Futuristic cyber-industrial Resistance theme for Void Defense:
+ * Warm orange, amber, steel, charcoal and graphite interfaces contrasting
+ * against the cold cosmic midnight-indigo and violet Void. */
+
+.void-shell {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: #0b0e14;
+  color: #e6edf5;
+  font-family: var(--font, sans-serif);
+  overflow: hidden;
+  user-select: none;
+}
+
+.void-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.45rem 0.85rem;
+  background: linear-gradient(180deg, #1b2230 0%, #111620 100%);
+  border-bottom: 2px solid #f28d35;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.void-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.void-emblem {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.8rem;
+  height: 1.8rem;
+  background: #231934;
+  border: 1px solid #b85cff;
+  color: #ff9933;
+  font-size: 1.1rem;
+  border-radius: 3px;
+}
+
+.void-brand strong {
+  display: block;
+  color: #ff9f43;
+  letter-spacing: 0.06em;
+  font-size: 0.95rem;
+}
+
+.void-brand small {
+  display: block;
+  color: #9ba8bc;
+  font-size: 0.72rem;
+}
+
+.void-currencies {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.void-curr {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.22rem 0.55rem;
+  background: #141923;
+  border: 1px solid #333e52;
+  border-radius: 3px;
+  font-size: 0.8rem;
+}
+
+.void-curr.supplies b {
+  color: #ffaa33;
+}
+
+.void-curr.essence b {
+  color: #c88aff;
+}
+
+.void-curr.sparks b {
+  color: #6ef3ff;
+}
+
+.void-prof-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.6rem;
+  background: #1d2534;
+  border: 1px solid #49566e;
+  color: #e6edf5;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.78rem;
+}
+
+.void-mini-flag {
+  width: 12px;
+  height: 18px;
+}
+
+.void-page {
+  display: none;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.void-page.active {
+  display: flex;
+}
+
+.void-battle-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 0.6rem;
+  padding: 0.3rem 0.75rem;
+  background: #131822;
+  border-bottom: 1px solid #283244;
+  font-size: 0.78rem;
+  color: #b0bdd0;
+  flex-wrap: wrap;
+}
+
+.void-battle-status b {
+  color: #ffaa33;
+}
+
+.void-board-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background: #07080d;
+  overflow: hidden;
+}
+
+#void-board-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.void-inspector {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.7rem;
+  background: rgba(18, 23, 34, 0.94);
+  border: 1px solid #f28d35;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  z-index: 5;
+}
+
+.void-outcome-banner {
+  position: absolute;
+  inset: auto 1rem 1rem 1rem;
+  max-width: 540px;
+  margin: 0 auto;
+  padding: 1rem 1.25rem;
+  background: rgba(15, 19, 29, 0.96);
+  border: 2px solid #ff9933;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.75);
+  text-align: center;
+  z-index: 10;
+}
+
+.void-outcome-banner h2 {
+  margin: 0 0 0.4rem;
+  color: #ffaa33;
+  font-size: 1.15rem;
+}
+
+.void-outcome-banner p {
+  margin: 0.3rem 0;
+  font-size: 0.86rem;
+}
+
+.void-warn {
+  display: block;
+  margin-top: 0.4rem;
+  color: #ff7b7b;
+  font-size: 0.75rem;
+}
+
+.void-outcome-actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+}
+
+.void-battle-dock {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding: 0.45rem 0.75rem;
+  background: #141a24;
+  border-top: 1px solid #2d384c;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.void-palette,
+.void-strikes,
+.void-run-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.void-pal-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 4.1rem;
+  padding: 0.28rem 0.45rem;
+  background: #1d2533;
+  border: 1px solid #3c4961;
+  color: #e6edf5;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.74rem;
+  border-radius: 3px;
+}
+
+.void-pal-btn.selected {
+  border-color: #ffaa33;
+  box-shadow: 0 0 8px rgba(255, 170, 51, 0.45);
+  background: #2b241d;
+}
+
+.void-pal-btn.strike {
+  border-color: #4d3c7a;
+}
+
+.void-pal-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.void-pal-swatch {
+  width: 1.2rem;
+  height: 0.35rem;
+  border-radius: 2px;
+  margin-bottom: 0.15rem;
+}
+
+.void-nav {
+  display: flex;
+  background: #10141d;
+  border-top: 2px solid #263144;
+  flex-shrink: 0;
+}
+
+.void-nav button {
+  flex: 1;
+  padding: 0.55rem 0.4rem;
+  background: transparent;
+  border: none;
+  border-right: 1px solid #1f2838;
+  color: #9ba8bc;
+  font-family: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.void-nav button.selected {
+  background: #1d2536;
+  color: #ffaa33;
+  border-top: 2px solid #ff9933;
+}
+
+/* Global Tech Network View */
+.void-tech-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.void-tech-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.85rem;
+  background: #141924;
+  border-bottom: 1px solid #2b364a;
+  flex-wrap: wrap;
+}
+
+.void-tech-title strong {
+  display: block;
+  color: #ffaa33;
+}
+
+.void-tech-title small {
+  color: #9ba8bc;
+  font-size: 0.75rem;
+}
+
+.void-tech-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.void-tech-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  background: radial-gradient(circle at center, #161229 0%, #090b10 100%);
+  overflow: hidden;
+}
+
+.void-tech-graph {
+  flex: 1;
+  height: 100%;
+  min-height: 320px;
+}
+
+.void-tech-card {
+  width: 290px;
+  max-width: 42vw;
+  padding: 0.85rem;
+  background: rgba(17, 22, 32, 0.95);
+  border-left: 1px solid #344159;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  z-index: 4;
+  overflow-y: auto;
+}
+
+.void-card-sector {
+  font-size: 0.72rem;
+  color: #6ef3ff;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.void-tech-card h3 {
+  margin: 0;
+  color: #ffaa33;
+  font-size: 1rem;
+}
+
+.void-card-desc {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #cbd5e1;
+  line-height: 1.35;
+}
+
+.void-card-meta,
+.void-card-reqs {
+  font-size: 0.78rem;
+  color: #9ba8bc;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.void-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-top: 0.4rem;
+}
+
+/* Resistance Operations View */
+.void-ops-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  padding: 0.75rem;
+  gap: 0.65rem;
+}
+
+.void-ops-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.void-ops-header strong {
+  display: block;
+  color: #ffaa33;
+}
+
+.void-ops-header small {
+  color: #9ba8bc;
+  font-size: 0.76rem;
+}
+
+.void-ops-canvas-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #090c12;
+  border: 1px solid #2e394d;
+}
+
+.void-ops-canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.void-ops-status {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.45rem 0.75rem;
+  background: #141924;
+  border: 1px solid #283244;
+  font-size: 0.8rem;
+  flex-wrap: wrap;
+}
+
+/* Sectors & Mode View */
+.void-sectors-wrap {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.85rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.void-mode-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.75rem;
+  margin: 0.5rem 0;
+}
+
+.void-mode-card {
+  text-align: left;
+  padding: 0.75rem;
+  background: #161c28;
+  border: 1px solid #344159;
+  color: #e6edf5;
+  cursor: pointer;
+  font-family: inherit;
+  border-radius: 4px;
+}
+
+.void-mode-card.selected {
+  border-color: #ffaa33;
+  background: #26201a;
+  box-shadow: 0 0 10px rgba(255, 170, 51, 0.3);
+}
+
+.void-mode-card strong {
+  display: block;
+  color: #ffaa33;
+  margin-bottom: 0.3rem;
+}
+
+.void-mode-card p {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #b8c4d6;
+}
+
+.void-sector-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 0.75rem;
+}
+
+.void-sector-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0.45rem;
+  padding: 0.75rem;
+  background: #141924;
+  border: 1px solid #2e394e;
+  border-radius: 4px;
+}
+
+.void-sector-card.active {
+  border-color: #f28d35;
+}
+
+.void-sector-card header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #ffaa33;
+}
+
+.void-sector-stars {
+  color: #6ef3ff;
+  letter-spacing: 0.08em;
+}
+
+.void-sector-card p {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #aebbd0;
+}
+
+.void-sector-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.74rem;
+  color: #8f9eb5;
+}
+
+.primary-btn,
+.danger-btn,
+.secondary-btn {
+  padding: 0.38rem 0.75rem;
+  font-family: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.primary-btn {
+  background: #d97224;
+  border: 1px solid #ffaa33;
+  color: #fff;
+  font-weight: bold;
+}
+
+.danger-btn {
+  background: #4a1c24;
+  border: 1px solid #c94a58;
+  color: #ffd6db;
+}
+
+.secondary-btn {
+  background: #232c3d;
+  border: 1px solid #4d5d7a;
+  color: #e6edf5;
+}
+
+.void-dialog {
+  max-width: 520px;
+  background: #141924;
+  border: 2px solid #f28d35;
+  color: #e6edf5;
+  padding: 1.1rem;
+}
+
+.void-profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.void-profile-form input {
+  display: block;
+  width: 100%;
+  margin-top: 0.25rem;
+  padding: 0.4rem;
+  background: #0d1118;
+  border: 1px solid #3c4961;
+  color: #fff;
+  font-family: inherit;
+}

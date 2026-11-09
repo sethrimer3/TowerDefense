@@ -27,15 +27,15 @@ export const WORK_SCALE = 1000;
 /** Material resistance (micro-work required to erode 1 HP of cell integrity). */
 export const MATERIAL_RESISTANCE = {
   void: 0,
-  unclaimed: 400,
-  street: 900,
-  park: 700,
-  reclaimed: 1100,
-  salvage: 800,
-  building: 1600,
-   skyscraper: 2400,
-  wall: 3800,
-  barrier: 3200,
+  unclaimed: 90,
+  street: 180,
+  park: 140,
+  reclaimed: 220,
+  salvage: 160,
+  building: 320,
+  skyscraper: 480,
+  wall: 760,
+  barrier: 640,
 } as const;
 
 /** Void expansion and energy balance.

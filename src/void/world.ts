@@ -65,8 +65,15 @@ export class VoidWorld {
 
     this.generateMetropolis(scenario);
     this.applyInitialBreaches(scenario);
-    this.totalBaselineValue = this.snapshotBaseline();
+    const totalValue = this.snapshotBaseline();
+    let totalHp = 0;
+    for (let i = 0; i < n; i++) {
+      if (this.isBaselineCell[i]) totalHp += this.hp[i] * this.baselineCellValue[i];
+    }
+    this.totalBaselineValue = totalValue;
+    this.totalBaselineWeightedHp = Math.max(1, totalHp);
   }
+  readonly totalBaselineWeightedHp: number;
 
   private generateMetropolis(scenario: ScenarioConfig): void {
     const { w, h } = this.grid;
@@ -371,21 +378,35 @@ export class VoidWorld {
   }
 
   /** Calculates current preserved scorable baseline value (never exceeding `totalBaselineValue`).
+   * Also tracks `preservedWeightedHp` so gradual frontier erosion is reflected immediately.
    * Extra player-created islands or over-100% building developments do not inflate this score. */
-  computePreservedBaseline(): { preservedValue: number; preservedRatio: number; preservedPercent: number } {
+  computePreservedBaseline(): {
+    preservedValue: number;
+    preservedWeightedHp: number;
+    preservedRatio: number;
+    preservedPercent: number;
+  } {
     let preserved = 0;
+    let weightedHp = 0;
     const n = this.grid.count;
     for (let i = 0; i < n; i++) {
       if (!this.isBaselineCell[i]) continue;
       const mat = this.material[i];
       if (mat !== CellMaterial.VOID && mat !== CellMaterial.UNCLAIMED && this.hp[i] > 0) {
-        preserved += this.baselineCellValue[i];
+        const val = this.baselineCellValue[i];
+        preserved += val;
+        weightedHp += Math.min(this.hp[i], this.maxHp[i]) * val;
       }
     }
     const capped = Math.min(this.totalBaselineValue, preserved);
-    const ratio = Math.max(0, Math.min(1, capped / this.totalBaselineValue));
+    const cappedHp = Math.min(this.totalBaselineWeightedHp, weightedHp);
+    const ratio =
+      capped === 0
+        ? 0
+        : Math.max(0, Math.min(1, (capped / this.totalBaselineValue) * 0.7 + (cappedHp / this.totalBaselineWeightedHp) * 0.3));
     return {
       preservedValue: capped,
+      preservedWeightedHp: cappedHp,
       preservedRatio: ratio,
       preservedPercent: Math.round(ratio * 1000) / 10,
     };
