@@ -91,11 +91,11 @@ test("a structure pressed and let go where it stands is tapped, not reshuffled",
   assert.ok(drop.kind === "build" && drop.tap && drop.layout === l);
 });
 
-test("city tiles stand apart from the start, but never on the top row", () => {
+test("city tiles stand apart from the start, but never on the outer ring", () => {
   const l = city(), { tx, ty } = l.keep;
   const far = { tx: 1, ty: 3 };
   assert.equal(placeCityTile(l, 2, 0), null, "the spawn row stays closed");
-  assert.match(refusal({ from: "palette", item: "cityTile" }, l, "2,0"), /top row/);
+  assert.match(refusal({ from: "palette", item: "cityTile" }, l, "2,0"), /outer ring/);
   const apart = placeCityTile(l, far.tx, far.ty)!;
   assert.ok(apart, "a tile apart from the city");
   const built = placeStructure(apart, "cannonTower", far.tx, far.ty)!;

@@ -51,6 +51,7 @@ import { drawGrid, drawLifting, drawOverlay, type Overlay } from "./edit-overlay
 import { drawBuildingOrders, drawInspect, type Armed } from "./inspect.ts";
 import { drawShimmer, drawShimmerFlash, drawHighlights, flashAlpha, closeFade, type Highlight } from "./placed-shimmer.ts";
 import { ART } from "./park-art.ts";
+import { Wilds } from "./wilds.ts";
 import { drawFlag, drawWarBanner } from "./structure-art.ts";
 import { RallyFlagArt } from "./rally-flag-art.ts";
 import { bannerReach } from "./war-banner.ts";
@@ -228,6 +229,7 @@ export class DefendRenderer {
   private combatKey = '';
   private outline: UnitOutline | null = null;
   px = 8;
+  private wilds = new Wilds();
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -270,6 +272,20 @@ export class DefendRenderer {
     this.clampCam();
   }
   private ref = { w: 0, h: 0 };
+
+  /** CSS pixels the camera may always pan past the board's edges, so the
+   * rows under controls floating over the board (the landscape layout) can
+   * be brought clear of them. A framing's overscroll adds to it. */
+  setEdge(css: number) {
+    const k = this.canvas.width / (this.canvas.getBoundingClientRect().width || 1);
+    const edge = Math.max(0, css) * k;
+    if (Math.abs(edge - this.edge) < 0.5) return;
+    const framing = this.overscroll > this.edge ? this.overscroll : 0;
+    this.edge = edge;
+    this.overscroll = Math.max(edge, framing);
+    this.clampCam();
+  }
+  private edge = 0;
 
   /** The most device pixels a CSS pixel the board draws at (Settings' Board
    * resolution; 0 for the screen's own). Fewer are cheaper; the browser
@@ -383,14 +399,14 @@ export class DefendRenderer {
   /** Lets the camera pan `css` CSS pixels past the board's edges. */
   setOverscroll(css: number) {
     const r = this.canvas.getBoundingClientRect();
-    this.overscroll = Math.max(0, css) * (this.canvas.width / (r.width || 1));
+    this.overscroll = Math.max(this.edge, Math.max(0, css) * (this.canvas.width / (r.width || 1)));
   }
   /** Takes the overscroll away, gliding the view back onto the board over `ms`. */
   settle(ms: number) {
-    this.overscroll = 0;
+    this.overscroll = this.edge;
     const { W, H } = this.board, v = this.view();
-    v.x = clampAxis(v.x, this.canvas.width, W * v.s);
-    v.y = clampAxis(v.y, this.canvas.height, H * v.s);
+    v.x = clampAxis(v.x, this.canvas.width, W * v.s, this.edge);
+    v.y = clampAxis(v.y, this.canvas.height, H * v.s, this.edge);
     if (this.crisp) { v.x = Math.round(v.x); v.y = Math.round(v.y); }
     this.glideTo(v, ms);
   }
@@ -481,10 +497,11 @@ export class DefendRenderer {
     this.protectCombat = this.darkDrain.prepare(sim, opts.now, blightNight);
     this.refreshLayer(map, sim, opts.looks);
     if (opts.timings) this.timings.terrainMs = performance.now() - start;
-    // Beyond the board's edges: the dark ground the city stands on.
+    // Beyond the board's edges: the area's impassable wilds (`wilds.ts`).
     this.ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.ctx.fillStyle = BEYOND;
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    this.wilds.draw(this.ctx, this.area, ART, this.px, this.cam, opts.night);
     this.douse(sim, opts);
     const dt = this.lastNow ? (opts.now - this.lastNow) / 1000 : 0;
     this.lastNow = opts.now;

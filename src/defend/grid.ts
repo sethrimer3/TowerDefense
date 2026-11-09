@@ -1,10 +1,12 @@
-/** DEFEND board geometry. The board is a 9 × 13 grid of large "tiles" (the
- * unit the player builds with). Each tile is subdivided into a 7 × 7 block
+/** DEFEND board geometry. The board is a 12 × 12 square of large "tiles"
+ * (the unit the player builds with). Each tile is subdivided into a block
  * of "cells" — the unit the procedural city, walls, pathfinding and the
- * simulation all work in. */
+ * simulation all work in. Only the middle 10 × 10 tiles take building
+ * (`buildableTile`); the outer ring is open ground, and past the board's
+ * edge lies impassable scenery (`wilds.ts`) that is only ever drawn. */
 
-export const TILES_W = 9;
-export const TILES_H = 13;
+export const TILES_W = 12;
+export const TILES_H = 12;
 /** Cells per tile edge. */
 export const SUB = 8;
 export const CELLS_W = TILES_W * SUB;
@@ -29,6 +31,11 @@ export function parseTileKey(key: string): TilePos {
 }
 export const tileInBounds = (tx: number, ty: number) =>
   tx >= 0 && tx < TILES_W && ty >= 0 && ty < TILES_H;
+/** Tiles the player may build on: the board less its outer ring of tiles
+ * (the top row of which is the enemies' spawn lane). */
+export const BUILD_MARGIN = 1;
+export const buildableTile = (tx: number, ty: number) =>
+  tx >= BUILD_MARGIN && tx < TILES_W - BUILD_MARGIN && ty >= BUILD_MARGIN && ty < TILES_H - BUILD_MARGIN;
 export const cellInBounds = (cx: number, cy: number) =>
   cx >= 0 && cx < CELLS_W && cy >= 0 && cy < CELLS_H;
 export const cellIndex = (cx: number, cy: number) => cy * CELLS_W + cx;

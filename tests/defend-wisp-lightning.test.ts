@@ -6,6 +6,8 @@ import {CellType,generateCity} from "../src/defend/citygen.ts";
 import {defaultLayout,fitLayout} from "../src/defend/layout.ts";
 import {archerDamage} from "../src/defend/catalog.ts";
 import {CELLS_W,CELLS_H} from "../src/defend/grid.ts";
+// The scene stands as far from the east edge as on the old 72-cell field, so the arrow's flight keeps its timing.
+const O=CELLS_W-72;
 import {Towers} from "../src/defend/towers.ts";
 import {wispMapRay} from "../src/defend/wisp-lightning.ts";
 import {wispLightningPoints} from "../src/defend/wisp-lightning-art.ts";
@@ -17,7 +19,7 @@ import {kindStats} from "../src/ui/specialty.ts";
 function scene(rank=3,only=true) {
  const sim=new DefendSim(generateCity(fitLayout(defaultLayout()),4),defaults().defend.levels,1);
  sim.enemies=[];sim.soldiers=[];sim.civilians=[];sim.solid.fill(0);sim.foeSolid.fill(0);sim.ownSolid.fill(0);sim.map.type.fill(CellType.ROAD);
- const b={...sim.keep,kind:"wispTower" as const,rect:{x:19,y:19,w:2,h:2},structureUid:42};sim.map.buildings[b.id]=b;
+ const b={...sim.keep,kind:"wispTower" as const,rect:{x:O+19,y:19,w:2,h:2},structureUid:42};sim.map.buildings[b.id]=b;
  sim.bonuses={...sim.bonuses,structurePaths:rank?{42:{wispTower:{path:"wispArrow",rank}}}:{}};
  const t=new Towers();t.step(sim,0);const owner=sim.wispOwners.get(b.id)!,pool=owner.lightning;
  if(only){owner.quiver.arrows=[];owner.quiver.capacity=0;delete owner.fire;sim.wisps=sim.wisps.filter(w=>w.lightning);}
@@ -30,7 +32,7 @@ function enemy(sim:DefendSim,x:number,y:number,kind:Enemy["kind"]="orc") {
 const close=(a:number,b:number)=>assert.ok(Math.abs(a-b)<1e-7,`${a} != ${b}`);
 const clear=(s:ReturnType<typeof scene>)=>{s.sim.enemies=[];s.sim.reindexAfterDisplacement();};
 function launch(s:ReturnType<typeof scene>) {
- const w=s.w!;w.x=20;w.y=20;enemy(s.sim,25,20);s.t.step(s.sim,0);return w.ray!;
+ const w=s.w!;w.x=O+20;w.y=20;enemy(s.sim,O+25,20);s.t.step(s.sim,0);return w.ray!;
 }
 
 test("Lightning arrow is the final rank III, with the normal price, saved tier and exact refund",()=>{
@@ -71,16 +73,16 @@ test("Map rays meet the true rectangular map boundary in every direction, includ
 
 test("An unlocked purple arrow wanders harmlessly and only locks living enemies within tower range",()=>{
  const s=scene();s.t.step(s.sim,2);assert.equal(s.sim.wispLightningTrails.length,0);
- enemy(s.sim,40,20);const dead=enemy(s.sim,21,20);dead.hp=0;s.t.step(s.sim,.1);assert.equal(s.w!.ray,undefined);
- s.w!.x=20;s.w!.y=20;delete s.w!.flight;
- const first=enemy(s.sim,23,20),tie=enemy(s.sim,23,20);s.t.step(s.sim,0);
+ enemy(s.sim,O+40,20);const dead=enemy(s.sim,O+21,20);dead.hp=0;s.t.step(s.sim,.1);assert.equal(s.w!.ray,undefined);
+ s.w!.x=O+20;s.w!.y=20;delete s.w!.flight;
+ const first=enemy(s.sim,O+23,20),tie=enemy(s.sim,O+23,20);s.t.step(s.sim,0);
  assert.equal(s.w!.ray!.target,first.id);assert.notEqual(s.w!.ray!.target,tie.id);
 });
 
 test("A lock commits a piercing straight ray through the captured target all the way to the edge",()=>{
  const s=scene(),ray=launch(s),target=s.sim.enemies[0],end={...ray.b};
- target.x=10;target.y=5;target.hp=0;s.sim.reindexAfterDisplacement();enemy(s.sim,21,24);
- const beyond=enemy(s.sim,55,20),off=enemy(s.sim,55,24);
+ target.x=10;target.y=5;target.hp=0;s.sim.reindexAfterDisplacement();enemy(s.sim,O+21,24);
+ const beyond=enemy(s.sim,O+55,20),off=enemy(s.sim,O+55,24);
  for(let i=0;i<120&&s.pool!.arrows.length;i++){s.t.step(s.sim,1/60);close(s.w!.y,20);}
  assert.equal(s.pool!.arrows.length,0);close(s.w!.x,end.x);close(s.w!.y,end.y);assert.equal(s.w!.ray,undefined);
  assert.ok(beyond.hp<beyond.maxHp,"damage continues well beyond acquisition range");assert.equal(off.hp,off.maxHp);
@@ -88,7 +90,7 @@ test("A lock commits a piercing straight ray through the captured target all the
 });
 
 test("Every swept point lasts five seconds at 300% attack/s, with no additional direct-hit damage",()=>{
- const s=scene();launch(s);const ground=s.sim.enemies[0],flying=enemy(s.sim,25,20,"bat"),outside=enemy(s.sim,25,23);
+ const s=scene();launch(s);const ground=s.sim.enemies[0],flying=enemy(s.sim,O+25,20,"bat"),outside=enemy(s.sim,O+25,23);
  s.sim.bonuses={...s.sim.bonuses,towerDamage:2}; // A committed strike captures its old damage.
  s.t.step(s.sim,.3);const hp=ground.hp,airHp=flying.hp;
  s.t.step(s.sim,1);close(hp-ground.hp,archerDamage(0)*3);close(hp-ground.hp,airHp-flying.hp);
@@ -101,17 +103,17 @@ test("Every swept point lasts five seconds at 300% attack/s, with no additional 
 
 test("Late arrivals can enter the lightning after the arrow passes, with per-point expiry",()=>{
  const s=scene();launch(s);s.t.step(s.sim,2);clear(s);
- const near=enemy(s.sim,22,20),far=enemy(s.sim,65,20);s.t.step(s.sim,2.5);
+ const near=enemy(s.sim,O+22,20),far=enemy(s.sim,O+65,20);s.t.step(s.sim,2.5);
  const nearHp=near.hp,farHp=far.hp;s.t.step(s.sim,1.3);
  assert.ok(nearHp-near.hp<farHp-far.hp,"the early trail expires before the later trail");
  s.t.step(s.sim,1);assert.equal(s.sim.wispLightningTrails.length,0);
 });
 
 test("Lightning follows existing physical-element lightning armor and shield rules",()=>{
- const s=scene();launch(s);const normal=s.sim.enemies[0],immuneToFire=enemy(s.sim,25,20,"slagGolem"),armor=enemy(s.sim,25,20,"geodeCrab");
+ const s=scene();launch(s);const normal=s.sim.enemies[0],immuneToFire=enemy(s.sim,O+25,20,"slagGolem"),armor=enemy(s.sim,O+25,20,"geodeCrab");
  s.t.step(s.sim,.3);const h=[normal.hp,immuneToFire.hp,armor.hp];s.t.step(s.sim,.5);
  close(h[0]-normal.hp,h[1]-immuneToFire.hp);close(h[2]-armor.hp,(h[0]-normal.hp)/2);
- const shield=scene();launch(shield);const e=shield.sim.enemies[0],g=enemy(shield.sim,25,20,"shieldBearer");
+ const shield=scene();launch(shield);const e=shield.sim.enemies[0],g=enemy(shield.sim,O+25,20,"shieldBearer");
  g.shieldHp=1e6;(shield.sim as any).shieldGenerators=[g];shield.t.step(shield.sim,.5);
  assert.equal(e.hp,e.maxHp);assert.ok(g.shieldHp!<1e6);
 });
@@ -128,13 +130,13 @@ test("The nine-second refill starts at map exit, keeps its exact boundary, and n
 
 test("Reload upgrades speed the ray while keeping nine-second regeneration fixed",()=>{
  const normal=scene(),fast=scene();launch(normal);launch(fast);fast.sim.bonuses={...fast.sim.bonuses,towerReload:.5};
- normal.t.step(normal.sim,.5);fast.t.step(fast.sim,.5);close(fast.w!.x-20,(normal.w!.x-20)*2);
+ normal.t.step(normal.sim,.5);fast.t.step(fast.sim,.5);close(fast.w!.x-O-20,(normal.w!.x-O-20)*2);
  normal.t.step(normal.sim,2);fast.t.step(fast.sim,2);clear(normal);clear(fast);
  close(fast.pool!.refill-normal.pool!.refill,.65);
 });
 
 test("Fine and coarse ray flight, deposition, damage, expiry and refills agree",()=>{
- const coarse=scene(),fine=scene();for(const s of[coarse,fine]){launch(s);enemy(s.sim,60,20);}
+ const coarse=scene(),fine=scene();for(const s of[coarse,fine]){launch(s);enemy(s.sim,O+60,20);}
  coarse.t.step(coarse.sim,4);for(let i=0;i<240;i++)fine.t.step(fine.sim,1/60);
  for(let i=0;i<2;i++)close(coarse.sim.enemies[i].hp,fine.sim.enemies[i].hp);
  close(coarse.pool!.refill,fine.pool!.refill);close(coarse.w!.x,fine.w!.x);close(coarse.w!.y,fine.w!.y);

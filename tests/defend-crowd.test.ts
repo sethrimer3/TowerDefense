@@ -5,7 +5,7 @@ import { ENEMIES, UPGRADES, enemySize, type EnemyKind } from '../src/defend/cata
 import { DefendSim, type Enemy, type Soldier } from '../src/defend/sim.ts';
 import { generateCity } from '../src/defend/citygen.ts';
 import { defaultLayout, fitLayout } from '../src/defend/layout.ts';
-import { cellIndex } from '../src/defend/grid.ts';
+import { CELLS_W, cellIndex } from '../src/defend/grid.ts';
 import { buildingContactPoint, defenderContactPoint } from '../src/defend/contact.ts';
 import { routeToBuilding, stepEnemy, transferCrowdAttacks } from '../src/defend/enemies.ts';
 
@@ -72,7 +72,7 @@ test('axis slides retain native bucket order with one body-index rewrite', () =>
       assert.equal(moves-count,1);
       for(const list of before.values()) { const i=list.indexOf(body); if(i>=0) { list[i]=list[list.length-1]; list.pop(); } }
       for(let y=body.y0;y<=body.y1;y++)for(let x=body.x0;x<=body.x1;x++) {
-        const i=y*72*4+x, list=before.get(i)??[]; list.push(body); before.set(i,list);
+        const i=y*CELLS_W*4+x, list=before.get(i)??[]; list.push(body); before.set(i,list);
       }
     }
     for(const i of new Set([...before.keys(),...c.used])) assert.deepEqual(c.cells[i]??[],before.get(i)??[]);

@@ -5,7 +5,7 @@ import { ENEMIES, UPGRADES, type EnemyKind } from "../src/defend/catalog.ts";
 import { DefendSim, type Levels, type Soldier, type Civilian } from "../src/defend/sim.ts";
 import { generateCity, CellType } from "../src/defend/citygen.ts";
 import { defaultLayout, fitLayout } from "../src/defend/layout.ts";
-import { CELLS_W, cellIndex } from "../src/defend/grid.ts";
+import { CELLS_H, CELLS_W, cellIndex } from "../src/defend/grid.ts";
 import { stepEnemy } from "../src/defend/enemies.ts";
 import { BLIGHT_WORM as W, wormTrailAt, wormOpenPoint, wormOnTowerTile } from "../src/defend/blight-worm.ts";
 import { groundBody } from "../src/defend/enemy-crowd.ts";
@@ -331,14 +331,14 @@ test("an underground cut preserves its ray and the once-per-building pass ledger
 });
 
 for (const terrain of ["water", "rock", "edge"] as const) test(`surface heads bounce off ${terrain}`, () => {
-  const sim = fixture(), segments = worm(sim, 20.5, terrain === "edge" ? 100 : 40), head = segments[0];
+  const sim = fixture(), segments = worm(sim, 20.5, terrain === "edge" ? CELLS_H - 4 : 40), head = segments[0];
   if (terrain !== "edge") for (let x = 18; x <= 22; x++) {
     const cell = cellIndex(x, 42);
     if (terrain === "water") sim.map.type[cell] = CellType.WATER; else sim.rocks[cell] = 1;
   }
   for (let i = 0; i < 90 && head.worm!.head!.dy === 1; i++) tick(sim, 1 / 30);
   assert.ok(head.worm!.head!.dy <= Math.SQRT1_2 + 1e-8);
-  assert.ok(head.y <= (terrain === "edge" ? 104 : 42) - W.spacing / 2);
+  assert.ok(head.y <= (terrain === "edge" ? CELLS_H : 42) - W.spacing / 2);
 });
 
 test("a fence bounce closes through its empty cell margin to the painted rail", () => {
@@ -354,7 +354,7 @@ test("a fence bounce closes through its empty cell margin to the painted rail", 
 });
 
 test("an underground edge bounce stays submerged and every segment follows its exact turn", () => {
-  const sim = fixture(); structure(sim, sim.keepId, 20, 98, 4, 4);
+  const sim = fixture(); structure(sim, sim.keepId, 20, CELLS_H - 6, 4, 4);
   const segments = worm(sim, 22, 50), head = segments[0], h = head.worm!.head!;
   h.surfaceT = 0; sim.rand = () => 0;
   tick(sim, 1 / 30); assert.ok(head.burrow);
@@ -370,7 +370,7 @@ test("an underground edge bounce stays submerged and every segment follows its e
     }
     if (bounce) for (let n = 1; n < segments.length; n++) nearest[n] = Math.min(nearest[n], Math.hypot(segments[n].x - bounce.x, segments[n].y - bounce.y));
     if (bounce && !head.burrow) { surfaced = true; h.surfaceT = h.turnT = 1e6; }
-    assert.ok(head.x >= 0 && head.x < 72 && head.y >= 0 && head.y < 104);
+    assert.ok(head.x >= 0 && head.x < CELLS_W && head.y >= 0 && head.y < CELLS_H);
     if (surfaced && segments.every(e => !e.burrow)) break;
   }
   assert.ok(bounce && surfaced);

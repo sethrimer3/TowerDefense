@@ -31,11 +31,11 @@ test("legalLayouts lists the layouts a drop makes, tile by tile", () => {
   assert.ok(fresh.size > 0);
   for (const [key, next] of fresh) {
     const [x, y] = key.split(",").map(Number);
-    assert.ok(!tiles.has(key) && y !== 0, key);
+    assert.ok(!tiles.has(key) && x > 0 && y > 0 && x < 11 && y < 11, key);
     assert.ok(next.cityTiles.includes(key));
   }
   // City tiles may stand anywhere, apart from the city too.
-  assert.ok(fresh.has(tileKey(0, KY - 4)), "a tile apart from the city");
+  assert.ok(fresh.has(tileKey(1, KY - 4)), "a tile apart from the city");
   // A tile carried with its barracks takes it along.
   const carried = legalLayouts({ from: "cityTile", tile: { tx: KX - 1, ty: KY } }, L).get(tileKey(KX - 3, KY - 3));
   assert.ok(carried, "the barracks' tile lands apart from the city");
@@ -59,17 +59,17 @@ test("dropGhost outlines a city tile, or the fitted structure", () => {
 });
 
 test("refusal explains why a tile turns a drop away", () => {
-  const far = tileKey(0, KY - 4);
-  assert.match(refusal({ from: "keep" }, L, tileKey(KX, 0)), /top row/);
+  const far = tileKey(1, KY - 4);
+  assert.match(refusal({ from: "keep" }, L, tileKey(KX, 0)), /outer ring/);
   assert.equal(refusal({ from: "palette", item: "cityTile" }, L, tileKey(KX, KY)), "That tile is already part of the city.");
-  assert.match(refusal({ from: "palette", item: "cityTile" }, L, tileKey(KX, 0)), /top row/);
+  assert.match(refusal({ from: "palette", item: "cityTile" }, L, tileKey(KX, 0)), /outer ring/);
   assert.equal(refusal({ from: "cityTile", tile: { tx: KX + 1, ty: KY } }, L, tileKey(KX, KY)), "That tile is already part of the city.");
   assert.equal(refusal({ from: "keep" }, L, far), "What stands on the keep's tile doesn't fit there.");
   // A structure is refused a spot (keyed by its top left quarter) for the fit's own reason.
-  const farQ = `0,${(KY - 4) * 4}`;
+  const farQ = `4,${(KY - 4) * 4}`;
   assert.equal(refusal({ from: "palette", item: "barracks" }, L, farQ), `${STRUCTURES.barracks.name} must be inside the city limits.`);
   assert.equal(refusal({ from: "structure", uid: 1, kind: "barracks" }, L, farQ), `${STRUCTURES.barracks.name} must be inside the city limits.`);
-  assert.match(refusal({ from: "palette", item: "archerTower" }, L, "0,0"), /top row/);
+  assert.match(refusal({ from: "palette", item: "archerTower" }, L, "0,0"), /outer ring/);
   const b = L.structures[0];
   assert.equal(refusal({ from: "palette", item: "watchTower" }, L, `${b.qx},${b.qy}`), "There's something standing there already.");
   assert.equal(refusal({ from: "palette", item: "watchTower" }, L, `${b.qx + 2},${b.qy}`), "Buildings need a clear square between them.");

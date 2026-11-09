@@ -1,3 +1,4 @@
+import { landscape } from "../ui/landscape.ts";
 import type { Highlight } from "./placed-shimmer.ts";
 import { wallAtCell, type SpikeSpot } from "./layout.ts";
 import { STRUCTURES } from "./catalog.ts";
@@ -838,6 +839,11 @@ export class DefendPage {
     this.fitHud();
     const stage = this.root.querySelector<HTMLElement>("#defend-stage")!;
     if (!stage.offsetParent) return;
+    if (this.floatBoard(stage)) {
+      this.fitView();
+      this.draw();
+      return;
+    }
     const top = stage.getBoundingClientRect().top + window.scrollY;
     // 24 px below leaves room for the board frame's lower brackets.
     let height = Math.max(160, Math.floor(window.innerHeight - top - this.navHeight() - 24));
@@ -858,8 +864,33 @@ export class DefendPage {
     const stage = this.root.querySelector<HTMLElement>("#defend-stage");
     const board = this.root.querySelector<HTMLElement>("#defend-board");
     if (!this.renderer || !stage || !board || !stage.offsetParent) return;
+    // In landscape the controls float over the board: the square field fits
+    // between the bars along its top and bottom, the wilds round it.
+    if (landscape()) return void this.renderer.resize(board.clientWidth, Math.max(80, board.clientHeight - 2 * this.floatEdge()));
     const frame = board.offsetWidth - board.clientWidth;
     this.renderer.resize(stage.clientWidth - frame, board.clientHeight);
+  }
+
+  /** The landscape layout: the board fills the window (CSS sizes it) and
+   * the square field fits between the controls floating over its top and
+   * bottom; zoomed in, the camera may pan its edge rows out from under them.
+   * Returns whether the layout is on. */
+  private floatBoard(stage: HTMLElement) {
+    const r = this.renderer!, on = landscape();
+    if (!on) {
+      r.setEdge(0);
+      return false;
+    }
+    stage.style.height = "";
+    this.fitView();
+    r.setEdge(this.floatEdge());
+    return true;
+  }
+  /** CSS pixels taken by the taller of the bars floating over the board. */
+  private floatEdge() {
+    const head = this.root.querySelector<HTMLElement>(".defend-head")?.offsetHeight ?? 0;
+    const side = this.root.querySelector<HTMLElement>("#defend-side")?.offsetHeight ?? 0;
+    return Math.max(head, side) + 12;
   }
 
   /** Lay out now, and again next frame once the new DOM has settled. */

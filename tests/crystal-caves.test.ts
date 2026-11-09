@@ -4,7 +4,7 @@ import { areaForWave } from "../src/defend/areas.ts";
 import { rollWeather } from "../src/defend/weather.ts";
 import { generateCity, CellType } from "../src/defend/citygen.ts";
 import { defaultLayout, fitLayout } from "../src/defend/layout.ts";
-import { cellIndex } from "../src/defend/grid.ts";
+import { cellIndex, CELLS_W, CELLS_H } from "../src/defend/grid.ts";
 import { CAVE_CEILING, CAVE_OPENING, crystalCavesPlan, openingDustAt, openingEdge, CRYSTAL_CAVES, dustAt, hasCrystalCaves, SHAFT_UP, shaftLight, sporeAt } from "../src/defend/crystal-caves.ts";
 import { skyAtTime } from "../src/daylight.ts";
 import { cavePixels, columnField, glowPixels, openingLight, sunAt, sunlitFloor } from "../src/defend/crystal-caves-art.ts";
@@ -57,9 +57,9 @@ test("spores rise off the mushrooms and dust drifts in the shafts", () => {
 });
 
 test("the floor covers every open cell and nothing else; sunlight brightens it; glow is sparse", () => {
-  const plan = crystalCavesPlan(city()), px = cavePixels(plan), glow = glowPixels(plan), W = 72 * 8;
+  const plan = crystalCavesPlan(city()), px = cavePixels(plan), glow = glowPixels(plan), W = CELLS_W * 8;
   for (let i = 0; i < plan.open.length; i++) {
-    const cx = i % 72, cy = Math.floor(i / 72), p = px[(cy * 8 + 3) * W + cx * 8 + 3];
+    const cx = i % CELLS_W, cy = Math.floor(i / CELLS_W), p = px[(cy * 8 + 3) * W + cx * 8 + 3];
     if (plan.open[i]) assert.equal(p >>> 24, 255);
     else assert.equal(p, 0);
   }
@@ -99,10 +99,10 @@ test("the holes' light follows the sun across the day", () => {
 });
 
 test("a great ragged opening lets the sky in over the top third", () => {
-  const edges = Array.from({ length: 72 * 4 }, (_, i) => openingEdge(i / 4));
+  const edges = Array.from({ length: CELLS_W * 4 }, (_, i) => openingEdge(i / 4));
   const lo = Math.min(...edges), hi = Math.max(...edges), mean = edges.reduce((a, b) => a + b) / edges.length;
-  assert.ok(lo > 104 * 0.2 && hi < 104 * 0.5, `${lo}..${hi}`);
-  assert.ok(Math.abs(mean - 104 / 3) < 6, `about a third down: ${mean}`);
+  assert.ok(lo > CELLS_H * 0.2 && hi < CELLS_H * 0.5, `${lo}..${hi}`);
+  assert.ok(Math.abs(mean - CELLS_H / 3) < 6, `about a third down: ${mean}`);
   assert.ok(hi - lo > 8, "its edge wanders in bays and spurs");
   // Lit above the edge (and above the board), dark below it.
   assert.equal(openingLight(100, -40), 1);
@@ -112,6 +112,6 @@ test("a great ragged opening lets the sky in over the top third", () => {
   for (const s of crystalCavesPlan(city()).shafts) assert.ok(s.y - s.r > openingEdge(s.x), `shaft at ${s.x},${s.y}`);
   for (let k = 0; k < CAVE_OPENING.dust; k++) {
     const d = openingDustAt(k, 7);
-    assert.ok(d.x >= 0 && d.x < 72 && d.y < 104 * 0.5);
+    assert.ok(d.x >= 0 && d.x < CELLS_W && d.y < CELLS_H * 0.5);
   }
 });

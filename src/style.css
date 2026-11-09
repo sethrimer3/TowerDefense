@@ -2632,3 +2632,189 @@ nav button[data-mode] > .tab-label { min-height: 2.4em; }
 .ambush-offer-changes { margin: 0; padding-left: 14px; text-align: left; align-self: stretch; color: #e8dcc4; }
 .ambush-offer-changes li { margin: 2px 0; }
 @media (max-width: 600px) { .native-campaign .side-open .ambush-side.offering { width: 150px; } .ambush-offer { font-size: 10px; } }
+
+/* ── LANDSCAPE (ui/landscape.ts) ────────────────────────────────────── */
+/* Wider than tall. A simulation (the Defend, Ambush and Siege boards, the
+ * Mine, the Library) fills the whole window, its frame just inside every
+ * edge, north up as always; the tabs, controls and palette float over it
+ * with no panels behind them. Other pages keep a tab column on the left. */
+:root.landscape {
+  --ls-in: 14px;
+  --ls-nav: 84px;
+  --ls-left: calc(var(--ls-in) + var(--ls-nav) + 12px);
+}
+:root.landscape .shell {
+  width: 100%;
+  max-width: none;
+  display: grid;
+  grid-template-columns: var(--ls-nav) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  column-gap: 14px;
+  padding: max(10px, var(--safe-top)) max(16px, var(--safe-right)) max(8px, var(--safe-bottom)) max(10px, var(--safe-left));
+}
+:root.landscape .shell > nav {
+  grid-column: 1;
+  grid-row: 1 / -1;
+  flex-direction: column;
+  justify-content: flex-start;
+  margin: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+:root.landscape .shell > nav::-webkit-scrollbar { display: none; }
+:root.landscape .shell > nav button { flex: 0 1 96px; min-height: 52px; }
+:root.landscape .shell > .currency-hold { grid-column: 2; grid-row: 1; }
+:root.landscape .shell > .page { grid-column: 2; grid-row: 2; min-height: 0; }
+
+/* A simulation page: the page is the whole window, everything else floats. */
+:root.landscape .shell:is(:has(> #defend.active), :has(> #ambush.native-campaign.active), :has(> #siege.native-campaign.active), :has(> #mine.active), :has(> #library.active)) {
+  display: block;
+  padding: 0;
+  border: 0;
+}
+:root.landscape .shell:is(:has(> #defend.active), :has(> #ambush.native-campaign.active), :has(> #siege.native-campaign.active), :has(> #mine.active), :has(> #library.active)) > .page.active {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: max(5px, var(--safe-top)) max(5px, var(--safe-right)) max(5px, var(--safe-bottom)) max(5px, var(--safe-left));
+}
+:root.landscape .shell:is(:has(> #defend.active), :has(> #ambush.native-campaign.active), :has(> #siege.native-campaign.active), :has(> #mine.active), :has(> #library.active)) > nav {
+  position: absolute;
+  z-index: 30;
+  left: max(var(--ls-in), calc(var(--safe-left) + 8px));
+  top: var(--ls-in);
+  bottom: var(--ls-in);
+  width: var(--ls-nav);
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  pointer-events: none;
+}
+:root.landscape .shell:is(:has(> #defend.active), :has(> #ambush.native-campaign.active), :has(> #siege.native-campaign.active), :has(> #mine.active), :has(> #library.active)) > nav button { pointer-events: auto; box-shadow: 0 2px 0 #000, 0 3px 8px #000000c0; }
+:root.landscape .shell:is(:has(> #defend.active), :has(> #ambush.native-campaign.active), :has(> #siege.native-campaign.active), :has(> #mine.active), :has(> #library.active)) > .currency-hold {
+  position: absolute;
+  z-index: 25;
+  top: var(--ls-in);
+  left: var(--ls-left);
+  right: var(--ls-in);
+  pointer-events: none;
+}
+:root.landscape .shell:is(:has(> #defend.active), :has(> #ambush.native-campaign.active), :has(> #siege.native-campaign.active), :has(> #mine.active), :has(> #library.active)) > .currency-hold .td-currencies { pointer-events: auto; margin: 0; }
+
+/* Defend: the board fills the page; the controls and wave float along its
+ * top, the palette along its bottom, both clear of the tabs. */
+:root.landscape #defend.active { overflow: hidden; }
+:root.landscape .defend-city,
+:root.landscape .defend-stage,
+:root.landscape .defend-board { position: absolute; inset: 0; height: auto; }
+:root.landscape .defend-city { inset: max(5px, var(--safe-top)) max(5px, var(--safe-right)) max(5px, var(--safe-bottom)) max(5px, var(--safe-left)); }
+:root.landscape .defend-head,
+:root.landscape .native-campaign .campaign-head {
+  position: absolute;
+  z-index: 12;
+  top: var(--ls-in);
+  left: var(--ls-left);
+  right: var(--ls-in);
+  margin: 0;
+  pointer-events: none;
+}
+:root.landscape .defend-head > *,
+:root.landscape .native-campaign .campaign-head > * { pointer-events: auto; }
+:root.landscape .defend-head .defend-center { pointer-events: none; }
+:root.landscape .defend-hud,
+:root.landscape .native-campaign .campaign-status,
+:root.landscape .native-campaign .campaign-head label,
+:root.landscape .ambush-level-name { text-shadow: 0 1px 0 #000, 0 0 4px #000, 0 0 8px #000; color: #f1e6cc; }
+:root.landscape .defend-side {
+  position: absolute;
+  z-index: 12;
+  left: var(--ls-left);
+  right: var(--ls-in);
+  bottom: var(--ls-in);
+  width: auto;
+  height: 0;
+  margin: 0;
+  align-items: stretch;
+  transition: height 0.35s ease, opacity 0.25s ease;
+}
+:root.landscape .defend-stage.side-open .defend-side,
+:root.landscape .defend-stage.palette-right.side-open .defend-side,
+:root.landscape .defend-stage.unit-testing.side-open .defend-side { width: auto; height: 92px; margin: 0; }
+:root.landscape .defend-palette,
+:root.landscape .unit-testing .defend-palette {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  flex-direction: row;
+  align-items: stretch;
+  padding: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+:root.landscape .defend-palette > .defend-item { width: 76px; justify-content: center; box-shadow: inset 0 3px 6px #000000c0, 0 2px 0 #000, 0 3px 8px #000000c0; }
+:root.landscape .defend-palette > .defend-enemy { width: 96px; }
+:root.landscape .defend-palette .defend-item,
+:root.landscape .defend-palette .defend-item canvas { touch-action: pan-x; }
+:root.landscape .defend-palette-title,
+:root.landscape .defend-palette-none { align-self: center; max-width: 140px; text-shadow: 0 1px 0 #000, 0 0 6px #000; }
+:root.landscape .defend-category { align-self: center; padding: 8px 10px; }
+:root.landscape .defend-categories { flex-direction: row; align-items: center; padding: 0; border: 0; }
+:root.landscape .defend-crisp { top: calc(var(--ls-in) + 52px); bottom: auto; right: calc(var(--ls-in) - 5px); }
+
+/* Ambush and Siege: the same, the plaque and buildings floating along the bottom. */
+:root.landscape .native-campaign.active { gap: 0; }
+:root.landscape .native-campaign .campaign-stage,
+:root.landscape #ambush.native-campaign .campaign-board,
+:root.landscape #siege.native-campaign .campaign-board { position: absolute; inset: max(5px, var(--safe-top)) max(5px, var(--safe-right)) max(5px, var(--safe-bottom)) max(5px, var(--safe-left)); width: auto; height: auto; }
+:root.landscape #ambush.native-campaign .campaign-board,
+:root.landscape #siege.native-campaign .campaign-board { inset: 0; }
+:root.landscape .native-campaign .ambush-side { flex-direction: row; }
+:root.landscape .native-campaign .side-open .ambush-side,
+:root.landscape .native-campaign .side-open .ambush-side.offering { width: auto; }
+:root.landscape .native-campaign .defend-stage.side-open .ambush-side.offering { height: 150px; }
+:root.landscape .ambush-side-head { justify-content: center; min-width: 96px; margin: 0 6px 0 0; }
+:root.landscape .ambush-side-content { flex: 1; display: flex; gap: 6px; overflow-x: auto; overflow-y: hidden; }
+:root.landscape .ambush-side-content .defend-palette { width: auto; flex: 1 0 auto; }
+:root.landscape .native-campaign .campaign-roster button { width: 76px; }
+:root.landscape .ambush-offer,
+:root.landscape #ambush-inspect { flex: none; overflow-y: auto; background: #000000b0; border: 1px solid var(--gold); }
+:root.landscape .ambush-offer { flex-direction: row; flex-wrap: wrap; justify-content: center; width: 340px; }
+:root.landscape .ambush-offer-changes { flex-basis: 100%; }
+:root.landscape .native-campaign .strike-bar { left: var(--ls-left); bottom: calc(var(--ls-in) + 100px); }
+:root.landscape .native-campaign .ambush-mini { left: var(--ls-left); top: calc(var(--ls-in) + 76px); }
+
+/* Mine and Library: the view fills the page, the buttons and tallies float on top. */
+:root.landscape .descent-world > .mine-body { position: absolute; inset: 0; }
+:root.landscape .descent-world > .mine-body .mine-view { margin: 7px; }
+:root.landscape .descent-world > .mine-head,
+:root.landscape .descent-world > .mine-tools { position: relative; z-index: 12; margin-left: calc(var(--ls-left) - 5px); margin-right: 9px; text-shadow: 0 1px 0 #000, 0 0 4px #000, 0 0 8px #000; }
+:root.landscape .descent-world > .mine-head { margin-top: calc(var(--ls-in) - 5px); }
+:root.landscape .shell.show-currencies .descent-world > .mine-head { margin-top: calc(var(--ls-in) + 76px); }
+:root.landscape .descent-world > .mine-body .mine-crew { position: absolute; z-index: 13; left: calc(var(--ls-left) - 5px); top: 110px; bottom: var(--ls-in); max-height: calc(100% - 110px - var(--ls-in)); margin: 0; }
+:root.landscape .shell.show-currencies .descent-world > .mine-body .mine-crew { top: 190px; max-height: calc(100% - 190px - var(--ls-in)); }
+
+/* A phone turned sideways is short: slimmer tabs and palette, icons only. */
+@media (max-height: 520px) {
+  :root.landscape { --ls-in: 8px; --ls-nav: 58px; }
+  :root.landscape .shell > nav { gap: 4px; }
+  :root.landscape .shell > nav button { min-height: 40px; padding: 3px 1px; font-size: 8px; gap: 2px; }
+  :root.landscape .shell > nav button > span img,
+  :root.landscape .shell > nav button > .combat-tab-icon,
+  :root.landscape .shell > nav button > span > .tab-icon { width: 24px; height: 24px; }
+  :root.landscape .defend-stage.side-open .defend-side,
+  :root.landscape .defend-stage.palette-right.side-open .defend-side,
+  :root.landscape .defend-stage.unit-testing.side-open .defend-side { height: 58px; }
+  :root.landscape .defend-palette { gap: 4px; }
+  :root.landscape .defend-palette > .defend-item { width: 50px; padding: 2px; }
+  :root.landscape .defend-palette .defend-item span:not(.defend-item-face) { display: none; }
+  :root.landscape .defend-palette .defend-item canvas { width: 30px; height: 30px; }
+  :root.landscape .defend-palette .defend-item b { font-size: 10px; }
+  :root.landscape .native-campaign .campaign-roster button { width: 50px; }
+  :root.landscape .native-campaign .defend-stage.side-open .ambush-side.offering { height: 110px; }
+  :root.landscape .ambush-side-head { min-width: 64px; }
+  :root.landscape .defend-crisp { display: none; }
+}

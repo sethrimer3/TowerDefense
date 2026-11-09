@@ -5,6 +5,7 @@ import { defaults } from '../src/save.ts';
 import { generateCastle } from '../src/campaign/castles.ts';
 import { SiegeSquads, squadRole } from '../src/campaign/siege-squads.ts';
 import { bannerFor } from '../src/defend/deployment.ts';
+import { CELLS_H } from '../src/defend/grid.ts';
 function fixture(){const save=defaults();Object.assign(save.defend.owned,{barracks:2,archerBarracks:2,mageGuild:1,lancerStable:1,heroHall:1,shadow:1,valkyriePalace:1,darkKeep:1,revolutionary:1,gatlingNest:1});const sim=new CampaignSim('siege',0,[],save.defend.owned,save.defend.levels,generateCastle(45,100),save);sim.start();sim.step(1/30);return {sim,squads:new SiegeSquads(sim.engine,sim.raid.field.attackerIds)};}
 test('Homes group by native troop role with separate heroes and ultimates',()=>{
  const {sim,squads}=fixture(),all=squads.groups.flatMap(g=>g.homes);assert.equal(all.length,sim.raid.field.attackerIds.size);assert.equal(new Set(all).size,all.length);
@@ -20,5 +21,5 @@ test('A group rally replaces only its homes’ native banner and clearing restor
  assert.equal(ordinary.thinkT,0);assert.equal(ordinary.target,-1);assert.deepEqual(ordinary.path,[]);
  const before=(ordinary.x-12)**2+(ordinary.y-90)**2;sim.raid.step(.2);assert.ok((ordinary.x-12)**2+(ordinary.y-90)**2<before,'Native movement turns toward the group destination');
  squads.clear(melee);assert.equal(bannerFor(a,ordinary),keep);assert.ok(melee.homes.every(id=>!a.rallies.has(id)));
- squads.plant(hero,{x:-20,y:1000});assert.deepEqual(squads.at(hero),{x:.5,y:103.5});assert.equal(squads.plant(hero,{x:NaN,y:2}),false);
+ squads.plant(hero,{x:-20,y:1000});assert.deepEqual(squads.at(hero),{x:.5,y:CELLS_H-.5});assert.equal(squads.plant(hero,{x:NaN,y:2}),false);
 });

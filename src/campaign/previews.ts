@@ -1,5 +1,6 @@
 /** One lazily used native renderer, at most thirty cached preview snapshots. */
 import { DefendRenderer } from "../defend/render.ts";
+import { CELLS_W } from "../defend/grid.ts";
 import { onCityArtLoaded } from "../defend/city-layer.ts";
 import { pixelArtOn } from "../defend/pixel-sprites.ts";
 import type { CastleSnapshot } from "./castles.ts";
@@ -137,7 +138,7 @@ export function observeSiegePreview(canvas: HTMLCanvasElement, castle: CastleSna
       r.resize(144, 208);
       r.resetCam();
       r.cam.s = 1.5;
-      r.cam.x = r.canvas.width / 2 - 36 * r.px * 1.5;
+      r.cam.x = r.canvas.width / 2 - (CELLS_W / 2) * r.px * 1.5;
       r.cam.y = r.canvas.width / 2 - 30 * r.px * 1.5;
       r.draw(field.map, null, null, {
         area: "moss",
