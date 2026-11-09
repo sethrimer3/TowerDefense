@@ -308,9 +308,13 @@ export type EvaluatedTech = {
   shieldExtraRadius: number;
   landfallRadiusMultiplier: number;
   strikeCooldownMultiplier: number;
+  strikeCostMultiplier: number;
   matterSynthesis: boolean;
   synthesisSpeedMultiplier: number;
   perimeterResonanceBonus: number;
+  serpentSpeedMultiplier: number;
+  extraMechCount: number;
+  mechDamageMultiplier: number;
 };
 
 export function evaluateTech(ranks: Readonly<Record<string, number>>): EvaluatedTech {
@@ -348,8 +352,12 @@ export function evaluateTech(ranks: Readonly<Record<string, number>>): Evaluated
     shieldExtraRadius: r("harmonicShields"),
     landfallRadiusMultiplier: 1 + 0.25 * r("landfallPayload"),
     strikeCooldownMultiplier: Math.max(0.4, 1 - 0.12 * r("orbitalCooldowns")),
+    strikeCostMultiplier: Math.max(0.5, 1 - 0.1 * r("strikeCapacitors")),
     matterSynthesis: r("matterSynthesis") > 0,
     synthesisSpeedMultiplier: 1 + 0.2 * r("synthesisEfficiency"),
     perimeterResonanceBonus: r("perimeterResonance") > 0 ? 0.35 : 0,
+    serpentSpeedMultiplier: 1 + 0.25 * r("serpentConduits"),
+    extraMechCount: r("mechOverdrive") > 0 ? 1 : 0,
+    mechDamageMultiplier: 1 + 0.3 * r("mechOverdrive"),
   };
 }

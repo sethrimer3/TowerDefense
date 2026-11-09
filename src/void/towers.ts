@@ -413,12 +413,13 @@ export class VoidCombatManager {
         });
       }
     } else if (tower.type === "heavyMechBay") {
-      for (let i = 0; i < 2; i++) {
+      const count = 2 + tech.extraMechCount;
+      for (let i = 0; i < count; i++) {
         this.agents.push({
           id: this.nextAgentId++,
           kind: "heavyMech",
           homeUid: tower.uid,
-          x: cx + (i === 0 ? -1.5 : 1.5),
+          x: cx + (i - 0.5) * 1.4,
           y: cy + 1.5,
           vx: 0,
           vy: 0,
@@ -774,7 +775,7 @@ export class VoidCombatManager {
       }
 
       if (a.kind === "wallSerpent") {
-        this.stepWallSerpent(world, physics, voidField, a, tick, dt);
+        this.stepWallSerpent(world, physics, voidField, a, tick, dt, tech);
       } else if (a.kind === "engineer") {
         this.stepEngineer(world, physics, a, tick, dt, tech);
       } else {
@@ -790,6 +791,7 @@ export class VoidCombatManager {
     a: Agent,
     tick: number,
     dt: number,
+    tech: EvaluatedTech,
   ): void {
     const target = this.pickFrontierTargetNear(world, voidField, a.x, a.y, 60, tick + a.id);
     if (target) {
@@ -799,13 +801,14 @@ export class VoidCombatManager {
       // Orbit/slither along frontier tangent when close
       const ux = d < 3.5 ? -dy / d : dx / d;
       const uy = d < 3.5 ? dx / d : dy / d;
-      a.x = Math.max(2, Math.min(world.grid.w - 3, a.x + ux * 9.5 * dt));
-      a.y = Math.max(2, Math.min(world.grid.h - 3, a.y + uy * 9.5 * dt));
+      const spd = 9.5 * tech.serpentSpeedMultiplier;
+      a.x = Math.max(2, Math.min(world.grid.w - 3, a.x + ux * spd * dt));
+      a.y = Math.max(2, Math.min(world.grid.h - 3, a.y + uy * spd * dt));
     }
     a.cooldown -= dt;
     if (a.cooldown <= 0) {
       a.cooldown = 0.22;
-      physics.depositMatterDisc(world, a.x, a.y, 1.35, true, 1.2);
+      physics.depositMatterDisc(world, a.x, a.y, 1.35 * tech.serpentSpeedMultiplier, true, 1.2);
     }
   }
 
@@ -932,7 +935,7 @@ export class VoidCombatManager {
     const isMech = a.kind === "heavyMech";
     const speed = isMech ? 8.5 : 11.5;
     const range = (isMech ? 16 : 13) * tech.rifleRangeMultiplier;
-    const damage = (isMech ? 28 : 11) * tech.rifleDamageMultiplier;
+    const damage = (isMech ? 28 * tech.mechDamageMultiplier : 11) * tech.rifleDamageMultiplier;
 
     const home = this.towers.find((t) => t.uid === a.homeUid);
     const focusX = home?.focus?.x ?? (home ? home.x + 1.5 : a.x);
