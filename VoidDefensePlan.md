@@ -3,10 +3,100 @@
 **Repository:** https://github.com/sethrimer3/TowerDefense  
 **New implementation roadmap:** `VoidDefensePlan.md`  
 **Original brainstorming transcript:** `VoidDefence.md`  
-**Status:** Completed and verified across all phases (0–16). See `src/void/`, `tests/void-defense.test.ts`, `docs/architecture/void-defense.md`, and `docs/void-defense-progress.md`.  
+**Visual reference gallery:** [`docs/void-defense/visual-references.md`](docs/void-defense/visual-references.md)  
+**Status:** Implementation roadmap with a **blocking visual-quality recovery gate**. Argon reports implementation complete, but completion is **not independently verified on this branch**, and the current screenshot has **not passed user visual acceptance**.  
 **Primary goal:** Transform the existing medieval-scale TowerDefense game into a new, futuristic, large-scale, pixel-art, physics-driven incremental tower-defense game in which a united human Resistance fights an expanding cosmic void.
 
 > **Agent directive:** Follow this plan in order, but inspect the current repository before editing each subsystem. This document describes targets, not a claim that the new mechanics already exist. Preserve useful TowerDefense infrastructure, avoid transplanting obsolete medieval economics or wave logic, keep a playable vertical slice after each milestone, and do not treat speculative balance numbers as final requirements.
+
+## Implementation progress tracker
+
+**Snapshot:** 2026-11-09 (review of repository's `main` branch plus user-supplied prototype, target-gameplay and cinematic stills). **Visual gate remains open regardless of agent-reported feature completion.**
+**Tracking rule:** A phase is **complete** only when its source, tests, screenshots (if visual), and acceptance gate have been verified on a named Git branch/commit. An agent's plan or an unverified screenshot is not sufficient to check off an entire phase.
+
+### Confirmed planning work
+- [x] Original concept and dialogue captured in `VoidDefence.md`.
+- [x] Phased implementation roadmap written and code-reuse opportunities reviewed in this file.
+- [x] Argon's revised technical execution proposal reviewed in conversation. **Proposal only; not evidence of implementation.**
+
+### Implementation phase checklist
+
+| Phase | Verified complete? | Current evidence and remaining gate |
+| --- | --- | --- |
+| 0. Baseline and recovery | - [ ] | Baseline test results, benchmark report, and protected pre-conversion branch/tag **not verified**. |
+| 1. New shell and saves | - [ ] | Screenshot shows a Void Defense screen, mode/profile badge and currencies. New bootstrap, separate save key, and isolation from offline systems **not verified in GitHub**. |
+| 2. Metropolitan city renderer | - [ ] | Screenshot shows a dense overhead city prototype. **Visual acceptance explicitly rejected**: flat repetitive gray buildings, little dimensional depth or richness compared with TowerDefense. Code/performance unverified. |
+| 3. Destructible city physics | - [ ] | No independently verified code, tests or controlled demonstration of damage, detached debris, and reconstruction. |
+| 4. Finite-energy Void | - [ ] | Screenshot shows a Void, reservoir and frontier-contact counters. Shared global perimeter work, energy conservation and edge cases **unverified**. |
+| 5. Live towers and Landfall | - [ ] | Tower placement, transaction safety, Matter Cannon and playable sacrificial-island Landfall **not verified**. |
+| 6. Autonomous workers/infantry | - [ ] | Screenshot shows a Void Nodes counter, but worker/infantry behavior, combat and navigation **not verified**. |
+| 7. Wall blueprints and reticles | - [ ] | No verification of editable shape orders, target focus or AI logic tiers. |
+| 8. Economy/scoring/upgrade kernel | - [ ] | Screenshot shows Supplies, Essence, Sparks and preservation %. Actual earnings, result calculations, upgrade/respec and anti-exploit tests **not verified**. |
+| 9. Single global elastic tech network | - [ ] | No verified new global graph or integration, dependency tests or refund validation. |
+| 10. Expanded strikes | - [ ] | No verified strike set or aiming tests. |
+| 11. Research Lab and Engineering Bay | - [ ] | No verified ambient scene, evolving prototype, or no-offline-earnings tests. |
+| 12. Modes, maps, endless campaign | - [ ] | Under Siege appears in screenshot. Build & Watch, map/mode reward isolation, campaign and endless **not verified**. |
+| 13. Advanced towers and synthesis | - [ ] | No verification. |
+| 14. Advanced Void creatures/AI | - [ ] | No verification of worms, spiders, blooms, queens, honeycombs or Nexus AI. |
+| 15. Visual/audio/UX polish | - [ ] | **Blocked on visual quality recovery**, which must start now rather than wait until late development. |
+| 16. Migration/cleanup/release | - [ ] | No verification; do not delete original TowerDefense implementation or saves. |
+
+**Repository evidence at snapshot:** On `main`, `VoidDefensePlan.md` exists, but `docs/void-defense-progress.md` and the probed `src/void/main.ts`, `citygen.ts`, `render.ts`, `void-field.ts`, `save.ts`, and `physics.ts` are absent. Searches for branches containing `void`, `defense` or `argon` returned no matches. **This does not mean Argon did not write the code**: the screenshot may be from an unpushed/local workspace or another branch. The screenshots are evidence of a running visual prototype, not verified source-level completion. Never mark an implementation phase done solely from that evidence.
+
+### Current blocking task: restore visual quality (see [reference gallery](docs/void-defense/visual-references.md))
+
+**Priority:** Do this before adding more late-game towers, enemies, maps or other scope. It may be performed as a Phase 2/15 corrective checkpoint, not a demand to finish all final graphics now. User feedback explicitly identified that Void Defense looks substantially worse than the original TowerDefense despite having a promising mechanical foundation.
+
+- [ ] Obtain the actual Argon workspace/branch and identify the commit that generated the shown screenshot. Do not overwrite unpushed agent work.
+- [ ] Confirm baseline tests/build and original-game preservation before revising the renderer.
+- [ ] Improve metropolis art with varied skyscraper footprints, roof heights/setbacks, structural shadows, glass and metal materials, infrastructure, active streets, and amber lighting. **No return to medieval scale or a uniformly gray blueprint.**
+- [ ] Improve the Void with layered star fields, nebula depth, living moving frontiers and visually legible pixel-by-pixel consumption/reconstruction.
+- [ ] Make soldiers, repair personnel, tower fire, impacts and construction legible at normal zoom without simply enlarging the whole simulation.
+- [ ] Replace placeholder-feeling flat HUD elements with a cohesive futuristic pixel-art command interface that preserves the original game's tactile craftsmanship.
+- [ ] Compare same-size before/after screenshots at the intended default zoom against the user's original TowerDefense screenshot; obtain user approval of the new look before marking Phase 2's visual gate complete.
+- [ ] Benchmark busy erosion/construction scenes and mobile high-DPI performance after visual changes; prevent shader/particle additions from undermining the larger simulation.
+- [ ] Investigate displayed run state (screenshot: approximately 99.7% preserved at 55 s, Void energy 0): determine whether this is debug balancing, successful containment or an incorrect outcome. Do not infer a gameplay defect from a single screenshot.
+
+### How the coding agent must maintain this tracker
+
+1. **Before work:** identify the actual branch and latest commit, compare this checklist to current source, and change **only verified statuses**. If the source is in an unpushed workspace, first record that workspace/branch and obtain a commit before claiming repository verification.
+2. **After every phase:** record commit SHA, files changed, tests/commands and their real results, key screenshot or demonstration, benchmark if appropriate, unresolved bugs and **next task**. Reference `docs/void-defense-progress.md` if it is created, but keep this summary checklist current in `VoidDefensePlan.md`.
+3. **Status semantics:** `[x]` means the **acceptance gate passes**, not merely that code exists. `[ ]` remains until verified; describe partial progress in its row. A regression reopens the phase. Update this document in the same commit or immediately following the implementation commit.
+4. **Do not alter checkboxes based on aspirational task lists.** Keep visual quality and actual playability gates independent of mechanical/code completeness.
+
+---
+## 0. Immediate priority: Visual Quality Recovery Milestone (blocking acceptance)
+
+> **Decision:** Do **not** declare Void Defense complete simply because an agent has implemented every planned mechanic. The current screenshot remains unacceptable compared with the original TowerDefense's art fidelity and the user's new references. This is a product-quality acceptance failure, not proof of a specific gameplay-code defect.
+
+**Primary visual reference:** [Visual gallery with the seven supplied screenshots](docs/void-defense/visual-references.md). The current Void Defense prototype is the **before** image; the colorful top-down gameplay reference defines desired **material richness and large-scale fluid motion**, and the four supplied cinematic stills define **cosmic prismatic light, event-horizon and debris motion**. The original TowerDefense comparison defines expected **sprite and environment craftsmanship**, not map scale.
+
+### Hard constraints
+
+- **Preserve the massively zoomed-out top-down simulation**: soldiers approximately 1x1 art pixels; tiny engineers/mechs approximately 1x2 or 2x2 as appropriate. Make motion and silhouette readable using context, contrast, effects and selection cues, **not oversized character sprites or a side-view camera**.
+- **Replace geometric monotony:** skyscrapers need diverse footprints, stepped setbacks, height-dependent directional shadows, different roof materials, utility clutter, glass, transit/avenue details and district personalities. Stop using repetitive dark rectangles filled with random orange dots as the dominant city motif.
+- **Make the city physically alive:** repair crews, civilian movement, laser streaks, lit transport/infrastructure, rooftop work, damaged edges and rebuilding must be clearly visible during play. Use ambient warm human light against the cool Void.
+- **Cosmic source versus expanding field:** central portal is a spectacular black-hole-like focal point with thin concentric luminous rings, chromatic flow, lensed stars and radial debris; the actual Void that eats land spreads **irregularly like a disease** along its shared frontier. Do not make all void matter one static purple circle.
+- **Material-energy behavior:** consumed building pixels become sparking, prismatic debris that streams/drifts toward the anomaly. Matter Cannon and Landfall visibly return terrain. Contact between land and Void shows lively localized fracture and color motion.
+- **Pixel integrity:** terrain, buildings and agents remain crisp. Use higher-resolution bloom, emissive passes or subtle displacement only **as an overlay**, bounded to important events. Avoid opaque gradients or full-screen blur hiding a low-detail game beneath them.
+- **UI:** replace any flat prototype HUD with a thoughtfully composed orange/steel futuristic tactical console, clear currency hierarchy and unobstructed gameplay; preserve the tactile craftsmanship of TowerDefense without medieval materials.
+
+### Required work packages, in order
+
+- [ ] **V0. Locate implementation and establish reproducibility.** Identify Argon's *actual* working branch/commit and run the current build and tests. Check existing saves. Reproduce current screenshot/level at fixed seed and normal zoom. Keep a rollback snapshot of working mechanics.
+- [ ] **V1. City composition before particle effects.** Build varied architecture/street districts and height/material shading. Demonstrate visually attractive *static* city screenshots at default zoom before adding spectacle; dense but readable.
+- [ ] **V2. Portal and Void art pass.** Build distinct source/field/frontier layers with cosmic nebula stars, restrained spectral event-horizon rings, chromatic ribbons and lensed particles. Show void-only and city-overlap screenshots.
+- [ ] **V3. Pixel-scale life, action and destructibility.** Show 1x1 people and 1x2/2x2 units working/fighting, live matter reconstruction, distinct tower projectiles, pixel fracturing and inward debris flow.
+- [ ] **V4. Command-center interface.** Refine HUD, build palette, strike targeting, minimap/alerts where justified. The map must still dominate visually and numbers must not overlap.
+- [ ] **V5. Visual acceptance and performance.** Capture standardized before/after at **the same map seed, window, zoom and in-run time** where feasible; include active frontier, Landfall, normal overview, close activity, HUD and reduced-effects variant. Benchmark busy foreground battles on desktop/mobile. Request and obtain user review before closing this gate.
+
+### Definition of visual success
+
+At **default overview zoom**, a viewer must immediately recognize a huge **year-3000 metropolitan city**, multiple distinct buildings/streets and a **beautiful, dangerous cosmic anomaly**; during action they must understand the direction of Void erosion and land reconstruction. The resulting richness should approach the supplied colorful top-down game reference **without copying its visual assets**, and the Void lighting/motion should convey the supplied cinematic energy **in pixel-art form**. A prototype HUD or repetitive grid of identical buildings **fails**, irrespective of test completion.
+
+**Priority rule for AI agents:** Implement this visual milestone **before adding further advanced content**. This checkpoint supplements Phase 2 and Phase 15 and does **not** authorize rewriting core physics or abandoning the stated small-unit scale.
+
+---
 
 ## 1. Design vision and requirements
 
@@ -353,7 +443,7 @@ For each phase below:
 3. Implement in small commits with tests for game rules, then rendering/UI, then integration.
 4. Run focused tests, `npm test`, and `npm run build`; run relevant browser tests and record performance when touching input/rendering.
 5. Keep new module/API descriptions, `CONTEXT.md` glossary, `AGENTS.md` and README accurate as architecture changes; add `docs/architecture/void-defense.md`.
-6. Inspect desktop and mobile behavior. Record changed behavior, known limitations and benchmarks in a short phase progress ledger, suggested `docs/void-defense-progress.md`, with checkboxes for the criteria below.
+6. Inspect desktop and mobile behavior. **Update the Implementation progress tracker at the top of this document** after each verified phase, with commit/test/screenshot evidence and any blockers. Maintain a detailed optional `docs/void-defense-progress.md` ledger, but it must not replace the in-plan checklist.
 7. Preserve deterministic seed/replay behavior, avoid stale legacy constants, and stop a phase if major regression or performance risk cannot be resolved.
 8. Do not delete old content early. Build Void Defense alongside it first, then remove dead code only after new features pass replacement tests.
 
@@ -361,7 +451,7 @@ For each phase below:
 
 ## 12. Ordered implementation phases and acceptance gates
 
-### [x] Phase 0 — Establish baseline and migration map
+### Phase 0 — Establish baseline and migration map
 **Inspect:** `AGENTS.md`; `docs/architecture/defend-core.md`, `defend-buildings.md`, `defend-play.md`, `rendering.md`, `economy.md`, `shell-ui.md`; old and new game specs.
 
 **Build:**
@@ -373,7 +463,7 @@ For each phase below:
 
 **Gate:** Baseline build/tests pass; rollback possible; measured old performance; legacy saves untouched.
 
-### [x] Phase 1 — New Void Defense shell and save model
+### Phase 1 — New Void Defense shell and save model
 **Inspect:** `src/main.ts`, `src/save.ts`, `src/settings.ts`, `src/profile/model.ts`, `src/profile/editor.ts`, `src/ui/dom.ts`, `src/ui/shell.ts`.
 
 **Build:**
@@ -385,7 +475,7 @@ For each phase below:
 
 **Gate:** New game page starts, persists a profile/mode, reloads reliably; original game and its old save remain untouched.
 
-### [x] Phase 2 — City-scale renderer and technical proof of concept
+### Phase 2 — City-scale renderer and technical proof of concept
 **Inspect:** `src/defend/grid.ts`, `citygen.ts`, `render.ts`, `lighting.ts`, `pixel-sprites.ts`, `city-life-art.ts`, camera and performance scripts.
 
 **Build:**
@@ -397,7 +487,7 @@ For each phase below:
 
 **Gate:** The game **visibly feels like a metropolis**, not nine large medieval tiles, and zoom/pan stay usable. Measured frame time/memory justify chosen map size.
 
-### [x] Phase 3 — Destructible terrain and building physics
+### Phase 3 — Destructible terrain and building physics
 **Inspect:** `src/defend/collapse-view.ts`, `citygen.ts`, `render.ts`, city art and destructibility tests.
 
 **Build:**
@@ -409,7 +499,7 @@ For each phase below:
 
 **Gate:** A tower can visibly remove and add local matter; individual structures chip, detach and crumble deterministically; large map remains performant.
 
-### [x] Phase 4 — Void field and finite-energy encounter
+### Phase 4 — Void field and finite-energy encounter
 **Inspect:** `src/defend/blight-*.ts`, `docs/architecture/blight.md`, `src/defend/sim.ts`, `src/defend/performance.ts`.
 
 **Build:**
@@ -421,7 +511,7 @@ For each phase below:
 
 **Gate:** With no defenses the Void consumes the city; additional sacrificial land slows the city's own erosion; finite energy can run out; win/loss is deterministic.
 
-### [x] Phase 5 — First placeable towers and during-battle interaction
+### Phase 5 — First placeable towers and during-battle interaction
 **Inspect:** `src/campaign/ambush-sim.ts`, `src/campaign/ambush-grid.ts`, `src/defend/board-pointers.ts`, `edit-session.ts`, `drag-rules.ts`, `src/ui/spell-bar.ts`, `src/defend/catalog.ts`.
 
 **Build:**
@@ -433,7 +523,7 @@ For each phase below:
 
 **Gate:** Player can afford, drag, place and use a Matter Cannon during an active Void encounter with both mouse and touch. No impossible placement/duplicate payment.
 
-### [x] Phase 6 — Autonomous engineers, masons and soldiers
+### Phase 6 — Autonomous engineers, masons and soldiers
 **Inspect:** `src/defend/troops.ts`, `civilians.ts`, `city-life.ts`, `building-controls.ts`, `pathing.ts` and performance tests.
 
 **Build:**
@@ -445,7 +535,7 @@ For each phase below:
 
 **Gate:** Watching autonomous workers and troops is enjoyable and understandable; each action physically affects terrain or defense. No unbounded pathfinding/particle costs.
 
-### [x] Phase 7 — Minimal player guidance and autonomous logic upgrades
+### Phase 7 — Minimal player guidance and autonomous logic upgrades
 **Inspect:** `src/defend/board-pointers.ts`, `defend/edit-session.ts`, `defend/building-orders.ts`, `defend/building-controls.ts`.
 
 **Build:**
@@ -456,7 +546,7 @@ For each phase below:
 
 **Gate:** Builders execute rough user plans autonomously; rifle squads focus near a marker; both still behave sensibly without orders.
 
-### [x] Phase 8 — In-run economy and accurate scoring
+### Phase 8 — In-run economy and accurate scoring
 **Inspect:** `src/defend/progress.ts`, `src/progression.ts`, `src/save.ts`, `src/ui/shell.ts`.
 
 **Build:**
@@ -468,7 +558,7 @@ For each phase below:
 
 **Gate:** Two identical seeded runs produce the same income/result. A loss can pay Void Essence, but not fabricate Sparks; adding arbitrary new land cannot inflate city preservation.
 
-### [x] Phase 9 — Single enormous elastic technology network
+### Phase 9 — Single enormous elastic technology network
 **Inspect:** `src/ui/upgrade-graph.ts`, `branch-art.ts`, `tree-motes.ts`, `specializations.ts`, `knowledge-paths.ts`, `ui/specialty.ts`.
 
 **Build:**
@@ -481,7 +571,7 @@ For each phase below:
 
 **Gate:** A single network controls **all** towers/strikes, with elastic physics retained. No placed building opens an independent persistent upgrade tree. Refunds never lose earned rare points.
 
-### [x] Phase 10 — Futuristic strike abilities
+### Phase 10 — Futuristic strike abilities
 **Inspect:** `src/ui/spell-bar.ts`, `src/defend/edit-session.ts`, `src/defend/meteor.ts`, `frost-nova.ts`, `reinforcements.ts`.
 
 **Build:**
@@ -492,7 +582,7 @@ For each phase below:
 
 **Gate:** Drag, preview, place, resolve and cool down. Spell-produced land interacts correctly with frontiers and scores.
 
-### [x] Phase 11 — Resistance Operations: Lab and Engineering Bay
+### Phase 11 — Resistance Operations: Lab and Engineering Bay
 **Inspect:** `src/mine/sim.ts`, `mine/render.ts`, `src/library/sim.ts`, `library/lab-render.ts`, `src/away.ts`, `src/main.ts`.
 
 **Build:**
@@ -504,7 +594,7 @@ For each phase below:
 
 **Gate:** Scenes reflect unlock progress, show scale contrast (enormous turret/tiny engineers), and are animated but **economically inert while closed, hidden, or unattended**.
 
-### [x] Phase 12 — Modes, profiles and progression campaign
+### Phase 12 — Modes, profiles and progression campaign
 **Inspect:** `src/profile/editor.ts`, `src/profile/model.ts`, `src/defend/progress.ts`, `src/campaign/ambush-ui.ts` (level select patterns).
 
 **Build:**
@@ -516,7 +606,7 @@ For each phase below:
 
 **Gate:** Switching play style cannot double-claim restricted Sparks or bypass mode rules. Normal battles end; endless rewards and leaderboard-like records work without an infinite-energy win.
 
-### [x] Phase 13 — Advanced towers, creative physics and synthetic matter
+### Phase 13 — Advanced towers, creative physics and synthetic matter
 **Inspect:** New `src/void/towers.ts`, `agents.ts`, `physics.ts`, `tech/catalog.ts`.
 
 **Build:**
@@ -527,7 +617,7 @@ For each phase below:
 
 **Gate:** At least three **different** defense strategies can win the first few maps, not simply a single high-DPS tower. All devices visibly interact with world matter.
 
-### [x] Phase 14 — Cosmic organisms and intelligent Void
+### Phase 14 — Cosmic organisms and intelligent Void
 **Inspect:** Existing `src/defend/blight-worm.ts`, `blight-fliers.ts`, `docs/architecture/blight.md` for reusable tactical ideas.
 
 **Build:**
@@ -538,7 +628,9 @@ For each phase below:
 
 **Gate:** Creatures are visually unique, behave differently, affect real terrain/towers, and late tactics are understandable and counterable. Performance holds with representative bee swarms.
 
-### [x] Phase 15 — Art direction, audio, UX and optional visual experiments
+### Phase 15 — Art direction, audio, UX and optional visual experiments
+
+**Critical acceptance dependency:** The Phase 0 Visual Quality Recovery Milestone must already have passed representative screenshot review. This phase finishes and polishes that art direction; it cannot be used to defer all city/portal quality until the very end.
 **Inspect:** `src/theme.css`, `src/style.css`, `src/defend/pixel-sprites.ts`, lighting/art modules.
 
 **Build:**
@@ -549,7 +641,7 @@ For each phase below:
 
 **Gate:** A single screenshot clearly communicates *massive futuristic city versus cosmic Void*; graphics remain legible at normal scale and with reduced motion.
 
-### [x] Phase 16 — Migration cleanup, polish and release
+### Phase 16 — Migration cleanup, polish and release
 **Inspect:** All dependencies on old idle economies, medieval terms, old spell IDs, old save types, old page routes and exported content.
 
 **Build:**
@@ -599,6 +691,6 @@ Void Defense is **not** finished merely because TowerDefense's menus turn orange
 - Every unlock/upgrade is managed by **one responsive elastic global network**, never per-tower independent trees.
 - The **Research Lab** and **Engineering Bay** show engaging little futuristic people and evolving huge machines, but do not create **offline income** or demand idle simulation management.
 - Both **Build Under Siege** and **Build & Watch** work as defined, with correctly tracked separate results and non-exploitable milestones.
-- The visual identity is **warm orange/steel Resistance versus cold cosmic starry Void**, with deterministic simulation, scalable rendering, intact save safety and passing tests.
+- The visual identity is **warm orange/steel Resistance versus cold cosmic starry Void**, with deterministic simulation, scalable rendering, intact save safety and passing tests; **the user has approved the visual-recovery comparison against the attached reference gallery**.
 
 **Final agent instruction:** Preserve the interaction quality and elastic UI that made TowerDefense enjoyable; replace its scale, theme, idle economy, technology structure and wave-based premise. The new defining experience is **watching a living megacity and hundreds of tiny agents struggle to build and repair reality faster than a beautiful expanding cosmic Void consumes it**.
