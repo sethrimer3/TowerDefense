@@ -29,6 +29,23 @@ export type CellMaterialId = (typeof CellMaterial)[keyof typeof CellMaterial];
 
 export type DistrictKind = "downtown" | "midtown" | "industrial" | "residential" | "plaza" | "breach";
 
+export type BuildingArchStyle =
+  | "glassTower"
+  | "artDecoSetback"
+  | "cyberArcology"
+  | "foundryComplex"
+  | "solarTerrace"
+  | "civicDome";
+
+export type RoofFeatureKind =
+  | "helipad"
+  | "spire"
+  | "reactorDome"
+  | "coolingTowers"
+  | "skyGarden"
+  | "solarArray"
+  | "commsArray";
+
 export type MetroBuilding = {
   id: number;
   x: number;
@@ -37,6 +54,10 @@ export type MetroBuilding = {
   h: number;
   district: DistrictKind;
   isSkyscraper: boolean;
+  /** Architectural style controlling material palette & setback tiers. */
+  archStyle: BuildingArchStyle;
+  /** Distinctive rooftop feature rendered at overview & close zoom. */
+  roofFeature: RoofFeatureKind;
   /** Stylized height in stories (1 to 28) for top-down shadow length & rooftop detail. */
   height: number;
   /** Cells originally belonging to this building footprint. */
@@ -73,7 +94,14 @@ export type VoidNode = {
 };
 
 /** Late-game / escalating cosmic organisms. */
-export type OrganismKind = "nebulaWorm" | "constellationSpider" | "voidBloom" | "nebulaQueen" | "voidBee" | "honeycombCrystal" | "nexusCrystal";
+export type OrganismKind =
+  | "nebulaWorm"
+  | "constellationSpider"
+  | "voidBloom"
+  | "nebulaQueen"
+  | "voidBee"
+  | "honeycombCrystal"
+  | "nexusCrystal";
 
 export type VoidOrganism = {
   id: number;
@@ -91,13 +119,30 @@ export type VoidOrganism = {
   trail?: { x: number; y: number }[];
 };
 
-/** Drifting detached building fragment pulled toward the Void. */
+/** Drifting detached building/terrain fragment pulled along curved streamlines into the Void. */
 export type DebrisFragment = {
   x: number;
   y: number;
+  px: number;
+  py: number;
   vx: number;
   vy: number;
-  color: number;
+  portalX: number;
+  portalY: number;
+  color: string;
+  glowColor: string;
+  size: number;
+  life: number;
+  maxLife: number;
+};
+
+/** Expanding shockwave or energy ring from Matter Cannon impacts, Landfall, or Containment Pulse. */
+export type ShockwaveEffect = {
+  x: number;
+  y: number;
+  maxRadius: number;
+  color: string;
+  secondaryColor: string;
   life: number;
   maxLife: number;
 };

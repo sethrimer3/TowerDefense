@@ -24,30 +24,32 @@ export const CHUNK_SIZE = 16;
  * deterministically across any perimeter length without floating-point drift. */
 export const WORK_SCALE = 1000;
 
-/** Material resistance (micro-work required to erode 1 HP of cell integrity). */
+/** Material resistance (micro-work required to erode 1 HP of cell integrity).
+ * Unreinforced civilian streets and buildings erode rapidly enough that an unopposed
+ * Void visibly devours entire city blocks, whereas Resistance-engineered reclaimed
+ * bedrock, ferrocrete walls, and energy barriers absorb 6x to 25x more work per HP. */
 export const MATERIAL_RESISTANCE = {
   void: 0,
-  unclaimed: 90,
-  street: 180,
-  park: 140,
-  reclaimed: 220,
-  salvage: 160,
-  building: 320,
-  skyscraper: 480,
-  wall: 760,
-  barrier: 640,
+  unclaimed: 14,
+  street: 18,
+  park: 15,
+  salvage: 22,
+  building: 30,
+  skyscraper: 45,
+  reclaimed: 180,
+  wall: 520,
+  barrier: 440,
 } as const;
 
 /** Void expansion and energy balance.
- * - `erosionReservoirShare`: 100% of frontier erosion work draws from the Void reservoir.
  * - `infantryAblationEfficiency`: Rifle laser damage pushes back local frontier
  *   accumulated work and newly formed Void cells, but drains the global reservoir
  *   at a low efficiency (12%) and cannot reduce reservoir below `minReservoirFloorFraction`
  *   via ablation alone, preventing cheap terrain/infantry loops from trivially exhausting the Void. */
 export const VOID_BALANCE = {
-  baseWorkPerSecond: 42,
-  rampPerMinute: 18,
-  isolatedPocketBurnPerSecond: 14,
+  baseWorkPerSecond: 220,
+  rampPerMinute: 140,
+  isolatedPocketBurnPerSecond: 120,
   infantryAblationEfficiency: 0.12,
   minReservoirFloorFraction: 0.15,
   nodeSpawnIntervalTicks: 180,
