@@ -8,6 +8,62 @@
 
 > **Agent directive:** Follow this plan in order, but inspect the current repository before editing each subsystem. This document describes targets, not a claim that the new mechanics already exist. Preserve useful TowerDefense infrastructure, avoid transplanting obsolete medieval economics or wave logic, keep a playable vertical slice after each milestone, and do not treat speculative balance numbers as final requirements.
 
+## Implementation progress tracker
+
+**Snapshot:** 2026-11-08 (review of the repository's `main` branch plus the user's prototype screenshots).
+**Tracking rule:** A phase is **complete** only when its source, tests, screenshots (if visual), and acceptance gate have been verified on a named Git branch/commit. An agent's plan or an unverified screenshot is not sufficient to check off an entire phase.
+
+### Confirmed planning work
+- [x] Original concept and dialogue captured in `VoidDefence.md`.
+- [x] Phased implementation roadmap written and code-reuse opportunities reviewed in this file.
+- [x] Argon's revised technical execution proposal reviewed in conversation. **Proposal only; not evidence of implementation.**
+
+### Implementation phase checklist
+
+| Phase | Verified complete? | Current evidence and remaining gate |
+| --- | --- | --- |
+| 0. Baseline and recovery | - [ ] | Baseline test results, benchmark report, and protected pre-conversion branch/tag **not verified**. |
+| 1. New shell and saves | - [ ] | Screenshot shows a Void Defense screen, mode/profile badge and currencies. New bootstrap, separate save key, and isolation from offline systems **not verified in GitHub**. |
+| 2. Metropolitan city renderer | - [ ] | Screenshot shows a dense overhead city prototype. **Visual acceptance explicitly rejected**: flat repetitive gray buildings, little dimensional depth or richness compared with TowerDefense. Code/performance unverified. |
+| 3. Destructible city physics | - [ ] | No independently verified code, tests or controlled demonstration of damage, detached debris, and reconstruction. |
+| 4. Finite-energy Void | - [ ] | Screenshot shows a Void, reservoir and frontier-contact counters. Shared global perimeter work, energy conservation and edge cases **unverified**. |
+| 5. Live towers and Landfall | - [ ] | Tower placement, transaction safety, Matter Cannon and playable sacrificial-island Landfall **not verified**. |
+| 6. Autonomous workers/infantry | - [ ] | Screenshot shows a Void Nodes counter, but worker/infantry behavior, combat and navigation **not verified**. |
+| 7. Wall blueprints and reticles | - [ ] | No verification of editable shape orders, target focus or AI logic tiers. |
+| 8. Economy/scoring/upgrade kernel | - [ ] | Screenshot shows Supplies, Essence, Sparks and preservation %. Actual earnings, result calculations, upgrade/respec and anti-exploit tests **not verified**. |
+| 9. Single global elastic tech network | - [ ] | No verified new global graph or integration, dependency tests or refund validation. |
+| 10. Expanded strikes | - [ ] | No verified strike set or aiming tests. |
+| 11. Research Lab and Engineering Bay | - [ ] | No verified ambient scene, evolving prototype, or no-offline-earnings tests. |
+| 12. Modes, maps, endless campaign | - [ ] | Under Siege appears in screenshot. Build & Watch, map/mode reward isolation, campaign and endless **not verified**. |
+| 13. Advanced towers and synthesis | - [ ] | No verification. |
+| 14. Advanced Void creatures/AI | - [ ] | No verification of worms, spiders, blooms, queens, honeycombs or Nexus AI. |
+| 15. Visual/audio/UX polish | - [ ] | **Blocked on visual quality recovery**, which must start now rather than wait until late development. |
+| 16. Migration/cleanup/release | - [ ] | No verification; do not delete original TowerDefense implementation or saves. |
+
+**Repository evidence at snapshot:** On `main`, `VoidDefensePlan.md` exists, but `docs/void-defense-progress.md` and the probed `src/void/main.ts`, `citygen.ts`, `render.ts`, `void-field.ts`, `save.ts`, and `physics.ts` are absent. Searches for branches containing `void`, `defense` or `argon` returned no matches. **This does not mean Argon did not write the code**: the screenshot may be from an unpushed/local workspace or another branch. The screenshots are evidence of a running visual prototype, not verified source-level completion. Never mark an implementation phase done solely from that evidence.
+
+### Current blocking task: restore visual quality
+
+**Priority:** Do this before adding more late-game towers, enemies, maps or other scope. It may be performed as a Phase 2/15 corrective checkpoint, not a demand to finish all final graphics now. User feedback explicitly identified that Void Defense looks substantially worse than the original TowerDefense despite having a promising mechanical foundation.
+
+- [ ] Obtain the actual Argon workspace/branch and identify the commit that generated the shown screenshot. Do not overwrite unpushed agent work.
+- [ ] Confirm baseline tests/build and original-game preservation before revising the renderer.
+- [ ] Improve metropolis art with varied skyscraper footprints, roof heights/setbacks, structural shadows, glass and metal materials, infrastructure, active streets, and amber lighting. **No return to medieval scale or a uniformly gray blueprint.**
+- [ ] Improve the Void with layered star fields, nebula depth, living moving frontiers and visually legible pixel-by-pixel consumption/reconstruction.
+- [ ] Make soldiers, repair personnel, tower fire, impacts and construction legible at normal zoom without simply enlarging the whole simulation.
+- [ ] Replace placeholder-feeling flat HUD elements with a cohesive futuristic pixel-art command interface that preserves the original game's tactile craftsmanship.
+- [ ] Compare same-size before/after screenshots at the intended default zoom against the user's original TowerDefense screenshot; obtain user approval of the new look before marking Phase 2's visual gate complete.
+- [ ] Benchmark busy erosion/construction scenes and mobile high-DPI performance after visual changes; prevent shader/particle additions from undermining the larger simulation.
+- [ ] Investigate displayed run state (screenshot: approximately 99.7% preserved at 55 s, Void energy 0): determine whether this is debug balancing, successful containment or an incorrect outcome. Do not infer a gameplay defect from a single screenshot.
+
+### How the coding agent must maintain this tracker
+
+1. **Before work:** identify the actual branch and latest commit, compare this checklist to current source, and change **only verified statuses**. If the source is in an unpushed workspace, first record that workspace/branch and obtain a commit before claiming repository verification.
+2. **After every phase:** record commit SHA, files changed, tests/commands and their real results, key screenshot or demonstration, benchmark if appropriate, unresolved bugs and **next task**. Reference `docs/void-defense-progress.md` if it is created, but keep this summary checklist current in `VoidDefensePlan.md`.
+3. **Status semantics:** `[x]` means the **acceptance gate passes**, not merely that code exists. `[ ]` remains until verified; describe partial progress in its row. A regression reopens the phase. Update this document in the same commit or immediately following the implementation commit.
+4. **Do not alter checkboxes based on aspirational task lists.** Keep visual quality and actual playability gates independent of mechanical/code completeness.
+
+---
 ## 1. Design vision and requirements
 
 ### Setting and player fantasy
@@ -353,7 +409,7 @@ For each phase below:
 3. Implement in small commits with tests for game rules, then rendering/UI, then integration.
 4. Run focused tests, `npm test`, and `npm run build`; run relevant browser tests and record performance when touching input/rendering.
 5. Keep new module/API descriptions, `CONTEXT.md` glossary, `AGENTS.md` and README accurate as architecture changes; add `docs/architecture/void-defense.md`.
-6. Inspect desktop and mobile behavior. Record changed behavior, known limitations and benchmarks in a short phase progress ledger, suggested `docs/void-defense-progress.md`, with checkboxes for the criteria below.
+6. Inspect desktop and mobile behavior. **Update the Implementation progress tracker at the top of this document** after each verified phase, with commit/test/screenshot evidence and any blockers. Maintain a detailed optional `docs/void-defense-progress.md` ledger, but it must not replace the in-plan checklist.
 7. Preserve deterministic seed/replay behavior, avoid stale legacy constants, and stop a phase if major regression or performance risk cannot be resolved.
 8. Do not delete old content early. Build Void Defense alongside it first, then remove dead code only after new features pass replacement tests.
 
