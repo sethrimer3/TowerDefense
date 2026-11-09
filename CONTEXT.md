@@ -812,3 +812,41 @@ A surfaced worm head's chance to turn back toward the nearest city edge when it 
 **Targeting mode**: A building's rule for choosing eligible enemies: Closest, First, Strongest, Weakest or Groups.
 
 **Crosshairs**: A shooting building's chosen aim point. Enemies within the clipped four-by-four-cell nearby square take priority, using that building's targeting mode.
+
+### Void Defense
+
+**Void**:
+An expanding cosmic expanse of darkness with a finite energy reservoir and a fixed expansion work budget per second, divided evenly across its exposed contact perimeter.
+
+**Void portal**:
+A rift that feeds the Void field; some open at the start of a scenario, while delayed portals warn on the metropolis map before rupturing.
+
+**Void Node**:
+A crystalline coalesced mass of Void energy near the active frontier that infantry riflemen and mechs can attack to slow local erosion and ablate a bounded share of the Void reservoir.
+
+**Supplies**:
+The in-battle currency generated periodically by surviving metropolis buildings (plus a baseline trickle) and spent to deploy Resistance towers and strikes.
+
+**Void Essence**:
+The common persistent currency earned from every meaningful run (victory or qualifying defeat) based on Void work resisted and preserved city fraction, spent on standard nodes in the Resistance Tech Tree.
+
+**Sparks of Defiance**:
+The rare milestone currency earned from first clears and high-preservation thresholds (50%, 75% and 90% preserved city value, shared across modes per scenario), spent on major breakthroughs and ultimate doctrines.
+
+**Build Under Siege**:
+The live real-time defense mode where the Void expands while the player deploys, relocates and sells towers and triggers tactical strikes.
+
+**Build & Watch**:
+The planning defense mode where the player lays out initial towers and wall blueprints while paused, then locks controls and watches the simulation play out hands-off (except optional emergency strikes).
+
+**Matter Cannon**:
+A Resistance reclamation tower that fires matter pellets into the Void, cooling into solid reclaimed bedrock discs on impact.
+
+**Landfall**:
+A tactical orbital strike that drops a large disc of sacrificial bedrock directly inside the Void to expand its contact perimeter and divert expansion work away from the city front.
+
+**Wall Serpent**:
+A multi-segment autonomous mechanical worm that patrols the Void frontier, absorbing erosion and depositing reclaimed matter behind its tail.
+
+**Resistance Operations**:
+The non-economic, non-idle cosmetic flavor view showing the Engineering Bay (a giant experimental turret prototype with autonomous welders) and Research Lab (captured Void specimens and researchers) growing alongside tech progression.

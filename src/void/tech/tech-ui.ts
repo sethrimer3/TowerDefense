@@ -3,11 +3,11 @@
  * painters while presenting all 6 Resistance sectors on one zoomable/pannable
  * screen with multi-parent cross-links and full no-fee respec. */
 
-import { paintIcon, type IconItem } from "../defend/structure-art.ts";
-import type { PathHue, PathIcon } from "../knowledge-paths.ts";
-import { MagicCircle } from "../magic-circle/render.ts";
-import { paintPathIcon } from "../ui/path-icons.ts";
-import { UpgradeGraph, type GraphNode } from "../ui/upgrade-graph.ts";
+import { paintIcon, type IconItem } from "../../defend/structure-art.ts";
+import type { PathHue, PathIcon } from "../../knowledge-paths.ts";
+import { MagicCircle } from "../../magic-circle/render.ts";
+import { paintPathIcon } from "../../ui/path-icons.ts";
+import { UpgradeGraph, type GraphNode } from "../../ui/upgrade-graph.ts";
 import { TECH_BY_ID, TECH_NODES, type TechSector } from "./catalog.ts";
 import {
   allocatedCurrencies,

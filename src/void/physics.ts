@@ -93,7 +93,7 @@ export class VoidPhysics {
         // Any tiny unsupported splinter (<= 2 cells when a larger main structure or Void surrounds it)
         // crumbles into salvage rubble and drifting fragments.
         if (components.length > 1) {
-          components.sort((a, bComp) => bComp.length - aComp.length);
+          components.sort((aComp, bComp) => bComp.length - aComp.length);
           for (let i = 1; i < components.length; i++) {
             const splinter = components[i];
             if (splinter.length <= 2) {
