@@ -26,7 +26,7 @@ import {
   type Price,
   type UpgradeId,
 } from "./catalog.ts";
-import { SPAWN_ROW, TILES_H, TILES_W, defendRandom, hash, parseTileKey, tileKey } from "./grid.ts";
+import { TILES_H, TILES_W, buildableTile, defendRandom, hash, parseTileKey, tileKey } from "./grid.ts";
 import {
   QUARTER,
   QUARTERS_H,
@@ -61,6 +61,8 @@ import { settleKept, wearFits } from "../specializations.ts";
 export type Kept = { kind: PlacedKind | "wallSpikes"; path: PathId; rank: number };
 
 export type DefendSave = {
+  /** The field the layout was built on (`FIELD`); see `squareField`. */
+  field?: number;
   /** The city as built, each placed building with its chosen path. */
   layout: Layout;
   owned: Record<PaletteItem, number>;
@@ -109,8 +111,40 @@ export type DefendSave = {
   upgradesFound?: string[];
 };
 
+/** The field a save's layout was built on: 12 for the 12 × 12 square. Saves
+ * without it were built on the old 9 × 13 board (`squareField`). */
+export const FIELD = 12;
+
+/** Moves a layout saved on the old 9 × 13 board into the square field's
+ * buildable middle: one tile right, and up so its lowest row of city tiles
+ * lands on the last buildable row (never pushing the keep off the top).
+ * Whatever lands outside the buildable middle is dropped, so its buildings
+ * return to the palette. Malformed input is passed on for `decodeLayout`. */
+export function squareField(raw: any): any {
+  if (!isObject(raw) || !isObject(raw.keep) || !Number.isInteger(raw.keep.tx) || !Number.isInteger(raw.keep.ty)) return raw;
+  const keys: string[] = Array.isArray(raw.cityTiles) ? raw.cityTiles.filter((k: unknown) => typeof k === "string" && /^\d+,\d+$/.test(k)) : [];
+  const rows = [raw.keep.ty, ...keys.map((k) => parseTileKey(k).ty)];
+  const dx = 1, dy = Math.max(1 - raw.keep.ty, Math.min(0, TILES_H - 2 - Math.max(...rows)));
+  const at = (o: any) => ({ ...o, tx: o.tx + dx, ty: o.ty + dy });
+  const keep = at(raw.keep);
+  if (!buildableTile(keep.tx, keep.ty)) return raw;
+  const tiles = keys.map((k) => { const t = parseTileKey(k); return { tx: t.tx + dx, ty: t.ty + dy }; }).filter((t) => buildableTile(t.tx, t.ty)).map((t) => tileKey(t.tx, t.ty));
+  const city = new Set([...tiles, tileKey(keep.tx, keep.ty)]);
+  const on = (o: any) => isObject(o) && Number.isInteger(o.tx) && Number.isInteger(o.ty) && buildableTile(o.tx + dx, o.ty + dy);
+  const list = (v: unknown) => (Array.isArray(v) ? v : []);
+  const structures = list(raw.structures).filter(on).map((p: any) => ({ ...at(p), ...(Number.isInteger(p.qx) && Number.isInteger(p.qy) ? { qx: p.qx + dx * QUARTER, qy: p.qy + dy * QUARTER } : {}) }));
+  const gates = list(raw.gates).filter(on).map(at).filter((g: any) => gateOk(city, g));
+  const spikes = list(raw.spikes).filter(on).map(at).filter((g: any) => gateOk(city, g));
+  const ballistas = list(raw.ballistas).filter((v: any) => isObject(v) && Number.isInteger(v.vx) && Number.isInteger(v.vy))
+    .map((v: any) => ({ ...v, vx: v.vx + dx, vy: v.vy + dy })).filter((v: any) => v.vx >= 1 && v.vy >= 1 && v.vx < TILES_W && v.vy < TILES_H && cornerOk(city, v));
+  const walls = raw.walls === undefined ? undefined : list(raw.walls).filter((w: any) => isObject(w) && Number.isInteger(w.qx) && Number.isInteger(w.qy))
+    .map((w: any) => ({ qx: w.qx + dx * QUARTER, qy: w.qy + dy * QUARTER })).filter((w: WallSpot) => wallSpotOk(w));
+  return { ...raw, keep, cityTiles: tiles, structures, gates, spikes, ballistas, ...(walls ? { walls } : {}) };
+}
+
 export function defaultDefendSave(seed?: number): DefendSave {
   return {
+    field: FIELD,
     layout: defaultLayout(),
     owned: { ...STARTING_OWNED },
     kept: [],
@@ -352,7 +386,7 @@ export function decodeDefendSave(raw: any): DefendSave {
   const compact = Array.isArray(s.legacyCompact) ? s.legacyCompact.filter((k: unknown)=>k==='darkKeep'||k==='valkyriePalace') as PlacedKind[] : [];
   if(compact.length)d.legacyCompact=[...new Set(compact)];
   const recovered: PlacedStructure[]=[];
-  d.layout = decodeLayout(s.layout, d.owned, d.levels, innerWalls(wallRanks), compact, recovered) ?? d.layout;
+  d.layout = decodeLayout(s.field === FIELD ? s.layout : squareField(s.layout), d.owned, d.levels, innerWalls(wallRanks), compact, recovered) ?? d.layout;
   d.kept = Array.isArray(s.kept) ? s.kept.filter((k: any) => isObject(k) && (PLACED.includes(k.kind) || k.kind === "wallSpikes") && wearFits(k.kind, k.path, k.rank))
     .slice(0, 9999).map((k: any): Kept => ({ kind: k.kind, path: k.path, rank: k.rank })) : [];
   for(const p of recovered)if(p.path&&p.rank)d.kept.push({kind:p.kind,path:p.path,rank:p.rank});
@@ -386,7 +420,7 @@ function wearOn(kind: string, p: any): { path?: PathId; rank?: number } {
 
 const isObject = (s: unknown): s is Record<string, any> => !!s && typeof s === "object";
 const intOr = (n: unknown, min: number, max: number, fallback: number) => (int(n, min, max) ? n : fallback);
-const tileOk = (tx: unknown, ty: unknown) => int(tx, 0, TILES_W - 1) && int(ty, 0, TILES_H - 1) && ty !== SPAWN_ROW;
+const tileOk = (tx: unknown, ty: unknown) => int(tx, 0, TILES_W - 1) && int(ty, 0, TILES_H - 1) && buildableTile(tx as number, ty as number);
 
 /** The saved layout, or null unless every part of it is well formed, the
  * player owns everything on it and its tiles join the keep. Structures that

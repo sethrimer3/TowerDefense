@@ -5,7 +5,7 @@ import { AMBUSH_LEVELS } from "../src/campaign/levels.ts";
 import { generateCity } from "../src/defend/citygen.ts";
 import { defaultLayout, fitLayout } from "../src/defend/layout.ts";
 import { CellType } from "../src/defend/citygen.ts";
-import { cellIndex } from "../src/defend/grid.ts";
+import { cellIndex, CELLS_H } from "../src/defend/grid.ts";
 import { fireflyAt, hasMagicForest, magicForestPlan, MAGIC_FOREST } from "../src/defend/magic-forest.ts";
 import { cloverPixels, wispyTreePixels } from "../src/defend/magic-forest-art.ts";
 
@@ -49,7 +49,7 @@ test("the Magic Forest plants wispy trees on open ground, ringed by lightning bu
 });
 
 test("clovers carpet every open cell and nothing else; trees are wispy, see-through", () => {
-  const map = city(), plan = magicForestPlan(map), px = cloverPixels(plan), W = plan.open.length / 104 * 8;
+  const map = city(), plan = magicForestPlan(map), px = cloverPixels(plan), W = plan.open.length / CELLS_H * 8;
   let covered = 0, open = 0;
   for (let i = 0; i < plan.open.length; i++) {
     const cx = i % (W / 8), cy = Math.floor(i / (W / 8)), p = px[(cy * 8 + 3) * W + cx * 8 + 3];

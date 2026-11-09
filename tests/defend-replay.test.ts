@@ -126,7 +126,7 @@ function scenarios(): Record<string, Scenario> {
     // Valkyries charging down the streets, a folded palace beside a whole one.
     valkyries: {
       layout: city(SQUARE, [["valkyriePalace", -1, 1], ["valkyriePalace", 1, -1], ["valkyriePalace", 1, 1], ["archerTower", 0, -2]], ["valkyriePalace"]),
-      citySeed: 7, levels: levelsAt({ valkyrieReach: 3, palaceCompact: 1, barracksCapacity: 2 }), seed: 3, seconds: 160, wave: 4,
+      citySeed: 7, levels: levelsAt({ valkyrieReach: 3, palaceCompact: 1, barracksCapacity: 2 }), seed: 2, seconds: 160, wave: 4,
       opening: [...Array<EnemyKind>(30).fill('orc'), ...Array<EnemyKind>(10).fill('bat'), ...Array<EnemyKind>(4).fill('ogre')],
       smash: [[90, "valkyriePalace"]],
     },

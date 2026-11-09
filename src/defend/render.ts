@@ -51,6 +51,7 @@ import { drawGrid, drawLifting, drawOverlay, type Overlay } from "./edit-overlay
 import { drawBuildingOrders, drawInspect, type Armed } from "./inspect.ts";
 import { drawShimmer, drawShimmerFlash, drawHighlights, flashAlpha, closeFade, type Highlight } from "./placed-shimmer.ts";
 import { ART } from "./park-art.ts";
+import { Wilds } from "./wilds.ts";
 import { drawFlag, drawWarBanner } from "./structure-art.ts";
 import { RallyFlagArt } from "./rally-flag-art.ts";
 import { bannerReach } from "./war-banner.ts";
@@ -228,6 +229,7 @@ export class DefendRenderer {
   private combatKey = '';
   private outline: UnitOutline | null = null;
   px = 8;
+  private wilds = new Wilds();
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -251,13 +253,10 @@ export class DefendRenderer {
     const dpr = this.dpr;
     const w = Math.max(1, Math.round(this.canvas.clientWidth * dpr)),
       h = Math.max(1, Math.round(this.canvas.clientHeight * dpr));
-    const across = (refW * dpr) / CELLS_W, down = (refH * dpr) / CELLS_H;
-    // Covering (the landscape layout), the board fills the whole view and
-    // pans where it runs past it; otherwise the whole board fits in it.
-    const fit = Math.max(1, this.covering ? Math.max(across, down) : Math.min(across, down));
+    const fit = Math.max(1, Math.min((refW * dpr) / CELLS_W, (refH * dpr) / CELLS_H));
     // Crisp: a whole number of device pixels an art pixel, the board at its
-    // fit or a little past it (covering, never short of it).
-    const px = this.crisp ? ART * Math.max(1, (this.covering ? Math.ceil : Math.floor)(fit / ART)) : fit;
+    // fit or a little past it.
+    const px = this.crisp ? ART * Math.max(1, Math.floor(fit / ART)) : fit;
     const old = { w: this.canvas.width, h: this.canvas.height, px: this.px };
     if (w === old.w && h === old.h && px === old.px && !this.rescale) return;
     this.rescale = false;
@@ -274,18 +273,6 @@ export class DefendRenderer {
   }
   private ref = { w: 0, h: 0 };
 
-  /** Whether the unzoomed board covers the whole view (the landscape layout)
-   * rather than fitting inside it. Changing it rescales on the next `resize`. */
-  get cover() {
-    return this.covering;
-  }
-  set cover(on: boolean) {
-    if (on === this.covering) return;
-    this.covering = on;
-    this.rescale = true;
-  }
-  private covering = false;
-
   /** CSS pixels the camera may always pan past the board's edges, so the
    * rows under controls floating over the board (the landscape layout) can
    * be brought clear of them. A framing's overscroll adds to it. */
@@ -299,15 +286,6 @@ export class DefendRenderer {
     this.clampCam();
   }
   private edge = 0;
-
-  /** Centres the view on board point (`fx`, `fy`, cells) at the current zoom. */
-  lookAt(fx: number, fy: number) {
-    this.glide = null;
-    const s = this.cam.s;
-    this.cam.x = this.canvas.width / 2 - fx * this.px * s;
-    this.cam.y = this.canvas.height / 2 - fy * this.px * s;
-    this.clampCam();
-  }
 
   /** The most device pixels a CSS pixel the board draws at (Settings' Board
    * resolution; 0 for the screen's own). Fewer are cheaper; the browser
@@ -519,10 +497,11 @@ export class DefendRenderer {
     this.protectCombat = this.darkDrain.prepare(sim, opts.now, blightNight);
     this.refreshLayer(map, sim, opts.looks);
     if (opts.timings) this.timings.terrainMs = performance.now() - start;
-    // Beyond the board's edges: the dark ground the city stands on.
+    // Beyond the board's edges: the area's impassable wilds (`wilds.ts`).
     this.ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.ctx.fillStyle = BEYOND;
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    this.wilds.draw(this.ctx, this.area, ART, this.px, this.cam, opts.night);
     this.douse(sim, opts);
     const dt = this.lastNow ? (opts.now - this.lastNow) / 1000 : 0;
     this.lastNow = opts.now;

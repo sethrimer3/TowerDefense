@@ -839,7 +839,7 @@ export class DefendPage {
     this.fitHud();
     const stage = this.root.querySelector<HTMLElement>("#defend-stage")!;
     if (!stage.offsetParent) return;
-    if (this.coverBoard(stage)) {
+    if (this.floatBoard(stage)) {
       this.fitView();
       this.draw();
       return;
@@ -864,36 +864,34 @@ export class DefendPage {
     const stage = this.root.querySelector<HTMLElement>("#defend-stage");
     const board = this.root.querySelector<HTMLElement>("#defend-board");
     if (!this.renderer || !stage || !board || !stage.offsetParent) return;
-    // In landscape the palette floats over the board, which keeps its size.
-    if (this.renderer.cover) return void this.renderer.resize(board.clientWidth, board.clientHeight);
+    // In landscape the controls float over the board: the square field fits
+    // between the bars along its top and bottom, the wilds round it.
+    if (landscape()) return void this.renderer.resize(board.clientWidth, Math.max(80, board.clientHeight - 2 * this.floatEdge()));
     const frame = board.offsetWidth - board.clientWidth;
     this.renderer.resize(stage.clientWidth - frame, board.clientHeight);
   }
 
-  /** The landscape layout: the board fills the window (CSS sizes it), covers
-   * its whole view, and may pan its edge rows out from under the controls
-   * floating over it. The first time, the view centres on the keep. Returns
-   * whether the layout is on; off, it puts the portrait fit back. */
-  private coverBoard(stage: HTMLElement) {
+  /** The landscape layout: the board fills the window (CSS sizes it) and
+   * the square field fits between the controls floating over its top and
+   * bottom; zoomed in, the camera may pan its edge rows out from under them.
+   * Returns whether the layout is on. */
+  private floatBoard(stage: HTMLElement) {
     const r = this.renderer!, on = landscape();
-    r.cover = on;
     if (!on) {
       r.setEdge(0);
       return false;
     }
     stage.style.height = "";
-    const head = this.root.querySelector<HTMLElement>(".defend-head")?.offsetHeight ?? 0;
-    const side = this.root.querySelector<HTMLElement>("#defend-side")?.offsetHeight ?? 0;
     this.fitView();
-    r.setEdge(Math.max(head, side) + 12);
-    if (!this.coverCentred) {
-      this.coverCentred = true;
-      const keep = this.currentMap().buildings.find((b) => b.kind === "keep")?.rect;
-      if (keep) r.lookAt(keep.x + keep.w / 2, keep.y + keep.h / 2);
-    }
+    r.setEdge(this.floatEdge());
     return true;
   }
-  private coverCentred = false;
+  /** CSS pixels taken by the taller of the bars floating over the board. */
+  private floatEdge() {
+    const head = this.root.querySelector<HTMLElement>(".defend-head")?.offsetHeight ?? 0;
+    const side = this.root.querySelector<HTMLElement>("#defend-side")?.offsetHeight ?? 0;
+    return Math.max(head, side) + 12;
+  }
 
   /** Lay out now, and again next frame once the new DOM has settled. */
   private relayout() {

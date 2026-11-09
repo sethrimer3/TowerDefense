@@ -8,7 +8,7 @@ import {
   CELLS_H,
   CELLS_W,
   ORTHO,
-  SPAWN_ROW,
+  buildableTile,
   SUB,
   TILES_H,
   TILES_W,
@@ -412,8 +412,8 @@ function fitOne(p: Placement, cityTiles: Set<string>, cells: FitCells): FittedSt
  * far, or null where it can. */
 function refuseOne(p: Placement, cityTiles: Set<string>, cells: FitCells): string | null {
   const def = STRUCTURES[p.kind], name = def.name.toLowerCase();
-  if (!tileInBounds(p.tx, p.ty) || p.ty === SPAWN_ROW) return "Nothing can be built on the spawn row.";
-  if (!tileInBounds(p.tx + p.span - 1, p.ty + p.span - 1)) return `The ${name} would hang off the board.`;
+  if (!buildableTile(p.tx, p.ty)) return "Nothing can be built on the outer ring of the field.";
+  if (!buildableTile(p.tx + p.span - 1, p.ty + p.span - 1)) return `The ${name} would hang off the buildable field.`;
   const x0 = p.tx * QUARTER, y0 = p.ty * QUARTER, x1 = (p.tx + p.span) * QUARTER, y1 = (p.ty + p.span) * QUARTER;
   if (p.qx < x0 || p.qy < y0 || p.qx + p.qw > x1 || p.qy + p.qh > y1) return p.span > 1 ? `The ${name} must fit inside a 2 × 2 block of tiles.` : `The ${name} must fit inside one tile.`;
   if(def.wholeTile&&(p.qx!==x0||p.qy!==y0))return `The ${name} snaps to a whole city tile.`;
@@ -710,7 +710,7 @@ export function moveBallista(l: Layout, from: CornerSpot, to: CornerSpot): Layou
 // Every edit returns the new layout, or null when it would be illegal.
 
 export function placeCityTile(l: Layout, tx: number, ty: number): Layout | null {
-  if (!tileInBounds(tx, ty) || ty === SPAWN_ROW) return null;
+  if (!buildableTile(tx, ty)) return null;
   const tiles = cityTileSet(l);
   if (tiles.has(tileKey(tx, ty))) return null;
   const next = cloneLayout(l);
@@ -758,7 +758,7 @@ export function moveCityTile(l: Layout, from: TilePos, to: TilePos): Layout | nu
 /** Carries tile `from` (a city tile, or the keep's) to open ground at `to`
  * with everything on it. */
 function carryTile(l: Layout, from: TilePos, to: TilePos): Layout | null {
-  if (!tileInBounds(to.tx, to.ty) || to.ty === SPAWN_ROW) return null;
+  if (!buildableTile(to.tx, to.ty)) return null;
   const toKey = tileKey(to.tx, to.ty);
   if (cityTileSet(l).has(toKey)) return null;
   const next = cloneLayout(l);
@@ -918,7 +918,7 @@ export function parseWallKey(key: string): WallSpot {
 export const wallTile = quarterTile;
 /** Whether a wall section may stand at `w` at all: on the board, off the
  * spawn row. */
-export const wallSpotOk = (w: WallSpot) => w.qx >= 0 && w.qy >= 0 && w.qx < QUARTERS_W && w.qy < QUARTERS_H && wallTile(w).ty !== SPAWN_ROW;
+export const wallSpotOk = (w: WallSpot) => w.qx >= 0 && w.qy >= 0 && w.qx < QUARTERS_W && w.qy < QUARTERS_H && buildableTile(wallTile(w).tx, wallTile(w).ty);
 
 /** The cells a wall section takes: its whole quarter tile. */
 export const wallPieceRect = (w: WallSpot): Rect => quarterRectCells(w.qx, w.qy, 1, 1);

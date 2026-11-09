@@ -479,7 +479,7 @@ test('cannon towers lob shells that burst with splash damage', () => {
   sim.breakT = 1e9;
   sim.enemies = [mk(1, 0), mk(2, 0.8)];
   let shells = 0, scorched = false;
-  for (let i = 0; i < 30 * 3; i++) {
+  for (let i = 0; i < 30 * 6; i++) {
     sim.step(1 / 30);
     shells = Math.max(shells, sim.shells.length);
     scorched ||= sim.scorches.length > 0;
@@ -927,9 +927,10 @@ test('the dark keep\'s corner turrets fire, and it summons one dark wizard who c
   const keep = sim.map.buildings.find((b) => b.kind === 'darkKeep')!;
   const spots = turretSpots(keep.rect);
   assert.equal(spots.length, 4);
-  // A crowd beside one turret, outside the keep.
+  // A crowd beside one turret, outside the keep, on open ground where the
+  // crowd can spread its packed bodies within a leap of each other.
   const s = spots[0];
-  sim.enemies = Array.from({ length: 12 }, (_, i) => foeAt(i + 1, s.x - 3 - (i % 4) * 0.4, s.y - (i >> 2) * 0.4));
+  sim.enemies = Array.from({ length: 12 }, (_, i) => foeAt(i + 1, s.x - 2 - (i % 4) * 0.4, s.y - 5 - (i >> 2) * 0.4));
   sim.step(1 / 30);
   // (The keep may already have trained its wizard, whose bolts chain
   // further; a turret's bolt leaves from half a cell over its spot.)

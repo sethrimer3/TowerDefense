@@ -134,7 +134,7 @@ function lanesFor(level: AmbushLevel, variant: number, river: boolean) {
     within = (salt: number, lo: number, hi: number) => lo + Math.floor(pick(salt) * (hi - lo + 1)),
     lanes = laneCount(level),
     order = levelOrder(level);
-  const keep = { x: lanes > 1 ? within(1, 32, 40) : within(1, 18, 54), y: within(2, CELLS_H - 16, CELLS_H - 12) },
+  const keep = { x: lanes > 1 ? within(1, CELLS_W / 2 - 4, CELLS_W / 2 + 4) : within(1, 18, CELLS_W - 18), y: within(2, CELLS_H - 16, CELLS_H - 12) },
     last = keep.y - 10 - within(3, 4, 9),
     // Diagonals bend the roads, except where a river must be bridged straight across.
     diagonal = river ? 0 : 0.15 + order * 0.01;
@@ -203,7 +203,7 @@ function lanesFor(level: AmbushLevel, variant: number, river: boolean) {
  * the entries and every road running along it. */
 function riverFor(level: AmbushLevel, lanes: LevelPoint[][], squares: { x: number; y: number; w: number; h: number }[]): River | undefined {
   for (let attempt = 0; attempt < 24; attempt++) {
-    const start = 20 + Math.floor(hash01(level.seed, 0x52, attempt) * 46),
+    const start = 20 + Math.floor(hash01(level.seed, 0x52, attempt) * (CELLS_H - 58)),
       top: number[] = [],
       depth: number[] = [];
     let off = 0;

@@ -492,8 +492,10 @@ test("overlapping watch towers combine their strongest mark and slow without mul
   const s = fixture("watchTower", 2), [first, second] = uids(s, "watchTower");
   spare(s, first, "spotters", 3); spare(s, second, "signalFires", 3);
   const fit = fitLayout(s.defend.layout); assert.ok(fit.ok);
-  const sim = new DefendSim(generateCity(fit, 4), { ...s.defend.levels }, 1, battleBonuses(s)), b = sim.map.buildings.find(b => b.kind === "watchTower")!, at = center(b.rect);
-  const e = enemy(sim, at.x + 2, at.y); (sim as any).markEnemies();
+  const sim = new DefendSim(generateCity(fit, 4), { ...s.defend.levels }, 1, battleBonuses(s));
+  // Midway between the two towers, within both their reaches.
+  const [a, b] = sim.map.buildings.filter(b => b.kind === "watchTower").map(b => center(b.rect));
+  const e = enemy(sim, (a.x + b.x) / 2, (a.y + b.y) / 2); (sim as any).markEnemies();
   assert.equal(e.markDamage, 3); assert.equal(e.slowed, 0.55);
 });
 

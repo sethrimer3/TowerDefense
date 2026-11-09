@@ -80,7 +80,7 @@ test('townsfolk make safe errands, watchmen patrol day and night (outside only t
 test('an inside watchman runs to a building; an outside watchman runs off the board', () => {
   const map=city(), life=new CityLife();life.sync(map,null,false);
   const guard=life.people.find(p=>p.role==='watchman')!;
-  guard.hidden=false;guard.mode='walk';guard.x+=1;
+  guard.hidden=false;guard.mode='walk';guard.x+=3;
   assert.equal(life.solid[cellAt(guard.x,guard.y)],0);
   const threat={x:guard.x+.2,y:guard.y,hp:10};
   tick(life,1/30,true,[threat]);

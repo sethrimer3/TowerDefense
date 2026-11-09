@@ -8,7 +8,8 @@ import { castleAtForge, castleSnapshot } from "../src/campaign/castle-model.ts";
 import { placeStructure } from "../src/defend/layout.ts";
 import { buildNativeCopy } from "../src/campaign/native-build.ts";
 import { center } from "../src/defend/pathing.ts";
-import type { Enemy, ScenarioSpell, Soldier } from "../src/defend/sim.ts";
+import type { DefendSim, Enemy, ScenarioSpell, Soldier } from "../src/defend/sim.ts";
+import { CELLS_H, CELLS_W, cellIndex } from "../src/defend/grid.ts";
 
 function battle(hero = false) {
   const game = defaults(),
@@ -32,6 +33,13 @@ function battle(hero = false) {
   mode.step(1 / 30);
   assert.ok(mode.mana);
   return mode;
+}
+/** An open cell on the middle row of the field, nearest its centre, for a grave. */
+function openSpot(sim: DefendSim) {
+  const y = CELLS_H >> 1;
+  for (let d = 0; d < CELLS_W; d++) for (const x of [(CELLS_W >> 1) + d, (CELLS_W >> 1) - d])
+    if (!sim.solid[cellIndex(x, y)]) return { x: x + 0.5, y: y + 0.5 };
+  throw new Error("no open cell");
 }
 function enemy(mode: CampaignSim, unit: Soldier): Enemy {
   return mode.raid.attack.enemies.find((e) => e.id === unit.id)!;
@@ -82,8 +90,9 @@ test("Each defending soldier or summon pays once; buildings, civilians and attac
   const attacker = r.attack.soldiers[0];
   r.defense.hurtEnemy(r.defense.enemies.find((e) => e.id === attacker.id)!, attacker.hp * 1000);
   assert.equal(mana.value, 2);
-  r.defense.graves.push({ x: 36.5, y: 46.5, difficulty: 4, life: 10 });
-  assert.equal(r.defense.castNecromancy({ x: 36.5, y: 46.5 }), 1);
+  const spot = openSpot(r.defense);
+  r.defense.graves.push({ ...spot, difficulty: 4, life: 10 });
+  assert.equal(r.defense.castNecromancy(spot), 1);
   mode.step(1 / 30);
   const summoned = r.defense.soldiers.find((s) => s.kind === "undead")!;
   assert.ok(summoned);
@@ -106,8 +115,9 @@ test("A native Hero's Legend revival pays only after its final death", () => {
 test("A native summon expiring on its own grants no mana or enemy grave", () => {
   const mode = battle(),
     defender = mode.raid.defense;
-  defender.graves.push({ x: 36.5, y: 46.5, difficulty: 4, life: 10 });
-  assert.equal(defender.castNecromancy({ x: 36.5, y: 46.5 }), 1);
+  const spot = openSpot(defender);
+  defender.graves.push({ ...spot, difficulty: 4, life: 10 });
+  assert.equal(defender.castNecromancy(spot), 1);
   mode.step(1 / 30);
   const summon = defender.soldiers.find((s) => s.kind === "undead")!;
   assert.ok(summon);
@@ -158,11 +168,10 @@ test("Externally killed proxies retain native graves and frost/nano death effect
     sim = mode.engine,
     unit = mode.raid.defense.soldiers.find(s=>s.kind!=="flagBearer")!,
     proxy = enemy(mode, unit);
-  unit.x = 36.5;
-  unit.y = 46.5;
+  Object.assign(unit, openSpot(sim));
   (sim.bonuses as any).frostNova = { path: "shatter", rank: 3 };
   proxy.freeze = 1;
-  proxy.nano = { r: 1, damage: 1, chance: 0, origin: -1 };
+  proxy.nano = { r: 1, damage: 1, chance: 0, origin: { x: 0, y: 0 } };
   kill(mode, unit);
   assert.equal(sim.graves.length, 0);
   mode.step(1 / 30);

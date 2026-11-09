@@ -95,7 +95,7 @@ Old saves infer entered progress from the cleared record plus one, preserving th
   hovered tile shows exactly where the building will be fitted.
 - Placed things can be dragged to another tile, or back onto the palette /
   off the board to pick them up again.
-- **City tiles** can go anywhere but the top row, next to the city or apart
+- **City tiles** can go anywhere in the middle 10 × 10 of the 12 × 12 board (never its outer ring), next to the city or apart
   from it; each group of tiles joined along their edges is walled on its own.
   The player starts with 8 — enough for a 3 × 3 city around the keep. Pressing
   a city tile away from its buildings lifts it with everything on it (its

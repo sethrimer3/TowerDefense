@@ -2,7 +2,7 @@
  * functions of the layout: the layout it makes on each tile, the outline it
  * shows there, why a tile refuses it, and which city tiles can be lifted. */
 import { STRUCTURES, type PaletteItem } from "./catalog.ts";
-import { SPAWN_ROW, SUB, TILES_H, TILES_W, tileInBounds, tileKey, type Rect, type TilePos } from "./grid.ts";
+import { SUB, TILES_H, TILES_W, buildableTile, tileInBounds, tileKey, type Rect, type TilePos } from "./grid.ts";
 import {
   SIDES,
   across,
@@ -291,18 +291,19 @@ export function refusal(drag: Drag, layout: Layout, key: string): string {
   }
   if (kind === "wallBlock") {
     const w = parseWallKey(key), t = wallTile(w);
-    if (t.ty === SPAWN_ROW) return "Nothing can be built on the top row — that's where the enemy gathers.";
+    if (!buildableTile(t.tx, t.ty)) return "Nothing can be built on the outer ring of the field — only the middle 10 × 10 tiles take building.";
     if (layout.walls?.some((o) => wallKey(o) === key)) return "There's already a wall there.";
     if (cityTileSet(layout).has(tileKey(t.tx, t.ty)))
       return layout.innerWalls ? "A wall there would leave no room for the city's streets and buildings." : "Walls can stand inside the city once the walls' Town walls upgrade is learned.";
     return "There's a wall or a building there already.";
   }
   if (carriesStructure(drag)) {
-    if (quarterTile(parseQuarterKey(key)).ty === SPAWN_ROW) return "Nothing can be built on the top row — that's where the enemy gathers.";
+    const qt = quarterTile(parseQuarterKey(key));
+    if (!buildableTile(qt.tx, qt.ty)) return "Nothing can be built on the outer ring of the field — only the middle 10 × 10 tiles take building.";
     return structureRefusal(drag, layout, key);
   }
-  const ty = Number(key.split(",")[1]);
-  if (ty === 0) return "Nothing can be built on the top row — that's where the enemy gathers.";
+  const [tx, ty] = key.split(",").map(Number);
+  if (!buildableTile(tx, ty)) return "Nothing can be built on the outer ring of the field — only the middle 10 × 10 tiles take building.";
   const inCity = cityTileSet(layout).has(key);
   if (kind === "cityTile")
     return inCity ? "That tile is already part of the city." : drag.from === "cityTile" ? "What stands on this tile doesn't fit there." : "There isn't room for a city tile there.";
