@@ -148,7 +148,7 @@ export class VoidField {
     if (gravityAnchorCells && gravityAnchorCells[idx]) {
       base = Math.round(base * 1.45);
     }
-    return Math.max(100, base);
+    return Math.max(10, base);
   }
 
   /** Advances Void expansion, delayed portals, and Void Node spawns for one fixed tick. */
@@ -267,14 +267,30 @@ export class VoidField {
     for (let i = 0; i < this.frontierCells.length; i++) {
       const cIdx = this.frontierCells[i];
       let wEdge = this.frontierContactCount[cIdx];
-      // Sacrificial non-baseline reclaimed islands get bonus diversion weight if upgraded
-      if (!world.isBaselineCell[cIdx] && world.material[cIdx] === CellMaterial.RECLAIMED) {
-        wEdge *= 1 + opts.perimeterResonanceBonus;
+      const cellX = world.grid.xOf(cIdx);
+      const cellY = world.grid.yOf(cIdx);
+      const mat = world.material[cIdx];
+
+      // Organic disease-like cosmic veins: deterministic spatial ridges + street conduit channeling
+      const veinWave =
+        0.5 +
+        0.5 *
+          Math.sin(cellX * 0.23 + cellY * 0.17 + (world.seed & 0xff)) *
+          Math.cos(cellX * 0.14 - cellY * 0.29 + ((tick >> 6) * 0.35));
+      wEdge *= 0.45 + 1.15 * veinWave;
+
+      if (mat === CellMaterial.STREET || mat === CellMaterial.PARK) {
+        wEdge *= 1.38;
+      }
+
+      // Sacrificial non-baseline reclaimed islands draw concentrated Void pressure away from the city
+      if (!world.isBaselineCell[cIdx] && mat === CellMaterial.RECLAIMED) {
+        wEdge *= 2.2 * (1 + opts.perimeterResonanceBonus);
       }
       // Nearby Void Nodes locally amplify pressure weight
       if (this.nodes.length > 0) {
-        const cx = world.grid.xOf(cIdx) + 0.5;
-        const cy = world.grid.yOf(cIdx) + 0.5;
+        const cx = cellX + 0.5;
+        const cy = cellY + 0.5;
         for (const node of this.nodes) {
           if (dist(cx - node.x, cy - node.y) <= 10) {
             wEdge *= VOID_BALANCE.nodeErosionBoost;
