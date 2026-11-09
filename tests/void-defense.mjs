@@ -282,14 +282,15 @@ try {
         }
       }
 
-      // Warm up 120 ticks so Void tendrils, debris streams, projectiles, and units are all active
-      for (let i = 0; i < 120; i++) sim.step();
+      // Warm up 120 ticks + initial terrain layer bake so Void tendrils, debris streams, projectiles, and units are all active
+      sim.stepTicks(120);
+      renderer.draw(sim, performance.now(), null, null, null, false);
 
       const simTimes = [];
       const renderTimes = [];
       for (let f = 0; f < 90; f++) {
         const t0 = performance.now();
-        sim.step();
+        sim.stepTicks(1);
         const t1 = performance.now();
         renderer.draw(sim, t1, null, null, null, false);
         const t2 = performance.now();

@@ -35,6 +35,7 @@ export class VoidTechTreeView {
   private picked = "commandCore";
   private filterSector: TechSector | "" = "";
   private searchQuery = "";
+  private hasFittedVisible = false;
 
   constructor(
     private readonly host: HTMLElement,

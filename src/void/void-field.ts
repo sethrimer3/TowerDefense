@@ -341,8 +341,14 @@ export class VoidField {
           this.cellMicroWork[cIdx] = 0;
           physics.consumeCellIntoVoid(world, cIdx, true);
         } else {
-          world.hp[cIdx] = curHp - hpLoss;
-          world.grid.markIndexDirty(cIdx);
+          const maxHp = Math.max(1, world.maxHp[cIdx]);
+          const nextHp = curHp - hpLoss;
+          world.hp[cIdx] = nextHp;
+          const prevStage = curHp / maxHp < 0.4 ? 2 : curHp / maxHp < 0.75 ? 1 : 0;
+          const nextStage = nextHp / maxHp < 0.4 ? 2 : nextHp / maxHp < 0.75 ? 1 : 0;
+          if (prevStage !== nextStage) {
+            world.grid.markIndexDirty(cIdx);
+          }
         }
       } else {
         this.cellMicroWork[cIdx] = totalCellMicro;
