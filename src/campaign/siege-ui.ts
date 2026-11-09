@@ -1,4 +1,4 @@
-import { localSize, TURN_CLASS } from "../ui/landscape.ts";
+import { floatingEdge, landscape } from "../ui/landscape.ts";
 import { worldSky } from "../daylight.ts";
 import { SquadBar } from "./siege-squad-bar.ts";
 import { SiegeSquads } from "./siege-squads.ts";
@@ -64,7 +64,6 @@ export class SiegePage {
     this.sim = this.make();
     this.renderer = new DefendRenderer(this.canvas);
     this.canvas.tabIndex=0;
-    this.canvas.classList.add(TURN_CLASS);
     this.canvas.setAttribute("aria-label", t("siege.board"));
     this.pointers = new BoardPointers({
       renderer: () => this.renderer,
@@ -365,9 +364,13 @@ export class SiegePage {
   private draw() {
     this.banners.draw(this.now, this.host.save().settings.reduceMotion);
     const r = this.renderer,
-      box = localSize(this.canvas);
+      box = this.canvas.getBoundingClientRect();
     r.maxDpr = this.host.save().settings.resolution;
-    r.resize(box.w, box.h);
+    // Landscape: the board covers the window and its edge rows can pan out
+    // from under the controls floating over it.
+    r.cover = landscape();
+    r.resize(box.width, box.height);
+    r.setEdge(r.cover ? floatingEdge(this.root) : 0);
     if (this.freshCamera) {
       r.resetCam();
       const top = r.toClient(CELLS_W / 2, 0);

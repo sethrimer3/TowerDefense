@@ -1,4 +1,4 @@
-import { landscape, turned } from "../ui/landscape.ts";
+import { landscape } from "../ui/landscape.ts";
 import type { Highlight } from "./placed-shimmer.ts";
 import { wallAtCell, type SpikeSpot } from "./layout.ts";
 import { STRUCTURES } from "./catalog.ts";
@@ -402,7 +402,7 @@ export class DefendPage {
       <div class="defend-city" id="defend-city">
         <div class="defend-stage" id="defend-stage">
           <aside class="defend-side" id="defend-side" aria-label="Palette"><div class="defend-palette" id="defend-palette"></div></aside>
-          <div class="defend-board" id="defend-board"><canvas id="defend-canvas" class="board-turn" aria-label="City defense board. Scroll or pinch to zoom, drag to pan."></canvas>
+          <div class="defend-board" id="defend-board"><canvas id="defend-canvas" aria-label="City defense board. Scroll or pinch to zoom, drag to pan."></canvas>
             <div class="defend-specialty" id="defend-specialty" role="dialog" aria-label="Specialization" hidden></div>
             <div class="defend-banner" id="defend-banner" role="dialog" aria-label="The keep has fallen" hidden></div>
             <div class="defend-message" id="defend-message" aria-live="polite"></div>
@@ -839,6 +839,11 @@ export class DefendPage {
     this.fitHud();
     const stage = this.root.querySelector<HTMLElement>("#defend-stage")!;
     if (!stage.offsetParent) return;
+    if (this.coverBoard(stage)) {
+      this.fitView();
+      this.draw();
+      return;
+    }
     const top = stage.getBoundingClientRect().top + window.scrollY;
     // 24 px below leaves room for the board frame's lower brackets.
     let height = Math.max(160, Math.floor(window.innerHeight - top - this.navHeight() - 24));
@@ -859,16 +864,36 @@ export class DefendPage {
     const stage = this.root.querySelector<HTMLElement>("#defend-stage");
     const board = this.root.querySelector<HTMLElement>("#defend-board");
     if (!this.renderer || !stage || !board || !stage.offsetParent) return;
-    // A turned board (landscape) lies across the stage: its canvas's width
-    // runs down the screen, where the palette slides in below it.
-    if (turned(this.renderer.canvas)) {
-      const frame = board.offsetHeight - board.clientHeight;
-      this.renderer.resize(stage.clientHeight - frame, board.clientWidth);
-      return;
-    }
+    // In landscape the palette floats over the board, which keeps its size.
+    if (this.renderer.cover) return void this.renderer.resize(board.clientWidth, board.clientHeight);
     const frame = board.offsetWidth - board.clientWidth;
     this.renderer.resize(stage.clientWidth - frame, board.clientHeight);
   }
+
+  /** The landscape layout: the board fills the window (CSS sizes it), covers
+   * its whole view, and may pan its edge rows out from under the controls
+   * floating over it. The first time, the view centres on the keep. Returns
+   * whether the layout is on; off, it puts the portrait fit back. */
+  private coverBoard(stage: HTMLElement) {
+    const r = this.renderer!, on = landscape();
+    r.cover = on;
+    if (!on) {
+      r.setEdge(0);
+      return false;
+    }
+    stage.style.height = "";
+    const head = this.root.querySelector<HTMLElement>(".defend-head")?.offsetHeight ?? 0;
+    const side = this.root.querySelector<HTMLElement>("#defend-side")?.offsetHeight ?? 0;
+    this.fitView();
+    r.setEdge(Math.max(head, side) + 12);
+    if (!this.coverCentred) {
+      this.coverCentred = true;
+      const keep = this.currentMap().buildings.find((b) => b.kind === "keep")?.rect;
+      if (keep) r.lookAt(keep.x + keep.w / 2, keep.y + keep.h / 2);
+    }
+    return true;
+  }
+  private coverCentred = false;
 
   /** Lay out now, and again next frame once the new DOM has settled. */
   private relayout() {
@@ -877,8 +902,6 @@ export class DefendPage {
   }
 
   private navHeight() {
-    // In landscape the tabs stand beside the page, not under it.
-    if (landscape()) return 0;
     return document.querySelector("nav")?.getBoundingClientRect().height ?? 80;
   }
 

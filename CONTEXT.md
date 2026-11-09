@@ -812,4 +812,4 @@ A surfaced worm head's chance to turn back toward the nearest city edge when it 
 **Targeting mode**: A building's rule for choosing eligible enemies: Closest, First, Strongest, Weakest or Groups.
 
 **Crosshairs**: A shooting building's chosen aim point. Enemies within the clipped four-by-four-cell nearby square take priority, using that building's targeting mode.
-- **Landscape layout:** the layout for a screen wider than tall: tabs in a column on the left, Defend's palette along the bottom, and the battle boards shown turned a quarter turn (city on the right, enemies in from the left) without changing the battle itself.
+- **Landscape layout:** the layout for a screen wider than tall: a simulation fills the whole window, north up, with the tabs, controls and palette floating over it.

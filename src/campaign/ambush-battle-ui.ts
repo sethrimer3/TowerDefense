@@ -1,4 +1,4 @@
-import { localSize, TURN_CLASS } from "../ui/landscape.ts";
+import { floatingEdge, landscape } from "../ui/landscape.ts";
 import { PlacedBuildingMenu } from "../ui/placed-building-menu.ts";
 import { decodeOrders } from "../defend/building-orders.ts";
 import { applyOrders, aimPoint, controlsOf } from "../defend/building-controls.ts";
@@ -93,7 +93,6 @@ export class AmbushBattlePage {
     this.sim = new AmbushSim(index, host.save());
     this.renderer = new DefendRenderer(this.canvas);
     this.canvas.setAttribute("aria-label", "Ambush battlefield");
-    this.canvas.classList.add(TURN_CLASS);
     this.pointers = new BoardPointers({
       renderer: () => this.renderer,
       paletteSelector: "#ambush-palette",
@@ -600,9 +599,13 @@ export class AmbushBattlePage {
   }
   private draw() {
     const r = this.renderer,
-      box = localSize(this.canvas);
+      box = this.canvas.getBoundingClientRect();
     r.maxDpr = this.host.save().settings.resolution;
-    r.resize(box.w, box.h);
+    // Landscape: the board covers the window and its edge rows can pan out
+    // from under the controls floating over it.
+    r.cover = landscape();
+    r.resize(box.width, box.height);
+    r.setEdge(r.cover ? floatingEdge(this.root) : 0);
     if (this.resetCamera) {
       r.resetCam();
       this.resetCamera = false;
