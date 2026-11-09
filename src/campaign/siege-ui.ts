@@ -1,3 +1,4 @@
+import { localSize, TURN_CLASS } from "../ui/landscape.ts";
 import { worldSky } from "../daylight.ts";
 import { SquadBar } from "./siege-squad-bar.ts";
 import { SiegeSquads } from "./siege-squads.ts";
@@ -63,6 +64,7 @@ export class SiegePage {
     this.sim = this.make();
     this.renderer = new DefendRenderer(this.canvas);
     this.canvas.tabIndex=0;
+    this.canvas.classList.add(TURN_CLASS);
     this.canvas.setAttribute("aria-label", t("siege.board"));
     this.pointers = new BoardPointers({
       renderer: () => this.renderer,
@@ -363,9 +365,9 @@ export class SiegePage {
   private draw() {
     this.banners.draw(this.now, this.host.save().settings.reduceMotion);
     const r = this.renderer,
-      box = this.canvas.getBoundingClientRect();
+      box = localSize(this.canvas);
     r.maxDpr = this.host.save().settings.resolution;
-    r.resize(box.width, box.height);
+    r.resize(box.w, box.h);
     if (this.freshCamera) {
       r.resetCam();
       const top = r.toClient(CELLS_W / 2, 0);

@@ -2632,3 +2632,112 @@ nav button[data-mode] > .tab-label { min-height: 2.4em; }
 .ambush-offer-changes { margin: 0; padding-left: 14px; text-align: left; align-self: stretch; color: #e8dcc4; }
 .ambush-offer-changes li { margin: 2px 0; }
 @media (max-width: 600px) { .native-campaign .side-open .ambush-side.offering { width: 150px; } .ambush-offer { font-size: 10px; } }
+
+/* ── LANDSCAPE (ui/landscape.ts) ────────────────────────────────────── */
+/* Wider than tall: the tabs stand in a column on the left, each page fills
+ * the rest, and the battle boards are shown turned a quarter turn (city on
+ * the right, enemies in from the left). Only the picture turns. */
+:root.landscape .shell {
+  width: 100%;
+  max-width: none;
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  column-gap: 14px;
+  padding: max(10px, var(--safe-top)) max(16px, var(--safe-right)) max(8px, var(--safe-bottom)) max(10px, var(--safe-left));
+}
+:root.landscape .shell > nav {
+  grid-column: 1;
+  grid-row: 1 / -1;
+  flex-direction: column;
+  justify-content: flex-start;
+  margin: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+:root.landscape .shell > nav::-webkit-scrollbar { display: none; }
+:root.landscape .shell > nav button { flex: 1 1 0; min-height: 58px; max-height: 128px; }
+:root.landscape .shell > .currency-hold { grid-column: 2; grid-row: 1; }
+:root.landscape .shell > .page { grid-column: 2; grid-row: 2; min-height: 0; }
+/* A board canvas is laid out tall (north up) in its box's turned size and
+ * shown turned counter-clockwise, filling the box. */
+:root.landscape .defend-board:has(> canvas.board-turn) { container-type: size; }
+:root.landscape .defend-board > canvas.board-turn {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  /* !important: over the campaign pages' id-scoped canvas sizes. */
+  width: 100cqh !important;
+  height: 100cqw !important;
+  transform: translate(-50%, -50%) rotate(-90deg);
+}
+/* Defend: the controls and wave along the top, the palette along the bottom. */
+:root.landscape .defend-stage,
+:root.landscape .defend-stage.palette-right { flex-direction: column-reverse; }
+:root.landscape .defend-side {
+  width: auto;
+  height: 0;
+  align-items: stretch;
+  transition: height 0.35s ease, margin 0.35s ease, opacity 0.25s ease;
+}
+:root.landscape .defend-stage.side-open .defend-side,
+:root.landscape .defend-stage.palette-right.side-open .defend-side,
+:root.landscape .defend-stage.unit-testing.side-open .defend-side {
+  width: auto;
+  height: 96px;
+  margin: 10px 0 0;
+}
+:root.landscape .defend-palette,
+:root.landscape .unit-testing .defend-palette {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  flex-direction: row;
+  align-items: stretch;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+:root.landscape .defend-palette > .defend-item { width: 76px; justify-content: center; }
+:root.landscape .defend-palette > .defend-enemy { width: 96px; }
+:root.landscape .defend-palette .defend-item,
+:root.landscape .defend-palette .defend-item canvas { touch-action: pan-x; }
+:root.landscape .defend-palette-title,
+:root.landscape .defend-palette-none { align-self: center; max-width: 140px; }
+:root.landscape .defend-category { align-self: center; padding: 8px 10px; }
+:root.landscape .defend-categories { flex-direction: row; align-items: center; padding: 0; }
+/* A phone turned sideways is short: a slimmer bar, icons only. */
+@media (max-height: 520px) {
+  :root.landscape .shell { grid-template-columns: 64px minmax(0, 1fr); column-gap: 10px; padding-top: max(6px, var(--safe-top)); padding-bottom: max(4px, var(--safe-bottom)); }
+  :root.landscape .shell > nav { padding: 4px; gap: 4px; }
+  :root.landscape .shell > nav button { min-height: 44px; padding: 3px 1px; font-size: 8px; gap: 2px; }
+  :root.landscape .shell > nav button > span img,
+  :root.landscape .shell > nav button > .combat-tab-icon,
+  :root.landscape .shell > nav button > span > .tab-icon { width: 26px; height: 26px; }
+  :root.landscape .defend-head { margin-bottom: 4px; }
+  :root.landscape .defend-stage.side-open .defend-side,
+  :root.landscape .defend-stage.palette-right.side-open .defend-side,
+  :root.landscape .defend-stage.unit-testing.side-open .defend-side { height: 64px; margin-top: 6px; }
+  :root.landscape .defend-palette { padding: 4px; gap: 4px; }
+  :root.landscape .defend-palette > .defend-item { width: 52px; padding: 2px; }
+  :root.landscape .defend-palette .defend-item span:not(.defend-item-face) { display: none; }
+  :root.landscape .defend-palette .defend-item canvas { width: 32px; height: 32px; }
+  :root.landscape .defend-palette .defend-item b { font-size: 10px; }
+}
+/* Ambush: the plaque (health, stars, gold) at the bar's left, the buildings
+ * in a row beside it; an upgrade's card makes the bar taller. */
+:root.landscape .native-campaign .ambush-side { flex-direction: row; }
+:root.landscape .native-campaign .side-open .ambush-side,
+:root.landscape .native-campaign .side-open .ambush-side.offering { width: auto; }
+:root.landscape .native-campaign .defend-stage.side-open .ambush-side.offering { height: 150px; }
+:root.landscape .ambush-side-head { justify-content: center; min-width: 96px; margin: 0 6px 0 0; }
+:root.landscape .ambush-side-content { flex: 1; display: flex; gap: 6px; overflow-x: auto; overflow-y: hidden; }
+:root.landscape .ambush-side-content .defend-palette { width: auto; flex: 1 0 auto; }
+:root.landscape .native-campaign .campaign-roster button { width: 76px; }
+:root.landscape .ambush-offer { flex: none; flex-direction: row; flex-wrap: wrap; justify-content: center; width: 340px; overflow-y: auto; }
+:root.landscape .ambush-offer-changes { flex-basis: 100%; }
+:root.landscape #ambush-inspect { flex: none; overflow-y: auto; }
+@media (max-height: 520px) {
+  :root.landscape .native-campaign .campaign-roster button { width: 52px; }
+  :root.landscape .native-campaign .defend-stage.side-open .ambush-side.offering { height: 110px; }
+  :root.landscape .ambush-side-head { min-width: 64px; }
+}

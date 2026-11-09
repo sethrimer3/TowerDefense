@@ -6,6 +6,8 @@
  * Any gesture can use it: `BoardPointers` points it at held drags and at
  * `BoardAim` gestures (through their optional `focus`). Presentation only. */
 
+import { clientToLocal, turned } from "../ui/landscape.ts";
+
 /** The box's side, in CSS pixels, before it is fitted to small screens:
  * half again the area of the first 132-pixel box (side times √1.5). */
 const SIZE = 162;
@@ -52,13 +54,26 @@ export class Loupe {
     box.style.top = `${top}px`;
     box.hidden = false;
 
-    const r = board.getBoundingClientRect();
-    const sx = board.width / r.width, sy = board.height / r.height;
     const span = size / LOUPE_ZOOM;
     const ctx = box.getContext("2d")!;
     ctx.imageSmoothingEnabled = false;
     ctx.fillStyle = "#14100b";
     ctx.fillRect(0, 0, px, px);
+    if (turned(board)) {
+      // A board shown turned: copy round the focus in the canvas's own
+      // pixels and turn the copy the same quarter turn.
+      const p = clientToLocal(board, at.focus.x, at.focus.y), k = board.width / p.w;
+      const s = span * k, x0 = p.x * k - s / 2, y0 = p.y * (board.height / p.h) - s / 2;
+      ctx.save();
+      ctx.translate(px / 2, px / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.drawImage(board, x0, y0, s, s, -px / 2, -px / 2, px, px);
+      ctx.restore();
+      crosshair(ctx, px / 2, Math.max(1, Math.round(dpr)));
+      return;
+    }
+    const r = board.getBoundingClientRect();
+    const sx = board.width / r.width, sy = board.height / r.height;
     // Only the part of the source on the canvas is copied, to the matching
     // part of the box, so the edges of the board stay sharp and in place.
     const x0 = (at.focus.x - span / 2 - r.left) * sx, y0 = (at.focus.y - span / 2 - r.top) * sy;

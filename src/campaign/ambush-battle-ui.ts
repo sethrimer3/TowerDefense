@@ -1,3 +1,4 @@
+import { localSize, TURN_CLASS } from "../ui/landscape.ts";
 import { PlacedBuildingMenu } from "../ui/placed-building-menu.ts";
 import { decodeOrders } from "../defend/building-orders.ts";
 import { applyOrders, aimPoint, controlsOf } from "../defend/building-controls.ts";
@@ -92,6 +93,7 @@ export class AmbushBattlePage {
     this.sim = new AmbushSim(index, host.save());
     this.renderer = new DefendRenderer(this.canvas);
     this.canvas.setAttribute("aria-label", "Ambush battlefield");
+    this.canvas.classList.add(TURN_CLASS);
     this.pointers = new BoardPointers({
       renderer: () => this.renderer,
       paletteSelector: "#ambush-palette",
@@ -598,9 +600,9 @@ export class AmbushBattlePage {
   }
   private draw() {
     const r = this.renderer,
-      box = this.canvas.getBoundingClientRect();
+      box = localSize(this.canvas);
     r.maxDpr = this.host.save().settings.resolution;
-    r.resize(box.width, box.height);
+    r.resize(box.w, box.h);
     if (this.resetCamera) {
       r.resetCam();
       this.resetCamera = false;
