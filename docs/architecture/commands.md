@@ -63,6 +63,4 @@ node tests/defend-reinforcements.mjs # Reinforcements palette, aim, drop, landin
 node tests/library-navigation.mjs # Whole-room Lab/Nave framing, Mine building picker and research/back transitions (needs dev server)
 node --experimental-transform-types --import ./tests/pin-random.ts tools/measure-upgrade-production.ts # Bounded 1x Mine/Library scenarios, no player saves
 node --experimental-transform-types --import ./tests/pin-random.ts tools/estimate-upgrades.ts # Catalog costs, rank CSV and docs/UPGRADE_TIMING.md (uses measured JSON)
-``node --experimental-transform-types --import ./tests/pin-random.ts --test tests/void-defense.test.ts # Void Defense unit & integration suite
-node tests/void-defense.mjs # Void Defense desktop/mobile QA screenshots and 192x256 & 256x384 simulation/render benchmarks (needs dev server)
-`
+```

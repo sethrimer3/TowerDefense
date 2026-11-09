@@ -10,7 +10,7 @@ test("every listed sound has its file, and every file is listed", () => {
   for (const path of listed) assert.ok(existsSync(new URL(path, ROOT)), `missing ${path}`);
   const files = readdirSync(ROOT, { recursive: true, withFileTypes: true })
     .filter((d) => d.isFile() && d.name.endsWith(".mp3"))
-    .map((d) => `${d.parentPath.replace(/\\/g, "/").slice(ROOT.pathname.replace(/^\/([A-Za-z]:)/, "$1").length).replace(/^\/|\/$/g, "")}/${d.name}`.replace(/^\//, ""));
+    .map((d) => `${d.parentPath.slice(ROOT.pathname.length).replace(/^\/|\/$/g, "")}/${d.name}`.replace(/^\//, ""));
   for (const f of files) assert.ok(listed.has(f), `unused ${f}`);
 });
 
