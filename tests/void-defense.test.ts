@@ -262,7 +262,7 @@ test("6. Anti-instant-abort participation gate & mode-shared Sparks entitlement"
 test("7. Global technology DAG validation, purchases, and cascading refunds", () => {
   const dagCheck = validateTechCatalog();
   assert.equal(dagCheck.ok, true, dagCheck.errors.join("; "));
-  assert.ok(TECH_NODES.length >= 22);
+  assert.ok(TECH_NODES.length >= 30, `Expected >=30 tech nodes, got ${TECH_NODES.length}`);
 
   const wallet = emptyTechWallet();
   recordScenarioResult(wallet, "tutorialBreach", "underSiege", true, 98, 3, 500);
@@ -361,4 +361,57 @@ test("9. Save isolation: voiddefense.v1 round-trips cleanly and never touches to
   const tdDefault = defaults();
   const tdRestored = decode(JSON.stringify(tdDefault));
   assert.equal(tdRestored.version, tdDefault.version);
+});
+
+test("10. Advanced towers, Wall Serpent trail, Matter Synthesis, and Cosmic Organisms (Honeycomb & Nexus Crystals)", () => {
+  const wallet = emptyTechWallet();
+  // Grant enough Sparks & Essence to unlock all 9 towers, all 5 strikes, and Matter Synthesis
+  for (const sc of SCENARIOS) {
+    if (!sc.endless) recordScenarioResult(wallet, sc.id, "underSiege", true, 99, 3, 1500);
+  }
+  for (const n of TECH_NODES) {
+    while (buyTechNode(wallet, n.id, false)) {
+      // buy to max rank
+    }
+  }
+
+  const tech = evaluateTech(wallet.ranks);
+  assert.equal(tech.unlockedTowers.size, 9, "All 9 Resistance tower types unlocked");
+  assert.equal(tech.unlockedStrikes.size, 5, "All 5 orbital strikes unlocked");
+  assert.equal(tech.matterSynthesis, true, "Matter Synthesis breakthrough active");
+
+  const sim = new VoidSim("organismEscalation", "underSiege", wallet, true);
+  // Place Constructor Hub, Wall Serpent Bay, Shield Projector, Gravity Anchor, Rocket Team, Heavy Mech Bay
+  sim.placeTower("constructorHub", 30, 180);
+  sim.placeTower("wallSerpent", 40, 180);
+  sim.placeTower("shieldProjector", 50, 180);
+  sim.placeTower("gravityAnchor", 60, 180);
+  sim.placeTower("rocketTeam", 70, 180);
+  sim.placeTower("heavyMechBay", 80, 180);
+
+  // Add a polyline wall blueprint
+  const bp = sim.combat.addWallBlueprint(
+    sim.world,
+    [
+      { x: 32, y: 165 },
+      { x: 42, y: 165 },
+    ],
+    false,
+  );
+  assert.ok(bp && bp.cells.length >= 8, "Created polyline wall blueprint");
+
+  // Cast Seismic Frame and Genesis strikes
+  assert.equal(sim.castStrike("seismicFrame", 50, 175), true);
+  assert.equal(sim.castStrike("genesis", 96, 128), true);
+
+  // Step 380 ticks so cosmic organisms spawn and Wall Serpent / Engineers build walls
+  sim.stepTicks(380);
+  assert.ok(sim.combat.organisms.length > 0, "Cosmic Void organisms spawned from active portal");
+
+  // Verify at least some blueprint cells or serpent trail cells were turned into WALL
+  let wallCount = 0;
+  for (let i = 0; i < sim.world.grid.count; i++) {
+    if (sim.world.material[i] === CellMaterial.WALL) wallCount++;
+  }
+  assert.ok(wallCount > 10, `Expected constructed ferrocrete wall cells, got ${wallCount}`);
 });

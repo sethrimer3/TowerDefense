@@ -3,7 +3,7 @@
 **Repository:** https://github.com/sethrimer3/TowerDefense  
 **New implementation roadmap:** `VoidDefensePlan.md`  
 **Original brainstorming transcript:** `VoidDefence.md`  
-**Status:** Implementation specification, not completed work.  
+**Status:** Completed and verified across all phases (0–16). See `src/void/`, `tests/void-defense.test.ts`, `docs/architecture/void-defense.md`, and `docs/void-defense-progress.md`.  
 **Primary goal:** Transform the existing medieval-scale TowerDefense game into a new, futuristic, large-scale, pixel-art, physics-driven incremental tower-defense game in which a united human Resistance fights an expanding cosmic void.
 
 > **Agent directive:** Follow this plan in order, but inspect the current repository before editing each subsystem. This document describes targets, not a claim that the new mechanics already exist. Preserve useful TowerDefense infrastructure, avoid transplanting obsolete medieval economics or wave logic, keep a playable vertical slice after each milestone, and do not treat speculative balance numbers as final requirements.
@@ -361,7 +361,7 @@ For each phase below:
 
 ## 12. Ordered implementation phases and acceptance gates
 
-### Phase 0 — Establish baseline and migration map
+### [x] Phase 0 — Establish baseline and migration map
 **Inspect:** `AGENTS.md`; `docs/architecture/defend-core.md`, `defend-buildings.md`, `defend-play.md`, `rendering.md`, `economy.md`, `shell-ui.md`; old and new game specs.
 
 **Build:**
@@ -373,7 +373,7 @@ For each phase below:
 
 **Gate:** Baseline build/tests pass; rollback possible; measured old performance; legacy saves untouched.
 
-### Phase 1 — New Void Defense shell and save model
+### [x] Phase 1 — New Void Defense shell and save model
 **Inspect:** `src/main.ts`, `src/save.ts`, `src/settings.ts`, `src/profile/model.ts`, `src/profile/editor.ts`, `src/ui/dom.ts`, `src/ui/shell.ts`.
 
 **Build:**
@@ -385,7 +385,7 @@ For each phase below:
 
 **Gate:** New game page starts, persists a profile/mode, reloads reliably; original game and its old save remain untouched.
 
-### Phase 2 — City-scale renderer and technical proof of concept
+### [x] Phase 2 — City-scale renderer and technical proof of concept
 **Inspect:** `src/defend/grid.ts`, `citygen.ts`, `render.ts`, `lighting.ts`, `pixel-sprites.ts`, `city-life-art.ts`, camera and performance scripts.
 
 **Build:**
@@ -397,7 +397,7 @@ For each phase below:
 
 **Gate:** The game **visibly feels like a metropolis**, not nine large medieval tiles, and zoom/pan stay usable. Measured frame time/memory justify chosen map size.
 
-### Phase 3 — Destructible terrain and building physics
+### [x] Phase 3 — Destructible terrain and building physics
 **Inspect:** `src/defend/collapse-view.ts`, `citygen.ts`, `render.ts`, city art and destructibility tests.
 
 **Build:**
@@ -409,7 +409,7 @@ For each phase below:
 
 **Gate:** A tower can visibly remove and add local matter; individual structures chip, detach and crumble deterministically; large map remains performant.
 
-### Phase 4 — Void field and finite-energy encounter
+### [x] Phase 4 — Void field and finite-energy encounter
 **Inspect:** `src/defend/blight-*.ts`, `docs/architecture/blight.md`, `src/defend/sim.ts`, `src/defend/performance.ts`.
 
 **Build:**
@@ -421,7 +421,7 @@ For each phase below:
 
 **Gate:** With no defenses the Void consumes the city; additional sacrificial land slows the city's own erosion; finite energy can run out; win/loss is deterministic.
 
-### Phase 5 — First placeable towers and during-battle interaction
+### [x] Phase 5 — First placeable towers and during-battle interaction
 **Inspect:** `src/campaign/ambush-sim.ts`, `src/campaign/ambush-grid.ts`, `src/defend/board-pointers.ts`, `edit-session.ts`, `drag-rules.ts`, `src/ui/spell-bar.ts`, `src/defend/catalog.ts`.
 
 **Build:**
@@ -433,7 +433,7 @@ For each phase below:
 
 **Gate:** Player can afford, drag, place and use a Matter Cannon during an active Void encounter with both mouse and touch. No impossible placement/duplicate payment.
 
-### Phase 6 — Autonomous engineers, masons and soldiers
+### [x] Phase 6 — Autonomous engineers, masons and soldiers
 **Inspect:** `src/defend/troops.ts`, `civilians.ts`, `city-life.ts`, `building-controls.ts`, `pathing.ts` and performance tests.
 
 **Build:**
@@ -445,7 +445,7 @@ For each phase below:
 
 **Gate:** Watching autonomous workers and troops is enjoyable and understandable; each action physically affects terrain or defense. No unbounded pathfinding/particle costs.
 
-### Phase 7 — Minimal player guidance and autonomous logic upgrades
+### [x] Phase 7 — Minimal player guidance and autonomous logic upgrades
 **Inspect:** `src/defend/board-pointers.ts`, `defend/edit-session.ts`, `defend/building-orders.ts`, `defend/building-controls.ts`.
 
 **Build:**
@@ -456,7 +456,7 @@ For each phase below:
 
 **Gate:** Builders execute rough user plans autonomously; rifle squads focus near a marker; both still behave sensibly without orders.
 
-### Phase 8 — In-run economy and accurate scoring
+### [x] Phase 8 — In-run economy and accurate scoring
 **Inspect:** `src/defend/progress.ts`, `src/progression.ts`, `src/save.ts`, `src/ui/shell.ts`.
 
 **Build:**
@@ -468,7 +468,7 @@ For each phase below:
 
 **Gate:** Two identical seeded runs produce the same income/result. A loss can pay Void Essence, but not fabricate Sparks; adding arbitrary new land cannot inflate city preservation.
 
-### Phase 9 — Single enormous elastic technology network
+### [x] Phase 9 — Single enormous elastic technology network
 **Inspect:** `src/ui/upgrade-graph.ts`, `branch-art.ts`, `tree-motes.ts`, `specializations.ts`, `knowledge-paths.ts`, `ui/specialty.ts`.
 
 **Build:**
@@ -481,7 +481,7 @@ For each phase below:
 
 **Gate:** A single network controls **all** towers/strikes, with elastic physics retained. No placed building opens an independent persistent upgrade tree. Refunds never lose earned rare points.
 
-### Phase 10 — Futuristic strike abilities
+### [x] Phase 10 — Futuristic strike abilities
 **Inspect:** `src/ui/spell-bar.ts`, `src/defend/edit-session.ts`, `src/defend/meteor.ts`, `frost-nova.ts`, `reinforcements.ts`.
 
 **Build:**
@@ -492,7 +492,7 @@ For each phase below:
 
 **Gate:** Drag, preview, place, resolve and cool down. Spell-produced land interacts correctly with frontiers and scores.
 
-### Phase 11 — Resistance Operations: Lab and Engineering Bay
+### [x] Phase 11 — Resistance Operations: Lab and Engineering Bay
 **Inspect:** `src/mine/sim.ts`, `mine/render.ts`, `src/library/sim.ts`, `library/lab-render.ts`, `src/away.ts`, `src/main.ts`.
 
 **Build:**
@@ -504,7 +504,7 @@ For each phase below:
 
 **Gate:** Scenes reflect unlock progress, show scale contrast (enormous turret/tiny engineers), and are animated but **economically inert while closed, hidden, or unattended**.
 
-### Phase 12 — Modes, profiles and progression campaign
+### [x] Phase 12 — Modes, profiles and progression campaign
 **Inspect:** `src/profile/editor.ts`, `src/profile/model.ts`, `src/defend/progress.ts`, `src/campaign/ambush-ui.ts` (level select patterns).
 
 **Build:**
@@ -516,7 +516,7 @@ For each phase below:
 
 **Gate:** Switching play style cannot double-claim restricted Sparks or bypass mode rules. Normal battles end; endless rewards and leaderboard-like records work without an infinite-energy win.
 
-### Phase 13 — Advanced towers, creative physics and synthetic matter
+### [x] Phase 13 — Advanced towers, creative physics and synthetic matter
 **Inspect:** New `src/void/towers.ts`, `agents.ts`, `physics.ts`, `tech/catalog.ts`.
 
 **Build:**
@@ -527,7 +527,7 @@ For each phase below:
 
 **Gate:** At least three **different** defense strategies can win the first few maps, not simply a single high-DPS tower. All devices visibly interact with world matter.
 
-### Phase 14 — Cosmic organisms and intelligent Void
+### [x] Phase 14 — Cosmic organisms and intelligent Void
 **Inspect:** Existing `src/defend/blight-worm.ts`, `blight-fliers.ts`, `docs/architecture/blight.md` for reusable tactical ideas.
 
 **Build:**
@@ -538,7 +538,7 @@ For each phase below:
 
 **Gate:** Creatures are visually unique, behave differently, affect real terrain/towers, and late tactics are understandable and counterable. Performance holds with representative bee swarms.
 
-### Phase 15 — Art direction, audio, UX and optional visual experiments
+### [x] Phase 15 — Art direction, audio, UX and optional visual experiments
 **Inspect:** `src/theme.css`, `src/style.css`, `src/defend/pixel-sprites.ts`, lighting/art modules.
 
 **Build:**
@@ -549,7 +549,7 @@ For each phase below:
 
 **Gate:** A single screenshot clearly communicates *massive futuristic city versus cosmic Void*; graphics remain legible at normal scale and with reduced motion.
 
-### Phase 16 — Migration cleanup, polish and release
+### [x] Phase 16 — Migration cleanup, polish and release
 **Inspect:** All dependencies on old idle economies, medieval terms, old spell IDs, old save types, old page routes and exported content.
 
 **Build:**

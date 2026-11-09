@@ -285,7 +285,7 @@ export class VoidApp {
       const valid =
         this.sim.phase === "battle" &&
         this.sim.combat.strikeCooldowns[strike] <= 0 &&
-        this.sim.supplies >= STRIKE_SPECS[strike].supplyCost &&
+        this.sim.supplies >= this.sim.strikePrice(strike) &&
         this.sim.world.grid.inBounds(cx, cy);
       this.hoverPreview = { kind: "strike", strike, x: fx, y: fy, valid };
     } else if (this.activeTool.kind === "setReticle") {
@@ -428,6 +428,7 @@ export class VoidApp {
     strikePal.innerHTML = unlockedStrikes
       .map((s) => {
         const spec = STRIKE_SPECS[s];
+        const price = this.sim.strikePrice(s);
         const cd = Math.ceil(this.sim.combat.strikeCooldowns[s]);
         const active =
           this.activeTool.kind === "castStrike" && this.activeTool.strike === s;
@@ -437,7 +438,7 @@ export class VoidApp {
           } title="${spec.name}: ${spec.description}">
             <span class="void-pal-swatch" style="background:${spec.color}"></span>
             <b>${spec.shortName}</b>
-            <small>${cd > 0 ? `${cd}s` : `${spec.supplyCost}⚡`}</small>
+            <small>${cd > 0 ? `${cd}s` : `${price}⚡`}</small>
           </button>
         `;
       })
@@ -652,6 +653,15 @@ export class VoidApp {
             }).join("")}
           </div>
         </section>
+        <section class="void-settings-panel">
+          <h3>Resistance Command Settings</h3>
+          <div class="void-settings-row">
+            <label><input type="checkbox" data-set-sound ${!this.save.settings.soundOff ? "checked" : ""} /> Audio Telemetry & Sound Effects</label>
+            <label><input type="checkbox" data-set-mag ${this.save.settings.magnifier ? "checked" : ""} /> Precision Placement Magnifier (Loupe)</label>
+            <label><input type="checkbox" data-set-motion ${this.save.settings.reduceMotion ? "checked" : ""} /> Reduce Motion & Ambient Flicker</label>
+            <label><input type="checkbox" data-set-dev ${this.save.settings.devMode ? "checked" : ""} /> Developer Mode (Unlock All Towers/Strikes & Unlimited Supplies)</label>
+          </div>
+        </section>
         ${
           this.onSwitchToClassic
             ? `<footer class="void-classic-switch"><button type="button" data-open-classic>Switch to Classic Medieval TowerDefense (Legacy Save Intact)</button></footer>`
@@ -659,6 +669,24 @@ export class VoidApp {
         }
       </div>
     `;
+
+    secPage.querySelector<HTMLInputElement>("[data-set-sound]")!.onchange = (e) => {
+      this.save.settings.soundOff = !(e.target as HTMLInputElement).checked;
+      this.persist();
+    };
+    secPage.querySelector<HTMLInputElement>("[data-set-mag]")!.onchange = (e) => {
+      this.save.settings.magnifier = (e.target as HTMLInputElement).checked;
+      this.persist();
+    };
+    secPage.querySelector<HTMLInputElement>("[data-set-motion]")!.onchange = (e) => {
+      this.save.settings.reduceMotion = (e.target as HTMLInputElement).checked;
+      this.persist();
+    };
+    secPage.querySelector<HTMLInputElement>("[data-set-dev]")!.onchange = (e) => {
+      this.save.settings.devMode = (e.target as HTMLInputElement).checked;
+      this.persist();
+      this.startNewRun(this.save.selectedScenario);
+    };
 
     secPage.querySelectorAll<HTMLButtonElement>("[data-select-mode]").forEach((btn) => {
       btn.onclick = () => {

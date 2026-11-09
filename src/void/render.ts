@@ -465,6 +465,17 @@ export class VoidRenderer {
         }
         c.fillStyle = "#e08aff";
         c.fillRect(o.x - 0.7, o.y - 0.7, 1.4, 1.4);
+      } else if (o.kind === "honeycombCrystal") {
+        c.fillStyle = "#f2c94c";
+        c.fillRect(o.x - 1.1, o.y - 1.1, 2.2, 2.2);
+        c.fillStyle = "#b85cff";
+        c.fillRect(o.x - 0.5, o.y - 0.5, 1.0, 1.0);
+      } else if (o.kind === "nexusCrystal") {
+        c.strokeStyle = "#6ef3ff";
+        c.lineWidth = 0.35;
+        c.strokeRect(o.x - 1.4, o.y - 1.4, 2.8, 2.8);
+        c.fillStyle = "#ff66e8";
+        c.fillRect(o.x - 0.7, o.y - 0.7, 1.4, 1.4);
       } else {
         c.fillStyle = o.kind === "nebulaQueen" ? "#ff66e8" : "#b85cff";
         c.fillRect(o.x - 1.2, o.y - 1.2, 2.4, 2.4);

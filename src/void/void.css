@@ -589,3 +589,31 @@
   color: #fff;
   font-family: inherit;
 }
+
+.void-settings-panel {
+  padding: 0.75rem;
+  background: #141924;
+  border: 1px solid #2e394e;
+  border-radius: 4px;
+}
+
+.void-settings-panel h3 {
+  margin: 0 0 0.5rem;
+  color: #ffaa33;
+  font-size: 0.92rem;
+}
+
+.void-settings-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  font-size: 0.82rem;
+  color: #cbd5e1;
+}
+
+.void-settings-row label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}

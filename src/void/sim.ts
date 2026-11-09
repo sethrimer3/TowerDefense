@@ -133,10 +133,14 @@ export class VoidSim {
     return true;
   }
 
+  strikePrice(strike: StrikeId): number {
+    return Math.max(10, Math.round((STRIKE_SPECS[strike].supplyCost * this.tech.strikeCostMultiplier) / 5) * 5);
+  }
+
   castStrike(strike: StrikeId, tx: number, ty: number): boolean {
     if (this.phase !== "battle") return false;
     if (!this.devUnlimited && !this.tech.unlockedStrikes.has(strike)) return false;
-    const cost = STRIKE_SPECS[strike].supplyCost;
+    const cost = this.strikePrice(strike);
     if (!this.devUnlimited && cost > this.supplies) return false;
     const ok = this.combat.castStrike(
       this.world,

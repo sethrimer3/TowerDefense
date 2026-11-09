@@ -1045,14 +1045,38 @@ export class VoidCombatManager {
       const activePortals = world.portals.filter((p) => p.active);
       if (activePortals.length > 0) {
         const p = activePortals[tick % activePortals.length];
-        const kinds: OrganismKind[] = ["nebulaWorm", "constellationSpider", "voidBloom", "nebulaQueen"];
+        const kinds: OrganismKind[] = [
+          "nebulaWorm",
+          "constellationSpider",
+          "voidBloom",
+          "nebulaQueen",
+          "honeycombCrystal",
+          ...(tick >= 1080 ? (["nexusCrystal"] as OrganismKind[]) : []),
+        ];
         const kind = kinds[Math.floor(hash01(world.seed, 909, tick) * kinds.length)];
-        const maxHp = kind === "nebulaQueen" ? 260 : kind === "nebulaWorm" ? 150 : 110;
+        const maxHp =
+          kind === "nebulaQueen"
+            ? 260
+            : kind === "nexusCrystal"
+              ? 220
+              : kind === "honeycombCrystal"
+                ? 170
+                : kind === "nebulaWorm"
+                  ? 150
+                  : 110;
+        const ox =
+          kind === "honeycombCrystal" || kind === "nexusCrystal"
+            ? Math.max(4, Math.min(world.grid.w - 5, p.x + Math.round((hash01(world.seed, 910, tick) - 0.5) * 14)))
+            : p.x;
+        const oy =
+          kind === "honeycombCrystal" || kind === "nexusCrystal"
+            ? Math.max(4, Math.min(world.grid.h - 5, p.y + Math.round((hash01(world.seed, 911, tick) - 0.5) * 14)))
+            : p.y;
         this.organisms.push({
           id: this.nextOrganismId++,
           kind,
-          x: p.x,
-          y: p.y,
+          x: ox,
+          y: oy,
           vx: 0,
           vy: 0,
           hp: maxHp,
@@ -1060,30 +1084,38 @@ export class VoidCombatManager {
           targetX: world.grid.w * 0.5,
           targetY: world.grid.h * 0.5,
           cooldown: 1.5,
-          ...(kind === "nebulaWorm" ? { trail: [{ x: p.x, y: p.y }] } : {}),
+          ...(kind === "nebulaWorm" ? { trail: [{ x: ox, y: oy }] } : {}),
         });
         voidField.energyRemaining = Math.max(0, voidField.energyRemaining - 120);
       }
     }
 
+    // Check if an active Nexus Crystal exists to coordinate organism targeting toward observed towers
+    const activeNexus = this.organisms.find((org) => org.kind === "nexusCrystal");
+
     for (let i = this.organisms.length - 1; i >= 0; i--) {
       const o = this.organisms[i];
+      const isStationaryCrystal = o.kind === "honeycombCrystal" || o.kind === "nexusCrystal";
+
       // Retarget nearest tower or frontier
-      if (tick % 45 === 0) {
-        if (o.kind === "constellationSpider" && this.towers.length > 0) {
-          // Spiders specifically hunt Repair Depots and towers
-          let bestT = this.towers[0];
+      if (!isStationaryCrystal && tick % 45 === 0) {
+        if ((o.kind === "constellationSpider" || activeNexus) && this.towers.length > 0) {
+          // Spiders and Nexus-coordinated organisms hunt observed Repair Depots and towers within 70 cells of Void
+          let bestT: PlacedTower | null = null;
           let bestD = Infinity;
           for (const t of this.towers) {
             const d = dist(t.x - o.x, t.y - o.y);
+            if (d > 85) continue; // Only react to observed/nearby defenses, never omniscient across whole board
             const weight = t.type === "repairDepot" ? 0.5 : 1.0;
             if (d * weight < bestD) {
               bestD = d * weight;
               bestT = t;
             }
           }
-          o.targetX = bestT.x + 1.5;
-          o.targetY = bestT.y + 1.5;
+          if (bestT) {
+            o.targetX = bestT.x + 1.5;
+            o.targetY = bestT.y + 1.5;
+          }
         } else if (voidField.frontierCells.length > 0) {
           const pick = voidField.frontierCells[(tick + o.id * 17) % voidField.frontierCells.length];
           o.targetX = world.grid.xOf(pick) + 0.5;
@@ -1091,12 +1123,14 @@ export class VoidCombatManager {
         }
       }
 
-      const dx = o.targetX - o.x;
-      const dy = o.targetY - o.y;
-      const d = Math.max(0.1, dist(dx, dy));
-      const speed = o.kind === "voidBee" ? 15 : o.kind === "constellationSpider" ? 9 : o.kind === "nebulaWorm" ? 7.5 : 4.5;
-      o.x = Math.max(2, Math.min(world.grid.w - 3, o.x + (dx / d) * speed * dt));
-      o.y = Math.max(2, Math.min(world.grid.h - 3, o.y + (dy / d) * speed * dt));
+      if (!isStationaryCrystal) {
+        const dx = o.targetX - o.x;
+        const dy = o.targetY - o.y;
+        const d = Math.max(0.1, dist(dx, dy));
+        const speed = o.kind === "voidBee" ? 15 : o.kind === "constellationSpider" ? 9 : o.kind === "nebulaWorm" ? 7.5 : 4.5;
+        o.x = Math.max(2, Math.min(world.grid.w - 3, o.x + (dx / d) * speed * dt));
+        o.y = Math.max(2, Math.min(world.grid.h - 3, o.y + (dy / d) * speed * dt));
+      }
 
       if (o.trail && tick % 4 === 0) {
         o.trail.unshift({ x: o.x, y: o.y });
@@ -1105,10 +1139,18 @@ export class VoidCombatManager {
 
       o.cooldown -= dt;
       if (o.cooldown <= 0) {
-        o.cooldown = o.kind === "nebulaQueen" ? 4.5 : 1.2;
-        if (o.kind === "nebulaQueen" && this.organisms.length < 32) {
-          // Spawn 2 swarming 1-pixel Void Bees
-          for (let b = 0; b < 2; b++) {
+        o.cooldown =
+          o.kind === "nebulaQueen"
+            ? 4.5
+            : o.kind === "honeycombCrystal"
+              ? 6.0
+              : o.kind === "nexusCrystal"
+                ? 3.0
+                : 1.2;
+        if ((o.kind === "nebulaQueen" || o.kind === "honeycombCrystal") && this.organisms.length < 32) {
+          // Queen or Honeycomb Crystal spawns swarming 1-pixel Void Bees
+          const beeCount = o.kind === "nebulaQueen" ? 2 : 1;
+          for (let b = 0; b < beeCount; b++) {
             this.organisms.push({
               id: this.nextOrganismId++,
               kind: "voidBee",
@@ -1124,7 +1166,28 @@ export class VoidCombatManager {
               parentId: o.id,
             });
           }
-        } else {
+          // Queen also establishes a Honeycomb Crystal occasionally if few exist
+          if (
+            o.kind === "nebulaQueen" &&
+            this.organisms.filter((x) => x.kind === "honeycombCrystal").length < 3 &&
+            hash01(world.seed, o.id, tick) < 0.35
+          ) {
+            this.organisms.push({
+              id: this.nextOrganismId++,
+              kind: "honeycombCrystal",
+              x: o.x,
+              y: o.y,
+              vx: 0,
+              vy: 0,
+              hp: 160,
+              maxHp: 160,
+              targetX: o.targetX,
+              targetY: o.targetY,
+              cooldown: 5.0,
+              parentId: o.id,
+            });
+          }
+        } else if (o.kind !== "nexusCrystal") {
           // Erode cell under organism or damage adjacent tower
           const cx = Math.floor(o.x);
           const cy = Math.floor(o.y);
