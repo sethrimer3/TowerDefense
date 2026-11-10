@@ -542,6 +542,8 @@ export class DefendRenderer {
     this.drawForest(sim, opts, dt);
     this.drawMagicForest(sim, opts);
     this.drawCaveGlow(opts);
+    // The mountains' long shadows past the board, over the field too.
+    this.wilds.drawShade(this.ctx, { px: this.px, cam: this.cam, night: opts.night });
     this.ghosts.watch(sim, opts.now / 1000);
     this.ghosts.draw(this.ctx, this.px, opts.now / 1000, opts.reduceMotion);
     if (opts.effects ?? true) this.drawSmoke(map, sim, opts);
