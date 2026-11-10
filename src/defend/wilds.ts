@@ -14,7 +14,8 @@
  * ranges rise (`rangeAt`, `paintRanges`: one height field of slow ridged
  * noise, so they read as single ranges and cliffs, not a heap of stones),
  * in each area recoloured to its own stone (red layered sandstone cliffs
- * in the Amber Desert). Trees of the field
+ * in the Amber Desert), wooded in the forest. They cast long shadows over
+ * the field too (`mountainShade`, `Wilds.drawShade`). Trees of the field
  * whose crowns reach past the board are finished out here too.
  *
  * Presentation only: nothing in the battle reads it, and its randomness is
@@ -60,7 +61,7 @@ export function rangeAt(x: number, y: number) {
   const dx = x < 0 ? -x : x > CELLS_W ? x - CELLS_W : 0, dy = y < 0 ? -y : y > CELLS_H ? y - CELLS_H : 0;
   const d = Math.sqrt(dx * dx + dy * dy);
   if (d < 9) return -1;
-  return smooth(12, 44, d) * 1.2 + (valueNoise(x / 22, y / 22, 721) - 0.5) * 0.9 + (valueNoise(x / 9, y / 9, 722) - 0.5) * 0.3 - 0.55 - (1 - smooth(9, 14, d));
+  return smooth(12, 44, d) * 1.2 + (valueNoise(x / 22, y / 22, 721) - 0.5) * 0.9 + (valueNoise(x / 9, y / 9, 722) - 0.5) * 0.3 + (valueNoise(x / 3, y / 3, 728) - 0.5) * 0.16 - 0.55 - (1 - smooth(9, 14, d));
 }
 /** As `valueNoise`, but cubic between the lattice points (no creases). */
 function smoothNoise(x: number, y: number, salt: number) {
@@ -174,10 +175,17 @@ const shadeHex = (c: number, k: number) => (Math.round(((c >> 16) & 0xff) * k) <
  * where `rangeAt` crosses 0, then ridged noise for peaks and gullies, lit
  * from the upper left in the forest's crag greys, moss on the gentler
  * slopes, outlined, casting a shadow down and right. */
-function paintRanges(out: Uint32Array) {
+type RangeField = { H: Float32Array; f: Float32Array; mossy: Float32Array };
+let field: RangeField | null = null;
+/** The ranges' height field over the whole wilds (art pixels, wilds
+ * coordinates), once: `f` is `rangeAt` (above 0 inside a range), `H` the
+ * height, `mossy` the slow noise the moss and the mountain woods follow. */
+function rangeField(): RangeField {
+  if (field) return field;
   const H = new Float32Array(GW * GH), f = new Float32Array(GW * GH), mossy = new Float32Array(GW * GH);
   const ridge = (x: number, y: number, salt: number) => 1 - Math.abs(2 * smoothNoise(x, y, salt) - 1);
-  // The slow fields sampled every `Q` art pixels, blended between.
+  // The slow fields sampled every `Q` art pixels, blended between (the
+  // finest octave's facets between samples make the rock jagged).
   const Q = 4, qw = Math.ceil(GW / Q) + 1, qh = Math.ceil(GH / Q) + 1;
   const qf = new Float32Array(qw * qh), qr = new Float32Array(qw * qh), qm = new Float32Array(qw * qh);
   for (let gy = 0; gy < qh; gy++)
@@ -186,7 +194,8 @@ function paintRanges(out: Uint32Array) {
       qf[j] = rangeAt((X - OX + 0.5) / ART, (Y - OY + 0.5) / ART);
       if (qf[j] < -0.2) continue;
       // Octaves turned against each other so no lattice lines show.
-      qr[j] = 0.62 * ridge((X * 0.8 + Y * 0.6) / 150, (Y * 0.8 - X * 0.6) / 150, 724) + 0.28 * ridge((X * 0.5 - Y * 0.87) / 64, (Y * 0.5 + X * 0.87) / 64, 725) + 0.1 * ridge(X / 26, Y / 26, 726);
+      const r = 0.52 * ridge((X * 0.8 + Y * 0.6) / 150, (Y * 0.8 - X * 0.6) / 150, 724) + 0.24 * ridge((X * 0.5 - Y * 0.87) / 64, (Y * 0.5 + X * 0.87) / 64, 725) + 0.14 * ridge(X / 26, Y / 26, 726) + 0.1 * ridge((X * 0.6 + Y * 0.8) / 11, (Y * 0.6 - X * 0.8) / 11, 729);
+      qr[j] = r * Math.sqrt(r);
       qm[j] = smoothNoise(X / 18, Y / 18, 727);
     }
   for (let Y = 0; Y < GH; Y++) {
@@ -197,21 +206,39 @@ function paintRanges(out: Uint32Array) {
       const v = lerp(qf) + ((hash(X, Y, 723) % 3) - 1) * 0.004;
       f[i] = v;
       if (v <= 0) continue;
-      const r = lerp(qr);
-      H[i] = 30 * smooth(0, 0.6, v) + 120 * r * r * smooth(0, 0.35, v);
+      H[i] = 30 * smooth(0, 0.6, v) + 150 * lerp(qr) * smooth(0, 0.35, v);
       mossy[i] = lerp(qm);
     }
   }
+  return (field = { H, f, mossy });
+}
+
+/** The mountains' long shadows, falling down and right away from the light
+ * over the wilds and the field alike, wherever the mountains stand (on
+ * screen or not): 1 where a pixel lies in one. A single sweep along the
+ * diagonal carries the tallest shadow-casting height, sinking `DROP` a
+ * step. */
+const DROP = 0.4;
+let shade: Uint8Array | null = null;
+export function mountainShade(): Uint8Array {
+  if (shade) return shade;
+  const { H } = rangeField(), S = new Float32Array(GW * GH), out = new Uint8Array(GW * GH);
+  for (let Y = 0; Y < GH; Y++)
+    for (let X = 0; X < GW; X++) {
+      const i = Y * GW + X, up = X > 0 && Y > 0 ? S[i - GW - 1] - DROP : 0;
+      if (up > H[i] + 1) out[i] = 1;
+      S[i] = Math.max(H[i], up);
+    }
+  return (shade = out);
+}
+
+/** The mountain ranges, from `rangeField`: lit from the upper left in the
+ * forest's crag greys, moss on the gentler slopes, outlined. */
+function paintRanges(out: Uint32Array) {
+  const { H, f, mossy } = rangeField();
   const ramp = [0x24262a, 0x34373a, 0x4a4d4c, 0x63665f, 0x81847a, 0xa2a497].map((c) => rgbaOf(c));
   const moss = [0x4f6a32, 0x6f8f44].map((c) => rgbaOf(c)), edge = rgbaOf(0x141518);
   const inR = (X: number, Y: number) => X >= 0 && Y >= 0 && X < GW && Y < GH && f[Y * GW + X] > 0;
-  // Its shadow on the ground first.
-  for (let Y = 0; Y < GH; Y++)
-    for (let X = 0; X < GW; X++) {
-      const i = Y * GW + X;
-      if (f[i] > 0 || !out[i]) continue;
-      if (inR(X - 3, Y - 3) || (inR(X - 5, Y - 5) && !((X + Y) & 1))) out[i] = darken(out[i]);
-    }
   for (let Y = 0; Y < GH; Y++)
     for (let X = 0; X < GW; X++) {
       const i = Y * GW + X;
@@ -253,6 +280,27 @@ export function paintWilds(forest: boolean, stone?: Stone) {
       stampInto(out, GW, GH, s, x0 + (r.size > 1 ? 2 : 1), y0 + (r.size > 1 ? 2 : 1), true);
       stampInto(out, GW, GH, s, x0, y0, false);
     } });
+  // In the forest, woods and bushes up the mountains' gentler slopes, in
+  // patches where the moss is (still: they are far off).
+  if (forest) {
+    const { H, f, mossy } = rangeField();
+    for (let cy = -MARGIN; cy < CELLS_H + MARGIN; cy++)
+      for (let cx = -MARGIN; cx < CELLS_W + MARGIN; cx++) {
+        const X = (cx + MARGIN) * ART + 4, Y = (cy + MARGIN) * ART + 4, i = Y * GW + X;
+        if (X < 1 || Y < 1 || X >= GW - 1 || Y >= GH - 1 || f[i] < 0.06) continue;
+        const steep = Math.abs(H[i + 1] - H[i - 1]) + Math.abs(H[i + GW] - H[i - GW]);
+        const p = (mossy[i] - 0.5) * 2.6 - steep * 0.04 - smooth(0.5, 1.2, f[i]) * 0.25;
+        if (hash01(cx, cy, 731) >= p) continue;
+        const size = (hash01(cx, cy, 732) < 0.6 ? 0 : 1) as TreeSize, kind: TreeKind = hash01(cx, cy, 733) < 0.6 ? "pine" : "oak";
+        const sp = outlinedSprite(treeSprite(kind, hash(cx, cy, 734) % VARIANTS, 0, size));
+        const x = cx + 0.2 + hash01(cx, cy, 735) * 0.6, y = cy + 0.2 + hash01(cx, cy, 736) * 0.6;
+        items.push({ y, draw: () => {
+          const x0 = Math.round(x * ART) - sp.ox + OX, y0 = Math.round(y * ART) - sp.oy + OY;
+          stampInto(out, GW, GH, sp, x0 + 2, y0 + 3, true);
+          stampInto(out, GW, GH, sp, x0, y0, false);
+        } });
+      }
+  }
   items.sort((a, b) => a.y - b.y);
   for (const it of items) it.draw();
   if (stone) recolour(out, GW, stone);
@@ -379,6 +427,43 @@ export class Wilds {
     g = { canvas, turf: painted.turf, shaded: painted.shaded };
     this.grounds.set(key, g);
     return g;
+  }
+
+  private shadeCanvas: { canvas: HTMLCanvasElement; box: Box } | null = null;
+  /** The mountains' long shadows over the field and the wilds, drawn once
+   * the field's ground, buildings and trees are down (`mountainShade`),
+   * fading out at night. */
+  drawShade(ctx: CanvasRenderingContext2D, f: { px: number; cam: { s: number; x: number; y: number }; night: number }) {
+    if (typeof document === "undefined") return;
+    const alpha = 0.34 * (1 - Math.min(1, f.night * 1.4));
+    if (alpha <= 0.01) return;
+    if (!this.shadeCanvas) {
+      const m = mountainShade();
+      let x0 = GW, y0 = GH, x1 = 0, y1 = 0;
+      for (let Y = 0; Y < GH; Y++)
+        for (let X = 0; X < GW; X++)
+          if (m[Y * GW + X]) { if (X < x0) x0 = X; if (X >= x1) x1 = X + 1; if (Y < y0) y0 = Y; if (Y >= y1) y1 = Y + 1; }
+      if (x1 <= x0) { x0 = y0 = 0; x1 = y1 = 1; }
+      const w = x1 - x0, h = y1 - y0, canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      const c = canvas.getContext("2d")!, img = c.createImageData(w, h), px = new Uint32Array(img.data.buffer);
+      for (let Y = y0; Y < y1; Y++) for (let X = x0; X < x1; X++) if (m[Y * GW + X]) px[(Y - y0) * w + X - x0] = 0xff000000;
+      c.putImageData(img, 0, 0);
+      this.shadeCanvas = { canvas, box: { x0, y0, x1, y1 } };
+    }
+    const k = (f.px * f.cam.s) / ART, cw = ctx.canvas.width, ch = ctx.canvas.height, b = this.shadeCanvas.box;
+    const v: Box = {
+      x0: Math.max(b.x0, Math.floor(-f.cam.x / k) + OX), y0: Math.max(b.y0, Math.floor(-f.cam.y / k) + OY),
+      x1: Math.min(b.x1, Math.ceil((cw - f.cam.x) / k) + OX), y1: Math.min(b.y1, Math.ceil((ch - f.cam.y) / k) + OY),
+    };
+    if (v.x1 <= v.x0 || v.y1 <= v.y0) return;
+    const toX = (X: number) => Math.round(f.cam.x + (X - OX) * k), toY = (Y: number) => Math.round(f.cam.y + (Y - OY) * k);
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(this.shadeCanvas.canvas, v.x0 - b.x0, v.y0 - b.y0, v.x1 - v.x0, v.y1 - v.y0, toX(v.x0), toY(v.y0), toX(v.x1) - toX(v.x0), toY(v.y1) - toY(v.y0));
+    ctx.restore();
   }
 
   draw(ctx: CanvasRenderingContext2D, f: WildsFrame) {
