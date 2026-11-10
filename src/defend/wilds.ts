@@ -10,9 +10,11 @@
  * edge, swaying like the field's) and its waving grass (`planCell`, swayed
  * as `forest-grass.ts` sways it); elsewhere the area's flagstones
  * (`paintFloorTile`). Over that ground the forest's rocks (`rockSprite`)
- * scatter, then crowd, grow into boulders and close into the forest's small
- * mountains (`mountainOf`) farther out, in each area recoloured to its own
- * stone (red layered sandstone in the Amber Desert). Trees of the field
+ * scatter as sparsely as on the field, and a few tiles out whole mountain
+ * ranges rise (`rangeAt`, `paintRanges`: one height field of slow ridged
+ * noise, so they read as single ranges and cliffs, not a heap of stones),
+ * in each area recoloured to its own stone (red layered sandstone cliffs
+ * in the Amber Desert). Trees of the field
  * whose crowns reach past the board are finished out here too.
  *
  * Presentation only: nothing in the battle reads it, and its randomness is
@@ -25,7 +27,7 @@ import type { AreaId } from "./areas.ts";
 import { CELLS_H, CELLS_W, SUB, TILES_H, TILES_W, hash, hash01 } from "./grid.ts";
 import { ART } from "./park-art.ts";
 import { FOREST, VARIANTS, canopyRadius, hasForest, thicket, type ForestDamage, type ForestPlan, type ForestTree, type TreeKind, type TreeSize } from "./forest.ts";
-import { darken, lawnCell, leanOf, mountainOf, outlinedSprite, rockSprite, stampInto, treeSprite, type Sprite } from "./forest-art.ts";
+import { darken, lawnCell, leanOf, outlinedSprite, rockSprite, stampInto, treeSprite, type Sprite } from "./forest-art.ts";
 import { planCell } from "./forest-grass.ts";
 import { CURVE, PALETTE32, SHADOW, WIND } from "./park-grass.ts";
 import { paintFloorTile } from "./city-layer.ts";
@@ -44,6 +46,29 @@ export function beyond(cx: number, cy: number) {
   const dx = x < 0 ? -x : x > CELLS_W ? x - CELLS_W : 0, dy = y < 0 ? -y : y > CELLS_H ? y - CELLS_H : 0;
   return Math.sqrt(dx * dx + dy * dy);
 }
+/** Smooth value noise in [0, 1) over a lattice one unit apart. */
+function valueNoise(x: number, y: number, salt: number) {
+  const ix = Math.floor(x), iy = Math.floor(y), u = x - ix, v = y - iy, su = u * u * (3 - 2 * u), sv = v * v * (3 - 2 * v);
+  const a = hash01(ix, iy, salt), b = hash01(ix + 1, iy, salt), c = hash01(ix, iy + 1, salt), d = hash01(ix + 1, iy + 1, salt);
+  return (a * (1 - su) + b * su) * (1 - sv) + (c * (1 - su) + d * su) * sv;
+}
+/** How far into the mountains the point (x, y) cells lies: above 0 inside
+ * a range. The rise with distance from the field plus slow noise, so whole
+ * ranges wander in and out, forest valleys reaching into them and the odd
+ * lone peak standing in front. */
+export function rangeAt(x: number, y: number) {
+  const dx = x < 0 ? -x : x > CELLS_W ? x - CELLS_W : 0, dy = y < 0 ? -y : y > CELLS_H ? y - CELLS_H : 0;
+  const d = Math.sqrt(dx * dx + dy * dy);
+  if (d < 9) return -1;
+  return smooth(12, 44, d) * 1.2 + (valueNoise(x / 22, y / 22, 721) - 0.5) * 0.9 + (valueNoise(x / 9, y / 9, 722) - 0.5) * 0.3 - 0.55 - (1 - smooth(9, 14, d));
+}
+/** As `valueNoise`, but cubic between the lattice points (no creases). */
+function smoothNoise(x: number, y: number, salt: number) {
+  const ix = Math.floor(x), iy = Math.floor(y), u = x - ix, v = y - iy;
+  const cub = (p0: number, p1: number, p2: number, p3: number, t: number) => p1 + 0.5 * t * (p2 - p0 + t * (2 * p0 - 5 * p1 + 4 * p2 - p3 + t * (3 * (p1 - p2) + p3 - p0)));
+  const row = (j: number) => cub(hash01(ix - 1, iy + j, salt), hash01(ix, iy + j, salt), hash01(ix + 1, iy + j, salt), hash01(ix + 2, iy + j, salt), u);
+  return Math.max(0, Math.min(1, cub(row(-1), row(0), row(1), row(2), v)));
+}
 const smooth = (a: number, b: number, v: number) => {
   const t = Math.max(0, Math.min(1, (v - a) / (b - a)));
   return t * t * (3 - 2 * t);
@@ -52,53 +77,33 @@ const onBoard = (cx: number, cy: number) => cx >= 0 && cy >= 0 && cx < CELLS_W &
 
 /** A stone: the forest's rock sprite at (x, y) cells, `size` cells across. */
 export type WildRock = { x: number; y: number; size: number; seed: number };
-/** A hill: the forest's small mountain over a heap of cells. */
-export type WildHill = { cells: { x: number; y: number }[]; seed: number; y: number };
-/** The wilds' layout, the same in every area: hills, rocks and (where the
+/** The wilds' layout, the same in every area: rocks and (where the
  * area has a forest) trees, back to front. */
-export type WildsPlan = { hills: WildHill[]; rocks: WildRock[]; trees: ForestTree[] };
+export type WildsPlan = { rocks: WildRock[]; trees: ForestTree[] };
 
 let planned: WildsPlan | null = null;
 
-/** Lays the wilds out, once (in cells, eight a tile): hills rising from
- * about a tile and a half out, more and bigger until they close over
- * everything some six tiles out; rocks scattered from the field's edge,
- * more and bigger the farther out; trees by the forest's own rules,
- * thinning out from two tiles to six. */
+/** Lays the wilds out, once (in cells, eight a tile): whole mountain
+ * ranges rising from about a tile and a half out until they close over
+ * everything some five tiles out; rocks scattered as sparsely as on the
+ * field, thinning farther out; trees by the forest's own rules, thinning
+ * out from two tiles to six. */
 export function wildsPlan(): WildsPlan {
   if (planned) return planned;
   const N = CELLS_W + 2 * MARGIN, M = CELLS_H + 2 * MARGIN;
   const taken = new Uint8Array(N * M), at = (cx: number, cy: number) => (cy + MARGIN) * N + cx + MARGIN;
   const inside = (cx: number, cy: number) => cx >= -MARGIN && cy >= -MARGIN && cx < CELLS_W + MARGIN && cy < CELLS_H + MARGIN;
-  // Hills on a jittered grid, bigger the farther out.
-  const hills: WildHill[] = [], S = 6;
-  for (let gy = -Math.ceil(MARGIN / S) - 1; gy * S < CELLS_H + MARGIN + S; gy++)
-    for (let gx = -Math.ceil(MARGIN / S) - 1; gx * S < CELLS_W + MARGIN + S; gx++) {
-      const x = gx * S + hash01(gx, gy, 701) * S, y = gy * S + hash01(gx, gy, 702) * S;
-      const d = beyond(Math.floor(x), Math.floor(y));
-      if (d < 12 || hash01(gx, gy, 703) > 0.12 + 0.88 * smooth(14, 50, d)) continue;
-      const R = Math.min(12, 2 + (d - 12) * 0.22) * (0.75 + hash01(gx, gy, 704) * 0.5), ph = hash01(gx, gy, 705) * 6.28;
-      const cells: { x: number; y: number }[] = [];
-      for (let cy = Math.floor(y - R * 1.3); cy <= y + R * 1.3; cy++)
-        for (let cx = Math.floor(x - R * 1.3); cx <= x + R * 1.3; cx++) {
-          if (!inside(cx, cy) || beyond(cx, cy) < 8) continue;
-          const dx = cx + 0.5 - x, dy = cy + 0.5 - y, a = Math.atan2(dy, dx);
-          const rim = R * (1 + 0.22 * Math.sin(a * 3 + ph) + 0.1 * Math.sin(a * 5 - ph * 2));
-          if (dx * dx + dy * dy < rim * rim) cells.push({ x: cx, y: cy });
-        }
-      if (cells.length < 4) continue;
-      for (const c of cells) taken[at(c.x, c.y)] = 1;
-      hills.push({ cells, seed: hash(gx, gy, 706) % 100000, y: y + R });
-    }
-  hills.sort((a, b) => a.y - b.y);
+  // The mountain ranges' ground (`rangeAt`) is left to them.
+  for (let cy = -MARGIN; cy < CELLS_H + MARGIN; cy++)
+    for (let cx = -MARGIN; cx < CELLS_W + MARGIN; cx++) if (rangeAt(cx + 0.5, cy + 0.5) > -0.06) taken[at(cx, cy)] = 1;
   // Rocks in the open between them.
   const rocks: WildRock[] = [];
   for (let cy = -MARGIN; cy < CELLS_H + MARGIN; cy++)
     for (let cx = -MARGIN; cx < CELLS_W + MARGIN; cx++) {
       if (onBoard(cx, cy) || taken[at(cx, cy)]) continue;
       const d = beyond(cx, cy);
-      if (hash01(cx, cy, 711) >= FOREST.rock + 0.25 * smooth(8, 50, d)) continue;
-      const grow = smooth(6, 44, d), size = 0.18 + hash01(cx, cy, 712) * 0.3 + grow * hash01(cx, cy, 713) * 1.7;
+      if (hash01(cx, cy, 711) >= FOREST.rock * (1 - 0.7 * smooth(8, 30, d))) continue;
+      const grow = 0.4 * smooth(6, 30, d), size = 0.18 + hash01(cx, cy, 712) * 0.3 + grow * hash01(cx, cy, 713) * 1.7;
       rocks.push({ x: cx + 0.3 + hash01(cx, cy, 714) * 0.4, y: cy + 0.3 + hash01(cx, cy, 715) * 0.4, size: Math.round(size * 8) / 8, seed: hash(cx, cy, 716) % 64 });
       if (size > 0.9) taken[at(cx, cy)] = 1;
     }
@@ -126,7 +131,7 @@ export function wildsPlan(): WildsPlan {
       }
   trees.sort((a, b) => a.y - b.y || a.x - b.x);
   trees.forEach((t, i) => (t.id = i));
-  return (planned = { hills, rocks, trees });
+  return (planned = { rocks, trees });
 }
 
 /** An area's stone, dark to light, and the tint on its gentlest slopes
@@ -165,9 +170,66 @@ function recolour(px: Uint32Array, w: number, stone: Stone) {
 }
 const shadeHex = (c: number, k: number) => (Math.round(((c >> 16) & 0xff) * k) << 16) | (Math.round(((c >> 8) & 0xff) * k) << 8) | Math.round((c & 0xff) * k);
 
+/** The mountain ranges, as one height field over the wilds: a steep foot
+ * where `rangeAt` crosses 0, then ridged noise for peaks and gullies, lit
+ * from the upper left in the forest's crag greys, moss on the gentler
+ * slopes, outlined, casting a shadow down and right. */
+function paintRanges(out: Uint32Array) {
+  const H = new Float32Array(GW * GH), f = new Float32Array(GW * GH), mossy = new Float32Array(GW * GH);
+  const ridge = (x: number, y: number, salt: number) => 1 - Math.abs(2 * smoothNoise(x, y, salt) - 1);
+  // The slow fields sampled every `Q` art pixels, blended between.
+  const Q = 4, qw = Math.ceil(GW / Q) + 1, qh = Math.ceil(GH / Q) + 1;
+  const qf = new Float32Array(qw * qh), qr = new Float32Array(qw * qh), qm = new Float32Array(qw * qh);
+  for (let gy = 0; gy < qh; gy++)
+    for (let gx = 0; gx < qw; gx++) {
+      const X = gx * Q, Y = gy * Q, j = gy * qw + gx;
+      qf[j] = rangeAt((X - OX + 0.5) / ART, (Y - OY + 0.5) / ART);
+      if (qf[j] < -0.2) continue;
+      // Octaves turned against each other so no lattice lines show.
+      qr[j] = 0.62 * ridge((X * 0.8 + Y * 0.6) / 150, (Y * 0.8 - X * 0.6) / 150, 724) + 0.28 * ridge((X * 0.5 - Y * 0.87) / 64, (Y * 0.5 + X * 0.87) / 64, 725) + 0.1 * ridge(X / 26, Y / 26, 726);
+      qm[j] = smoothNoise(X / 18, Y / 18, 727);
+    }
+  for (let Y = 0; Y < GH; Y++) {
+    const gy = Math.floor(Y / Q), v0 = (Y % Q) / Q;
+    for (let X = 0; X < GW; X++) {
+      const gx = Math.floor(X / Q), u = (X % Q) / Q, j = gy * qw + gx, i = Y * GW + X;
+      const lerp = (a: Float32Array) => (a[j] * (1 - u) + a[j + 1] * u) * (1 - v0) + (a[j + qw] * (1 - u) + a[j + qw + 1] * u) * v0;
+      const v = lerp(qf) + ((hash(X, Y, 723) % 3) - 1) * 0.004;
+      f[i] = v;
+      if (v <= 0) continue;
+      const r = lerp(qr);
+      H[i] = 30 * smooth(0, 0.6, v) + 120 * r * r * smooth(0, 0.35, v);
+      mossy[i] = lerp(qm);
+    }
+  }
+  const ramp = [0x24262a, 0x34373a, 0x4a4d4c, 0x63665f, 0x81847a, 0xa2a497].map((c) => rgbaOf(c));
+  const moss = [0x4f6a32, 0x6f8f44].map((c) => rgbaOf(c)), edge = rgbaOf(0x141518);
+  const inR = (X: number, Y: number) => X >= 0 && Y >= 0 && X < GW && Y < GH && f[Y * GW + X] > 0;
+  // Its shadow on the ground first.
+  for (let Y = 0; Y < GH; Y++)
+    for (let X = 0; X < GW; X++) {
+      const i = Y * GW + X;
+      if (f[i] > 0 || !out[i]) continue;
+      if (inR(X - 3, Y - 3) || (inR(X - 5, Y - 5) && !((X + Y) & 1))) out[i] = darken(out[i]);
+    }
+  for (let Y = 0; Y < GH; Y++)
+    for (let X = 0; X < GW; X++) {
+      const i = Y * GW + X;
+      if (f[i] <= 0) continue;
+      if (!inR(X - 1, Y) || !inR(X + 1, Y) || !inR(X, Y - 1) || !inR(X, Y + 1)) { out[i] = edge; continue; }
+      const gx = H[i + 1] - H[i - 1], gy = H[i + GW] - H[i - GW], steep = Math.abs(gx) + Math.abs(gy);
+      const k = (0.6 * gx + 0.8 * gy) * 0.3 + (H[i] - 50) * 0.004 + (((X & 3) * 4 + (Y & 3) * 7) % 16 / 16 - 0.5) * 0.3;
+      let c = k > 0.75 ? ramp[5] : k > 0.35 ? ramp[4] : k > 0.02 ? ramp[3] : k > -0.35 ? ramp[2] : k > -0.8 ? ramp[1] : ramp[0];
+      const m = mossy[i] - steep * 0.12 + (((X & 3) * 4 + (Y & 3) * 7) % 16 / 16 - 0.5) * 0.12;
+      if (m > 0.66 || (m > 0.6 && (X + Y) & 1)) c = moss[k > 0.3 ? 1 : 0];
+      out[i] = c;
+    }
+}
+const rgbaOf = (c: number) => ((255 << 24) | ((c & 0xff) << 16) | (c & 0xff00) | ((c >> 16) & 0xff)) >>> 0;
+
 /** The wilds' still ground in art pixels over the whole extent: in the
  * forest its lawn, else clear (the flagstones are drawn under it); then
- * rocks and hills with their shadows, and in the forest the trees'
+ * the mountain ranges, rocks with their shadows, and in the forest the trees'
  * shadows. `turf` marks the lawn pixels left (where blades grow), `shaded`
  * those under a tree's shadow. */
 export function paintWilds(forest: boolean, stone?: Stone) {
@@ -182,33 +244,14 @@ export function paintWilds(forest: boolean, stone?: Stone) {
         });
       }
   const lawn = forest ? out.slice() : null;
-  // Rocks and hills, back to front, each with its shadow down and right.
+  paintRanges(out);
+  // Rocks, back to front, each with its shadow down and right.
   const items: { y: number; draw: () => void }[] = [];
   for (const r of plan.rocks)
     items.push({ y: r.y, draw: () => {
       const s = rockSprite(r.size, r.seed), x0 = Math.round(r.x * ART) - s.ox + OX, y0 = Math.round(r.y * ART) - s.oy + OY;
       stampInto(out, GW, GH, s, x0 + (r.size > 1 ? 2 : 1), y0 + (r.size > 1 ? 2 : 1), true);
       stampInto(out, GW, GH, s, x0, y0, false);
-    } });
-  for (const h of plan.hills)
-    items.push({ y: h.y, draw: () => {
-      const s = mountainOf(h.cells, h.seed), X0 = s.x + OX, Y0 = s.y + OY;
-      for (let y = 0; y < s.h; y++)
-        for (let x = 0; x < s.w; x++) {
-          if (!s.px[y * s.w + x]) continue;
-          for (const k of [2, 4]) {
-            const sx = x + k, sy = y + k, X = X0 + sx, Y = Y0 + sy;
-            if ((sx < s.w && sy < s.h && s.px[sy * s.w + sx]) || X < 0 || Y < 0 || X >= GW || Y >= GH || (k === 4 && (X + Y) & 1)) continue;
-            out[Y * GW + X] = darken(out[Y * GW + X]);
-          }
-        }
-      stampInto(out, GW, GH, s, X0, Y0, false);
-      for (const g of s.crags) {
-        const sp = rockSprite(Math.round((0.9 + Math.min(1.2, g.deep / 14) + hash01(g.seed, 515) * 0.3) * 4) / 4, g.seed % 64);
-        const gx = Math.round(g.x * ART) - sp.ox + OX, gy = Math.round(g.y * ART) - sp.oy + OY;
-        stampInto(out, GW, GH, sp, gx + 2, gy + 2, true);
-        stampInto(out, GW, GH, sp, gx, gy, false);
-      }
     } });
   items.sort((a, b) => a.y - b.y);
   for (const it of items) it.draw();
