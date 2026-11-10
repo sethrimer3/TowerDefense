@@ -235,34 +235,40 @@ function paintFlagstones({ c, px, area }: Paint) {
 /** The flagstone tiles alone, over the dark grout, at `px` a cell: the
  * city layer's ground, and what the ground relief's bump map is cut from. */
 export function paintFloor(c: CanvasRenderingContext2D, px: number, area: AreaId = "moss") {
-  const T = px * SUB, moss = areaArtId(area) === "moss";
+  const T = px * SUB;
   const { width, height } = c.canvas;
   // Very dark grey shows in the gaps around the flagstone sprites.
   c.fillStyle = "#17181b";
   c.fillRect(0, 0, width, height);
   for (let ty = 0; ty < TILES_H; ty++)
     for (let tx = 0; tx < TILES_W; tx++) {
-      const k = hash(tx, ty, 3) % 4;
-      const img = moss ? floorImages[k] : themedFloors.get(area)?.[k];
       // Whole pixels, each tile ending where the next begins.
       const x = Math.round(tx * T),
-        y = Math.round(ty * T),
-        w = Math.round((tx + 1) * T) - x,
-        h = Math.round((ty + 1) * T) - y;
-      // Pixel Art's mossy flagstones stand in for Mossbound Ruins' own.
-      if (moss && drawPixel(c, `floor-${k + 1}` as PixelSprite, x, y, w, h)) continue;
-      if (ready(img)) {
-        const { x: sx, y: sy } = moss ? FLOOR_CROP[k] : { x: 0, y: 0 };
-        const size = moss ? FLOOR_SIZE : img.naturalWidth;
-        c.drawImage(img, sx, sy, size, size, x, y, w, h);
-      } else {
-        c.fillStyle = AREAS.find(a => a.id === area)!.dark;
-        c.fillRect(x, y, w, h);
-      }
+        y = Math.round(ty * T);
+      paintFloorTile(c, area, tx, ty, x, y, Math.round((tx + 1) * T) - x, Math.round((ty + 1) * T) - y);
     }
   if (area === "nadir") {
     c.fillStyle = "rgba(17,8,32,0.48)";
     c.fillRect(0, 0, width, height);
+  }
+}
+
+/** Board tile (tx, ty)'s flagstones in `area` (any tile, on the board or
+ * off it), into the box at (x, y), `w` × `h` canvas pixels; the wilds
+ * (`wilds.ts`) carry the floor on past the board with it. Nadir's tint is
+ * the caller's. */
+export function paintFloorTile(c: CanvasRenderingContext2D, area: AreaId, tx: number, ty: number, x: number, y: number, w: number, h: number) {
+  const moss = areaArtId(area) === "moss", k = hash(tx, ty, 3) % 4;
+  const img = moss ? floorImages[k] : themedFloors.get(area)?.[k];
+  // Pixel Art's mossy flagstones stand in for Mossbound Ruins' own.
+  if (moss && drawPixel(c, `floor-${k + 1}` as PixelSprite, x, y, w, h)) return;
+  if (ready(img)) {
+    const { x: sx, y: sy } = moss ? FLOOR_CROP[k] : { x: 0, y: 0 };
+    const size = moss ? FLOOR_SIZE : img.naturalWidth;
+    c.drawImage(img, sx, sy, size, size, x, y, w, h);
+  } else {
+    c.fillStyle = AREAS.find(a => a.id === area)!.dark;
+    c.fillRect(x, y, w, h);
   }
 }
 

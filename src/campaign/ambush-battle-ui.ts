@@ -1,4 +1,3 @@
-import { floatingEdge, landscape } from "../ui/landscape.ts";
 import { PlacedBuildingMenu } from "../ui/placed-building-menu.ts";
 import { decodeOrders } from "../defend/building-orders.ts";
 import { applyOrders, aimPoint, controlsOf } from "../defend/building-controls.ts";
@@ -601,11 +600,7 @@ export class AmbushBattlePage {
     const r = this.renderer,
       box = this.canvas.getBoundingClientRect();
     r.maxDpr = this.host.save().settings.resolution;
-    // Landscape: the field fits between the controls floating over the
-    // board's top and bottom, and zoomed in may pan out from under them.
-    const edge = landscape() ? floatingEdge(this.root) : 0;
-    r.resize(box.width, Math.max(80, box.height - 2 * edge));
-    r.setEdge(edge);
+    r.resize(box.width, box.height);
     if (this.resetCamera) {
       r.resetCam();
       this.resetCamera = false;

@@ -46,7 +46,7 @@ An entry point on the bottom edge where an owned infantry squad enters a Siege a
 The unit the player builds with: the board is 12 × 12 of them. Only the middle 10 × 10, the **buildable field**, takes building; the outer ring stays open, and enemies enter along the top.
 
 **Wilds**:
-The impassable, visible scenery beyond the board's edges: scattered stones thickening into hills (in the desert, sandstone fins and buttes). Nothing happens there; it fills the view so no dark space shows at any window shape.
+The impassable, visible scenery beyond the board's edges, carrying on the area's own ground: in the forest its grass and trees, then rocks thickening into hills (in the desert, sandstone over flagstones). Nothing happens there; it fills the view so no dark space shows at any window shape.
 _Avoid_: border, margin
 
 **Cell**:

@@ -61,7 +61,7 @@ Each new furthest wave reached automatically selects the preceding wave for your
 
 ## How it's built
 
-On a screen wider than tall (a desktop window or a phone turned sideways) the game switches to a landscape layout. The Defend, Ambush and Siege boards, the Mine and the Library fill the whole window, north up as always, and the tabs, controls and palette float over them (`src/ui/landscape.ts`, `DefendRenderer.cover`).
+On a screen wider than tall (a desktop window or a phone turned sideways) the game switches to a landscape layout. The Defend, Ambush and Siege boards, the Mine and the Library fill the whole window, north up as always, and the tabs, controls and palette float over them (`src/ui/landscape.ts`). Zoomed all the way out the square field fits the window exactly along its tighter side, so a wide window shows the area's wilds beside it and a phone shows them above and below; the wilds carry on the zone's own grass, trees and rocks (`src/defend/wilds.ts`).
 
 Placed buildings in Defend and Ambush open a square oak menu: Upgrade tree, Remove/Sell, targeting modes, a range limit, and a rally flag or crosshairs where applicable. Battle drags aim directly; Settings → Controls can turn either shortcut off. Defend saves each building's orders as optional centre-relative offsets, so points follow moved buildings; Ambush keeps them for the current run. `building-orders.ts` owns decoding/selection and `building-controls.ts` shares clamping/live application. The original `building-menu.ts` and `square-range-art.ts` supply the visuals. Building ranges, spell areas and banner influence are squares; blasts and unit reach retain their circular geometry. The build palette alone enables the placed-piece gold shimmer.
 

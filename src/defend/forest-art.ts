@@ -395,26 +395,47 @@ function lawnIn(out: Uint32Array, open: Uint8Array) {
   for (let cy = Math.floor(clip.y0 / ART); cy * ART < clip.y1; cy++)
     for (let cx = Math.floor(clip.x0 / ART); cx * ART < clip.x1; cx++) {
       if (!open[cellIndex(cx, cy)]) continue;
-      const patch = rgba(TURF.patch[hash01(Math.floor(cx / 2), Math.floor(cy / 2), 50) < 0.5 ? 0 : 1]);
-      const put = (X: number, Y: number, c: number) => {
+      lawnCell(cx, cy, (X, Y, c) => {
         if (inClip(X, Y)) out[Y * W + X] = lawn[Y * W + X] = c;
-      };
-      for (let y = 0; y < ART; y++) for (let x = 0; x < ART; x++) put(cx * ART + x, cy * ART + y, patch);
-      for (let k = 0; k < 5; k++) {
-        const hx = cx * ART + Math.floor(hash01(cx, cy, 51, k) * (ART - 1)), hy = cy * ART + Math.floor(hash01(cx, cy, 52, k) * (ART - 2));
-        const c = rgba(k % 2 ? TURF.dark : TURF.light);
-        put(hx, hy, c);
-        put(hx, hy + 1, c);
-      }
+      });
     }
 }
 
+/** Cell (cx, cy)'s grass, any cell on or off the board: its 2 × 2 patch's
+ * green with a few dark and light tufts, through `put` (art pixels). The
+ * wilds (`wilds.ts`) carry the forest's lawn on past the board with it. */
+export function lawnCell(cx: number, cy: number, put: (X: number, Y: number, c: number) => void) {
+  const patch = rgba(TURF.patch[hash01(Math.floor(cx / 2), Math.floor(cy / 2), 50) < 0.5 ? 0 : 1]);
+  for (let y = 0; y < ART; y++) for (let x = 0; x < ART; x++) put(cx * ART + x, cy * ART + y, patch);
+  for (let k = 0; k < 5; k++) {
+    const hx = cx * ART + Math.floor(hash01(cx, cy, 51, k) * (ART - 1)), hy = cy * ART + Math.floor(hash01(cx, cy, 52, k) * (ART - 2));
+    const c = rgba(k % 2 ? TURF.dark : TURF.light);
+    put(hx, hy, c);
+    put(hx, hy + 1, c);
+  }
+}
+
 /** A pixel in shadow: a solid one darkened, a clear one made a dim shade. */
-function darken(p: number, strength = 1) {
+export function darken(p: number, strength = 1) {
   if (!(p >>> 24)) return rgba(0x060a05, Math.round(92 * strength));
   const k = 1 - .4 * strength;
   const r = (p & 0xff) * k, g = ((p >> 8) & 0xff) * k, b = ((p >> 16) & 0xff) * k;
   return ((255 << 24) | (Math.round(b) << 16) | (Math.round(g) << 8) | Math.round(r)) >>> 0;
+}
+
+/** As `stamp`, into any `ow` × `oh` buffer: a sprite's pixels in its
+ * outline, or (`shadow`) shading where they would go. */
+export function stampInto(out: Uint32Array, ow: number, oh: number, source: Sprite, x0: number, y0: number, shadow: boolean) {
+  const s = outlinedScenery(source); x0--; y0--;
+  for (let y = 0; y < s.h; y++) {
+    const Y = y0 + y;
+    if (Y < 0 || Y >= oh) continue;
+    for (let x = 0; x < s.w; x++) {
+      const p = s.px[y * s.w + x], X = x0 + x;
+      if (!p || X < 0 || X >= ow) continue;
+      out[Y * ow + X] = shadow ? darken(out[Y * ow + X]) : p;
+    }
+  }
 }
 
 /** Copies a sprite's pixels in, or (`shadow`) shades where they would go. */
@@ -619,7 +640,7 @@ export function waterGlints(plan: ForestPlan) {
 /** A small mountain: a heap of cells raised into a rocky hill seen from
  * above, its ridges lit from the upper left, scree at its ragged foot, moss
  * on its gentler slopes, a long shadow to the lower right. */
-type MountainSource = Sprite & { x: number; y: number; name: string; crags: { x: number; y: number; deep: number; seed: number }[] };
+export type MountainSource = Sprite & { x: number; y: number; name: string; crags: { x: number; y: number; deep: number; seed: number }[] };
 let mountains = new WeakMap<Boulder, { key: string; source: MountainSource }>();
 export function mountainSource(b: Boulder): MountainSource {
   // The native plan is stable, but keep direct/export callers correct when
@@ -627,17 +648,26 @@ export function mountainSource(b: Boulder): MountainSource {
   // regenerate every mountain's noise, height field and distance transform.
   const key = `${pixelKey()}:${b.seed}:${b.cells.join(',')}`, cached = mountains.get(b);
   if (cached?.key === key) return cached.source;
-  const rock = new Set(b.cells);
+  const made = mountainOf(b.cells.map((c) => ({ x: c % CELLS_W, y: Math.floor(c / CELLS_W) })), b.seed);
+  mountains.set(b, { key, source: made });
+  return made;
+}
+
+/** A small mountain over any heap of cells, on or off the board (`cells`
+ * as cell coordinates, `seed` its look): as `mountainSource`, which the
+ * forest's boulders take, and the wilds' hills past the board's edge. */
+export function mountainOf(cells: readonly { x: number; y: number }[], seed0: number): MountainSource {
+  const b = { seed: seed0 };
+  const rock = new Set(cells.map((c) => c.x * 65536 + c.y));
   let cx0 = Infinity, cy0 = Infinity, cx1 = -Infinity, cy1 = -Infinity;
-  for (const c of b.cells) {
-    const x = c % CELLS_W, y = Math.floor(c / CELLS_W);
+  for (const { x, y } of cells) {
     cx0 = Math.min(cx0, x), cy0 = Math.min(cy0, y), cx1 = Math.max(cx1, x), cy1 = Math.max(cy1, y);
   }
   const X0 = (cx0 - 1) * ART, Y0 = (cy0 - 1) * ART, w = (cx1 - cx0 + 3) * ART, h = (cy1 - cy0 + 3) * ART;
   const seed = b.seed % 1000;
   // Its outline: the heap's cells blended smoothly between their middles,
   // so its corners round off, ragged by noise.
-  const isRock = (cx: number, cy: number) => (rock.has(cellIndex(cx, cy)) && cx >= 0 && cx < CELLS_W ? 1 : 0);
+  const isRock = (cx: number, cy: number) => (rock.has(cx * 65536 + cy) ? 1 : 0);
   const inside = new Uint8Array(w * h);
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
@@ -677,17 +707,15 @@ export function mountainSource(b: Boulder): MountainSource {
       put(x, y, rgba(c));
     }
   // Crags heaped on its slopes, the biggest toward its heart.
-  const crags = b.cells
+  const crags = cells
     .map((c, k) => {
-      const x = (c % CELLS_W) + 0.5 + (hash01(b.seed, k, 511) - 0.5) * 0.5, y = Math.floor(c / CELLS_W) + 0.5 + (hash01(b.seed, k, 512) - 0.5) * 0.5;
+      const x = c.x + 0.5 + (hash01(b.seed, k, 511) - 0.5) * 0.5, y = c.y + 0.5 + (hash01(b.seed, k, 512) - 0.5) * 0.5;
       return { x, y, deep: d[Math.round(y * ART - Y0) * w + Math.round(x * ART - X0)] ?? 0, seed: hash(b.seed, k, 513) };
     })
     .filter((g) => g.deep > 5 && hash01(g.seed, 514) < 0.55)
     .sort((a, c) => a.y - c.y);
   const name=ART_NAMES.scenery(`mountain-${w}x${h}-${b.seed%16}`);
-  const made = {px:sourcePixels(name,w,h,()=>source),w,h,ox:0,oy:0,x:X0,y:Y0,name,crags};
-  mountains.set(b, { key, source: made });
-  return made;
+  return {px:sourcePixels(name,w,h,()=>source),w,h,ox:0,oy:0,x:X0,y:Y0,name,crags};
 }
 function mountain(out:Uint32Array,b:Boulder) {
   const s=mountainSource(b);
@@ -1505,3 +1533,4 @@ export function forestPieces(): ArtPiece[] {
   return pieces;
 }
 onPixelArt(()=>{sprites.length=0;rocks.clear();stumps.clear();charred.clear();mountains=new WeakMap();});
+export const outlinedSprite = (s: Sprite): Sprite => outlinedScenery(s);

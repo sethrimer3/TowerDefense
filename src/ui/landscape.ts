@@ -24,11 +24,3 @@ export function watchLandscape() {
   window.addEventListener("resize", apply);
   query?.addEventListener?.("change", apply);
 }
-
-/** How far (CSS pixels) a campaign board's view may pan past its edges in
- * landscape: the taller of the controls floating over its top and bottom. */
-export function floatingEdge(page: HTMLElement): number {
-  const head = page.querySelector<HTMLElement>(".campaign-head")?.offsetHeight ?? 0;
-  const side = page.querySelector<HTMLElement>(".campaign-stage.side-open .defend-side")?.offsetHeight ?? 0;
-  return Math.max(head, side) + 12;
-}

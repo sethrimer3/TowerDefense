@@ -1,4 +1,3 @@
-import { floatingEdge, landscape } from "../ui/landscape.ts";
 import { worldSky } from "../daylight.ts";
 import { SquadBar } from "./siege-squad-bar.ts";
 import { SiegeSquads } from "./siege-squads.ts";
@@ -366,11 +365,7 @@ export class SiegePage {
     const r = this.renderer,
       box = this.canvas.getBoundingClientRect();
     r.maxDpr = this.host.save().settings.resolution;
-    // Landscape: the field fits between the controls floating over the
-    // board's top and bottom, and zoomed in may pan out from under them.
-    const edge = landscape() ? floatingEdge(this.root) : 0;
-    r.resize(box.width, Math.max(80, box.height - 2 * edge));
-    r.setEdge(edge);
+    r.resize(box.width, box.height);
     if (this.freshCamera) {
       r.resetCam();
       const top = r.toClient(CELLS_W / 2, 0);

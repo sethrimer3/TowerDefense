@@ -1,234 +1,481 @@
-/** The wilds: impassable scenery past the battlefield's edge. The field is a
- * square (`grid.ts`); whatever of the view the square doesn't fill (above
- * and below it on a tall screen, beside it on a wide one) shows country no
- * one can enter, so the view is never dark. Near the field it is the area's
- * open ground with scattered stones; farther out the stones crowd and grow
- * until they close into hills: grey rocks and mountains round the Mossbound
- * Ruins, red sandstone fins and buttes in the Amber Desert, and the same in
- * each other area's own stone.
+/** The wilds: the country past the battlefield's edge, which no one enters.
+ * The field is a square (`grid.ts`); zoomed all the way out it fills the
+ * view along its tighter side, and the rest of the view (beside it on a
+ * wide screen, above and below it on a tall one) shows the wilds, so the
+ * view is never dark.
+ *
+ * They carry on the field's own ground, so the board's edge is no seam: in
+ * Mossbound Ruins the forest's lawn (`lawnCell`), its trees (planned by the
+ * forest's own rules, `thicket` and `FOREST.big`, thinning out from the
+ * edge, swaying like the field's) and its waving grass (`planCell`, swayed
+ * as `forest-grass.ts` sways it); elsewhere the area's flagstones
+ * (`paintFloorTile`). Over that ground the forest's rocks (`rockSprite`)
+ * scatter, then crowd, grow into boulders and close into the forest's small
+ * mountains (`mountainOf`) farther out, in each area recoloured to its own
+ * stone (red layered sandstone in the Amber Desert). Trees of the field
+ * whose crowns reach past the board are finished out here too.
  *
  * Presentation only: nothing in the battle reads it, and its randomness is
- * a fixed hash, so it is the same every time. It is painted once per area as
- * pixel art at `ART` pixels a cell into a canvas reaching `MARGIN` cells
- * past every edge, and drawn under the board with the camera. */
+ * a fixed hash. The still ground is painted once (per area, for the stone's
+ * colours) at `ART` pixels a cell into a canvas reaching `MARGIN` cells past
+ * every edge; the grass and the crowns are painted at most 30 times a
+ * second into strips covering only what the view shows of the wilds. */
 
 import type { AreaId } from "./areas.ts";
-import { CELLS_H, CELLS_W, hash01 } from "./grid.ts";
+import { CELLS_H, CELLS_W, SUB, TILES_H, TILES_W, hash, hash01 } from "./grid.ts";
+import { ART } from "./park-art.ts";
+import { FOREST, VARIANTS, canopyRadius, hasForest, thicket, type ForestDamage, type ForestPlan, type ForestTree, type TreeKind, type TreeSize } from "./forest.ts";
+import { darken, lawnCell, leanOf, mountainOf, outlinedSprite, rockSprite, stampInto, treeSprite, type Sprite } from "./forest-art.ts";
+import { planCell } from "./forest-grass.ts";
+import { CURVE, PALETTE32, SHADOW, WIND } from "./park-grass.ts";
+import { paintFloorTile } from "./city-layer.ts";
 
-/** Cells of scenery past each edge of the field: enough to fill an
- * ultra-wide or very tall view around the square at its unzoomed fit. */
+/** Cells of wilds past each edge of the field: enough to fill an
+ * ultra-wide or very tall view beside the square at its fit. */
 export const MARGIN = 72;
 
-type RGB = readonly [number, number, number];
-type Palette = {
-  /** Open ground: base and its darker and lighter flecks. */
-  ground: RGB; groundDark: RGB; groundLight: RGB;
-  /** Stone: shadowed, mid and lit faces, its outline, and a top tint (moss,
-   * snow, dust) laid on the most upward-facing stone, if any. */
-  shade: RGB; mid: RGB; lit: RGB; line: RGB; top?: RGB;
-  /** Horizontal bands of darker stone, as in layered sandstone. */
-  strata?: number;
-  /** Rare glints in the stone (crystals, embers). */
-  glint?: RGB;
-};
+/** The wilds' extent in art pixels, and where the board's corner sits in it. */
+const GW = (CELLS_W + 2 * MARGIN) * ART, GH = (CELLS_H + 2 * MARGIN) * ART, OX = MARGIN * ART, OY = MARGIN * ART;
+const BW = CELLS_W * ART, BH = CELLS_H * ART;
 
-const hex = (h: string): RGB => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
-const pal = (g: string, gd: string, gl: string, s: string, m: string, l: string, line: string, extra: Partial<Palette> = {}): Palette => ({
-  ground: hex(g), groundDark: hex(gd), groundLight: hex(gl), shade: hex(s), mid: hex(m), lit: hex(l), line: hex(line), ...extra,
-});
-
-const PALETTES: Partial<Record<AreaId, Palette>> & { moss: Palette } = {
-  moss: pal("#3f5a2a", "#33491f", "#4d6a33", "#4f5357", "#6f7478", "#9a9fa2", "#121314", { top: hex("#5d7a3a") }),
-  desert: pal("#d9a45f", "#c48d4c", "#e6b674", "#8e3a1c", "#bd5a2c", "#df8547", "#2e130a", { strata: 0.55, top: hex("#e8a25c") }),
-  drowned: pal("#232b37", "#1b222c", "#2c3644", "#2f3a4a", "#465670", "#6a7f9c", "#0b0e14", { glint: hex("#9fe6ff") }),
-  ember: pal("#3a2621", "#2e1d19", "#47302a", "#2a2324", "#433838", "#615150", "#0c0909", { glint: hex("#ff8a3a") }),
-  fungal: pal("#3a2833", "#2e1f29", "#46313e", "#4a3743", "#664e5e", "#8a6c80", "#120b10", { top: hex("#a8668e") }),
-  frozen: pal("#dbe9f2", "#c3d6e3", "#eef6fb", "#5f7f9a", "#86a7c1", "#b7d2e6", "#1a2633", { top: hex("#f4fbff") }),
-  crystal: pal("#2c2238", "#22192c", "#382c46", "#4a3762", "#6a5089", "#9478b8", "#100a18", { glint: hex("#e9c8ff") }),
-  obsidian: pal("#352d31", "#2a2327", "#40373c", "#1c171b", "#2f272d", "#4b4049", "#060506"),
-  astral: pal("#27324a", "#1f283c", "#323f5a", "#706a58", "#9a927a", "#cfc6a4", "#14161e", { glint: hex("#fff3c4") }),
-  nadir: pal("#16121e", "#110e17", "#1d1827", "#231d2e", "#342b44", "#4b3f60", "#050408"),
-  magic: pal("#2c4a36", "#223a2a", "#376044", "#4a5a5c", "#68807f", "#93b3ac", "#0e1414", { top: hex("#5fae7e"), glint: hex("#b6ffd8") }),
-};
-
-export function wildsPalette(area: AreaId): Palette {
-  return PALETTES[area] ?? PALETTES.moss;
-}
-
-/** How crowded the stone is `d` cells out from the field: none at the edge,
- * filling to solid hills some forty cells out. */
-export const crowding = (d: number) => {
-  const t = Math.max(0, Math.min(1, (d - 0.5) / 36));
-  return t * (1.35 - 0.35 * t);
-};
-
-/** One stone: centre and radii in cells, the lumps of its outline, and
- * whether it is a hill (drawn smoother and taller). */
-export type Boulder = { x: number; y: number; rx: number; ry: number; lump: [number, number, number, number]; seed: number };
-
-/** How far a boulder's outline swells at the angle whose cosine and sine
- * are `c`, `s`: two lumps (3 and 5 a turn) at hashed phases. */
-function swell(b: Boulder, c: number, s: number) {
-  const c3 = 4 * c * c * c - 3 * c, s3 = 3 * s - 4 * s * s * s;
-  const c5 = 16 * c ** 5 - 20 * c * c * c + 5 * c, s5 = 16 * s ** 5 - 20 * s * s * s + 5 * s;
-  return 1 + b.lump[2] * (s3 * Math.cos(b.lump[0]) + c3 * Math.sin(b.lump[0])) + b.lump[3] * (s5 * Math.cos(b.lump[1]) + c5 * Math.sin(b.lump[1]));
-}
-
-/** Sizes of stone, from pebbles to hills: the grid each is scattered on
- * (cells), its radius range, and the crowding it starts to appear at. */
-const SIZES = [
-  { grid: 2.5, r0: 0.3, r1: 0.9, from: 0, salt: 11 },
-  { grid: 5, r0: 0.9, r1: 2.6, from: 0.18, salt: 23 },
-  { grid: 9, r0: 2.4, r1: 5.5, from: 0.42, salt: 37 },
-  { grid: 16, r0: 5, r1: 11, from: 0.66, salt: 53 },
-] as const;
-
-/** Every stone in the wilds, seeded and sized by how crowded it is where it
- * stands, back to front (by its lowest edge) so nearer stones overlap. */
-export function boulders(desert = false): Boulder[] {
-  const out: Boulder[] = [];
-  const lo = -MARGIN, hiX = CELLS_W + MARGIN, hiY = CELLS_H + MARGIN;
-  for (const size of SIZES)
-    for (let gy = Math.floor(lo / size.grid); gy * size.grid < hiY; gy++)
-      for (let gx = Math.floor(lo / size.grid); gx * size.grid < hiX; gx++) {
-        const x = (gx + 0.1 + 0.8 * hash01(gx, gy, size.salt)) * size.grid, y = (gy + 0.1 + 0.8 * hash01(gx, gy, size.salt + 1)) * size.grid;
-        const d = beyond(x, y);
-        if (d < 0.6) continue;
-        const c = crowding(d), over = (c - size.from) / (1 - size.from);
-        if (over <= 0 || hash01(gx, gy, size.salt + 2) > Math.min(1, 0.15 + 1.1 * over)) continue;
-        const r = size.r0 + (size.r1 - size.r0) * Math.min(1, over * (0.6 + 0.6 * hash01(gx, gy, size.salt + 3)));
-        // A stone near the field stays clear of it.
-        const room = Math.max(0.3, d - 0.4);
-        const rr = Math.min(r, room);
-        const tall = desert ? 1.25 + 0.3 * hash01(gx, gy, size.salt + 4) : 0.85 + 0.2 * hash01(gx, gy, size.salt + 4);
-        out.push({
-          x, y, rx: rr, ry: rr * tall,
-          lump: [hash01(gx, gy, size.salt + 5) * 6.283, hash01(gx, gy, size.salt + 6) * 6.283, 0.08 + 0.1 * hash01(gx, gy, size.salt + 7), 0.05 + 0.08 * hash01(gx, gy, size.salt + 8)],
-          seed: (hash01(gx, gy, size.salt + 9) * 1e9) | 0,
-        });
-      }
-  return out.sort((a, b) => a.y + a.ry - (b.y + b.ry));
-}
-
-/** Cells beyond the field's nearest edge (0 inside it). */
-export function beyond(x: number, y: number) {
-  const dx = Math.max(0, -x, x - CELLS_W), dy = Math.max(0, -y, y - CELLS_H);
+/** Cells from the field's edge to cell (cx, cy)'s middle (0 on the board). */
+export function beyond(cx: number, cy: number) {
+  const x = cx + 0.5, y = cy + 0.5;
+  const dx = x < 0 ? -x : x > CELLS_W ? x - CELLS_W : 0, dy = y < 0 ? -y : y > CELLS_H ? y - CELLS_H : 0;
   return Math.sqrt(dx * dx + dy * dy);
 }
+const smooth = (a: number, b: number, v: number) => {
+  const t = Math.max(0, Math.min(1, (v - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+};
+const onBoard = (cx: number, cy: number) => cx >= 0 && cy >= 0 && cx < CELLS_W && cy < CELLS_H;
 
-/** Light from the upper left and above, as on the city's roofs. */
-const LX = -0.48, LY = -0.56, LZ = 0.68;
+/** A stone: the forest's rock sprite at (x, y) cells, `size` cells across. */
+export type WildRock = { x: number; y: number; size: number; seed: number };
+/** A hill: the forest's small mountain over a heap of cells. */
+export type WildHill = { cells: { x: number; y: number }[]; seed: number; y: number };
+/** The wilds' layout, the same in every area: hills, rocks and (where the
+ * area has a forest) trees, back to front. */
+export type WildsPlan = { hills: WildHill[]; rocks: WildRock[]; trees: ForestTree[] };
 
-/** Paints the wilds round the field into `data` (RGBA), `width` × `height`
- * pixels at `art` pixels a cell, its top left `MARGIN` cells up and left of
- * the field's. The field itself is left transparent. */
-export function paintWilds(data: Uint8ClampedArray, width: number, height: number, art: number, area: AreaId) {
-  const p = wildsPalette(area);
-  const set = (o: number, c: RGB) => { data[o] = c[0]; data[o + 1] = c[1]; data[o + 2] = c[2]; data[o + 3] = 255; };
-  // Open ground, speckled; the field left clear.
-  for (let j = 0; j < height; j++) {
-    const y = (j + 0.5) / art - MARGIN;
-    for (let i = 0; i < width; i++) {
-      const x = (i + 0.5) / art - MARGIN, o = (j * width + i) * 4;
-      if (x >= 0 && x < CELLS_W && y >= 0 && y < CELLS_H) { data[o + 3] = 0; continue; }
-      const n = speck(i, j, 5);
-      set(o, n < 0.12 ? p.groundDark : n > 0.93 ? p.groundLight : p.ground);
+let planned: WildsPlan | null = null;
+
+/** Lays the wilds out, once (in cells, eight a tile): hills rising from
+ * about a tile and a half out, more and bigger until they close over
+ * everything some six tiles out; rocks scattered from the field's edge,
+ * more and bigger the farther out; trees by the forest's own rules,
+ * thinning out from two tiles to six. */
+export function wildsPlan(): WildsPlan {
+  if (planned) return planned;
+  const N = CELLS_W + 2 * MARGIN, M = CELLS_H + 2 * MARGIN;
+  const taken = new Uint8Array(N * M), at = (cx: number, cy: number) => (cy + MARGIN) * N + cx + MARGIN;
+  const inside = (cx: number, cy: number) => cx >= -MARGIN && cy >= -MARGIN && cx < CELLS_W + MARGIN && cy < CELLS_H + MARGIN;
+  // Hills on a jittered grid, bigger the farther out.
+  const hills: WildHill[] = [], S = 6;
+  for (let gy = -Math.ceil(MARGIN / S) - 1; gy * S < CELLS_H + MARGIN + S; gy++)
+    for (let gx = -Math.ceil(MARGIN / S) - 1; gx * S < CELLS_W + MARGIN + S; gx++) {
+      const x = gx * S + hash01(gx, gy, 701) * S, y = gy * S + hash01(gx, gy, 702) * S;
+      const d = beyond(Math.floor(x), Math.floor(y));
+      if (d < 12 || hash01(gx, gy, 703) > 0.12 + 0.88 * smooth(14, 50, d)) continue;
+      const R = Math.min(12, 2 + (d - 12) * 0.22) * (0.75 + hash01(gx, gy, 704) * 0.5), ph = hash01(gx, gy, 705) * 6.28;
+      const cells: { x: number; y: number }[] = [];
+      for (let cy = Math.floor(y - R * 1.3); cy <= y + R * 1.3; cy++)
+        for (let cx = Math.floor(x - R * 1.3); cx <= x + R * 1.3; cx++) {
+          if (!inside(cx, cy) || beyond(cx, cy) < 8) continue;
+          const dx = cx + 0.5 - x, dy = cy + 0.5 - y, a = Math.atan2(dy, dx);
+          const rim = R * (1 + 0.22 * Math.sin(a * 3 + ph) + 0.1 * Math.sin(a * 5 - ph * 2));
+          if (dx * dx + dy * dy < rim * rim) cells.push({ x: cx, y: cy });
+        }
+      if (cells.length < 4) continue;
+      for (const c of cells) taken[at(c.x, c.y)] = 1;
+      hills.push({ cells, seed: hash(gx, gy, 706) % 100000, y: y + R });
+    }
+  hills.sort((a, b) => a.y - b.y);
+  // Rocks in the open between them.
+  const rocks: WildRock[] = [];
+  for (let cy = -MARGIN; cy < CELLS_H + MARGIN; cy++)
+    for (let cx = -MARGIN; cx < CELLS_W + MARGIN; cx++) {
+      if (onBoard(cx, cy) || taken[at(cx, cy)]) continue;
+      const d = beyond(cx, cy);
+      if (hash01(cx, cy, 711) >= FOREST.rock + 0.25 * smooth(8, 50, d)) continue;
+      const grow = smooth(6, 44, d), size = 0.18 + hash01(cx, cy, 712) * 0.3 + grow * hash01(cx, cy, 713) * 1.7;
+      rocks.push({ x: cx + 0.3 + hash01(cx, cy, 714) * 0.4, y: cy + 0.3 + hash01(cx, cy, 715) * 0.4, size: Math.round(size * 8) / 8, seed: hash(cx, cy, 716) % 64 });
+      if (size > 0.9) taken[at(cx, cy)] = 1;
+    }
+  rocks.sort((a, b) => a.y - b.y);
+  // Trees as the forest plants them, thinning out from the edge.
+  const trees: ForestTree[] = [], keep: { x: number; y: number; r: number }[] = [];
+  const clear = (x: number, y: number, r: number) => {
+    for (let cy = Math.floor(y - r); cy <= Math.floor(y + r); cy++)
+      for (let cx = Math.floor(x - r); cx <= Math.floor(x + r); cx++) if (onBoard(cx, cy) || !inside(cx, cy) || taken[at(cx, cy)]) return false;
+    return !keep.some((k) => (x - k.x) ** 2 + (y - k.y) ** 2 < (k.r + r * 0.6) ** 2);
+  };
+  for (const size of [3, 2, 1] as const)
+    for (let cy = -MARGIN; cy < CELLS_H + MARGIN; cy++)
+      for (let cx = -MARGIN; cx < CELLS_W + MARGIN; cx++) {
+        const d = beyond(cx, cy);
+        if (d === 0 || d > 48) continue;
+        const fade = 1 - smooth(18, 48, d);
+        if (hash01(cx, cy, 440 + size) >= FOREST.big[size] * (0.4 + thicket(cx + 0.5, cy + 0.5) * 1.6) * fade) continue;
+        const kind: TreeKind = hash01(cx, cy, 444) < 0.55 ? "oak" : "pine";
+        const variant = hash(cx, cy, 445) % VARIANTS, r = canopyRadius(kind, variant, size as TreeSize);
+        const x = cx + 0.25 + hash01(cx, cy, 446) * 0.5, y = cy + 0.25 + hash01(cx, cy, 447) * 0.5;
+        if (!clear(x, y, r)) continue;
+        trees.push({ id: 0, x, y, r, kind, size, variant, phase: hash01(cx, cy, 448) * Math.PI * 2 });
+        keep.push({ x, y, r: r * 0.7 });
+      }
+  trees.sort((a, b) => a.y - b.y || a.x - b.x);
+  trees.forEach((t, i) => (t.id = i));
+  return (planned = { hills, rocks, trees });
+}
+
+/** An area's stone, dark to light, and the tint on its gentlest slopes
+ * (moss, snow, dust), for recolouring the forest's grey; `strata` darkens
+ * horizontal bands, as in layered sandstone. */
+type Stone = { ramp: number[]; top: number[]; strata?: number };
+const STONES: Partial<Record<AreaId, Stone>> = {
+  desert: { ramp: [0x5a2410, 0x7c3518, 0xa04a22, 0xbd5f2e, 0xd77b42, 0xeb9d60], top: [0xc9884c, 0xe0a868], strata: 0.16 },
+  drowned: { ramp: [0x1a2230, 0x263244, 0x34445c, 0x465a76, 0x5d7594, 0x7d95b2], top: [0x3d6f86, 0x5fa3bd] },
+  ember: { ramp: [0x1c1515, 0x2a2121, 0x3a2e2d, 0x4d3d3b, 0x63504c, 0x7d6560], top: [0x8a3b1e, 0xc4602a] },
+  fungal: { ramp: [0x2c1f28, 0x3e2c38, 0x52394a, 0x684a5e, 0x815e75, 0x9c7790], top: [0x8a4f76, 0xb06e98] },
+  frozen: { ramp: [0x3a5268, 0x4d6a84, 0x6886a0, 0x86a6bf, 0xa9c6db, 0xcde2ef], top: [0xdcecf6, 0xf4fbff] },
+  crystal: { ramp: [0x241a33, 0x33264a, 0x45345f, 0x5a4478, 0x725894, 0x9076b4], top: [0x8f62c2, 0xbf96e8] },
+  obsidian: { ramp: [0x0e0b0e, 0x181418, 0x231d22, 0x30282e, 0x40363d, 0x54484f], top: [0x3d2f3a, 0x55434f] },
+  astral: { ramp: [0x3e3a30, 0x544e40, 0x6d6652, 0x878067, 0xa49c80, 0xc4bc9c], top: [0x5d6c96, 0x8697c4] },
+  nadir: { ramp: [0x120f19, 0x1b1625, 0x251e33, 0x312842, 0x3f3455, 0x51446c], top: [0x3a2c55, 0x52407a] },
+  magic: { ramp: [0x2e3a3a, 0x3e4e4e, 0x506565, 0x667e7c, 0x80999a, 0x9db8b4], top: [0x3f8a5c, 0x63b27e] },
+};
+
+/** Recolours the forest's grey stone and moss in `px` to `stone` (outlines
+ * and shadows kept); strata by art row `Y` (relative). */
+function recolour(px: Uint32Array, w: number, stone: Stone) {
+  for (let i = 0; i < px.length; i++) {
+    const p = px[i], a = p >>> 24;
+    if (a < 255) continue;
+    const r = p & 0xff, g = (p >> 8) & 0xff, b = (p >> 16) & 0xff, lum = 0.3 * r + 0.55 * g + 0.15 * b;
+    if (lum < 22) continue;
+    const mossy = g > r + 14 && g > b + 14;
+    let c = mossy ? stone.top[lum > 90 ? 1 : 0] : stone.ramp[Math.max(0, Math.min(5, Math.round(((lum - 34) / 130) * 5)))];
+    if (stone.strata && !mossy) {
+      const Y = Math.floor(i / w), band = Math.floor(Y / 3) % 5;
+      if (band === 0 || (band === 3 && ((i % w) + Y) % 2)) c = shadeHex(c, 1 - stone.strata);
+    }
+    px[i] = ((255 << 24) | ((c & 0xff) << 16) | (c & 0xff00) | ((c >> 16) & 0xff)) >>> 0;
+  }
+}
+const shadeHex = (c: number, k: number) => (Math.round(((c >> 16) & 0xff) * k) << 16) | (Math.round(((c >> 8) & 0xff) * k) << 8) | Math.round((c & 0xff) * k);
+
+/** The wilds' still ground in art pixels over the whole extent: in the
+ * forest its lawn, else clear (the flagstones are drawn under it); then
+ * rocks and hills with their shadows, and in the forest the trees'
+ * shadows. `turf` marks the lawn pixels left (where blades grow), `shaded`
+ * those under a tree's shadow. */
+export function paintWilds(forest: boolean, stone?: Stone) {
+  const out = new Uint32Array(GW * GH), plan = wildsPlan();
+  if (forest)
+    for (let cy = -MARGIN; cy < CELLS_H + MARGIN; cy++)
+      for (let cx = -MARGIN; cx < CELLS_W + MARGIN; cx++) {
+        if (onBoard(cx, cy)) continue;
+        lawnCell(cx, cy, (X, Y, c) => {
+          X += OX; Y += OY;
+          if (X >= 0 && Y >= 0 && X < GW && Y < GH) out[Y * GW + X] = c;
+        });
+      }
+  const lawn = forest ? out.slice() : null;
+  // Rocks and hills, back to front, each with its shadow down and right.
+  const items: { y: number; draw: () => void }[] = [];
+  for (const r of plan.rocks)
+    items.push({ y: r.y, draw: () => {
+      const s = rockSprite(r.size, r.seed), x0 = Math.round(r.x * ART) - s.ox + OX, y0 = Math.round(r.y * ART) - s.oy + OY;
+      stampInto(out, GW, GH, s, x0 + (r.size > 1 ? 2 : 1), y0 + (r.size > 1 ? 2 : 1), true);
+      stampInto(out, GW, GH, s, x0, y0, false);
+    } });
+  for (const h of plan.hills)
+    items.push({ y: h.y, draw: () => {
+      const s = mountainOf(h.cells, h.seed), X0 = s.x + OX, Y0 = s.y + OY;
+      for (let y = 0; y < s.h; y++)
+        for (let x = 0; x < s.w; x++) {
+          if (!s.px[y * s.w + x]) continue;
+          for (const k of [2, 4]) {
+            const sx = x + k, sy = y + k, X = X0 + sx, Y = Y0 + sy;
+            if ((sx < s.w && sy < s.h && s.px[sy * s.w + sx]) || X < 0 || Y < 0 || X >= GW || Y >= GH || (k === 4 && (X + Y) & 1)) continue;
+            out[Y * GW + X] = darken(out[Y * GW + X]);
+          }
+        }
+      stampInto(out, GW, GH, s, X0, Y0, false);
+      for (const g of s.crags) {
+        const sp = rockSprite(Math.round((0.9 + Math.min(1.2, g.deep / 14) + hash01(g.seed, 515) * 0.3) * 4) / 4, g.seed % 64);
+        const gx = Math.round(g.x * ART) - sp.ox + OX, gy = Math.round(g.y * ART) - sp.oy + OY;
+        stampInto(out, GW, GH, sp, gx + 2, gy + 2, true);
+        stampInto(out, GW, GH, sp, gx, gy, false);
+      }
+    } });
+  items.sort((a, b) => a.y - b.y);
+  for (const it of items) it.draw();
+  if (stone) recolour(out, GW, stone);
+  const turf = new Uint8Array(GW * GH), shaded = new Uint8Array(GW * GH);
+  if (lawn) {
+    for (let i = 0; i < out.length; i++) turf[i] = out[i] !== 0 && out[i] === lawn[i] ? 1 : 0;
+    // The trees' shadows, as the forest casts them.
+    for (const t of plan.trees) {
+      const s = outlinedSprite(treeSprite(t.kind, t.variant, 0, t.size)), R = t.r * ART;
+      const x0 = Math.round(t.x * ART) - s.ox + Math.round(R * 0.35) + 1 + OX, y0 = Math.round(t.y * ART) - s.oy + Math.round(R * 0.5) + 1 + OY;
+      for (let y = 0; y < s.h; y++)
+        for (let x = 0; x < s.w; x++) {
+          if (!s.px[y * s.w + x]) continue;
+          const X = x0 + x, Y = y0 + y, i = Y * GW + X;
+          if (X < 0 || Y < 0 || X >= GW || Y >= GH || shaded[i] || (X >= OX && Y >= OY && X < OX + BW && Y < OY + BH)) continue;
+          shaded[i] = 1;
+          out[i] = darken(out[i]);
+        }
     }
   }
-  const stones = boulders(!!p.strata);
-  const px = (x: number) => Math.round((x + MARGIN) * art);
-  // Shadows first, cast down and to the right onto the ground.
-  for (const b of stones) {
-    // Far out the stone covers all the ground: no shadow shows.
-    if (beyond(b.x, b.y) > 34) continue;
-    const ox = b.rx * 0.35, oy = b.ry * 0.3;
-    for (let j = px(b.y - b.ry + oy); j < px(b.y + b.ry + oy); j++)
-      for (let i = px(b.x - b.rx + ox); i < px(b.x + b.rx + ox); i++) {
-        if (i < 0 || j < 0 || i >= width || j >= height) continue;
-        const o = (j * width + i) * 4;
-        if (!data[o + 3]) continue;
-        const u = ((i + 0.5) / art - MARGIN - b.x - ox) / b.rx, v = ((j + 0.5) / art - MARGIN - b.y - oy) / b.ry;
-        if (u * u + v * v < 1 && (i + j) % 2 === 0) set(o, mix([data[o], data[o + 1], data[o + 2]], p.groundDark, 0.7));
-      }
-  }
-  // Then each stone, front to back, each pixel taken by the nearest stone
-  // over it alone (so deep piles cost no more than one layer).
-  const taken = new Uint8Array(width * height);
-  for (let n = stones.length - 1; n >= 0; n--) {
-    const b = stones[n];
-    const edge = 1.2 / (art * Math.min(b.rx, b.ry));
-    for (let j = px(b.y - b.ry * 1.25); j < px(b.y + b.ry * 1.25); j++)
-      for (let i = px(b.x - b.rx * 1.25); i < px(b.x + b.rx * 1.25); i++) {
-        if (i < 0 || j < 0 || i >= width || j >= height) continue;
-        const k = j * width + i, o = k * 4;
-        if (taken[k] || !data[o + 3]) continue;
-        const u = ((i + 0.5) / art - MARGIN - b.x) / b.rx, v = ((j + 0.5) / art - MARGIN - b.y) / b.ry;
-        const len = Math.sqrt(u * u + v * v);
-        if (len >= 1.25) continue;
-        const lumpy = len > 1e-6 ? swell(b, u / len, v / len) : 1;
-        const q = len / lumpy;
-        if (q >= 1) continue;
-        taken[k] = 1;
-        if (q > 1 - edge) { set(o, p.line); continue; }
-        // A dome: its slope toward the light picks the tone.
-        const z = Math.sqrt(Math.max(0, 1 - q * q)), nx = u / lumpy, ny = v / lumpy;
-        let light = (nx * LX + ny * LY + z * LZ) / Math.sqrt(nx * nx + ny * ny + z * z);
-        light += (speck(i >> 1, j >> 1, b.seed & 1023) - 0.5) * 0.12;
-        let c: RGB = light > 0.78 ? mix(p.lit, [255, 255, 255], 0.12) : light > 0.55 ? p.lit : light > 0.25 ? p.mid : p.shade;
-        if (p.strata) {
-          const band = Math.floor(((j + 0.5) / art - MARGIN) * 1.4 + b.seed % 3);
-          if (band % 3 === 0) c = mix(c, p.shade, p.strata * 0.55);
-          else if (band % 3 === 1 && light > 0.25) c = mix(c, p.lit, 0.25);
-        }
-        if (p.top && light > 0.55 && z > 0.6 && speck(i >> 1, j >> 1, 9) < 0.22) c = mix(c, p.top, 0.6);
-        if (p.glint && speck(i, j, 13) < 0.003) c = p.glint;
-        set(o, c);
-      }
-  }
+  return { px: out, turf, shaded };
 }
 
-/** A cheap per-pixel hash in [0, 1). */
-function speck(i: number, j: number, salt: number) {
-  let h = Math.imul(i, 0x27d4eb2d) ^ Math.imul(j, 0x165667b1) ^ Math.imul(salt, 0x9e3779b9);
-  h = Math.imul(h ^ (h >>> 15), 0x85ebca6b);
-  h ^= h >>> 13;
-  return (h >>> 0) / 4294967296;
+/** The waving blades of the wilds' lawn, as flat arrays: each blade's root
+ * (art pixels, wilds coordinates), height, colour and splay, and the parts
+ * of its sway that don't change with time (as `forest-grass.ts`'s
+ * `Swaying`), bucketed by cell row and column for the strips in view. */
+type Blades = { gx: Int16Array; gy: Int16Array; h: Uint8Array; color: Uint8Array; splay: Float32Array; s1: Float32Array; c1: Float32Array; s2: Float32Array; c2: Float32Array; s3: Float32Array; c3: Float32Array; start: Int32Array };
+
+function planBlades(turf: Uint8Array, plan: WildsPlan): Blades {
+  const N = CELLS_W + 2 * MARGIN, M = CELLS_H + 2 * MARGIN;
+  const crowns: { x: number; y: number; r: number }[][] = Array.from({ length: N * M }, () => []);
+  for (const t of plan.trees) {
+    const r = t.r * 0.85;
+    for (let cy = Math.floor(t.y - r); cy <= Math.floor(t.y + r); cy++)
+      for (let cx = Math.floor(t.x - r); cx <= Math.floor(t.x + r); cx++)
+        if (cx >= -MARGIN && cy >= -MARGIN && cx < CELLS_W + MARGIN && cy < CELLS_H + MARGIN) crowns[(cy + MARGIN) * N + cx + MARGIN].push({ x: t.x, y: t.y, r });
+  }
+  const list: number[][] = [];
+  const start = new Int32Array(N * M + 1);
+  let n = 0;
+  for (let cy = -MARGIN; cy < CELLS_H + MARGIN; cy++)
+    for (let cx = -MARGIN; cx < CELLS_W + MARGIN; cx++) {
+      const k = (cy + MARGIN) * N + cx + MARGIN;
+      start[k] = n;
+      if (onBoard(cx, cy) || beyond(cx, cy) > 64) continue;
+      const blades = planCell(cx, cy, (x, y) => {
+        const X = Math.floor(x * ART) + OX, Y = Math.floor(y * ART) + OY;
+        if (X < 0 || Y < 0 || X >= GW || Y >= GH || !turf[Y * GW + X]) return -2;
+        return crowns[k].some((c) => (x - c.x) ** 2 + (y - c.y) ** 2 < c.r * c.r) ? -2 : -1;
+      });
+      for (const b of blades) {
+        const gx = (cx + MARGIN) * ART + b.i, gy = (cy + MARGIN) * ART + b.j;
+        list.push([gx, gy, b.h, b.color, b.splay, b.phase]);
+        n++;
+      }
+    }
+  start[N * M] = n;
+  const o: Blades = {
+    gx: new Int16Array(n), gy: new Int16Array(n), h: new Uint8Array(n), color: new Uint8Array(n), splay: new Float32Array(n),
+    s1: new Float32Array(n), c1: new Float32Array(n), s2: new Float32Array(n), c2: new Float32Array(n), s3: new Float32Array(n), c3: new Float32Array(n), start,
+  };
+  list.forEach(([gx, gy, h, color, splay, phase], k) => {
+    // As the forest's: its sway's phase from its root on the board's grid.
+    const bx = gx - OX, by = gy - OY, a1 = phase + bx * 0.06, a2 = phase * 2, a3 = bx * 0.021 + by * 0.009;
+    o.gx[k] = gx, o.gy[k] = gy, o.h[k] = h, o.color[k] = color, o.splay[k] = splay;
+    o.s1[k] = Math.sin(a1), o.c1[k] = Math.cos(a1), o.s2[k] = Math.sin(a2), o.c2[k] = Math.cos(a2), o.s3[k] = Math.sin(a3), o.c3[k] = Math.cos(a3);
+  });
+  return o;
 }
 
-const mix = (a: RGB, b: RGB, t: number): RGB => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+/** A sprite's rows as runs of solid pixels (row, first, past-last). */
+const runCache = new WeakMap<Sprite, Int16Array>();
+function runs(s: Sprite) {
+  let r = runCache.get(s);
+  if (r) return r;
+  const out: number[] = [];
+  for (let y = 0; y < s.h; y++)
+    for (let x = 0; x < s.w; x++) {
+      if (!s.px[y * s.w + x]) continue;
+      let e = x;
+      while (e < s.w && s.px[y * s.w + e]) e++;
+      out.push(y, x, e);
+      x = e;
+    }
+  runCache.set(s, (r = Int16Array.from(out)));
+  return r;
+}
 
-/** The wilds' canvas per area, painted on first use, and drawn under the
- * board through the camera. */
+/** A box of art pixels in wilds coordinates, `x1`/`y1` exclusive. */
+type Box = { x0: number; y0: number; x1: number; y1: number };
+type Strip = { box: Box; canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D; img: ImageData; px: Uint32Array };
+
+/** What a frame of the wilds needs from the battle. */
+export type WildsFrame = {
+  area: AreaId; px: number; cam: { s: number; x: number; y: number }; night: number; now: number;
+  /** The grass's wind (`park-grass.ts`) and the trees' (as the forest's crowns lean). */
+  grassWind: keyof typeof WIND; treeWind: number; reduceMotion: boolean; effects: boolean;
+  /** The field's forest, whose crowns past the board's edge are finished here. */
+  forest?: { plan: ForestPlan; damage: ForestDamage | null } | null;
+};
+
+/** Draws the wilds, kept by the renderer. */
 export class Wilds {
-  private canvases = new Map<AreaId, HTMLCanvasElement>();
+  private grounds = new Map<string, { canvas: HTMLCanvasElement; turf: Uint8Array; shaded: Uint8Array }>();
+  private blades: Blades | null = null;
+  private strips: Strip[] = [];
+  private builtAt = -Infinity;
+  private builtKey = "";
+  /** The field's trees whose crowns reach past the board, by plan. */
+  private overhang = new WeakMap<ForestPlan, ForestTree[]>();
 
-  private canvas(area: AreaId, art: number) {
-    let c = this.canvases.get(area);
-    if (c) return c;
-    c = document.createElement("canvas");
-    c.width = (CELLS_W + 2 * MARGIN) * art;
-    c.height = (CELLS_H + 2 * MARGIN) * art;
-    const ctx = c.getContext("2d")!;
-    const img = ctx.createImageData(c.width, c.height);
-    paintWilds(img.data, c.width, c.height, art, area);
+  private ground(forest: boolean, area: AreaId) {
+    const key = forest ? "forest" : area;
+    let g = this.grounds.get(key);
+    if (g) return g;
+    const painted = paintWilds(forest, forest ? undefined : STONES[area]);
+    const canvas = document.createElement("canvas");
+    canvas.width = GW;
+    canvas.height = GH;
+    const ctx = canvas.getContext("2d")!, img = ctx.createImageData(GW, GH);
+    new Uint32Array(img.data.buffer).set(painted.px);
     ctx.putImageData(img, 0, 0);
-    this.canvases.set(area, c);
-    return c;
+    g = { canvas, turf: painted.turf, shaded: painted.shaded };
+    this.grounds.set(key, g);
+    return g;
   }
 
-  /** Draws the wilds for `area` under a board drawn at `px` canvas pixels a
-   * cell through camera `cam`, darkened by `night` (0 to 1). */
-  draw(ctx: CanvasRenderingContext2D, area: AreaId, art: number, px: number, cam: { s: number; x: number; y: number }, night: number) {
-    const c = this.canvas(area, art), k = (px * cam.s) / art;
+  draw(ctx: CanvasRenderingContext2D, f: WildsFrame) {
+    if (typeof document === "undefined") return;
+    const forest = hasForest(f.area), k = (f.px * f.cam.s) / ART, cw = ctx.canvas.width, ch = ctx.canvas.height;
+    // The wilds in view, in art pixels (wilds coordinates).
+    const view: Box = {
+      x0: Math.max(0, Math.floor(-f.cam.x / k) + OX), y0: Math.max(0, Math.floor(-f.cam.y / k) + OY),
+      x1: Math.min(GW, Math.ceil((cw - f.cam.x) / k) + OX), y1: Math.min(GH, Math.ceil((ch - f.cam.y) / k) + OY),
+    };
+    if (view.x0 >= OX && view.y0 >= OY && view.x1 <= OX + BW && view.y1 <= OY + BH) return;
+    const toX = (X: number) => f.cam.x + (X - OX) * k, toY = (Y: number) => f.cam.y + (Y - OY) * k;
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.imageSmoothingEnabled = false;
-    const x = cam.x - MARGIN * px * cam.s, y = cam.y - MARGIN * px * cam.s;
-    ctx.drawImage(c, Math.round(x), Math.round(y), Math.round(c.width * k), Math.round(c.height * k));
-    if (night > 0.001) {
-      ctx.fillStyle = `rgba(6,8,18,${Math.min(0.82, night * 0.78).toFixed(3)})`;
-      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    if (!forest) this.floor(ctx, f, view, toX, toY, k);
+    const g = this.ground(forest, f.area);
+    const blit = (src: CanvasImageSource, b: Box, sx = b.x0, sy = b.y0) => {
+      const x = Math.round(toX(b.x0)), y = Math.round(toY(b.y0));
+      ctx.drawImage(src, sx, sy, b.x1 - b.x0, b.y1 - b.y0, x, y, Math.round(toX(b.x1)) - x, Math.round(toY(b.y1)) - y);
+    };
+    blit(g.canvas, view);
+    if (forest && f.effects) this.life(ctx, f, g, view, blit);
+    if (f.night > 0.001) {
+      ctx.fillStyle = `rgba(6,8,18,${Math.min(0.82, f.night * 0.78).toFixed(3)})`;
+      ctx.fillRect(0, 0, cw, ch);
     }
     ctx.restore();
+  }
+
+  /** The area's flagstones past the board, tile by tile, under the stone. */
+  private floor(ctx: CanvasRenderingContext2D, f: WildsFrame, view: Box, toX: (X: number) => number, toY: (Y: number) => number, k: number) {
+    const T = SUB * ART;
+    for (let ty = Math.floor((view.y0 - OY) / T); ty * T < view.y1 - OY; ty++)
+      for (let tx = Math.floor((view.x0 - OX) / T); tx * T < view.x1 - OX; tx++) {
+        if (tx >= 0 && ty >= 0 && tx < TILES_W && ty < TILES_H) continue;
+        const x = Math.round(toX(tx * T + OX)), y = Math.round(toY(ty * T + OY)), w = Math.round(toX((tx + 1) * T + OX)) - x, h = Math.round(toY((ty + 1) * T + OY)) - y;
+        ctx.fillStyle = "#17181b";
+        ctx.fillRect(x, y, w, h);
+        paintFloorTile(ctx, f.area, tx, ty, x, y, w, h);
+      }
+    if (f.area === "nadir") {
+      ctx.fillStyle = "rgba(17,8,32,0.48)";
+      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    }
+    void k;
+  }
+
+  /** The forest's waving grass and swaying crowns over the wilds in view,
+   * painted into strips round the board at most 30 times a second. */
+  private life(ctx: CanvasRenderingContext2D, f: WildsFrame, g: { turf: Uint8Array; shaded: Uint8Array }, view: Box, blit: (src: CanvasImageSource, b: Box, sx?: number, sy?: number) => void) {
+    this.blades ??= planBlades(g.turf, wildsPlan());
+    // The view less the board: above, below, left and right of it.
+    const boxes: Box[] = [
+      { x0: view.x0, y0: view.y0, x1: view.x1, y1: Math.min(view.y1, OY) },
+      { x0: view.x0, y0: Math.max(view.y0, OY + BH), x1: view.x1, y1: view.y1 },
+      { x0: view.x0, y0: Math.max(view.y0, OY), x1: Math.min(view.x1, OX), y1: Math.min(view.y1, OY + BH) },
+      { x0: Math.max(view.x0, OX + BW), y0: Math.max(view.y0, OY), x1: view.x1, y1: Math.min(view.y1, OY + BH) },
+    ].filter((b) => b.x1 > b.x0 && b.y1 > b.y0);
+    const key = boxes.map((b) => `${b.x0},${b.y0},${b.x1},${b.y1}`).join(";") + (f.forest?.plan ? "f" : "");
+    const due = f.reduceMotion ? f.now - this.builtAt >= 500 : f.now - this.builtAt >= 1000 / 30;
+    if (key !== this.builtKey || due) {
+      this.builtAt = f.now;
+      this.builtKey = key;
+      this.strips = boxes.map((b, i) => this.strip(i, b));
+      const t = f.reduceMotion ? 0 : f.now / 1000;
+      for (const s of this.strips) {
+        s.px.fill(0);
+        this.paintBlades(s, g.shaded, t, WIND[f.grassWind]);
+        this.paintCrowns(s, f, t);
+        s.ctx.putImageData(s.img, 0, 0);
+      }
+    }
+    for (const s of this.strips) blit(s.canvas, s.box, 0, 0);
+  }
+
+  private strip(i: number, box: Box): Strip {
+    const w = box.x1 - box.x0, h = box.y1 - box.y0, old = this.strips[i];
+    if (old && old.img.width === w && old.img.height === h) return { ...old, box };
+    const canvas = old?.canvas ?? document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d")!, img = ctx.createImageData(w, h);
+    return { box, canvas, ctx, img, px: new Uint32Array(img.data.buffer) };
+  }
+
+  /** As `ForestGrass.paint`, with no one walking through. */
+  private paintBlades(s: Strip, shaded: Uint8Array, t: number, wind: number) {
+    const b = this.blades!, N = CELLS_W + 2 * MARGIN, { box, px } = s, w = box.x1 - box.x0;
+    const S1 = Math.sin(t * 2.1), C1 = Math.cos(t * 2.1), S2 = Math.sin(t * 3.7), C2 = Math.cos(t * 3.7), S3 = Math.sin(-t * 1.6), C3 = Math.cos(-t * 1.6);
+    const cx0 = Math.max(0, Math.floor(box.x0 / ART) - 1), cx1 = Math.min(N - 1, Math.floor((box.x1 - 1) / ART) + 1);
+    const cy0 = Math.max(0, Math.floor(box.y0 / ART)), cy1 = Math.min(CELLS_H + 2 * MARGIN - 1, Math.floor((box.y1 - 1) / ART) + 1);
+    for (let cy = cy0; cy <= cy1; cy++)
+      for (let k = b.start[cy * N + cx0], e = b.start[cy * N + cx1 + 1]; k < e; k++) {
+        const gx = b.gx[k], gy = b.gy[k];
+        if (gy - b.h[k] + 1 >= box.y1 || gy < box.y0) continue;
+        const shade = shaded[gy * GW + gx] ? SHADOW : 0;
+        const sway = (b.s1[k] * C1 + b.c1[k] * S1) * 0.5 + (b.s2[k] * C2 + b.c2[k] * S2) * 0.2;
+        const band = b.s3[k] * C3 + b.c3[k] * S3, gust = band > 0 ? band * band * band * 1.6 : 0;
+        const lean = b.splay[k] + wind * (0.35 + sway * 0.45 + gust);
+        const h = b.h[k], curve = CURVE[h], color = b.color[k];
+        let lastX = gx, start = 0;
+        for (let q = 1; q <= h; q++) {
+          const bx = q === h ? -1 : gx + Math.round(lean * curve[q]);
+          if (q !== h && bx === lastX) continue;
+          if (lastX >= box.x0 && lastX < box.x1) {
+            const colour = PALETTE32[shade + (start === 0 ? color % 2 : q >= h - 1 ? color + 2 : color + 1)];
+            for (let y = Math.max(box.y0, gy - q + 1), end = Math.min(box.y1, gy - start + 1); y < end; y++) px[(y - box.y0) * w + lastX - box.x0] = colour;
+          }
+          start = q;
+          lastX = bx;
+        }
+      }
+  }
+
+  /** The wilds' trees, and the field's whose crowns reach past the board,
+   * leaning as the forest's do. */
+  private paintCrowns(s: Strip, f: WildsFrame, t: number) {
+    const { box, px } = s, w = box.x1 - box.x0;
+    const draw = (tree: ForestTree) => {
+      const sp = outlinedSprite(treeSprite(tree.kind, tree.variant, leanOf(tree, t, f.treeWind), tree.size)), r = runs(sp);
+      const sx = Math.round(tree.x * ART) - sp.ox + OX, sy = Math.round(tree.y * ART) - sp.oy + OY;
+      if (sx >= box.x1 || sy >= box.y1 || sx + sp.w <= box.x0 || sy + sp.h <= box.y0) return;
+      for (let q = 0; q < r.length; q += 3) {
+        const Y = sy + r[q];
+        if (Y < box.y0 || Y >= box.y1) continue;
+        const row = r[q] * sp.w, xa = Math.max(r[q + 1], box.x0 - sx), xb = Math.min(r[q + 2], box.x1 - sx), at = (Y - box.y0) * w + sx - box.x0;
+        for (let x = xa; x < xb; x++) px[at + x] = sp.px[row + x];
+      }
+    };
+    const field = f.forest?.plan;
+    if (field) {
+      let reach = this.overhang.get(field);
+      if (!reach) {
+        reach = field.trees.filter((tr) => tr.x - tr.r * 1.4 < 0 || tr.y - tr.r * 1.4 < 0 || tr.x + tr.r * 1.4 > CELLS_W || tr.y + tr.r * 1.4 > CELLS_H);
+        this.overhang.set(field, reach);
+      }
+      const damage = f.forest!.damage;
+      for (const tr of reach) if (!damage || damage.standing(tr)) draw(tr);
+    }
+    for (const tr of wildsPlan().trees) draw(tr);
   }
 }
