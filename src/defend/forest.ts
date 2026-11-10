@@ -56,7 +56,7 @@ export function canopyRadius(kind: TreeKind, variant: number, size: TreeSize = 0
 }
 
 /** Smooth value noise on the coarse grid, 0..1. */
-function thicket(x: number, y: number) {
+export function thicket(x: number, y: number) {
   const s = FOREST.cell, gx = x / s, gy = y / s, ix = Math.floor(gx), iy = Math.floor(gy);
   const fx = gx - ix, fy = gy - iy, ux = fx * fx * (3 - 2 * fx), uy = fy * fy * (3 - 2 * fy);
   const v = (a: number, b: number) => hash01(a, b, 411);

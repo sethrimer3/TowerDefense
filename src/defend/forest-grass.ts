@@ -27,7 +27,7 @@ export type ForestBlade = Blade & { under: number };
 /** Open cell (cx, cy)'s blades, as the parks' are planned: clumps of two to
  * four fanning out from one root; `keep` says whether a root may grow
  * there (-1 for no) and under which tree. */
-function planCell(cx: number, cy: number, keep: (x: number, y: number) => number): ForestBlade[] {
+export function planCell(cx: number, cy: number, keep: (x: number, y: number) => number): ForestBlade[] {
   const r = (k: number) => hash01(cx, cy, 600 + k);
   const out: ForestBlade[] = [];
   const clumps = 2 + Math.floor(r(0) * 3);
