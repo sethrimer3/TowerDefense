@@ -24,7 +24,7 @@ const W = CELLS_W * ART, H = CELLS_H * ART;
 /** How far past a trail's half width (as a share of it) its ragged edge may reach. */
 const FRINGE = 1.25;
 /** How many half widths off a trail's middle its distance map reaches. */
-export const FIELD_REACH = 5.6;
+export const FIELD_REACH = 9.1;
 
 /** Each art pixel's distance from the nearest trail's middle as a share of
  * its half width (`t`, Infinity far from any), and that trail's wear. */
@@ -226,10 +226,11 @@ function bankPixels(t: Float32Array, w: number, h: number, ox: number, oy: numbe
       const steep = Math.max(0, 1 - Math.max(0, v - 0.75) / 0.85);
       // The face looks toward the trail (-gradient): lit when that is the sun's way.
       const lit = (-(gx / g) * SUN.x - (gy / g) * SUN.y) * steep;
+      // Dithered, not a smooth wash, so the bank keeps the sand's grain.
       const a = Math.min(1, Math.abs(lit) * 0.75);
-      if (a < 0.04) continue;
+      if (a < 0.04 || a < BAYER[(Y & 3) * 4 + (X & 3)] * 0.9 + (hash01(X, Y, 929) - 0.5) * 0.25) continue;
       const c = lit > 0 ? [252, 214, 150] : [96, 58, 30];
-      data[o] = c[0]; data[o + 1] = c[1]; data[o + 2] = c[2]; data[o + 3] = Math.round(a * (lit > 0 ? 150 : 170));
+      data[o] = c[0]; data[o + 1] = c[1]; data[o + 2] = c[2]; data[o + 3] = lit > 0 ? 120 : 140;
     }
   return data;
 }

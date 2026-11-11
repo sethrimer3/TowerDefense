@@ -228,11 +228,11 @@ function binOf(gx: number, gy: number, range: number) {
 }
 /** A dune pixel's colour from its surface's slope (gx, gy) at tile pixel
  * (tx, ty), in the current style and light. */
-function duneColor(gx: number, gy: number, tx: number, ty: number, cast = true, detail = false) {
+function duneColor(gx: number, gy: number, tx: number, ty: number, cast = true, detail: boolean | "grain" = false) {
   const range = slopes().range, bin = binOf(gx, gy, range);
   if (style === "hd") return hdTone(bin < 0 ? hdLight(gx, gy) : shadeTable()[bin], tx, ty);
   const i = ty * DUNE_PERIOD * ART + tx, shadowed = cast && castShadows()[i] === 1;
-  return sandAt(bin < 0 ? duneShade(gx, gy, shadowed) : shadeTable()[bin + (shadowed ? BINS * BINS : 0)], tx, ty, detail ? sandDetail()[i] : 0);
+  return sandAt(bin < 0 ? duneShade(gx, gy, shadowed) : shadeTable()[bin + (shadowed ? BINS * BINS : 0)], tx, ty, detail === "grain" ? grainDetail()[i] : detail ? sandDetail()[i] : 0);
 }
 
 /** Where along a simple swell its crest stands: a long windward rise, then a
@@ -296,8 +296,10 @@ let flatDetail: Int8Array | null = null;
 /** The simple tile's detail (`detailPixels`) in the current light. */
 function sandDetail() {
   if (light.contrast >= SHADOWS_FROM) return detailCache ??= detailPixels(true);
-  return flatDetail ??= detailPixels(false);
+  return grainDetail();
 }
+/** Only the grains and pebbles: the sand's texture without its relief. */
+function grainDetail() { return flatDetail ??= detailPixels(false); }
 
 const heightCache: Record<DuneStyle, Float32Array | null> = { simple: null, hd: null };
 /** The dunes' surface over one field period, art pixels high at `ART`
@@ -425,7 +427,7 @@ export function duneTile() { return dunes(); }
  * flat sheet at `TAPER.from`, so each swell slopes away into the trail
  * rather than ending in a cliff; that run down is lit `TAPER.slope` as
  * steep as it stands, so it reads as the sand sinking, not a new bowl. */
-export const TAPER = { from: 1.1, to: 5.5, slope: .3 };
+export const TAPER = { from: 1.1, to: 9, slope: .25 };
 /** How much of the dunes' height stands at trail distance `t`, 0 to 1. */
 export function taperAt(t: number) {
   const u = (t - TAPER.from) / (TAPER.to - TAPER.from);
@@ -456,7 +458,8 @@ export function duneTaperPixels(t: Float32Array, w: number, h: number, bx: numbe
       // sooner their lit crest lines and ripples, so a crest dies away
       // before the trail rather than running on to its edge.
       const d = BAYER[(ty & 3) * 4 + (tx & 3)];
-      const col = duneColor(gx, gy, tx, ty, k > .35 + d * .6, k > .7 + d * .28);
+      // The grains stay, so the sinking sand keeps its texture.
+      const col = duneColor(gx, gy, tx, ty, k > .35 + d * .6, k > .45 + d * .3 || "grain");
       out[i * 4] = col[0]; out[i * 4 + 1] = col[1]; out[i * 4 + 2] = col[2]; out[i * 4 + 3] = 255;
     }
   return out;
