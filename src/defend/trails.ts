@@ -7,8 +7,8 @@
  * tile or tower re-wears them round itself and the same city always gets the
  * same trails. A few enter at the top edge (`heads`) and wind down toward the
  * city, merging as they near it, ending at a gate where the city has one or
- * else at the wall nearest the keep; in the forest one more leaves the city
- * out the bottom edge. Each is traced downhill on a routing field to the keep
+ * else at the wall nearest the keep; more (`tails`) leave the city out the
+ * bottom edge, so the trails run the whole field wherever the city stands. Each is traced downhill on a routing field to the keep
  * (`routeField`) whose open ground is priced by a smooth noise, so it bends;
  * then rocks are dropped onto the ways every so often (`rockEvery`) and the
  * ways traced again round them, so each swerves sharply past its rocks.
@@ -48,8 +48,8 @@ export const TRAIL = {
   /** A surfaced worm on a trail turns toward the point this many cells on
    * down it. */
   wormAhead: 3,
-  road: { half: 2.2, heads: 3, meander: 1.6, scale: 9, rockEvery: 12, rock: [0.8, 1.3] },
-  sand: { half: 2, heads: 4, meander: 1.8, scale: 10, rockEvery: 13, rock: [1, 1.6] },
+  road: { half: 2.2, heads: 3, tails: 1, meander: 1.6, scale: 9, rockEvery: 12, rock: [0.8, 1.3] },
+  sand: { half: 2, heads: 4, tails: 2, meander: 1.8, scale: 10, rockEvery: 13, rock: [1, 1.6] },
 };
 
 /** A trail's middle line (cells), how far either side of it is worn, and
@@ -177,7 +177,7 @@ function wearOf(map: CityMap, lines: readonly TrailLine[]): Float32Array {
 export type TrailRock = { x: number; y: number; r: number };
 
 /** The trails of either area: `heads` trails in from the top edge (and, in
- * the forest, one out the bottom), each traced down `routeField` to the city.
+ * `tails` out the bottom, past the city), each traced down `routeField` to it.
  * Rocks are then dropped onto the traced ways every so often, a little to one
  * side, and the ways traced again round them, so each trail swerves sharply
  * past its rocks as a game trail does. */
@@ -192,13 +192,17 @@ function planTrails(map: CityMap, seed: number, style: TrailStyle): TrailPlan {
     const x = Math.max(6, Math.min(CELLS_W - 7, Math.floor((k + 0.5) * band + (hash01(seed, k, 902, style.length) - 0.5) * band * 0.6)));
     starts.push({ x, y: 0, edge: -1 });
   }
-  if (style === "road" && keep) {
-    const want = keep.rect.x + keep.rect.w / 2 + (hash01(seed, 903) - 0.5) * 24;
-    for (let off = 0; off < CELLS_W; off++) {
-      const x = Math.round(want + (off % 2 ? -1 : 1) * Math.ceil(off / 2));
-      if (x >= 6 && x <= CELLS_W - 7 && isOpen(map, cellIndex(x, CELLS_H - 1))) { starts.push({ x, y: CELLS_H - 1, edge: 1 }); break; }
+  // And out the bottom, past the city (wherever the player sets it), so the
+  // trails run the whole field: about the keep, spread apart.
+  if (keep)
+    for (let k = 0; k < S.tails; k++) {
+      const spread = (k - (S.tails - 1) / 2) * 28;
+      const want = keep.rect.x + keep.rect.w / 2 + spread + (hash01(seed, k, 903) - 0.5) * (S.tails > 1 ? 12 : 24);
+      for (let off = 0; off < CELLS_W; off++) {
+        const x = Math.round(want + (off % 2 ? -1 : 1) * Math.ceil(off / 2));
+        if (x >= 6 && x <= CELLS_W - 7 && isOpen(map, cellIndex(x, CELLS_H - 1)) && !starts.some((o) => o.edge > 0 && Math.abs(o.x - x) < 12)) { starts.push({ x, y: CELLS_H - 1, edge: 1 }); break; }
+      }
     }
-  }
   const traceAll = (field: Float64Array) =>
     starts.map((s) => (isOpen(map, cellIndex(s.x, s.y)) && field[cellIndex(s.x, s.y)] < Infinity ? trace(map, field, s.x, s.y) : []));
   let field = routeField(map, seed, S.meander, S.scale, blocked);
