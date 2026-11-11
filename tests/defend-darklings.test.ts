@@ -61,18 +61,18 @@ test('splitting respects the native hard cap', () => {
   assert.equal((sim as any).waveSpawned, MAX_WAVE_ENEMIES);
 });
 
-test('one to five art-pixel bodies stay plain black in normal and Simple settings, even when struck or marked', () => {
+test('one to five art-pixel bodies, drawn a pixel larger, stay plain black in normal and Simple settings, even when struck or marked', () => {
   for (const [kind, side] of [['miniDarkling', 1], ['darkling', 2], ['largeDarkling', 3], ['majorDarkling', 4], ['significantDarkling', 5], ['blightWorm', 5], ['smallBlightWorm', 2], ['mediumBlightWorm', 3]] as const) {
     for (const px of [8, 24]) {
       const boxes: number[][] = [];
       const c = { fillStyle: '', fillRect(...args: number[]) { assert.equal(this.fillStyle, '#000000'); boxes.push(args); }, rect(...args: number[]) { assert.equal(this.fillStyle, '#000000'); boxes.push(args); }, beginPath() {}, fill() {} } as unknown as CanvasRenderingContext2D;
       const e = { ...crowd(1, kind, 10, 10)[0], flash: 1, marked: true };
-      const source = basicUnitPixels(kind, true);
-      assert.equal(source.w, side); assert.equal(source.h, side);
+      const source = basicUnitPixels(kind, true), drawn = side + 1;
+      assert.equal(source.w, drawn); assert.equal(source.h, drawn);
       assert.ok(source.data.every(v => v === 0xff000000), 'solid black material survives without stripping');
       drawSimpleEnemies({ c, px }, [e]);
       assert.equal(boxes.length, 1);
-      assert.ok(boxes.every(b => b[2] === side * px / 8 && b[3] === side * px / 8));
+      assert.ok(boxes.every(b => b[2] === drawn * px / 8 && b[3] === drawn * px / 8));
     }
   }
 });

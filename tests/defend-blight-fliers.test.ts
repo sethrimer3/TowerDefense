@@ -85,7 +85,7 @@ test("outline-free black silhouettes export with a shallow dart notch and accept
   setPixelArt(true);
   for (const kind of kinds) {
     const { w, h, data } = basicUnitPixels(kind, true);
-    assert.equal(w, ENEMIES[kind].size * 8); assert.equal(h, w);
+    assert.equal(w, ENEMIES[kind].size * 8 + 1, 'drawn one art pixel larger'); assert.equal(h, w);
     assert.ok(data.some(v => v === 0)); assert.ok(data.some(v => v === 0xff000000));
     assert.ok(data.every(v => v === 0 || v === 0xff000000));
     const piece = basicUnitPieces().find(p => p.name === basicName(kind, true))!;
@@ -96,7 +96,7 @@ test("outline-free black silhouettes export with a shallow dart notch and accept
     finally { setArtOverride(basicName(kind, true), null); }
   }
   const dart = basicUnitPixels("blightDart", true);
-  assert.equal(dart.data[5 * dart.w + 2], 0); assert.equal(dart.data[5 * dart.w], 0xff000000);
+  assert.equal(dart.data[5 * dart.w + 2], 0); assert.equal(dart.data[5 * dart.w + 1], 0xff000000);
 });
 
 test("nested rotation rates are fractional and realign periodically", () => {

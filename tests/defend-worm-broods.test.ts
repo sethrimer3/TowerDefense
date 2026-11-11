@@ -65,7 +65,7 @@ for (const [kind, count, pixels, bodies, child] of [
     assert.ok(h.surfaceT >= 40 && h.surfaceT < 72);
     assert.equal(tuning.surfaceMin, BLIGHT_WORM.surfaceMin * 4); assert.equal(tuning.surfaceRange, BLIGHT_WORM.surfaceRange * 4);
     const piece = basicUnitPieces().find(p => p.name === basicName(kind, true))!;
-    assert.equal(piece.w, pixels); assert.ok(piece.pixels().every(p => p === 0xff000000));
+    assert.equal(piece.w, pixels + 1, "drawn one art pixel larger"); assert.ok(piece.pixels().every(p => p === 0xff000000));
     assert.match(journalHTML([kind]), new RegExp(ENEMIES[kind].name));
     for (let n = 0; n < 7 && sim.enemies.length; n++) { sim.enemies.forEach(e => e.hp = 0); sweep(sim); }
     assert.equal(sim.enemies.length, 0); assert.equal(sim.slain[kind], count);

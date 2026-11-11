@@ -1,5 +1,6 @@
 /** Presentation only: black paper darts and nested, periodically aligned prisms. */
-import { ENEMIES } from "./catalog.ts";
+import { blightDrawnPixels } from "./blight-size.ts";
+import { ART } from "./art-scale.ts";
 import { isBlightPrism } from "./blight-fliers.ts";
 import { hasArtOverride } from "./art-overrides.ts";
 import { basicName, basicUnitSprite } from "./basic-unit-art.ts";
@@ -39,7 +40,7 @@ function body(c: CanvasRenderingContext2D, e: Enemy, d: number) {
 }
 
 export function drawBlightFlier({ c, px }: Brush, e: Enemy, seconds: number, reduceMotion = false, under?: Brush, simple = false) {
-  const d = ENEMIES[e.kind].size * px;
+  const d = blightDrawnPixels(e.kind)! * px / ART;
   const facing = e.facing ?? { x: 0, y: 1 }, angle = Math.atan2(facing.y, facing.x) + Math.PI / 2;
   if (under) {
     under.c.save(); under.c.globalAlpha *= .2;

@@ -131,7 +131,7 @@ test("Significant Darkling is five art pixels, releases two majors and descends 
   assert.equal(Object.values(sim.slain).reduce((a, b) => a + b, 0), 45);
   for (const kind of ["significantDarkling", "blightWorm"] as const) {
     const piece = basicUnitPieces().find(p => p.name === basicName(kind, true))!;
-    assert.equal(piece.name, `enemies/${kind}-body`); assert.equal(piece.w, 5); assert.equal(piece.h, 5);
+    assert.equal(piece.name, `enemies/${kind}-body`); assert.equal(piece.w, 6); assert.equal(piece.h, 6); // five-pixel body, drawn a pixel larger
     assert.ok(piece.pixels().every(p => p === 0xff000000));
     assert.match(journalHTML([kind]), new RegExp(ENEMIES[kind].name));
   }

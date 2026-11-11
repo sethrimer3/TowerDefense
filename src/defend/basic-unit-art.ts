@@ -10,14 +10,19 @@ import { ART } from "./art-scale.ts";
 import { ART_NAMES } from "./art-overrides.ts";
 import { sourcePixels, type ArtPiece } from "./sprite-source.ts";
 import { rgba, sprite } from "./damage-art.ts";
+import { blightDrawnPixels } from "./blight-size.ts";
 export const basicName = (kind: string, enemy = false) =>
   enemy ? ART_NAMES.enemy(kind, "body") : ART_NAMES.unit(`${kind}-body`);
+/** Source width in art pixels; Blight monsters are drawn a pixel larger. */
+function sourceWidth(kind: string, enemy: boolean) {
+  return (enemy && blightDrawnPixels(kind as EnemyKind)) || Math.max(1, Math.round(definition(kind, enemy).size * ART));
+}
 function definition(kind: string, enemy: boolean) {
   return enemy ? ENEMIES[kind as EnemyKind] : kind === "civilian" ? CIVILIAN : TROOPS[kind as keyof typeof TROOPS];
 }
 export function basicUnitPixels(kind: string, enemy = false, flash = false) {
   const def = definition(kind, enemy),
-    w = Math.max(1, Math.round(def.size * ART)),
+    w = sourceWidth(kind, enemy),
     h = w;
   const data = sourcePixels(basicName(kind, enemy), w, h, () =>
     enemy && isBlightFlier(kind as EnemyKind) ? blightFlierPixels(kind as EnemyKind, w) : new Uint32Array(w * h).fill(rgba(parseInt(def.color.slice(1), 16))),
@@ -25,7 +30,7 @@ export function basicUnitPixels(kind: string, enemy = false, flash = false) {
   return { w, h, data: flash ? data.map((v) => (v ? rgba(0xffffff) : 0)) : data };
 }
 export function basicUnitSprite(kind: string, enemy = false, flash = false) {
-  const w = Math.max(1, Math.round(definition(kind, enemy).size * ART));
+  const w = sourceWidth(kind, enemy);
   return sprite(`basic:${kind}:${enemy}:${flash}`, w, w, () => basicUnitPixels(kind, enemy, flash).data, false);
 }
 export function basicUnitPieces(): ArtPiece[] {

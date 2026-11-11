@@ -14,6 +14,7 @@ import { drawSprite } from "./damage-art.ts";
  * are batched into one path per colour, so a crowd of thousands costs a
  * handful of fills. Presentation only. */
 import { ENEMIES, enemySize } from "./catalog.ts";
+import { blightDrawnPixels } from "./blight-size.ts";
 import type { Enemy, Soldier } from "./sim.ts";
 import type { UnitInks } from "./unit-outline.ts";
 
@@ -109,9 +110,8 @@ export function drawDarklingBodies({ c, px }: Brush, enemies: readonly Enemy[], 
   const replacements = sourceArt && DARKLING_SOURCES.some(hasArtOverride);
   let any = false;
   for (const e of enemies) {
-    const side = ENEMIES[e.kind].darkPixels;
-    if (!side || e.raidProxy || !wormBodyVisible(e)) continue;
-    const d = px / ART * side;
+    if (!ENEMIES[e.kind].darkPixels || e.raidProxy || !wormBodyVisible(e)) continue;
+    const d = px / ART * blightDrawnPixels(e.kind)!;
     if (replacements && hasArtOverride(basicName(e.kind, true))) {
       drawSprite(c, basicUnitSprite(e.kind, true), e.x * px - d / 2, e.y * px - d / 2, d, d);
       continue;

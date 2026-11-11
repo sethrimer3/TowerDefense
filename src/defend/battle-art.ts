@@ -6,6 +6,7 @@ import { isBlightFlier } from "./blight-fliers.ts";
 import { drawBlightFlier } from "./blight-flier-art.ts";
 import { drawWormShadow, wormBodyVisible } from "./blight-worm-art.ts";
 import { basicUnitSprite } from "./basic-unit-art.ts";
+import { blightDrawnPixels } from "./blight-size.ts";
 import { drawSprite } from "./damage-art.ts";
 import { ART, UNIT_CONTOUR_ART_PIXELS, DARK_UNIT_INK, PLAYER_UNIT_INK, NEUTRAL_UNIT_INK, MARKED_UNIT_INK, BROOD_UNIT_INK, PORTAL_UNIT_INK } from "./art-scale.ts";
 import {drawChrono} from "./chrono-art.ts";
@@ -683,7 +684,7 @@ export function drawEnemyArt(b: Brush, e: Enemy, sim: DefendSim, under = b, redu
   if (isBlightFlier(e.kind)) return drawBlightFlier(b, e, sim.time, reduceMotion, under);
   if (def.darkPixels) {
     // No sprite lookup, rims, shading, torch, or animated decoration.
-    const d = b.px / ART * def.darkPixels;
+    const d = b.px / ART * blightDrawnPixels(e.kind)!;
     drawSprite(b.c, basicUnitSprite(e.kind,true),e.x * b.px - d / 2,e.y * b.px - d / 2,d,d);
   }
   else if (def.siege) drawSiegeEngine(b, e, sim.time);
