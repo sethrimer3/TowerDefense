@@ -1,52 +1,46 @@
 /** Worn monster trails across the open ground of Defend's first two areas:
- * the Mossbound Ruins' country roads and the Amber Desert's Galton trails.
+ * the Mossbound Ruins' forest trails (`"road"`) and the Amber Desert's sand
+ * trails (`"sand"`), natural game trails or pioneer paths.
  *
  * They are the ways the Dark One's walkers have always come. Each is planned
  * from the map alone (`trailPlan`, memoised per map and style), so a placed
  * tile or tower re-wears them round itself and the same city always gets the
- * same trails:
- *
- * - **Country roads** (`"road"`): a few roads enter at the top edge and wind
- *   down toward the city, merging as they near it, ending at a gate where the
- *   city has one or else at the wall nearest the keep; one more leaves the
- *   city out the bottom edge. Each is traced downhill on a routing field to
- *   the keep (`routeField`) whose open ground is priced by a smooth noise, so
- *   the road bends round low hills and the boulders.
- * - **Galton trails** (`"galton"`): pegs in staggered rows down the field,
- *   each joined to the two pegs below it, like the pins of a Galton board.
- *   Traffic starts at the top row's trailheads and splits at every peg, more
- *   of it toward the keep; a trail is worn as deep as the traffic it carries
- *   (`level`), and one that carries next to none is not worn at all.
+ * same trails. A few enter at the top edge (`heads`) and wind down toward the
+ * city, merging as they near it, ending at a gate where the city has one or
+ * else at the wall nearest the keep; in the forest one more leaves the city
+ * out the bottom edge. Each is traced downhill on a routing field to the keep
+ * (`routeField`) whose open ground is priced by a smooth noise, so it bends;
+ * then rocks are dropped onto the ways every so often (`rockEvery`) and the
+ * ways traced again round them, so each swerves sharply past its rocks.
  *
  * Trails only run over open ground: one stops where it meets the city, its
- * wall or a building, and none crosses a pond or a boulder.
+ * wall or a building, and none crosses a pond, a boulder or a rock.
  *
  * In battle (`DefendSim.syncTrails`) a trail's cells are cheaper to walk
  * (`TRAIL.cost`), so the flow field leads ground enemies onto them; ground
- * walkers enter at the trailheads (`TRAIL.spread`), and at a fork an enemy
- * takes either branch whose cost is within `TRAIL.slack` of the best by its
- * own coin (`forkPick`), so a crowd spreads down the Galton pegs instead of
- * marching in one file. Only Defend's own maps carry trails (`CityMap.trails`):
- * Ambush and Siege battles are untouched, and so is every replay without one.
- * `forest.ts` keeps its trees, lakes and rocks off the roads and
- * `trail-art.ts` draws both kinds. */
+ * walkers enter at the trailheads (`TRAIL.spread`), and where trails split an
+ * enemy takes either branch whose cost is within `TRAIL.slack` of the best by
+ * its own coin (`forkPick`). Only Defend's own maps carry trails
+ * (`CityMap.trails`): Ambush and Siege battles are untouched, and so is every
+ * replay without one. `forest.ts` keeps its trees, lakes and rocks off the
+ * trails and `trail-art.ts` draws both kinds. */
 import { CELL_COUNT, CELLS_H, CELLS_W, cellIndex, hash, hash01 } from "./grid.ts";
 import { CellType, type CityMap } from "./citygen.ts";
 import { downhill, fillFlowField, openSteps, type Point } from "./pathing.ts";
 import { boulderPlan } from "./forest.ts";
 import type { AreaId } from "./areas.ts";
 
-export type TrailStyle = "road" | "galton";
+export type TrailStyle = "road" | "sand";
 
 /** Which trails an area's open ground has, if any. */
-export const trailStyle = (area: AreaId): TrailStyle | null => (area === "moss" ? "road" : area === "desert" ? "galton" : null);
+export const trailStyle = (area: AreaId): TrailStyle | null => (area === "moss" ? "road" : area === "desert" ? "sand" : null);
 
 /** Tuning. `cost` is how much cheaper a fully worn cell is to walk than open
  * ground (1.25 a cell); `slack` how much dearer a branch at a fork may be and
  * still be taken; `spread` how far either side of a trailhead (cells) a
- * walker enters. Roads are `road.half` cells wide either side of their middle
- * (`roads` of them from the top), Galton trails `galton.half`, with their
- * pegs every `dx` cells across and `dy` down. */
+ * walker enters. Per style: `half` cells wide either side of the middle,
+ * `heads` trails from the top, the routing noise's `meander` and `scale`,
+ * a rock about every `rockEvery` cells along a way, `rock` its radius range. */
 export const TRAIL = {
   cost: 0.5,
   slack: 2.5,
@@ -54,8 +48,8 @@ export const TRAIL = {
   /** A surfaced worm on a trail turns toward the point this many cells on
    * down it. */
   wormAhead: 3,
-  road: { half: 1.4, roads: 3, meander: 1.6, scale: 9 },
-  galton: { half: 0.9, dx: 16, dy: 12, min: 0.06, bend: 5 },
+  road: { half: 2.2, heads: 3, meander: 1.6, scale: 9, rockEvery: 12, rock: [0.8, 1.3] },
+  sand: { half: 2, heads: 4, meander: 1.8, scale: 10, rockEvery: 13, rock: [1, 1.6] },
 };
 
 /** A trail's middle line (cells), how far either side of it is worn, and
@@ -63,7 +57,7 @@ export const TRAIL = {
 export type TrailLine = { points: Point[]; half: number; level: number };
 /** A map's trails: each cell's wear (0..1, only on open ground), the
  * trailheads' x along the top edge, and the lines to draw. */
-export type TrailPlan = { style: TrailStyle; wear: Float32Array; heads: number[]; lines: TrailLine[]; pegs: Point[] };
+export type TrailPlan = { style: TrailStyle; wear: Float32Array; heads: number[]; lines: TrailLine[]; rocks: TrailRock[] };
 
 const plans = new WeakMap<CityMap, Map<TrailStyle, TrailPlan>>();
 
@@ -74,7 +68,7 @@ export function trailPlan(map: CityMap, style: TrailStyle): TrailPlan | null {
   let byStyle = plans.get(map);
   if (!byStyle) plans.set(map, (byStyle = new Map()));
   let plan = byStyle.get(style);
-  if (!plan) byStyle.set(style, (plan = style === "road" ? roads(map, map.trails.seed) : galton(map, map.trails.seed)));
+  if (!plan) byStyle.set(style, (plan = planTrails(map, map.trails.seed, style)));
   return plan;
 }
 
@@ -179,102 +173,72 @@ function wearOf(map: CityMap, lines: readonly TrailLine[]): Float32Array {
   return wear;
 }
 
-/** The Mossbound Ruins' country roads. */
-function roads(map: CityMap, seed: number): TrailPlan {
-  const R = TRAIL.road, blocked = new Uint8Array(CELL_COUNT);
-  for (const b of boulderPlan(map)) for (const c of b.cells) blocked[c] = 1;
-  const field = routeField(map, seed, R.meander, R.scale, blocked);
-  const lines: TrailLine[] = [], heads: number[] = [];
-  const band = CELLS_W / R.roads;
-  for (let k = 0; k < R.roads; k++) {
-    let x = Math.floor((k + 0.5) * band + (hash01(seed, k, 902) - 0.5) * band * 0.6);
-    x = Math.max(6, Math.min(CELLS_W - 7, x));
-    if (!isOpen(map, cellIndex(x, 0)) || field[cellIndex(x, 0)] === Infinity) continue;
-    const points = trace(map, field, x, 0);
-    // Start just past the board's edge, so the road comes in from beyond it.
-    points.unshift({ x: x + 0.5, y: -1.5 });
-    lines.push({ points: smooth(points), half: R.half, level: 1 });
-    heads.push(x + 0.5);
-  }
-  // The road out: from the bottom edge below the keep, where it is open.
+/** A rock a trail bends round: its middle and radius (cells). */
+export type TrailRock = { x: number; y: number; r: number };
+
+/** The trails of either area: `heads` trails in from the top edge (and, in
+ * the forest, one out the bottom), each traced down `routeField` to the city.
+ * Rocks are then dropped onto the traced ways every so often, a little to one
+ * side, and the ways traced again round them, so each trail swerves sharply
+ * past its rocks as a game trail does. */
+function planTrails(map: CityMap, seed: number, style: TrailStyle): TrailPlan {
+  const S = TRAIL[style], blocked = new Uint8Array(CELL_COUNT);
+  if (style === "road") for (const b of boulderPlan(map)) for (const c of b.cells) blocked[c] = 1;
   const keep = map.buildings.find((b) => b.kind === "keep");
-  if (keep) {
+  // Where each trail starts: along the top edge, and the forest's road out.
+  const starts: { x: number; y: number; edge: number }[] = [];
+  const band = CELLS_W / S.heads;
+  for (let k = 0; k < S.heads; k++) {
+    const x = Math.max(6, Math.min(CELLS_W - 7, Math.floor((k + 0.5) * band + (hash01(seed, k, 902, style.length) - 0.5) * band * 0.6)));
+    starts.push({ x, y: 0, edge: -1 });
+  }
+  if (style === "road" && keep) {
     const want = keep.rect.x + keep.rect.w / 2 + (hash01(seed, 903) - 0.5) * 24;
     for (let off = 0; off < CELLS_W; off++) {
-      const x = Math.round(want + (off % 2 ? -1 : 1) * Math.ceil(off / 2)), y = CELLS_H - 1;
-      if (x < 6 || x > CELLS_W - 7) continue;
-      const i = cellIndex(x, y);
-      if (!isOpen(map, i) || field[i] === Infinity) continue;
-      const points = trace(map, field, x, y);
-      if (points.length < 4) break;
-      points.unshift({ x: x + 0.5, y: CELLS_H + 1.5 });
-      lines.push({ points: smooth(points), half: R.half, level: 1 });
-      break;
+      const x = Math.round(want + (off % 2 ? -1 : 1) * Math.ceil(off / 2));
+      if (x >= 6 && x <= CELLS_W - 7 && isOpen(map, cellIndex(x, CELLS_H - 1))) { starts.push({ x, y: CELLS_H - 1, edge: 1 }); break; }
     }
   }
-  return { style: "road", wear: wearOf(map, lines), heads, lines, pegs: [] };
-}
-
-/** A Galton peg: where it stands, its place on the unwobbled lattice, and the
- * traffic through it. */
-type Peg = { x: number; y: number; row: number; base: number; mass: number };
-
-/** The Amber Desert's Galton trails. */
-function galton(map: CityMap, seed: number): TrailPlan {
-  const G = TRAIL.galton, field = routeField(map, seed, 0, 1);
-  const x0 = 4 + hash01(seed, 910) * (G.dx - 8);
-  const rows: Peg[][] = [];
-  for (let row = 0, y = 0; y <= CELLS_H; row++, y += G.dy) {
-    const pegs: Peg[] = [];
-    for (let base = x0 + (row % 2 ? G.dx / 2 : 0) - G.dx; base < CELLS_W + G.dx; base += G.dx) {
-      const edge = row === 0 || y + G.dy > CELLS_H;
-      const x = base + (edge && row === 0 ? 0 : (hash01(seed, row, Math.round(base), 911) - 0.5) * 4);
-      const py = row === 0 ? -1.5 : edge ? CELLS_H + 1.5 : y + (hash01(seed, row, Math.round(base), 912) - 0.5) * 3;
-      pegs.push({ x, y: py, row, base, mass: 0 });
+  const traceAll = (field: Float64Array) =>
+    starts.map((s) => (isOpen(map, cellIndex(s.x, s.y)) && field[cellIndex(s.x, s.y)] < Infinity ? trace(map, field, s.x, s.y) : []));
+  let field = routeField(map, seed, S.meander, S.scale, blocked);
+  // Rocks along the first ways, never near the ends or each other.
+  const rocks: TrailRock[] = [];
+  traceAll(field).forEach((way, k) => {
+    let next = 8 + Math.floor(hash01(seed, k, 930) * S.rockEvery);
+    for (let n = 0; n < way.length - 8; n++) {
+      if (n < next) continue;
+      next = n + S.rockEvery * (0.7 + hash01(seed, k, n, 931) * 0.7);
+      const p = way[n], a = way[Math.min(way.length - 1, n + 2)], b = way[Math.max(0, n - 2)];
+      const dx = a.x - b.x, dy = a.y - b.y, len = Math.hypot(dx, dy) || 1;
+      const side = (hash01(seed, k, n, 932) - 0.5) * 0.6, r = S.rock[0] + hash01(seed, k, n, 933) * (S.rock[1] - S.rock[0]);
+      const x = p.x - (dy / len) * side, y = p.y + (dx / len) * side;
+      if (rocks.some((o) => Math.hypot(o.x - x, o.y - y) < o.r + r + 4) || !clearAround(map, { x, y }, r + 2)) continue;
+      rocks.push({ x, y, r });
+      for (let cy = Math.floor(y - r - S.half); cy <= Math.floor(y + r + S.half); cy++)
+        for (let cx = Math.floor(x - r - S.half); cx <= Math.floor(x + r + S.half); cx++)
+          if (cx >= 0 && cy >= 0 && cx < CELLS_W && cy < CELLS_H && Math.hypot(cx + 0.5 - x, cy + 0.5 - y) < r + S.half * 0.9) blocked[cellIndex(cx, cy)] = 1;
     }
-    rows.push(pegs);
-  }
-  // Trailheads: the top row's pegs over open ground.
-  const heads: number[] = [];
-  for (const p of rows[0])
-    if (p.x >= 2 && p.x <= CELLS_W - 2 && isOpen(map, cellIndex(Math.floor(p.x), 0))) {
-      p.mass = 1;
-      heads.push(p.x);
-    }
-  // Every segment, curved a little, cut where it leaves the open ground.
-  const lines: TrailLine[] = [], pegs: Point[] = [];
-  const valueAt = (p: Point) => {
-    const cx = Math.max(0, Math.min(CELLS_W - 1, Math.floor(p.x))), cy = Math.max(0, Math.min(CELLS_H - 1, Math.floor(p.y)));
-    return field[cellIndex(cx, cy)];
-  };
-  for (let r = 0; r + 1 < rows.length; r++)
-    for (const p of rows[r]) {
-      if (p.mass <= 0) continue;
-      const kids = rows[r + 1].filter((c) => Math.abs(c.base - p.base) === G.dx / 2);
-      const routes = kids.flatMap((kid) => {
-        const s = segment(map, p, kid, seed);
-        return s ? [{ ...s, kid }] : [];
-      });
-      if (!routes.length) continue;
-      // More of the traffic takes the branch nearer the keep.
-      const value = routes.map((s) => valueAt(s.points[s.points.length - 1]));
-      const shares = routes.length === 1 ? [1] : (() => {
-        const a = value[0], b = value[1], finite = a < Infinity && b < Infinity;
-        const left = finite ? 0.5 + 0.4 * Math.tanh((b - a) / 8) : a < Infinity ? 0.9 : 0.1;
-        return [left, 1 - left];
-      })();
-      let worn = 0;
-      routes.forEach((s, k) => {
-        const m = p.mass * shares[k];
-        if (m < G.min) return;
-        worn++;
-        lines.push({ points: s.points, half: G.half, level: Math.min(1, 0.15 + 0.85 * Math.sqrt(m)) });
-        if (s.through) s.kid.mass += m;
-      });
-      // The pin the trail parts round: a rock where two worn ways go on.
-      if (worn === 2 && r > 0 && p.y < CELLS_H && clearAround(map, p, 2)) pegs.push({ x: p.x, y: p.y });
-    }
-  return { style: "galton", wear: wearOf(map, lines), heads, lines, pegs };
+  });
+  field = routeField(map, seed, S.meander, S.scale, blocked);
+  const lines: TrailLine[] = [], heads: number[] = [];
+  traceAll(field).forEach((way, k) => {
+    if (way.length < 4) return;
+    const s = starts[k];
+    // From just past the board's edge, so the trail comes in from beyond it.
+    way.unshift({ x: s.x + 0.5, y: s.edge < 0 ? -1.5 : CELLS_H + 1.5 });
+    lines.push({ points: smooth(way, 2, 1), half: S.half, level: 1 });
+    if (s.edge < 0) heads.push(s.x + 0.5);
+  });
+  // A rock may have been passed by no trail after all: keep those beside one.
+  const near = rocks.filter((r) => lines.some((l) => l.points.some((p) => Math.hypot(p.x - r.x, p.y - r.y) < r.r + S.half + 1.5)));
+  // Nothing is worn under a rock.
+  const wear = wearOf(map, lines);
+  for (const r of near)
+    for (let cy = Math.floor(r.y - r.r); cy <= Math.floor(r.y + r.r); cy++)
+      for (let cx = Math.floor(r.x - r.r); cx <= Math.floor(r.x + r.r); cx++)
+        if (cx >= 0 && cy >= 0 && cx < CELLS_W && cy < CELLS_H && Math.hypot(cx + 0.5 - r.x, cy + 0.5 - r.y) < r.r + 0.3) wear[cellIndex(cx, cy)] = 0;
+  return { style, wear, heads, lines, rocks: near };
 }
 
 /** Whether every cell within `r` of point `p` on the board is open ground. */
@@ -283,32 +247,6 @@ function clearAround(map: CityMap, p: Point, r: number) {
     for (let x = Math.floor(p.x - r); x <= Math.floor(p.x + r); x++)
       if (x >= 0 && y >= 0 && x < CELLS_W && y < CELLS_H && !isOpen(map, cellIndex(x, y))) return false;
   return true;
-}
-
-/** The trail from peg `a` down to peg `b`, a gentle curve; cut short where it
- * leaves the open ground (`through` false then), null if it never gets onto
- * it. Off the board's top and bottom edges counts as open. */
-function segment(map: CityMap, a: Peg, b: Peg, seed: number): { points: Point[]; through: boolean } | null {
-  const bend = (hash01(seed, a.row, Math.round(a.base), Math.round(b.base), 913) - 0.5) * TRAIL.galton.bend;
-  const wiggle = hash01(seed, a.row, Math.round(a.base), Math.round(b.base), 915) * 6.28;
-  const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
-  const cx = mx - (dy / len) * bend, cy = my + (dx / len) * bend;
-  const n = Math.ceil(len * 2), points: Point[] = [];
-  for (let k = 0; k <= n; k++) {
-    const t = k / n, u = 1 - t;
-    // A slow waver either side, none at the pegs themselves.
-    const w = Math.sin(t * Math.PI) * 0.35 * Math.sin(t * 6 + wiggle);
-    const x = u * u * a.x + 2 * u * t * cx + t * t * b.x - (dy / len) * w, y = u * u * a.y + 2 * u * t * cy + t * t * b.y + (dx / len) * w;
-    const X = Math.floor(x), Y = Math.floor(y);
-    if (X < 0 || X >= CELLS_W) return points.length > 2 ? { points, through: false } : null;
-    if (Y >= 0 && Y < CELLS_H && !isOpen(map, cellIndex(X, Y))) {
-      if (!points.length) return null;
-      points.push({ x, y });
-      return { points, through: false };
-    }
-    points.push(k === n ? { x: b.x, y: b.y } : { x, y });
-  }
-  return { points, through: true };
 }
 
 /** The flow-field cost of walking out of open cell `i` with `wear`: open
