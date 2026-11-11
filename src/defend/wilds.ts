@@ -35,7 +35,7 @@ import { paintFloorTile } from "./city-layer.ts";
 import { pixelKey } from "./pixel-sprites.ts";
 import { sceneryOutlinesOn, windAt } from "./scenery-looks.ts";
 import { paintRoadLines, sandReachCanvases } from "./trail-art.ts";
-import { BUMP, duneHeights, duneLightKey, duneTaperPixels, duneTile } from "./atmosphere-art.ts";
+import { duneHeights, duneLightKey, duneTaperPixels, duneTile } from "./atmosphere-art.ts";
 import { segmentDistance, type TrailLine, type TrailPlan } from "./trails.ts";
 
 /** Cells of wilds past each edge of the field: enough to fill an
@@ -255,13 +255,20 @@ function rangeField(): RangeField {
  * diagonal carries the tallest shadow-casting height, sinking `DROP` a
  * step. */
 const DROP = 0.4;
+/** The mountains' shadow multiplies the ground by this cool grey (ABGR):
+ * about two thirds as bright, so where it falls over a dune's own shade the
+ * two deepen together a little rather than one hiding the other. */
+const SHADE_INK = 0xffbea8a6;
+/** How much the dunes' height lifts the ground the mountains' shadows fall
+ * on: enough to bend a shadow's edge over a swell, not so much that the
+ * swells cut the shadows into pools along their troughs. */
+const DUNE_LIFT = 2;
 let shade: Uint8Array | null = null;
 const duneShades = new WeakMap<Float32Array, Uint8Array>();
 /** With `dunes` (the desert's dune heights, one tiling period at `ART`
  * pixels a cell, from the board's corner), the ground under the shadows
- * rises and falls with the swells, lit `BUMP` times as steep as the dunes'
- * own shading: a shadow ends up the face of a swell turned to the sun and
- * reaches on past its crest, as the dunes' own cast shadows do. */
+ * rises and falls with the swells (`DUNE_LIFT`): a shadow's edge pulls back
+ * up the face of a swell turned to the sun and reaches on past its crest. */
 export function mountainShade(dunes: Float32Array | null = null): Uint8Array {
   const done = dunes ? duneShades.get(dunes) : shade;
   if (done) return done;
@@ -271,7 +278,7 @@ export function mountainShade(dunes: Float32Array | null = null): Uint8Array {
     const row = dunes ? (((Y - OY) % n + n) % n) * n : 0;
     for (let X = 0; X < GW; X++) {
       const i = Y * GW + X, up = X > 0 && Y > 0 ? S[i - GW - 1] - DROP : 0;
-      const g = H[i] + (dunes ? dunes[row + (((X - OX) % n + n) % n)] * BUMP : 0);
+      const g = H[i] + (dunes ? dunes[row + (((X - OX) % n + n) % n)] * DUNE_LIFT : 0);
       if (up > g + 1) out[i] = 1;
       S[i] = Math.max(g, up);
     }
@@ -463,15 +470,21 @@ export type WildsFrame = {
   /** The desert's dunes, on the field now: they run on out here to the
    * mountains, the field's sand trails carved on through them. */
   sand?: { trails: TrailPlan | null } | null;
+  /** The day's colour washed over the board (soft light), so the wilds take it too. */
+  tint?: { color: string; strength: number };
+  /** How dark the board's own night is at its edge (its ambient's opacity),
+   * where the wilds' darker night starts. */
+  dark?: number;
 };
 
 /** At night the wilds darken more than the field (which keeps its torches
- * and lamps): at the board's edge only `NIGHT_EDGE` of their full darkness,
- * deepening over `NIGHT_FADE` cells out. */
+ * and lamps): at the board's edge only as dark as the board (`dark`, or
+ * else `NIGHT_EDGE` of their full darkness), deepening over `NIGHT_FADE`
+ * cells out. */
 const NIGHT_EDGE = 0.45, NIGHT_FADE = 20;
 let nightMask: HTMLCanvasElement | null = null;
-/** The night's darkness over the wilds, a texel a cell (drawn smoothed):
- * opaque where it is full, fainter toward the board. */
+/** The rest of the night's darkness over the wilds, a texel a cell (drawn
+ * smoothed): clear at the board's edge, opaque from `NIGHT_FADE` cells out. */
 function nightShade() {
   if (nightMask) return nightMask;
   const w = CELLS_W + 2 * MARGIN, h = CELLS_H + 2 * MARGIN, canvas = document.createElement("canvas");
@@ -481,7 +494,7 @@ function nightShade() {
     const dx = Math.max(0, MARGIN - x - 0.5, x + 0.5 - MARGIN - CELLS_W), dy = Math.max(0, MARGIN - y - 0.5, y + 0.5 - MARGIN - CELLS_H);
     const t = Math.min(1, Math.sqrt(dx * dx + dy * dy) / NIGHT_FADE), k = (y * w + x) * 4;
     img.data[k] = 6; img.data[k + 1] = 8; img.data[k + 2] = 18;
-    img.data[k + 3] = Math.round(255 * (NIGHT_EDGE + (1 - NIGHT_EDGE) * t * t * (3 - 2 * t)));
+    img.data[k + 3] = Math.round(255 * t * t * (3 - 2 * t));
   }
   c.putImageData(img, 0, 0);
   return nightMask = canvas;
@@ -542,7 +555,7 @@ export class Wilds {
    * fading out at night. */
   drawShade(ctx: CanvasRenderingContext2D, f: { px: number; cam: { s: number; x: number; y: number }; night: number; sand?: boolean }) {
     if (typeof document === "undefined") return;
-    const alpha = 0.34 * (1 - Math.min(1, f.night * 1.4));
+    const alpha = 1 - Math.min(1, f.night * 1.4);
     if (alpha <= 0.01) return;
     const dunes = f.sand ? duneHeights() : null;
     if (!this.shadeCanvas || this.shadeCanvas.dunes !== dunes) {
@@ -555,7 +568,7 @@ export class Wilds {
       const w = x1 - x0, h = y1 - y0, canvas = document.createElement("canvas");
       canvas.width = w; canvas.height = h;
       const c = canvas.getContext("2d")!, img = c.createImageData(w, h), px = new Uint32Array(img.data.buffer);
-      for (let Y = y0; Y < y1; Y++) for (let X = x0; X < x1; X++) if (m[Y * GW + X]) px[(Y - y0) * w + X - x0] = 0xff000000;
+      for (let Y = y0; Y < y1; Y++) for (let X = x0; X < x1; X++) if (m[Y * GW + X]) px[(Y - y0) * w + X - x0] = SHADE_INK;
       c.putImageData(img, 0, 0);
       this.shadeCanvas = { canvas, box: { x0, y0, x1, y1 }, dunes };
     }
@@ -570,6 +583,7 @@ export class Wilds {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.imageSmoothingEnabled = false;
     ctx.globalAlpha = alpha;
+    ctx.globalCompositeOperation = "multiply";
     ctx.drawImage(this.shadeCanvas.canvas, v.x0 - b.x0, v.y0 - b.y0, v.x1 - v.x0, v.y1 - v.y0, toX(v.x0), toY(v.y0), toX(v.x1) - toX(v.x0), toY(v.y1) - toY(v.y0));
     ctx.restore();
   }
@@ -596,9 +610,21 @@ export class Wilds {
     const g = this.ground(forest, f.area, f.forest?.plan.roads);
     blit(g.canvas, view);
     if (forest && f.effects) this.life(ctx, f, g, view, blit);
+    if (f.tint?.strength) {
+      ctx.globalCompositeOperation = "soft-light";
+      ctx.globalAlpha = f.tint.strength;
+      ctx.fillStyle = f.tint.color;
+      ctx.fillRect(0, 0, cw, ch);
+      ctx.globalCompositeOperation = "source-over";
+      ctx.globalAlpha = 1;
+    }
     if (f.night > 0.001) {
-      // Fading in from the board's edge, so the lit field doesn't end in a step.
-      ctx.globalAlpha = Math.min(0.82, f.night * 0.78);
+      // As dark as the board at its edge, deepening outward, so the lit
+      // field doesn't end in a step.
+      const full = Math.min(0.82, f.night * 0.78), edge = Math.min(full, f.dark ?? full * NIGHT_EDGE);
+      ctx.fillStyle = `rgba(6,8,18,${edge.toFixed(3)})`;
+      ctx.fillRect(0, 0, cw, ch);
+      ctx.globalAlpha = edge < 1 ? Math.max(0, (full - edge) / (1 - edge)) : 0;
       ctx.imageSmoothingEnabled = true;
       const x = toX(0), y = toY(0);
       ctx.drawImage(nightShade(), x, y, toX(GW) - x, toY(GH) - y);

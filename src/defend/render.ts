@@ -504,6 +504,14 @@ export class DefendRenderer {
         reduceMotion: opts.reduceMotion, effects: opts.effects ?? true,
         forest: hasForest(this.area) && this.forest.forestPlan ? { plan: this.forest.forestPlan, damage: this.forest.damage } : null,
         sand: sim?.atmosphere?.mode === "sand" ? { trails: sim.trails?.style === "sand" ? sim.trails : null } : null,
+        // The day's tint, as the board takes it (in battle, or by night).
+        tint: sim || opts.night > .001 ? opts.tint : undefined,
+        // The board's own darkness, which the wilds' night meets at its edge.
+        dark: (() => {
+          if (!opts.weather || !(sim || opts.night > .001)) return undefined;
+          const a = ambientFor(opts.weather, opts.night, this.previousArea ? this.previousWeather : null, this.areaMix);
+          return opts.sun ? a.alpha * Math.min(1, opts.night * 3) : a.alpha;
+        })(),
       });
     }
     this.douse(sim, opts);

@@ -425,7 +425,7 @@ export function duneTile() { return dunes(); }
  * flat sheet at `TAPER.from`, so each swell slopes away into the trail
  * rather than ending in a cliff; that run down is lit `TAPER.slope` as
  * steep as it stands, so it reads as the sand sinking, not a new bowl. */
-export const TAPER = { from: 1, to: 3.2, slope: .35 };
+export const TAPER = { from: 1.1, to: 5.5, slope: .3 };
 /** How much of the dunes' height stands at trail distance `t`, 0 to 1. */
 export function taperAt(t: number) {
   const u = (t - TAPER.from) / (TAPER.to - TAPER.from);
@@ -452,7 +452,8 @@ export function duneTaperPixels(t: Float32Array, w: number, h: number, bx: numbe
       const v = raw(x, y), k = s[i];
       const gx = k * (raw(x + 1, y) - raw(x - 1, y)) * .5 + TAPER.slope * v * (sAt(x + 1, y) - sAt(x - 1, y)) * .5;
       const gy = k * (raw(x, y + 1) - raw(x, y - 1)) * .5 + TAPER.slope * v * (sAt(x, y + 1) - sAt(x, y - 1)) * .5;
-      const col = duneColor(gx, gy, tx, ty, k > .9, true);
+      // The swells' cast shadows thin out in a dither as they sink.
+      const col = duneColor(gx, gy, tx, ty, k > .35 + BAYER[(ty & 3) * 4 + (tx & 3)] * .6, true);
       out[i * 4] = col[0]; out[i * 4 + 1] = col[1]; out[i * 4 + 2] = col[2]; out[i * 4 + 3] = 255;
     }
   return out;

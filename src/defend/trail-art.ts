@@ -24,7 +24,7 @@ const W = CELLS_W * ART, H = CELLS_H * ART;
 /** How far past a trail's half width (as a share of it) its ragged edge may reach. */
 const FRINGE = 1.25;
 /** How many half widths off a trail's middle its distance map reaches. */
-export const FIELD_REACH = 3.6;
+export const FIELD_REACH = 5.6;
 
 /** Each art pixel's distance from the nearest trail's middle as a share of
  * its half width (`t`, Infinity far from any), and that trail's wear. */
