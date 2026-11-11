@@ -23,7 +23,7 @@
  * black-outlined sprites in several sizes, over it. Presentation only: it
  * reads `sim.atmosphere` and changes nothing. */
 import { CELLS_W, CELLS_H, CELL_COUNT, cellIndex, hash } from "./grid.ts";
-import { galtonCanvas } from "./trail-art.ts";
+import { sandTrailCanvases, trailId } from "./trail-art.ts";
 import { DUNE_CREST, DUNE_PERIOD, WEED_SIZES, duneAt, periodicNoise, weatherNoise, type Atmosphere } from "./atmosphere.ts";
 import { ENEMIES } from "./catalog.ts";
 import { ART } from "./park-art.ts";
@@ -705,8 +705,9 @@ export class AtmosphereArt {
     c.save();
     c.imageSmoothingEnabled = false;
     c.drawImage(this.composeDunes(env, sim, reduceMotion), 0, 0, CELLS_W * px, CELLS_H * px);
-    // The Galton trails, packed into the dunes under the battle's own marks.
-    if (sim.trails?.style === "galton") c.drawImage(galtonCanvas(sim.trails, sim.map), 0, 0, CELLS_W * px, CELLS_H * px);
+    // The trails' sloping banks and rocks, under the battle's own marks (the
+    // sand itself is carved out of the dunes in composeDunes).
+    if (sim.trails?.style === "sand") c.drawImage(sandTrailCanvases(sim.trails, sim.map).banks, 0, 0, CELLS_W * px, CELLS_H * px);
     const marks = this.drawMarks(sim);
     if (marks) c.drawImage(marks, 0, 0, CELLS_W * px, CELLS_H * px);
     const sand = this.sandLayer(env, sim, reduceMotion);
@@ -760,7 +761,7 @@ export class AtmosphereArt {
     }
     const tile = dunes(), size = tile.width;
     const ox = reduceMotion ? 0 : Math.round(env.drift.x * ART), oy = reduceMotion ? 0 : Math.round(env.drift.y * ART);
-    const key = `${ox}:${oy}:${light.key}`;
+    const key = `${ox}:${oy}:${light.key}:${sim.trails?.style === "sand" ? trailId(sim.trails) : 0}`;
     this.marks.setGround(this.ground, ox, oy, changed);
     if (!changed && key === this.duneKey) return this.dunes;
     this.duneKey = key;
@@ -772,6 +773,11 @@ export class AtmosphereArt {
     d.globalCompositeOperation = "destination-in";
     d.imageSmoothingEnabled = false;
     d.drawImage(this.mask!, 0, 0, w, h);
+    // The trails carved down through the sand to the flagstones.
+    if (sim.trails?.style === "sand") {
+      d.globalCompositeOperation = "destination-out";
+      d.drawImage(sandTrailCanvases(sim.trails, sim.map).cut, 0, 0, w, h);
+    }
     d.globalCompositeOperation = "source-over";
     return this.dunes;
   }

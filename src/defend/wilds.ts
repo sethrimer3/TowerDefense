@@ -139,9 +139,9 @@ export function wildsPlan(): WildsPlan {
   return (planned = { rocks, trees });
 }
 
-/** The field's country roads carried on into the wilds: from where each
+/** The field's forest trails carried on into the wilds: from where each
  * crosses the board's top or bottom edge, on away from the field, wandering
- * a little, until the mountains close in. */
+ * a little, until it disappears under the mountains. */
 export function roadReach(roads: TrailPlan): TrailLine[] {
   const out: TrailLine[] = [];
   for (const line of roads.lines) {
@@ -155,7 +155,8 @@ export function roadReach(roads: TrailPlan): TrailLine[] {
       drift = drift * 0.85 + (valueNoise(k / 7, Math.round(from.x), 741) - 0.5) * 0.5;
       x += drift;
       points.push({ x, y });
-      if (rangeAt(x, y) > -0.25) break;
+      // On until well under the mountains, which are painted over it.
+      if (rangeAt(x, y) > 0.35) break;
     }
     out.push({ points, half: line.half, level: line.level });
   }

@@ -203,7 +203,7 @@ function plan_(map: CityMap): ForestPlan {
   // whose grass is the forest's though nothing grows on them.
   const open = Uint8Array.from(map.type, (t, i) => (t === CellType.OUT || (t === CellType.WALL && map.buildings[map.owner[i]]?.fence) ? 1 : 0));
   const boulders = boulderPlan(map);
-  // The country roads (Defend's own cities only): nothing grows or lies on them.
+  // The forest trails (Defend's own cities only): nothing grows or lies on them.
   const roads = trailPlan(map, "road");
   const onRoad = (x: number, y: number, r: number) => {
     if (!roads) return false;
@@ -278,6 +278,8 @@ function plan_(map: CityMap): ForestPlan {
       if (clearOf(map, x, y, r * 0.6) && !inDiscs(keep, x, y, r * 0.5)) pads.push({ x, y, r, seed: hash(cx, cy, 416) });
     }
   });
+  // The rocks the roads bend round.
+  for (const r of roads?.rocks ?? []) rocks.push({ x: r.x, y: r.y, size: Math.round(r.r * 16) / 8, seed: hash(Math.round(r.x * 8), Math.round(r.y * 8), 413) % 64 });
   // Drawn back to front, so a canopy lower on the board stands over the one behind.
   trees.sort((a, b) => a.y - b.y || a.x - b.x);
   trees.forEach((t, i) => (t.id = i));

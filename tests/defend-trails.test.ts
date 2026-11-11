@@ -1,5 +1,5 @@
 // The worn monster trails (src/defend/trails.ts, trail-art.ts): the
-// Mossbound Ruins' country roads and the Amber Desert's Galton trails, where
+// Mossbound Ruins' forest trails and the Amber Desert's sand trails, where
 // they run, that only Defend's own cities have them, that the forest keeps
 // off the roads, that ground enemies enter at the trailheads and walk them,
 // and that forks split a crowd by each enemy's own coin.
@@ -26,10 +26,10 @@ const cellOf = (x: number, y: number) => cellIndex(Math.max(0, Math.min(CELLS_W 
 
 test("only the first two areas wear trails, and only on Defend's own cities", () => {
   assert.equal(trailStyle("moss"), "road");
-  assert.equal(trailStyle("desert"), "galton");
+  assert.equal(trailStyle("desert"), "sand");
   assert.equal(trailStyle("drowned"), null);
   assert.equal(trailPlan(city(7, false), "road"), null);
-  assert.equal(trailPlan(city(7, false), "galton"), null);
+  assert.equal(trailPlan(city(7, false), "sand"), null);
   const map = city();
   assert.equal(trailPlan(map, "road"), trailPlan(map, "road"), "planned once a map");
   assert.equal(forestPlan(city(7, false)).roads, null);
@@ -67,7 +67,7 @@ test("the forest keeps its trees, lakes and rocks off the roads", () => {
   const map = city(), plan = forestPlan(map), roads = plan.roads!;
   assert.ok(roads);
   for (const t of plan.trees) assert.ok(roads.wear[cellOf(t.x, t.y)] < 0.2, "no trunk on a road");
-  for (const r of plan.rocks) assert.ok(roads.wear[cellOf(r.x, r.y)] < 0.2, "no rock on a road");
+  for (const r of plan.rocks) assert.ok(roads.wear[cellOf(r.x, r.y)] < 0.5, "no rock on a road");
   for (const l of plan.lakes) for (const d of l.discs) assert.ok(roads.wear[cellOf(d.x, d.y)] === 0, "no lake on a road");
   // The road's own pixels are dirt: none left the plain lawn green.
   const W = CELLS_W * 8, H = CELLS_H * 8, out = new Uint32Array(W * H);
@@ -77,17 +77,22 @@ test("the forest keeps its trees, lakes and rocks off the roads", () => {
   assert.ok(onRoad > 500 && painted / onRoad > 0.6, `roads painted (${painted}/${onRoad})`);
 });
 
-test("Galton trails part round pegs in rows, more worn toward the keep", () => {
-  const map = city(), plan = trailPlan(map, "galton")!;
-  assert.ok(plan.heads.length >= 5, "a trailhead every couple of tiles");
-  assert.ok(plan.pegs.length >= 6, "pins the trails part round");
-  for (let i = 0; i < CELL_COUNT; i++) if (plan.wear[i] > 0) assert.equal(map.type[i], CellType.OUT);
-  const keep = map.buildings.find((b) => b.kind === "keep")!, kx = keep.rect.x + keep.rect.w / 2;
-  // Worn deeper near the keep's side of the field than far out at its edges.
-  const near = plan.lines.filter((l) => Math.abs(l.points[l.points.length - 1].x - kx) < 16).map((l) => l.level);
-  const far = plan.lines.filter((l) => Math.abs(l.points[l.points.length - 1].x - kx) > 32 && l.points[0].y > 20).map((l) => l.level);
-  const mean = (a: number[]) => a.reduce((s, v) => s + v, 0) / Math.max(1, a.length);
-  assert.ok(mean(near) > mean(far), `${mean(near)} > ${mean(far)}`);
+test("both areas' trails bend round rocks beside them, never over them", () => {
+  for (const style of ["road", "sand"] as const) {
+    const map = city(), plan = trailPlan(map, style)!;
+    assert.ok(plan.heads.length >= 3, `${style}: several trailheads`);
+    assert.ok(plan.rocks.length >= 4, `${style}: rocks to bend round (${plan.rocks.length})`);
+    for (const r of plan.rocks) {
+      assert.ok(plan.wear[cellOf(r.x, r.y)] < 0.5, `${style}: no trail over a rock`);
+      // Each lies beside a trail it turned.
+      const gap = Math.min(...plan.lines.flatMap((l) => l.points.map((p) => Math.hypot(p.x - r.x, p.y - r.y))));
+      assert.ok(gap < r.r + TRAIL[style].half + 1.5, `${style}: a rock beside a trail`);
+    }
+    for (let i = 0; i < CELL_COUNT; i++) if (plan.wear[i] > 0) assert.equal(map.type[i], CellType.OUT);
+  }
+  // The forest draws the roads' rocks.
+  const map = city(), roads = trailPlan(map, "road")!, forest = forestPlan(map);
+  for (const r of roads.rocks) assert.ok(forest.rocks.some((o) => o.x === r.x && o.y === r.y && o.size > 1.5));
 });
 
 test("a worn trail is cheaper to walk than open ground", () => {
@@ -151,9 +156,9 @@ test("in battle, ground enemies enter at the trailheads and keep to the roads", 
   for (const x of entries) assert.ok(sim.trails!.heads.some((h) => Math.abs(h - x) <= TRAIL.spread + 0.5), `entered at a trailhead (${x})`);
 });
 
-test("in the desert, the surfaced Blight worms slither down the Galton trails", () => {
+test("in the desert, the surfaced Blight worms slither down the sand trails", () => {
   const map = city(), { sim, samples, share } = march(map, 23);
-  assert.equal(sim.trails?.style, "galton");
+  assert.equal(sim.trails?.style, "sand");
   assert.ok(samples > 100, `enough walkers (${samples})`);
   assert.ok(share > 0.8, `on the trails ${Math.round(share * 100)}% of the time`);
 });
