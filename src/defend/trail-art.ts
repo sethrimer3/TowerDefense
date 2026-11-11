@@ -16,7 +16,7 @@
  * width, and that trail's wear. */
 import { CELLS_H, CELLS_W, cellIndex, hash, hash01 } from "./grid.ts";
 import { ART } from "./art-scale.ts";
-import { segmentDistance, type TrailPlan } from "./trails.ts";
+import { segmentDistance, type TrailLine, type TrailPlan } from "./trails.ts";
 import { CellType, type CityMap } from "./citygen.ts";
 import { rgba } from "./damage-art.ts";
 
@@ -33,23 +33,29 @@ const fields = new WeakMap<TrailPlan, TrailField>();
 export function trailField(plan: TrailPlan): TrailField {
   let f = fields.get(plan);
   if (f) return f;
-  const t = new Float32Array(W * H).fill(Infinity), level = new Float32Array(W * H);
-  for (const line of plan.lines) {
+  fields.set(plan, (f = distanceField(plan.lines, W, H, 0, 0)));
+  return f;
+}
+
+/** `trailField` for any lines over a `w` by `h` art pixel box whose corner
+ * lies (`ox`, `oy`) art pixels before the board's. */
+function distanceField(lines: readonly TrailLine[], w: number, h: number, ox: number, oy: number): TrailField {
+  const t = new Float32Array(w * h).fill(Infinity), level = new Float32Array(w * h);
+  for (const line of lines) {
     const R = line.half * ART, reach = R * FRINGE + 1;
-    const pts = line.points.map((p) => ({ x: p.x * ART, y: p.y * ART }));
+    const pts = line.points.map((p) => ({ x: p.x * ART + ox, y: p.y * ART + oy }));
     for (let k = 0; k + 1 < pts.length; k++) {
       const a = pts[k], b = pts[k + 1];
-      const x0 = Math.max(0, Math.floor(Math.min(a.x, b.x) - reach)), x1 = Math.min(W - 1, Math.ceil(Math.max(a.x, b.x) + reach));
-      const y0 = Math.max(0, Math.floor(Math.min(a.y, b.y) - reach)), y1 = Math.min(H - 1, Math.ceil(Math.max(a.y, b.y) + reach));
+      const x0 = Math.max(0, Math.floor(Math.min(a.x, b.x) - reach)), x1 = Math.min(w - 1, Math.ceil(Math.max(a.x, b.x) + reach));
+      const y0 = Math.max(0, Math.floor(Math.min(a.y, b.y) - reach)), y1 = Math.min(h - 1, Math.ceil(Math.max(a.y, b.y) + reach));
       for (let Y = y0; Y <= y1; Y++)
         for (let X = x0; X <= x1; X++) {
-          const i = Y * W + X, v = segmentDistance(X + 0.5, Y + 0.5, a, b) / R;
+          const i = Y * w + X, v = segmentDistance(X + 0.5, Y + 0.5, a, b) / R;
           if (v < t[i]) (t[i] = v), (level[i] = line.level);
         }
     }
   }
-  fields.set(plan, (f = { t, level }));
-  return f;
+  return { t, level };
 }
 
 /** A trail's ragged edge at art pixel (X, Y): about 1, wavering slowly along
@@ -177,10 +183,15 @@ const open = (map: CityMap, X: number, Y: number) => map.type[cellIndex(Math.flo
 
 /** The cut's alpha into `data`. */
 export function sandCutPixels(plan: TrailPlan, map: CityMap, data: Uint8ClampedArray) {
-  const { t } = trailField(plan);
-  for (let Y = 0; Y < H; Y++)
-    for (let X = 0, i = Y * W; X < W; X++, i++)
-      if (t[i] < FRINGE && open(map, X, Y) && carved(t[i], X, Y)) data[i * 4 + 3] = 255;
+  return cutPixels(trailField(plan).t, W, H, 0, 0, (X, Y) => open(map, X, Y), data);
+}
+/** The cut's alpha over a box (`distanceField`'s), only where `open`. */
+function cutPixels(t: Float32Array, w: number, h: number, ox: number, oy: number, isOpen: (X: number, Y: number) => boolean, data: Uint8ClampedArray) {
+  for (let y = 0; y < h; y++)
+    for (let x = 0, i = y * w; x < w; x++, i++) {
+      const X = x - ox, Y = y - oy;
+      if (t[i] < FRINGE && isOpen(X, Y) && carved(t[i], X, Y)) data[i * 4 + 3] = 255;
+    }
   return data;
 }
 
@@ -188,11 +199,17 @@ export function sandCutPixels(plan: TrailPlan, map: CityMap, data: Uint8ClampedA
  * down toward its middle, the face toward the sun lit and the face away
  * shaded, steepest at the lip; and drifted grains spilling onto the tiles. */
 export function sandBankPixels(plan: TrailPlan, map: CityMap, data: Uint8ClampedArray) {
-  const { t } = trailField(plan), SUN = { x: -Math.SQRT1_2, y: -Math.SQRT1_2 };
-  for (let Y = 1; Y < H - 1; Y++)
-    for (let X = 1, i = Y * W + 1; X < W - 1; X++, i++) {
-      const v = t[i];
-      if (v > FRINGE + 0.4 || !open(map, X, Y)) continue;
+  bankPixels(trailField(plan).t, W, H, 0, 0, (X, Y) => open(map, X, Y), data);
+  for (const r of plan.rocks) trailRock(data, r.x * ART, r.y * ART, r.r * ART, hash(Math.round(r.x * 8), Math.round(r.y * 8), 925));
+  return data;
+}
+/** The banks over a box (`distanceField`'s), only where `open`. */
+function bankPixels(t: Float32Array, w: number, h: number, ox: number, oy: number, isOpen: (X: number, Y: number) => boolean, data: Uint8ClampedArray) {
+  const W = w, SUN = { x: -Math.SQRT1_2, y: -Math.SQRT1_2 };
+  for (let y = 1; y < h - 1; y++)
+    for (let x = 1, i = y * w + 1; x < w - 1; x++, i++) {
+      const v = t[i], X = x - ox, Y = y - oy;
+      if (v > FRINGE + 0.4 || !isOpen(X, Y)) continue;
       const o = i * 4;
       if (v < FRINGE && carved(v, X, Y)) {
         // Grains blown back over the tiles near the lip.
@@ -210,8 +227,39 @@ export function sandBankPixels(plan: TrailPlan, map: CityMap, data: Uint8Clamped
       const c = lit > 0 ? [252, 214, 150] : [96, 58, 30];
       data[o] = c[0]; data[o + 1] = c[1]; data[o + 2] = c[2]; data[o + 3] = Math.round(a * (lit > 0 ? 150 : 170));
     }
-  for (const r of plan.rocks) trailRock(data, r.x * ART, r.y * ART, r.r * ART, hash(Math.round(r.x * 8), Math.round(r.y * 8), 925));
   return data;
+}
+
+/** Sand trails carried on past the board (`roadReach`'s lines, in board
+ * cells), cut and banked exactly as on the field (`sandTrailCanvases`) and
+ * hashed in board coordinates, so they run on with no seam: for each run
+ * of lines leaving the top or the bottom edge, its box in art pixels from
+ * the board's corner, the sand to erase there and the banks to lay over
+ * it. Nothing on the board itself. */
+export function sandReachCanvases(lines: readonly TrailLine[]) {
+  const out: { x: number; y: number; cut: HTMLCanvasElement; banks: HTMLCanvasElement }[] = [];
+  for (const up of [true, false]) {
+    const group = lines.filter((l) => (l.points[l.points.length - 1].y < CELLS_H / 2) === up);
+    if (!group.length) continue;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const l of group) for (const p of l.points) {
+      const r = l.half * FRINGE + 1;
+      x0 = Math.min(x0, p.x - r); x1 = Math.max(x1, p.x + r); y0 = Math.min(y0, p.y - r); y1 = Math.max(y1, p.y + r);
+    }
+    const X0 = Math.floor(x0 * ART), Y0 = Math.floor(y0 * ART), w = Math.ceil(x1 * ART) - X0, h = Math.ceil(y1 * ART) - Y0;
+    const { t } = distanceField(group, w, h, -X0, -Y0);
+    const off = (X: number, Y: number) => X < 0 || Y < 0 || X >= W || Y >= H;
+    const make = (fill: (d: Uint8ClampedArray) => void) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext("2d")!, image = ctx.createImageData(w, h);
+      fill(image.data);
+      ctx.putImageData(image, 0, 0);
+      return canvas;
+    };
+    out.push({ x: X0, y: Y0, cut: make((d) => cutPixels(t, w, h, -X0, -Y0, off, d)), banks: make((d) => bankPixels(t, w, h, -X0, -Y0, off, d)) });
+  }
+  return out;
 }
 
 /** Sandstone, shadow to sunlit, and the rock's dark rim. */

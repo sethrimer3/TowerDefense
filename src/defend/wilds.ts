@@ -34,7 +34,8 @@ import { CURVE, PALETTE32, SHADOW, WIND } from "./park-grass.ts";
 import { paintFloorTile } from "./city-layer.ts";
 import { pixelKey } from "./pixel-sprites.ts";
 import { sceneryOutlinesOn, windAt } from "./scenery-looks.ts";
-import { paintRoadLines } from "./trail-art.ts";
+import { paintRoadLines, sandReachCanvases } from "./trail-art.ts";
+import { duneLightKey, duneTile } from "./atmosphere-art.ts";
 import { segmentDistance, type TrailLine, type TrailPlan } from "./trails.ts";
 
 /** Cells of wilds past each edge of the field: enough to fill an
@@ -294,7 +295,7 @@ const rgbaOf = (c: number) => ((255 << 24) | ((c & 0xff) << 16) | (c & 0xff00) |
  * the mountain ranges, rocks with their shadows, and in the forest the trees'
  * shadows. `turf` marks the lawn pixels left (where blades grow), `shaded`
  * those under a tree's shadow. */
-export function paintWilds(forest: boolean, stone?: Stone, reach: readonly TrailLine[] = []) {
+export function paintWilds(forest: boolean, stone?: Stone, reach: readonly TrailLine[] = [], rocks = true) {
   const out = new Uint32Array(GW * GH), whole = wildsPlan();
   // The trees and rocks clear of the roads carried out here.
   const plan: WildsPlan = reach.length
@@ -319,7 +320,8 @@ export function paintWilds(forest: boolean, stone?: Stone, reach: readonly Trail
   paintRanges(out);
   // Rocks, back to front, each with its shadow down and right.
   const items: { y: number; draw: () => void }[] = [];
-  for (const r of plan.rocks)
+  // (None in the desert: its dunes run on over the wilds, as rockless as the field's.)
+  if (rocks) for (const r of plan.rocks)
     items.push({ y: r.y, draw: () => {
       const s = rockSprite(r.size, r.seed), x0 = Math.round(r.x * ART) - s.ox + OX, y0 = Math.round(r.y * ART) - s.oy + OY;
       stampInto(out, GW, GH, s, x0 + (r.size > 1 ? 2 : 1), y0 + (r.size > 1 ? 2 : 1), true);
@@ -446,7 +448,32 @@ export type WildsFrame = {
   grassWind: keyof typeof WIND; treeWind: number; reduceMotion: boolean; effects: boolean;
   /** The field's forest, whose crowns past the board's edge are finished here. */
   forest?: { plan: ForestPlan; damage: ForestDamage | null } | null;
+  /** The desert's dunes, on the field now: they run on out here to the
+   * mountains, the field's sand trails carved on through them. */
+  sand?: { trails: TrailPlan | null } | null;
 };
+
+/** At night the wilds darken more than the field (which keeps its torches
+ * and lamps): at the board's edge only `NIGHT_EDGE` of their full darkness,
+ * deepening over `NIGHT_FADE` cells out. */
+const NIGHT_EDGE = 0.45, NIGHT_FADE = 20;
+let nightMask: HTMLCanvasElement | null = null;
+/** The night's darkness over the wilds, a texel a cell (drawn smoothed):
+ * opaque where it is full, fainter toward the board. */
+function nightShade() {
+  if (nightMask) return nightMask;
+  const w = CELLS_W + 2 * MARGIN, h = CELLS_H + 2 * MARGIN, canvas = document.createElement("canvas");
+  canvas.width = w; canvas.height = h;
+  const c = canvas.getContext("2d")!, img = c.createImageData(w, h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const dx = Math.max(0, MARGIN - x - 0.5, x + 0.5 - MARGIN - CELLS_W), dy = Math.max(0, MARGIN - y - 0.5, y + 0.5 - MARGIN - CELLS_H);
+    const t = Math.min(1, Math.sqrt(dx * dx + dy * dy) / NIGHT_FADE), k = (y * w + x) * 4;
+    img.data[k] = 6; img.data[k + 1] = 8; img.data[k + 2] = 18;
+    img.data[k + 3] = Math.round(255 * (NIGHT_EDGE + (1 - NIGHT_EDGE) * t * t * (3 - 2 * t)));
+  }
+  c.putImageData(img, 0, 0);
+  return nightMask = canvas;
+}
 
 /** The wilds' still ground painted for one area (and, in the forest, one
  * city's roads), the trees and rocks it was painted with, and its blades. */
@@ -475,7 +502,7 @@ export class Wilds {
     if (g) return g;
     // Only the current city's roads are kept.
     if (forest) for (const k of [...this.grounds.keys()]) if (k.startsWith("forest:")) this.grounds.delete(k);
-    const painted = paintWilds(forest, forest ? undefined : STONES[area], reach?.lines ?? []);
+    const painted = paintWilds(forest, forest ? undefined : STONES[area], reach?.lines ?? [], area !== "desert");
     const canvas = document.createElement("canvas");
     canvas.width = GW;
     canvas.height = GH;
@@ -548,18 +575,56 @@ export class Wilds {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.imageSmoothingEnabled = false;
     if (!forest) this.floor(ctx, f, view, toX, toY, k);
-    const g = this.ground(forest, f.area, f.forest?.plan.roads);
     const blit = (src: CanvasImageSource, b: Box, sx = b.x0, sy = b.y0) => {
       const x = Math.round(toX(b.x0)), y = Math.round(toY(b.y0));
       ctx.drawImage(src, sx, sy, b.x1 - b.x0, b.y1 - b.y0, x, y, Math.round(toX(b.x1)) - x, Math.round(toY(b.y1)) - y);
     };
+    if (f.sand) blit(this.sand(f.sand.trails), view);
+    const g = this.ground(forest, f.area, f.forest?.plan.roads);
     blit(g.canvas, view);
     if (forest && f.effects) this.life(ctx, f, g, view, blit);
     if (f.night > 0.001) {
-      ctx.fillStyle = `rgba(6,8,18,${Math.min(0.82, f.night * 0.78).toFixed(3)})`;
-      ctx.fillRect(0, 0, cw, ch);
+      // Fading in from the board's edge, so the lit field doesn't end in a step.
+      ctx.globalAlpha = Math.min(0.82, f.night * 0.78);
+      ctx.imageSmoothingEnabled = true;
+      const x = toX(0), y = toY(0);
+      ctx.drawImage(nightShade(), x, y, toX(GW) - x, toY(GH) - y);
+      ctx.globalAlpha = 1;
     }
     ctx.restore();
+  }
+
+  private sandCanvas: HTMLCanvasElement | null = null;
+  private sandReach = new WeakMap<TrailPlan, ReturnType<typeof sandReachCanvases>>();
+  private sandKey = "";
+  /** The desert's dunes over all the wilds, at `ART` pixels a cell: the
+   * field's own dune tile laid on from the board's corner (so the board's
+   * edge is no seam), with each sand trail crossing the top or bottom edge
+   * carried on (`roadReach`, cut and banked by `sandReachCanvases` as on
+   * the field) down to the flagstones, until it disappears under the
+   * mountains. Repainted only when
+   * the dunes relight or the trails change. */
+  private sand(trails: TrailPlan | null) {
+    const reach = trails ? this.reach(trails) : null, key = `${duneLightKey()}|${reach?.key ?? ""}`;
+    if (this.sandCanvas && key === this.sandKey) return this.sandCanvas;
+    this.sandKey = key;
+    const canvas = this.sandCanvas ??= document.createElement("canvas");
+    if (canvas.width !== GW) { canvas.width = GW; canvas.height = GH; }
+    const c = canvas.getContext("2d")!, tile = duneTile(), n = tile.width;
+    c.globalCompositeOperation = "source-over";
+    c.clearRect(0, 0, GW, GH);
+    for (let y = OY - Math.ceil(OY / n) * n; y < GH; y += n) for (let x = OX - Math.ceil(OX / n) * n; x < GW; x += n) c.drawImage(tile, x, y);
+    if (reach) {
+      let cuts = this.sandReach.get(trails!);
+      if (!cuts) this.sandReach.set(trails!, (cuts = sandReachCanvases(reach.lines)));
+      for (const r of cuts) {
+        c.globalCompositeOperation = "destination-out";
+        c.drawImage(r.cut, OX + r.x, OY + r.y);
+        c.globalCompositeOperation = "source-over";
+        c.drawImage(r.banks, OX + r.x, OY + r.y);
+      }
+    }
+    return canvas;
   }
 
   /** The area's flagstones past the board, tile by tile, under the stone. */

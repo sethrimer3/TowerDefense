@@ -503,6 +503,7 @@ export class DefendRenderer {
         treeWind: still ? 0 : w?.rain ? 2 : w && !w.clear ? 1.4 : 1,
         reduceMotion: opts.reduceMotion, effects: opts.effects ?? true,
         forest: hasForest(this.area) && this.forest.forestPlan ? { plan: this.forest.forestPlan, damage: this.forest.damage } : null,
+        sand: sim?.atmosphere?.mode === "sand" ? { trails: sim.trails?.style === "sand" ? sim.trails : null } : null,
       });
     }
     this.douse(sim, opts);
