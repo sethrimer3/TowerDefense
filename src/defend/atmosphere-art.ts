@@ -1,9 +1,11 @@
 /** Ground weather drawn as pixel art beneath every combat silhouette. The
  * desert's dunes are one tiling sprite (`dunePixels`, `ART` pixels a cell)
- * of a few long, gentle swells (`duneHeights`), all one sand colour
- * (`SAND_COLOR`) made lighter or darker only by the day's sun: each pixel's
- * slope, lit `BUMP` times as steep as it stands, and the shadows the swells
- * cast when the sun is low (`castShadows`). The light follows the shared sky
+ * of a few long, low swells (`duneHeights`: a long windward rise, a sharp
+ * crest, a short slip face), lit by the day's sun: each pixel's slope, lit
+ * `BUMP` times as steep as it stands, and the shadows the swells cast when
+ * the sun is low (`castShadows`), snapped in hard bands to a few warm
+ * `SAND_TONES`, dithered only where bands meet, with lit crests, wind
+ * ripples, grains and pebbles over them (`sandDetail`). The light follows the shared sky
  * (`easeDuneLight`: its heading, height and strength, snapped, the next
  * light's shadows swept a few hundred lines a frame so a relight never
  * stalls); a shading table per slope bin keeps the tile cheap to relight.
@@ -38,9 +40,16 @@ const W = CELLS_W * RES, H = CELLS_H * RES;
 const BW = CELLS_W * ART, BH = CELLS_H * ART;
 /** A tiling noise texture, so the image never calls the noise per pixel. */
 const TEX = 64;
-/** The sand's one colour: flat ground in full light. Every dune pixel is
- * this colour made lighter or darker by its light, nothing else. */
+/** The sand's colour on flat ground in full light: `SAND_TONES`' middle tone. */
 export const SAND_COLOR = [212, 160, 96] as const;
+/** The simple dunes' few hard tones, deepest shade to the sunlit crest:
+ * warm, red-brown in the shade as real sand is. Brightness snaps to them in
+ * bands, dithered only where one band meets the next (`TONE_STEP` of
+ * brightness a tone, flat sunlit ground on `SAND_BASE`). */
+export const SAND_TONES = [[104, 58, 42], [140, 86, 54], [176, 120, 72], SAND_COLOR, [234, 190, 124], [250, 220, 166]] as const;
+const SAND_BASE = 3, TONE_STEP = .19;
+/** How wide the dithered seam between two bands is, in tones. */
+const SEAM = .45;
 /** The high-definition dunes' tones (HD Sand), deep shadow to sunlit, warm
  * in the shade as real sand is. */
 export const HD_TONES = [[112, 66, 40], [136, 84, 48], [160, 104, 58], [182, 124, 70], [202, 146, 84], [218, 166, 100], [232, 186, 120], [244, 208, 146], [252, 228, 176]];
@@ -62,8 +71,6 @@ export const SUN = { x: -Math.SQRT1_2, y: -Math.SQRT1_2 };
  * their low rises read in the light; how far a slope brightens or darkens
  * the sand, and how much a cast shadow takes off. */
 export const BUMP = 8, GAIN = .75, SHADE = .26;
-/** Brightness steps the sand is snapped to (a little banding, pixel art). */
-const LEVELS = 40;
 /** The HD dunes' Lambert light: the sun's share across the ground and up,
  * low in the sky (the old fixed sun's). */
 const HD_ACROSS = Math.SQRT2 / Math.sqrt(2.81), HD_UP = .9 / Math.sqrt(2.81);
@@ -178,18 +185,15 @@ export function hdLight(gx: number, gy: number) {
   const l = (-(gx * light.x + gy * light.y) * HD_ACROSS + HD_UP) / Math.sqrt(gx * gx + gy * gy + 1);
   return (l - HD_LO) / (HD_HI - HD_LO) * (HD_TONES.length - 1);
 }
-const sandCache = new Map<number, number[]>();
-/** The simple sand's colour at brightness `b`, snapped to `LEVELS` steps. */
-function sandAt(b: number) {
-  const step = Math.round(b * LEVELS);
-  let col = sandCache.get(step);
-  if (!col) {
-    const k = step / LEVELS;
-    col = [Math.min(255, Math.round(SAND_COLOR[0] * k)), Math.min(255, Math.round(SAND_COLOR[1] * k)), Math.min(255, Math.round(SAND_COLOR[2] * k))];
-    sandCache.set(step, col);
-  }
-  return col;
+/** The simple sand's tone at brightness `b` for tile pixel (tx, ty): one of
+ * `SAND_TONES`, ordered-dithered only near a band's edge, then moved by the
+ * pixel's own detail (`sandDetail`: its crest, ripple, grain or pebble). */
+function sandTone(b: number, tx: number, ty: number, detail = 0) {
+  const f = SAND_BASE + (b - 1) / TONE_STEP;
+  let t = Math.round(f + (BAYER[(ty & 3) * 4 + (tx & 3)] - .5) * SEAM) + detail;
+  return t < 0 ? 0 : t >= SAND_TONES.length ? SAND_TONES.length - 1 : t;
 }
+function sandAt(b: number, tx: number, ty: number, detail = 0) { return SAND_TONES[sandTone(b, tx, ty, detail)]; }
 /** The HD tone at light `f` for tile pixel (tx, ty): dithered, with a rare
  * grain a shade off. */
 function hdTone(f: number, tx: number, ty: number) {
@@ -223,17 +227,82 @@ function binOf(gx: number, gy: number, range: number) {
 }
 /** A dune pixel's colour from its surface's slope (gx, gy) at tile pixel
  * (tx, ty), in the current style and light. */
-function duneColor(gx: number, gy: number, tx: number, ty: number, cast = true) {
+function duneColor(gx: number, gy: number, tx: number, ty: number, cast = true, detail = false) {
   const range = slopes().range, bin = binOf(gx, gy, range);
   if (style === "hd") return hdTone(bin < 0 ? hdLight(gx, gy) : shadeTable()[bin], tx, ty);
-  const shadowed = cast && castShadows()[ty * DUNE_PERIOD * ART + tx] === 1;
-  return sandAt(bin < 0 ? duneShade(gx, gy, shadowed) : shadeTable()[bin + (shadowed ? BINS * BINS : 0)]);
+  const i = ty * DUNE_PERIOD * ART + tx, shadowed = cast && castShadows()[i] === 1;
+  return sandAt(bin < 0 ? duneShade(gx, gy, shadowed) : shadeTable()[bin + (shadowed ? BINS * BINS : 0)], tx, ty, detail ? sandDetail()[i] : 0);
+}
+
+/** Where along a simple swell its crest stands: a long windward rise, then a
+ * short slip face falling away downwind, steepest at the crest's edge. */
+const SWELL_CREST = .7;
+/** The simple swell's height, 0 to 1, at `f` along its wave (0 a trough). */
+function swellAt(f: number) {
+  if (f < SWELL_CREST) return (1 - Math.cos(f / SWELL_CREST * Math.PI * .75)) / (1 - Math.cos(Math.PI * .75));
+  return 1 - Math.sin((f - SWELL_CREST) / (1 - SWELL_CREST) * Math.PI * .5);
+}
+/** The simple swells' wave place at tile pixel (x, y): whole numbers its troughs. */
+function swellPhase(x: number, y: number) {
+  const p = DUNE_PERIOD, cx = (x + .5) / ART, cy = (y + .5) / ART;
+  return (cy - cx * SWELL_LEAN) / SWELL + periodicNoise(cx / 32, cy / 32, p / 32, p / 32, 821) * .45;
+}
+/** Wind ripples a swell's wave (a whole number, so they tile): about one
+ * every six art pixels. */
+const RIPPLES = 56;
+
+let detailCache: Int8Array | null = null;
+/** Each simple tile pixel's tones up or down from its light: a one-pixel lit
+ * line along every crest; short, bent pairs of light-over-dark wind ripples
+ * scattered over the windward rises; a rare grain a tone off; and the odd
+ * pebble, a dark pixel lit at its upper left. The crest and ripples are
+ * relief, so they fade by night with the light (`sandDetail` reads them
+ * only while the sun shows shadows); the grains and pebbles stay. Tiles. */
+function detailPixels(relief: boolean) {
+  const n = DUNE_PERIOD * ART, p = DUNE_PERIOD, d = new Int8Array(n * n);
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const i = y * n + x, ph = swellPhase(x, y), f = ph - Math.floor(ph);
+    if (relief) {
+      // The crest: the last windward pixel before the slip face.
+      const next = swellPhase(x - 1, y + 1) - Math.floor(ph);
+      if (f < SWELL_CREST && next >= SWELL_CREST - .002) { d[i] = 1; continue; }
+      const s = f / SWELL_CREST;
+      if (f < SWELL_CREST && s > .12 && s < .88) {
+        const cx = (x + .5) / ART, cy = (y + .5) / ART;
+        const patch = periodicNoise(cx / 6, cy / 6, p / 6, p / 6, 841);
+        const bit = periodicNoise(cx / 1.5, cy / 1.5, p / 1.5, p / 1.5, 843);
+        if (patch > .55 && bit > .45) {
+          const wob = periodicNoise(cx / 3, cy / 3, p / 3, p / 3, 845) * .6;
+          const r = ph * RIPPLES + wob, rf = r - Math.floor(r);
+          if (rf < .16) d[i] = 1; else if (rf < .32) d[i] = -1;
+        }
+      }
+    }
+    const g = hash(x, y, 851) % 53;
+    if (g === 0) d[i] += 1; else if (g === 1) d[i] -= 1;
+  }
+  // Pebbles, on top of all else.
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    if (hash(x, y, 853) % 1400) continue;
+    d[y * n + x] = -3;
+    d[((y + 1) % n) * n + x] = -2;
+    d[y * n + (x + n - 1) % n] = -2;
+    d[((y + n - 1) % n) * n + (x + n - 1) % n] = 1;
+  }
+  return d;
+}
+let flatDetail: Int8Array | null = null;
+/** The simple tile's detail (`detailPixels`) in the current light. */
+function sandDetail() {
+  if (light.contrast >= SHADOWS_FROM) return detailCache ??= detailPixels(true);
+  return flatDetail ??= detailPixels(false);
 }
 
 const heightCache: Record<DuneStyle, Float32Array | null> = { simple: null, hd: null };
 /** The dunes' surface over one field period, art pixels high at `ART`
- * pixels a cell, in the current style. Simple: long, low, rounded swells
- * running across the wind, gently bent and a little taller in places. HD:
+ * pixels a cell, in the current style. Simple: long, low swells running
+ * across the wind, each a long windward rise to a sharp crest and a short
+ * slip face downwind, gently bent and a little taller in places. HD:
  * the sim's own dunes, with wind ripples across their windward sides. Tiles. */
 export function duneHeights() {
   const done = heightCache[style];
@@ -252,10 +321,9 @@ export function duneHeights() {
       continue;
     }
     const cx = (x + .5) / ART, cy = (y + .5) / ART;
-    const bend = periodicNoise(cx / 32, cy / 32, p / 32, p / 32, 821) * .45;
     const amp = .65 + .35 * periodicNoise(cx / 48, cy / 48, p / 48, p / 48, 823);
-    const phase = (cy - cx * SWELL_LEAN) / SWELL + bend;
-    h[y * n + x] = (.5 - .5 * Math.cos(phase * Math.PI * 2)) * amp * DUNE_RELIEF;
+    const phase = swellPhase(x, y);
+    h[y * n + x] = swellAt(phase - Math.floor(phase)) * amp * DUNE_RELIEF;
   }
   return heightCache[style] = h;
 }
@@ -340,14 +408,11 @@ export function dunePixels() {
     }
     return { size: n, data: out };
   }
-  // Each bin's colour packed once, then a lookup a pixel.
-  const cast = castShadows(), colors = new Uint32Array(BINS * BINS * 2), words = new Uint32Array(out.buffer);
+  // Each tone packed once, then a few sums a pixel.
+  const cast = castShadows(), detail = sandDetail(), words = new Uint32Array(out.buffer), colors = new Uint32Array(SAND_TONES.length);
   const pack = new Uint8Array(colors.buffer);
-  for (let b = 0; b < colors.length; b++) {
-    const col = sandAt(t[b]);
-    pack[b * 4] = col[0]; pack[b * 4 + 1] = col[1]; pack[b * 4 + 2] = col[2]; pack[b * 4 + 3] = 255;
-  }
-  for (let i = 0; i < n * n; i++) words[i] = colors[bins[i] + (cast[i] ? BINS * BINS : 0)];
+  SAND_TONES.forEach((col, k) => { pack[k * 4] = col[0]; pack[k * 4 + 1] = col[1]; pack[k * 4 + 2] = col[2]; pack[k * 4 + 3] = 255; });
+  for (let y = 0, i = 0; y < n; y++) for (let x = 0; x < n; x++, i++) words[i] = colors[sandTone(t[bins[i] + (cast[i] ? BINS * BINS : 0)], x, y, detail[i])];
   return { size: n, data: out };
 }
 let duneSprite: HTMLCanvasElement | null = null;
@@ -562,7 +627,7 @@ export class SandMarks {
       if (near && this.ground[c]) {
         const tx = ((x - this.ox) % n + n) % n, ty = ((y - this.oy) % n + n) % n;
         const m = (y - y0 + 1) * S + x - x0 + 1;
-        const col = duneColor((surface[m + 1] - surface[m - 1]) * .5, (surface[m + S] - surface[m - S]) * .5, tx, ty);
+        const col = duneColor((surface[m + 1] - surface[m - 1]) * .5, (surface[m + S] - surface[m - S]) * .5, tx, ty, true, !delta[i]);
         out[o] = col[0]; out[o + 1] = col[1]; out[o + 2] = col[2]; out[o + 3] = 255;
       } else out[o + 3] = 0;
     }
