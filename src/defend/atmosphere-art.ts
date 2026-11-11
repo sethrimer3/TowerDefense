@@ -452,8 +452,11 @@ export function duneTaperPixels(t: Float32Array, w: number, h: number, bx: numbe
       const v = raw(x, y), k = s[i];
       const gx = k * (raw(x + 1, y) - raw(x - 1, y)) * .5 + TAPER.slope * v * (sAt(x + 1, y) - sAt(x - 1, y)) * .5;
       const gy = k * (raw(x, y + 1) - raw(x, y - 1)) * .5 + TAPER.slope * v * (sAt(x, y + 1) - sAt(x, y - 1)) * .5;
-      // The swells' cast shadows thin out in a dither as they sink.
-      const col = duneColor(gx, gy, tx, ty, k > .35 + BAYER[(ty & 3) * 4 + (tx & 3)] * .6, true);
+      // The swells' cast shadows thin out in a dither as they sink, and
+      // sooner their lit crest lines and ripples, so a crest dies away
+      // before the trail rather than running on to its edge.
+      const d = BAYER[(ty & 3) * 4 + (tx & 3)];
+      const col = duneColor(gx, gy, tx, ty, k > .35 + d * .6, k > .7 + d * .28);
       out[i * 4] = col[0]; out[i * 4 + 1] = col[1]; out[i * 4 + 2] = col[2]; out[i * 4 + 3] = 255;
     }
   return out;
