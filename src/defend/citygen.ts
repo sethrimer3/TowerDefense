@@ -88,6 +88,9 @@ export type CityMap = {
   spikes?: SpikeRow[];
   /** Road cells bridging water, 2 over the water itself and 1 on its banks (unset when there are none). */
   bridges?: Uint8Array;
+  /** Set on Defend's own cities only: the seed their worn monster trails are
+   * planned from (`trails.ts`). Unset, a map has no trails. */
+  trails?: { seed: number };
 };
 
 /** House footprints and how often each is tried first: mostly chunky

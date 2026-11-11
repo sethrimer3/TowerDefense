@@ -18,7 +18,8 @@ import { baitBitten, baitStanding, lureOf } from "./bait.ts";
 import { dist } from "../exact.ts";
 import { ENEMIES, type EnemyDef } from "./catalog.ts";
 import { CELLS_H, CELLS_W, cellIndex, sideCells } from "./grid.ts";
-import { cellCenter, center, clampCell, downhill, nearestPoint, rectDist } from "./pathing.ts";
+import { cellCenter, center, clampCell, downhill, nearestPoint, openSteps, rectDist } from "./pathing.ts";
+import { forkPick } from "./trails.ts";
 import { cloaked } from "./assassins.ts";
 import { perched } from "./gun-sight.ts";
 import { groundBody } from "./enemy-crowd.ts";
@@ -156,8 +157,10 @@ function march(t: Turn) {
     }
   }
   if (field === sim.field && rectDist(sim.keep.rect, e.x, e.y) <= reach) return contactBuilding(t, sim.keepId);
-  const best = downhill(field, sim.foeSolid, cx, cy);
+  let best = downhill(field, sim.foeSolid, cx, cy);
   if (best < 0) return;
+  // At a fork in a worn trail, either near-equal branch, by the enemy's own coin.
+  if (sim.trails && !sim.foeSolid[best]) best = forkPick(field, sim.trails.wear, cellIndex(cx, cy), best, openSteps(sim.foeSolid, cx, cy), e.id);
   const c = cellCenter(best);
   if (sim.foeSolid[best]) return smashThrough(t, best);
   if (field === sim.field) rollForDistraction(t, cx, cy);

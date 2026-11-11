@@ -12,6 +12,7 @@
 import { CELLS_H, CELLS_W, SUB, cellInBounds, cellIndex, hash, hash01 } from "./grid.ts";
 import { CellType, type CityMap } from "./citygen.ts";
 import type { AreaId } from "./areas.ts";
+import { trailPlan, type TrailPlan } from "./trails.ts";
 
 /** The areas with a forest outside their walls. */
 export const FOREST_AREAS: readonly AreaId[] = ["moss"];
@@ -44,7 +45,7 @@ export type Pad = { x: number; y: number; r: number; seed: number };
 export type Lake = { discs: { x: number; y: number; r: number }[]; seed: number };
 /** The plan: `open` is 1 on each open-ground cell, which alone the forest
  * covers. */
-export type ForestPlan = { trees: ForestTree[]; rocks: Rock[]; pads: Pad[]; lakes: Lake[]; boulders: Boulder[]; open: Uint8Array };
+export type ForestPlan = { trees: ForestTree[]; rocks: Rock[]; pads: Pad[]; lakes: Lake[]; boulders: Boulder[]; open: Uint8Array; roads: TrailPlan | null };
 
 /** A canopy radius for each kind, size and variant, in cells. */
 export function canopyRadius(kind: TreeKind, variant: number, size: TreeSize = 0) {
@@ -202,6 +203,17 @@ function plan_(map: CityMap): ForestPlan {
   // whose grass is the forest's though nothing grows on them.
   const open = Uint8Array.from(map.type, (t, i) => (t === CellType.OUT || (t === CellType.WALL && map.buildings[map.owner[i]]?.fence) ? 1 : 0));
   const boulders = boulderPlan(map);
+  // The country roads (Defend's own cities only): nothing grows or lies on them.
+  const roads = trailPlan(map, "road");
+  const onRoad = (x: number, y: number, r: number) => {
+    if (!roads) return false;
+    for (let cy = Math.max(0, Math.floor(y - r)); cy <= Math.min(CELLS_H - 1, Math.floor(y + r)); cy++)
+      for (let cx = Math.max(0, Math.floor(x - r)); cx <= Math.min(CELLS_W - 1, Math.floor(x + r)); cx++) {
+        const nx = Math.max(cx, Math.min(cx + 1, x)) - x, ny = Math.max(cy, Math.min(cy + 1, y)) - y;
+        if (nx * nx + ny * ny < r * r && roads.wear[cellIndex(cx, cy)] > 0.2) return true;
+      }
+    return false;
+  };
   // What keeps the rest away: lakes, big canopies and the boulders.
   const keep: { x: number; y: number; r: number }[] = [];
   const stones: { x: number; y: number; r: number }[] = [];
@@ -225,7 +237,7 @@ function plan_(map: CityMap): ForestPlan {
       const a = hash01(cx, cy, k, 422) * Math.PI * 2, d = R * (0.5 + hash01(cx, cy, k, 423) * 0.4);
       discs.push({ x: x + Math.cos(a) * d, y: y + Math.sin(a) * d * 0.8, r: R * (0.45 + hash01(cx, cy, k, 424) * 0.35) });
     }
-    if (!discs.every((d) => clearOf(map, d.x, d.y, d.r + 0.6)) || discs.some((d) => inDiscs(keep, d.x, d.y, d.r + 6) || inDiscs(stones, d.x, d.y, d.r + 0.5))) continue;
+    if (!discs.every((d) => clearOf(map, d.x, d.y, d.r + 0.6) && !onRoad(d.x, d.y, d.r + 1)) || discs.some((d) => inDiscs(keep, d.x, d.y, d.r + 6) || inDiscs(stones, d.x, d.y, d.r + 0.5))) continue;
     lakes.push({ discs, seed: hash(cx, cy, 425) });
     keep.push(...discs.map((d) => ({ ...d, r: d.r + 0.4 })));
   }
@@ -236,7 +248,7 @@ function plan_(map: CityMap): ForestPlan {
       const kind: TreeKind = hash01(cx, cy, 444) < 0.55 ? "oak" : "pine";
       const variant = hash(cx, cy, 445) % VARIANTS, r = canopyRadius(kind, variant, size);
       const x = cx + 0.25 + hash01(cx, cy, 446) * 0.5, y = cy + 0.25 + hash01(cx, cy, 447) * 0.5;
-      if (!clearOf(map, x, y, r) || inDiscs(keep, x, y, r * 0.6) || inDiscs(stones, x, y, r * 0.6)) return;
+      if (!clearOf(map, x, y, r) || onRoad(x, y, r * 0.85) || inDiscs(keep, x, y, r * 0.6) || inDiscs(stones, x, y, r * 0.6)) return;
       trees.push({ id: 0, x, y, r, kind, size, variant, phase: hash01(cx, cy, 448) * Math.PI * 2 });
       keep.push({ x, y, r: r * 0.7 });
     });
@@ -246,7 +258,7 @@ function plan_(map: CityMap): ForestPlan {
     if (bushes >= FOREST.bushes) break;
     const variant = hash(cx, cy, 451) % VARIANTS, r = canopyRadius("bush", variant);
     const x = cx + 0.3 + hash01(cx, cy, 452) * 0.4, y = cy + 0.3 + hash01(cx, cy, 453) * 0.4;
-    if (!clearOf(map, x, y, r) || inDiscs(keep, x, y, r + 0.6) || inDiscs(stones, x, y, r + 0.3)) continue;
+    if (!clearOf(map, x, y, r) || onRoad(x, y, r + 0.2) || inDiscs(keep, x, y, r + 0.6) || inDiscs(stones, x, y, r + 0.3)) continue;
     trees.push({ id: 0, x, y, r, kind: "bush", size: 0, variant, phase: hash01(cx, cy, 454) * Math.PI * 2 });
     keep.push({ x, y, r: r + 1.5 });
     bushes++;
@@ -254,7 +266,7 @@ function plan_(map: CityMap): ForestPlan {
   // Rocks and bare pads in the ground the trees leave.
   each((cx, cy) => {
     const x0 = cx + 0.5, y0 = cy + 0.5;
-    if (inDiscs(keep, x0, y0) || inDiscs(stones, x0, y0)) return;
+    if (inDiscs(keep, x0, y0) || inDiscs(stones, x0, y0) || onRoad(x0, y0, 0.8)) return;
     const dense = thicket(x0, y0);
     if (hash01(cx, cy, 408) < FOREST.rock) {
       const size = 0.18 + hash01(cx, cy, 409) * 0.3, x = cx + 0.3 + hash01(cx, cy, 410) * 0.4, y = cy + 0.3 + hash01(cx, cy, 412) * 0.4;
@@ -269,7 +281,7 @@ function plan_(map: CityMap): ForestPlan {
   // Drawn back to front, so a canopy lower on the board stands over the one behind.
   trees.sort((a, b) => a.y - b.y || a.x - b.x);
   trees.forEach((t, i) => (t.id = i));
-  return { trees, rocks, pads, lakes, boulders, open };
+  return { trees, rocks, pads, lakes, boulders, open, roads };
 }
 
 /** How a tree came down: struck apart by an attack (a stump left, cleanly

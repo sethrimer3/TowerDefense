@@ -277,3 +277,17 @@ export function downhill(field: Float64Array, solid: Uint8Array, cx: number, cy:
   }
   return best;
 }
+
+/** The open neighbours of cell (cx, cy) a step may go to (no solid cell, no
+ * cut corner), in search order: where a fork on a worn trail may lead
+ * (`trails.ts`, `forkPick`). */
+export function openSteps(solid: Uint8Array, cx: number, cy: number): number[] {
+  const out: number[] = [];
+  for (const [dx, dy] of NEIGHBOURS) {
+    const nx = cx + dx, ny = cy + dy;
+    if (!cellInBounds(nx, ny) || cutsCorner(solid, cx, cy, dx, dy)) continue;
+    const n = cellIndex(nx, ny);
+    if (!solid[n]) out.push(n);
+  }
+  return out;
+}

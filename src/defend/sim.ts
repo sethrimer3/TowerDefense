@@ -18,6 +18,7 @@ import { buildingPaths } from "../specializations.ts";
 import { DefenderIndex } from "./defender-index.ts";
 import { Atmosphere, groundWeather } from "./atmosphere.ts";
 import { areaForWave } from "./areas.ts";
+import { TRAIL, trailCost, trailPlan, trailStyle, type TrailPlan } from "./trails.ts";
 import { boulderPlan, hasForest } from "./forest.ts";
 import { IceMotion } from "./ice-motion.ts";
 import { icyCell } from "./boats.ts";
@@ -443,6 +444,11 @@ export class DefendSim {
    * forest (`syncBoulders`): solid like ponds, owned by no building. */
   readonly rocks = new Uint8Array(CELL_COUNT);
   private rocky = false;
+  /** The worn trails of the area the battle is in (`syncTrails`), each
+   * cell's wear 0..1; null where there are none (any map but a Defend city,
+   * a scenario, an area without trails). */
+  trails: TrailPlan | null = null;
+  private trailKey = "";
   enemies: Enemy[] = [];
   soldiers: Soldier[] = [];
   civilians: Civilian[] = [];
@@ -735,6 +741,7 @@ export class DefendSim {
     if (this.wave > 0) this.stats.current.seconds += dt;
     this.fieldT -= dt;
     this.syncBoulders();
+    this.syncTrails();
     if (this.fieldDirty && this.fieldT <= 0) this.computeField();
     this.runWaves(dt);
     if (this.skyPalaces.length) stepSkyPalaces(this, dt);
@@ -1002,7 +1009,9 @@ export class DefendSim {
     if (this.waveSpawned + (fort ? 1 + fort.turrets + fort.legs + fort.armor : 1) > waveCap(this.wave)) return;
     for (let tries = 0; tries < 20; tries++) {
       const margin = fort ? ENEMIES[kind].size / 2 + 1 : 1;
-      const x = at?.x ?? margin + this.rand() * (CELLS_W - 2 * margin);
+      const heads = this.trailheads(kind);
+      // A walker enters at one of the trailheads, where there are trails.
+      const x = at?.x ?? (heads ? heads[Math.floor(this.rand() * heads.length)] + (this.rand() * 2 - 1) * TRAIL.spread : margin + this.rand() * (CELLS_W - 2 * margin));
       const y = at?.y ?? (isBlightWorm(kind) ? wormTuning(kind).entryY : (fort ? fort.height / 2 + .5 : .5) + this.rand() * 2);
       if (blocked(this.solid, x, y)) continue;
       this.enemies.push(this.newEnemy(kind, x, y));
@@ -1023,6 +1032,15 @@ export class DefendSim {
       if (kind === "blightWorm" && worm) for (const segment of worm) this.wormRoot.set(segment.id, worm[0].id);
       return;
     }
+  }
+
+  /** The trailheads a new enemy of `kind` enters at: those of the area's
+   * trails for anything that walks or slithers in, none for fliers, boats
+   * and fortresses (or without trails). */
+  private trailheads(kind: EnemyKind): readonly number[] | null {
+    const def = ENEMIES[kind];
+    if (!this.trails?.heads.length || def.flying || def.boat || def.fortress) return null;
+    return this.trails.heads;
   }
 
   /** The `n`th of `count` young of `kind` bursting from `mother`: spread
@@ -1090,7 +1108,9 @@ export class DefendSim {
       const b = this.map.owner[i];
       return 3 + this.hp[b] / 6 + (this.scenario?.toll?.[i] ?? 0);
     }
-    return this.map.type[i] === CellType.ROAD ? 1 : 1.25;
+    if (this.map.type[i] === CellType.ROAD) return 1;
+    const wear = this.trails?.wear[i];
+    return wear ? trailCost(wear) : 1.25;
   }
 
   computeField() {
@@ -1438,6 +1458,18 @@ export class DefendSim {
     this.fieldDirty = true;
     this.fieldT = 0;
     this.mapVersion++;
+  }
+
+  /** Wears the area's trails into the ground on entering it (cheaper to
+   * walk, so the flow field takes them) and lifts them on leaving it. */
+  private syncTrails() {
+    const style = this.scenario || !this.map.trails ? null : trailStyle(areaForWave(this.wave).id);
+    const key = style ?? "";
+    if (key === this.trailKey) return;
+    this.trailKey = key;
+    this.trails = style ? trailPlan(this.map, style) : null;
+    this.fieldDirty = true;
+    this.fieldT = 0;
   }
 
   /** Nudge any unit on foot standing in a cell that just became solid. */
