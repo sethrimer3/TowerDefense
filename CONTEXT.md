@@ -49,6 +49,16 @@ The unit the player builds with: the board is 12 × 12 of them. Only the middle 
 The impassable, visible scenery beyond the board's edges, carrying on the area's own ground: in the forest its grass and trees, then whole mountain ranges (in the desert, sandstone cliffs over flagstones). Nothing happens there; it fills the view so no dark space shows at any window shape.
 _Avoid_: border, margin
 
+**Worn trail**:
+A way the Dark One's walkers have always come, worn into the open ground of Defend's first two areas from the top edge to the city. Cheaper to walk, so ground enemies keep to it; it bends round whatever the player builds. In Mossbound Ruins they are **country roads** (dirt two-tracks that merge as they near the city and end at a gate where there is one, with one more leaving out the bottom); in the Amber Desert, **Galton trails** (packed sand parting round rock pins in rows, like a Galton board, worn deeper the more traffic goes that way).
+_Avoid_: path, lane (an Ambush word)
+
+**Trailhead**:
+Where a worn trail enters at the board's top edge; ground enemies and Blight worms enter at one.
+
+**Fork**:
+A place where a worn trail splits. Each enemy takes either branch that is about as short as the other by its own coin, the same way every time, so a crowd spreads down the Galton pins.
+
 **Cell**:
 The unit the city, the walls, pathfinding and the battle work in: each tile is 8 × 8 cells, so a quarter tile is 2 × 2 cells.
 

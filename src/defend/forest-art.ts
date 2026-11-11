@@ -34,6 +34,7 @@ import type { Footprint } from "./shadow-art.ts";
 import type { DefendSim } from "./sim.ts";
 import { BURN, ForestDamage, MOUNTAIN, VARIANTS, canopyRadius, forestPlan, type Boulder, type Felled, type ForestPlan, type ForestTree, type Lake, type TreeKind, type TreeSize } from "./forest.ts";
 import { ART } from "./park-art.ts";
+import { paintRoads } from "./trail-art.ts";
 import { BANK, FOAM, GLINT, LILY, REED, SAND, WATER, bayer } from "./water-palette.ts";
 import { Birds, roosting } from "./forest-birds.ts";
 import { paintRiver, riverBed, riverCanvas, riverShape, type RiverShape } from "./river-art.ts";
@@ -347,6 +348,7 @@ export function paintFloor(out: Uint32Array, plan: ForestPlan, damage: ForestDam
   clip = { x0: Math.max(0, box.x0), y0: Math.max(0, box.y0), x1: Math.min(W, box.x1), y1: Math.min(H, box.y1) };
   for (let Y = clip.y0; Y < clip.y1; Y++) out.fill(0, Y * W + clip.x0, Y * W + clip.x1);
   lawnIn(out, plan.open);
+  if (plan.roads) paintRoads(out, plan.roads, plan.open, clip);
   for (const p of plan.pads) if (nearClip(p.x, p.y, p.r * 1.3 + 0.2)) blob(out, p.x, p.y, p.r, p.seed, DIRT, false);
   for (const c of damage?.clearings ?? []) if (nearClip(c.x, c.y, c.r * 1.3 + 0.2)) blob(out, c.x, c.y, c.r, c.seed, c.burnt ? CHAR : DIRT, false, plan.open);
   for (const l of plan.lakes) lake(out, l);

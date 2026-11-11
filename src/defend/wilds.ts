@@ -34,6 +34,8 @@ import { CURVE, PALETTE32, SHADOW, WIND } from "./park-grass.ts";
 import { paintFloorTile } from "./city-layer.ts";
 import { pixelKey } from "./pixel-sprites.ts";
 import { sceneryOutlinesOn, windAt } from "./scenery-looks.ts";
+import { paintRoadLines } from "./trail-art.ts";
+import { segmentDistance, type TrailLine, type TrailPlan } from "./trails.ts";
 
 /** Cells of wilds past each edge of the field: enough to fill an
  * ultra-wide or very tall view beside the square at its fit. */
@@ -135,6 +137,36 @@ export function wildsPlan(): WildsPlan {
   trees.sort((a, b) => a.y - b.y || a.x - b.x);
   trees.forEach((t, i) => (t.id = i));
   return (planned = { rocks, trees });
+}
+
+/** The field's country roads carried on into the wilds: from where each
+ * crosses the board's top or bottom edge, on away from the field, wandering
+ * a little, until the mountains close in. */
+export function roadReach(roads: TrailPlan): TrailLine[] {
+  const out: TrailLine[] = [];
+  for (const line of roads.lines) {
+    const first = line.points[0];
+    if (first.y >= 0 && first.y <= CELLS_H) continue;
+    const up = first.y < 0, from = line.points[1], dir = up ? -1 : 1;
+    const points = [{ x: from.x, y: from.y }];
+    let x = from.x, drift = 0;
+    for (let k = 1; k < MARGIN; k++) {
+      const y = from.y + dir * k;
+      drift = drift * 0.85 + (valueNoise(k / 7, Math.round(from.x), 741) - 0.5) * 0.5;
+      x += drift;
+      points.push({ x, y });
+      if (rangeAt(x, y) > -0.25) break;
+    }
+    out.push({ points, half: line.half, level: line.level });
+  }
+  return out;
+}
+
+/** Whether (x, y) lies within `r` cells of any line. */
+function nearLines(lines: readonly TrailLine[], x: number, y: number, r: number) {
+  for (const l of lines)
+    for (let k = 0; k + 1 < l.points.length; k++) if (segmentDistance(x, y, l.points[k], l.points[k + 1]) < r + l.half) return true;
+  return false;
 }
 
 /** An area's stone, dark to light, and the tint on its gentlest slopes
@@ -261,8 +293,12 @@ const rgbaOf = (c: number) => ((255 << 24) | ((c & 0xff) << 16) | (c & 0xff00) |
  * the mountain ranges, rocks with their shadows, and in the forest the trees'
  * shadows. `turf` marks the lawn pixels left (where blades grow), `shaded`
  * those under a tree's shadow. */
-export function paintWilds(forest: boolean, stone?: Stone) {
-  const out = new Uint32Array(GW * GH), plan = wildsPlan();
+export function paintWilds(forest: boolean, stone?: Stone, reach: readonly TrailLine[] = []) {
+  const out = new Uint32Array(GW * GH), whole = wildsPlan();
+  // The trees and rocks clear of the roads carried out here.
+  const plan: WildsPlan = reach.length
+    ? { trees: whole.trees.filter((t) => !nearLines(reach, t.x, t.y, t.r * 0.85)), rocks: whole.rocks.filter((r) => !nearLines(reach, r.x, r.y, r.size + 0.3)) }
+    : whole;
   if (forest)
     for (let cy = -MARGIN; cy < CELLS_H + MARGIN; cy++)
       for (let cx = -MARGIN; cx < CELLS_W + MARGIN; cx++) {
@@ -273,6 +309,12 @@ export function paintWilds(forest: boolean, stone?: Stone) {
         });
       }
   const lawn = forest ? out.slice() : null;
+  // The roads, on the lawn past the board (none of the field's own ground).
+  if (forest && reach.length)
+    paintRoadLines(out, GW, GH, OX, OY, reach, (i) => {
+      const X = i % GW, Y = (i - X) / GW;
+      return !(X >= OX && Y >= OY && X < OX + BW && Y < OY + BH);
+    });
   paintRanges(out);
   // Rocks, back to front, each with its shadow down and right.
   const items: { y: number; draw: () => void }[] = [];
@@ -323,7 +365,7 @@ export function paintWilds(forest: boolean, stone?: Stone) {
         }
     }
   }
-  return { px: out, turf, shaded };
+  return { px: out, turf, shaded, plan };
 }
 
 /** The waving blades of the wilds' lawn, as flat arrays: each blade's root
@@ -405,10 +447,16 @@ export type WildsFrame = {
   forest?: { plan: ForestPlan; damage: ForestDamage | null } | null;
 };
 
+/** The wilds' still ground painted for one area (and, in the forest, one
+ * city's roads), the trees and rocks it was painted with, and its blades. */
+type Ground = { canvas: HTMLCanvasElement; turf: Uint8Array; shaded: Uint8Array; plan: WildsPlan; blades: Blades | null };
+
 /** Draws the wilds, kept by the renderer. */
 export class Wilds {
-  private grounds = new Map<string, { canvas: HTMLCanvasElement; turf: Uint8Array; shaded: Uint8Array }>();
-  private blades: Blades | null = null;
+  private grounds = new Map<string, Ground>();
+  /** Each road plan's roads past the board and their key in `grounds`: the
+   * same roads (the same city, run after run) share one painting. */
+  private reaches = new WeakMap<TrailPlan, { lines: TrailLine[]; key: string }>();
   private strips: Strip[] = [];
   private builtAt = -Infinity;
   private builtKey = "";
@@ -417,22 +465,35 @@ export class Wilds {
 
   private groundsArt = "";
 
-  private ground(forest: boolean, area: AreaId) {
+  private ground(forest: boolean, area: AreaId, roads: TrailPlan | null = null) {
     // Repainted when the art changes (scenery outlines turned on or off).
     if (pixelKey() !== this.groundsArt) { this.groundsArt = pixelKey(); this.grounds.clear(); }
-    const key = forest ? "forest" : area;
+    const reach = forest && roads ? this.reach(roads) : null;
+    const key = forest ? `forest:${reach?.key ?? ""}` : area;
     let g = this.grounds.get(key);
     if (g) return g;
-    const painted = paintWilds(forest, forest ? undefined : STONES[area]);
+    // Only the current city's roads are kept.
+    if (forest) for (const k of [...this.grounds.keys()]) if (k.startsWith("forest:")) this.grounds.delete(k);
+    const painted = paintWilds(forest, forest ? undefined : STONES[area], reach?.lines ?? []);
     const canvas = document.createElement("canvas");
     canvas.width = GW;
     canvas.height = GH;
     const ctx = canvas.getContext("2d")!, img = ctx.createImageData(GW, GH);
     new Uint32Array(img.data.buffer).set(painted.px);
     ctx.putImageData(img, 0, 0);
-    g = { canvas, turf: painted.turf, shaded: painted.shaded };
+    g = { canvas, turf: painted.turf, shaded: painted.shaded, plan: painted.plan, blades: null };
     this.grounds.set(key, g);
     return g;
+  }
+
+  private reach(roads: TrailPlan) {
+    let r = this.reaches.get(roads);
+    if (!r) {
+      const lines = roadReach(roads);
+      r = { lines, key: lines.map((l) => l.points.map((p) => `${Math.round(p.x * 4)},${Math.round(p.y * 4)}`).join(" ")).join("|") };
+      this.reaches.set(roads, r);
+    }
+    return r;
   }
 
   private shadeCanvas: { canvas: HTMLCanvasElement; box: Box } | null = null;
@@ -486,7 +547,7 @@ export class Wilds {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.imageSmoothingEnabled = false;
     if (!forest) this.floor(ctx, f, view, toX, toY, k);
-    const g = this.ground(forest, f.area);
+    const g = this.ground(forest, f.area, f.forest?.plan.roads);
     const blit = (src: CanvasImageSource, b: Box, sx = b.x0, sy = b.y0) => {
       const x = Math.round(toX(b.x0)), y = Math.round(toY(b.y0));
       ctx.drawImage(src, sx, sy, b.x1 - b.x0, b.y1 - b.y0, x, y, Math.round(toX(b.x1)) - x, Math.round(toY(b.y1)) - y);
@@ -520,8 +581,8 @@ export class Wilds {
 
   /** The forest's waving grass and swaying crowns over the wilds in view,
    * painted into strips round the board at most 30 times a second. */
-  private life(ctx: CanvasRenderingContext2D, f: WildsFrame, g: { turf: Uint8Array; shaded: Uint8Array }, view: Box, blit: (src: CanvasImageSource, b: Box, sx?: number, sy?: number) => void) {
-    this.blades ??= planBlades(g.turf, wildsPlan());
+  private life(ctx: CanvasRenderingContext2D, f: WildsFrame, g: Ground, view: Box, blit: (src: CanvasImageSource, b: Box, sx?: number, sy?: number) => void) {
+    g.blades ??= planBlades(g.turf, g.plan);
     // The view less the board: above, below, left and right of it.
     const boxes: Box[] = [
       { x0: view.x0, y0: view.y0, x1: view.x1, y1: Math.min(view.y1, OY) },
@@ -529,7 +590,7 @@ export class Wilds {
       { x0: view.x0, y0: Math.max(view.y0, OY), x1: Math.min(view.x1, OX), y1: Math.min(view.y1, OY + BH) },
       { x0: Math.max(view.x0, OX + BW), y0: Math.max(view.y0, OY), x1: view.x1, y1: Math.min(view.y1, OY + BH) },
     ].filter((b) => b.x1 > b.x0 && b.y1 > b.y0);
-    const key = boxes.map((b) => `${b.x0},${b.y0},${b.x1},${b.y1}`).join(";") + (f.forest?.plan ? "f" : "");
+    const key = boxes.map((b) => `${b.x0},${b.y0},${b.x1},${b.y1}`).join(";") + (f.forest?.plan ? "f" : "") + (f.forest?.plan.roads ? this.reach(f.forest.plan.roads).key.length : 0);
     const due = f.reduceMotion ? f.now - this.builtAt >= 500 : f.now - this.builtAt >= 1000 / 30;
     if (key !== this.builtKey || due) {
       this.builtAt = f.now;
@@ -538,8 +599,8 @@ export class Wilds {
       const t = f.reduceMotion ? 0 : f.now / 1000;
       for (const s of this.strips) {
         s.px.fill(0);
-        this.paintBlades(s, g.shaded, t, WIND[f.grassWind]);
-        this.paintCrowns(s, f, t);
+        this.paintBlades(s, g.blades, g.shaded, t, WIND[f.grassWind]);
+        this.paintCrowns(s, f, t, g.plan);
         s.ctx.putImageData(s.img, 0, 0);
       }
     }
@@ -557,8 +618,8 @@ export class Wilds {
   }
 
   /** As `ForestGrass.paint`, with no one walking through. */
-  private paintBlades(s: Strip, shaded: Uint8Array, t: number, wind: number) {
-    const b = this.blades!, N = CELLS_W + 2 * MARGIN, { box, px } = s, w = box.x1 - box.x0;
+  private paintBlades(s: Strip, b: Blades, shaded: Uint8Array, t: number, wind: number) {
+    const N = CELLS_W + 2 * MARGIN, { box, px } = s, w = box.x1 - box.x0;
     const S1 = Math.sin(t * 2.1), C1 = Math.cos(t * 2.1), S2 = Math.sin(t * 3.7), C2 = Math.cos(t * 3.7), S3 = Math.sin(-t * 1.6), C3 = Math.cos(-t * 1.6);
     const cx0 = Math.max(0, Math.floor(box.x0 / ART) - 1), cx1 = Math.min(N - 1, Math.floor((box.x1 - 1) / ART) + 1);
     const cy0 = Math.max(0, Math.floor(box.y0 / ART)), cy1 = Math.min(CELLS_H + 2 * MARGIN - 1, Math.floor((box.y1 - 1) / ART) + 1);
@@ -587,7 +648,7 @@ export class Wilds {
 
   /** The wilds' trees, and the field's whose crowns reach past the board,
    * leaning as the forest's do. */
-  private paintCrowns(s: Strip, f: WildsFrame, t: number) {
+  private paintCrowns(s: Strip, f: WildsFrame, t: number, plan: WildsPlan) {
     const { box, px } = s, w = box.x1 - box.x0;
     const draw = (tree: ForestTree) => {
       const sp = outlinedSprite(treeSprite(tree.kind, tree.variant, leanOf(tree, t, f.treeWind * windAt(tree.x, tree.y)), tree.size)), r = runs(sp);
@@ -610,6 +671,6 @@ export class Wilds {
       const damage = f.forest!.damage;
       for (const tr of reach) if (!damage || damage.standing(tr)) draw(tr);
     }
-    for (const tr of wildsPlan().trees) draw(tr);
+    for (const tr of plan.trees) draw(tr);
   }
 }

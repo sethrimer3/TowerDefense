@@ -10,6 +10,7 @@ import { cellAt, cellCenter, center, clampCell, type Point } from "./pathing.ts"
 import { structureContactRect, fenceContactRects, CONTACT_OUTLINE, defenderInContact } from "./contact.ts";
 import { CHILL_SPEED } from "./catalog.ts";
 import { mageChillSpeed } from "./mage-attunements.ts";
+import { trailHeading } from "./trails.ts";
 import type { DefendSim, Enemy } from "./sim.ts";
 
 type TrailPoint = Point & { s: number; under: boolean; pass: number; target?: number; reached?: boolean };
@@ -91,6 +92,16 @@ export function initWorm(sim: DefendSim, segments: Enemy[]) {
     if (n === 0) e.worm.head = randomHead(sim, 0, 1, first.kind);
     setPhase(e, false);
   }
+}
+
+/** On a worn trail a surfaced head slithers down it (no wander, no draw);
+ * false off the trails, where it wanders as ever. */
+function followTrail(sim: DefendSim, e: Enemy) {
+  const way = trailHeading(sim.field, sim.foeSolid, sim.trails!.wear, e.x, e.y, e.id);
+  if (!way) return false;
+  const h = e.worm!.head!;
+  h.dx = way.x; h.dy = way.y;
+  return true;
 }
 
 function onBoard(p: Point, r = 0) { return p.x >= r && p.y >= r && p.x < CELLS_W - r && p.y < CELLS_H - r; }
@@ -305,6 +316,8 @@ export function stepBlightWorm(sim: DefendSim, e: Enemy, dt: number) {
   if (!h.under && onBoard(e, HALF + CONTACT_OUTLINE)) {
     h.surfaceT -= dt; h.turnT -= dt;
     if (h.surfaceT <= 0 && onBoard(e, HALF)) dive(sim, e);
+    // On a worn trail it slithers down the trail instead of wandering.
+    else if (sim.trails && followTrail(sim, e)) h.turnT = Math.max(h.turnT, 0);
     else if (h.turnT <= 0) {
       // Fixed order: wander angle, return roll only beyond the city margin,
       // then the next turn interval. Burrow rays never use this steering.

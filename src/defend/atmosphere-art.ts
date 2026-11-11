@@ -23,6 +23,7 @@
  * black-outlined sprites in several sizes, over it. Presentation only: it
  * reads `sim.atmosphere` and changes nothing. */
 import { CELLS_W, CELLS_H, CELL_COUNT, cellIndex, hash } from "./grid.ts";
+import { galtonCanvas } from "./trail-art.ts";
 import { DUNE_CREST, DUNE_PERIOD, WEED_SIZES, duneAt, periodicNoise, weatherNoise, type Atmosphere } from "./atmosphere.ts";
 import { ENEMIES } from "./catalog.ts";
 import { ART } from "./park-art.ts";
@@ -704,6 +705,8 @@ export class AtmosphereArt {
     c.save();
     c.imageSmoothingEnabled = false;
     c.drawImage(this.composeDunes(env, sim, reduceMotion), 0, 0, CELLS_W * px, CELLS_H * px);
+    // The Galton trails, packed into the dunes under the battle's own marks.
+    if (sim.trails?.style === "galton") c.drawImage(galtonCanvas(sim.trails, sim.map), 0, 0, CELLS_W * px, CELLS_H * px);
     const marks = this.drawMarks(sim);
     if (marks) c.drawImage(marks, 0, 0, CELLS_W * px, CELLS_H * px);
     const sand = this.sandLayer(env, sim, reduceMotion);

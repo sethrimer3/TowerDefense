@@ -895,6 +895,7 @@ export class DefendPage {
       const fit = fitLayout(layout);
       if (!fit.ok) throw new Error(fit.reason);
       this.map = generateCity(fit, this.save.seed);
+      this.map.trails = { seed: this.save.seed };
       this.mapLayout = layout;
     }
     return this.map;
