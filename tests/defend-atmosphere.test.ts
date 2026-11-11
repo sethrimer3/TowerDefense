@@ -9,7 +9,7 @@ import { CELLS_W, CELLS_H, CELL_COUNT } from '../src/defend/grid.ts';
 import { ART } from '../src/defend/park-art.ts';
 import { SNOW_CAP, STORM_CHANCE, rollWeather, skyLabel, Snow } from '../src/defend/weather.ts';
 import { areaForWave } from '../src/defend/areas.ts';
-import { tumbleweedPixels, dunePixels, duneHeights, SandMarks, CHUNK, DUNE_RELIEF, HD_RELIEF, HD_TONES, SAND_COLOR, FLOOR, SUN, SWELL, duneShade, castShadows, setDuneLight, easeDuneLight, setDuneStyle, duneLightKey } from '../src/defend/atmosphere-art.ts';
+import { tumbleweedPixels, dunePixels, duneHeights, SandMarks, CHUNK, DUNE_RELIEF, HD_RELIEF, HD_TONES, SAND_COLOR, SAND_TONES, FLOOR, SUN, SWELL, duneShade, castShadows, setDuneLight, easeDuneLight, setDuneStyle, duneLightKey } from '../src/defend/atmosphere-art.ts';
 import { skyAtTime } from '../src/daylight.ts';
 import { OUTLINE } from '../src/defend/pixel-fx.ts';
 
@@ -221,7 +221,7 @@ test('the dunes are large, hold still and leave the sand outside settled into th
   assert.ok(Math.abs(env.sand[i] - env.duneAt(i)) < .3);
 });
 
-test('the dunes are a few low, gentle swells of one sand colour, shaped only by light, tiling', () => {
+test('the dunes are a few low swells in a handful of hard sand tones, shaped by light, tiling', () => {
   setDuneStyle(false); setDuneLight();
   const { size, data } = dunePixels(), h = duneHeights();
   const shades = new Set<string>();
@@ -233,14 +233,13 @@ test('the dunes are a few low, gentle swells of one sand colour, shaped only by 
     const x = i % size, y = Math.floor(i / size);
     steepest = Math.max(steepest, Math.abs(h[y * size + (x + 1) % size] - h[i]), Math.abs(h[((y + 1) % size) * size + x] - h[i]));
   }
-  assert.ok(shades.size >= 6, `${shades.size} shades: the height shows in the light`);
-  // Every pixel is the one sand colour, lighter or darker: its channels keep
-  // the colour's proportions (to rounding), never a different hue.
-  for (const t of shades) {
-    const [r, g, b] = t.split(',').map(Number), k = r / SAND_COLOR[0];
-    assert.ok(Math.abs(g - SAND_COLOR[1] * k) <= 1.5 && Math.abs(b - SAND_COLOR[2] * k) <= 1.5, `${t} is the sand colour`);
-  }
-  assert.ok(tallest <= DUNE_RELIEF + 1e-6 && steepest < .2, `gentle: ${tallest} high, ${steepest} a pixel at most`);
+  // Every pixel is one of the few hard sand tones, flat ground the sand
+  // colour itself, and the light uses most of them.
+  const tones = new Set(SAND_TONES.map(t => t.join(',')));
+  assert.ok(tones.has(SAND_COLOR.join(',')));
+  for (const t of shades) assert.ok(tones.has(t), `${t} is a sand tone`);
+  assert.ok(shades.size >= 5, `${shades.size} tones: the height shows in the light`);
+  assert.ok(tallest <= DUNE_RELIEF + 1e-6 && steepest < .2, `low: ${tallest} high, ${steepest} a pixel at most`);
   // Only a couple of crests across a whole field period down any column.
   let crests = 0;
   for (let y = 0; y < size; y++) { const a = h[y * size + 40], b = h[((y + 1) % size) * size + 40], c = h[((y + 2) % size) * size + 40]; if (b > a && b >= c) crests++; }
@@ -273,7 +272,7 @@ test('the dunes turn with the sun: lit faces follow its heading, low suns cast s
   setDuneLight(skyAtTime(0, 'sunset').sun);
   assert.ok(share() > .05, `sunset shadows ${share()}`);
   setDuneLight(skyAtTime(0, 'day').sun);
-  assert.equal(share(), 0, 'no shadows at noon');
+  assert.ok(share() < .03, `at noon only a sliver under the steepest slip faces (${share()})`);
   // Night: the sun gone, the swells barely shaded and casting nothing.
   setDuneLight({ x: 1, y: .3, strength: 0 });
   assert.equal(share(), 0);
