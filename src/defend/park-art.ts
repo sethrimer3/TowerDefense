@@ -2,6 +2,7 @@ import { ART_NAMES } from "./art-overrides.ts";
 import { sourcePixels, type ArtPiece } from "./sprite-source.ts";
 import { outlinePixels, spriteCanvas } from "./damage-art.ts";
 import { onPixelArt } from "./pixel-sprites.ts";
+import { padPixels, sceneryOutlinesOn } from "./scenery-looks.ts";
 import { ART } from "./art-scale.ts";
 /** The parks' ponds and trees as pixel art: painted pixel by pixel at `ART`
  * pixels a cell (as the park grass's blades are), then drawn into the city
@@ -221,7 +222,7 @@ function paintTrees(map: CityMap, px: Uint32Array, open: Uint8Array): TreeSprite
   const out: TreeSprite[]=[];
   for(let cy=0;cy<CELLS_H;cy++)for(let cx=0;cx<CELLS_W;cx++){
     if(!hasTree(map,cx,cy))continue;
-    const p=parkTreeSource(cx,cy), art=outlinePixels(p.data,p.w,p.h),t=treeCanopy(cx,cy);
+    const p=parkTreeSource(cx,cy), art=sceneryOutlinesOn()?outlinePixels(p.data,p.w,p.h):padPixels(p.data,p.w,p.h),t=treeCanopy(cx,cy);
     for(let y=0;y<art.h;y++)for(let x=0;x<art.w;x++){
       const X=p.x+x-1,Y=p.y+y-1,v=art.data[y*art.w+x];
       if(v&&X>=0&&Y>=0&&X<W&&Y<H){px[Y*W+X]=v;open[Y*W+X]=0;}

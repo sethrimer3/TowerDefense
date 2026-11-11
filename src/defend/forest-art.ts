@@ -6,6 +6,7 @@ import { ART_NAMES } from "./art-overrides.ts";
 import { sourcePixels, type ArtPiece } from "./sprite-source.ts";
 import { outlinePixels, spriteCanvas, drawSprite } from "./damage-art.ts";
 import { onPixelArt, pixelKey } from "./pixel-sprites.ts";
+import { padPixels, sceneryOutlinesOn, windAt } from "./scenery-looks.ts";
 /** The forest outside the walls (`forest.ts`) as pixel art at `ART` pixels a
  * cell, inside crisp black outlines like the parks' trees:
  *
@@ -102,11 +103,17 @@ const CRAG = [0x24262a, 0x34373a, 0x4a4d4c, 0x63665f, 0x81847a, 0xa2a497];
 export type Sprite = { px: Uint32Array; w: number; h: number; ox: number; oy: number; runs?: Int16Array };
 
 const outlinedSceneryCache = new WeakMap<Sprite, Sprite>();
+const bareSceneryCache = new WeakMap<Sprite, Sprite>();
+/** Sprite `s` inside its one-art-pixel black outline, or (scenery outlines
+ * off, `scenery-looks.ts`) padded by the same pixel with none, so callers
+ * place either the same way. */
 function outlinedScenery(s: Sprite): Sprite {
-  let drawn=outlinedSceneryCache.get(s);
-  if(!drawn){const art=outlinePixels(s.px,s.w,s.h);drawn={px:art.data,w:art.w,h:art.h,ox:s.ox+1,oy:s.oy+1};outlinedSceneryCache.set(s,drawn);}
+  const ink = sceneryOutlinesOn(), cache = ink ? outlinedSceneryCache : bareSceneryCache;
+  let drawn=cache.get(s);
+  if(!drawn){const art=ink?outlinePixels(s.px,s.w,s.h):padPixels(s.px,s.w,s.h);drawn={px:art.data,w:art.w,h:art.h,ox:s.ox+1,oy:s.oy+1};cache.set(s,drawn);}
   return drawn;
 }
+
 
 /** A sprite's rows as runs of solid pixels: row, first and past-last
  * column, three numbers a run. */
@@ -1471,7 +1478,7 @@ export function composeCrowns(out: Uint32Array, plan: ForestPlan, damage: Forest
     const ty = Math.round(t.y * ART), reach = t.r * ART * 1.3 + 8;
     if (ty + reach < y0 || ty - reach >= y1 || (damage && !damage.standing(t))) continue;
     const stage = blight?.treeStage(t.x, t.y, t.r) ?? 0;
-    const source = treeSprite(t.kind, t.variant, stage === 3 ? 0 : leanOf(t, time, wind), t.size);
+    const source = treeSprite(t.kind, t.variant, stage === 3 ? 0 : leanOf(t, time, wind * windAt(t.x, t.y)), t.size);
     const s = outlinedScenery(witheredTreeSprite(source, stage, t.r, t.variant)), runs = runsOf(s), px = s.px;
     const sx = Math.round(t.x * ART) - s.ox, sy = ty - s.oy, a = alpha[t.id] ?? 1;
     for (let k = 0; k < runs.length; k += 3) {

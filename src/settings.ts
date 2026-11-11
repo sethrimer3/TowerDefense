@@ -35,6 +35,12 @@ export const SETTINGS = {
   /** The Defend board's zoom steps so every art pixel covers the same
    * whole number of screen pixels: outlines keep one width at every zoom. */
   crispZoom: { kind: "toggle", default: true, page: { id: "crisp-zoom", label: "Crisp pixel zoom" } },
+  /** The black outline round scenery: trees, bushes, stumps, rocks and
+   * mountains (`scenery-looks.ts`); units and buildings keep theirs. */
+  sceneryOutlines: { kind: "toggle", default: true, page: { id: "scenery-outlines", label: "Outlines on trees and scenery" } },
+  /** Grass and trees stand still in the wind and stir only where enemies
+   * are near (`scenery-looks.ts`). */
+  stillAir: { kind: "toggle", default: false, page: { id: "still-air", label: "Grass and trees move only near enemies" } },
   /** The Amber Desert's detailed dunes: rippled, in dithered sand tones,
    * instead of one sand colour shaped only by light and shadow. */
   /** Portal contours (the Major Darkling's burning outline) drawn as pixel

@@ -15,6 +15,7 @@ import { CELLS_H, CELLS_W, cellIndex, hash01 } from "./grid.ts";
 import type { ForestDamage, ForestPlan } from "./forest.ts";
 import { lakeDepth, shadedAt, turfAt } from "./forest-art.ts";
 import { ART } from "./park-art.ts";
+import { windInCell } from "./scenery-looks.ts";
 import { CURVE, PALETTE32, SHADOW, WIND, paintBlade, type Blade, type GrassFrame, type Walker } from "./park-grass.ts";
 
 const W = CELLS_W * ART, H = CELLS_H * ART;
@@ -212,7 +213,7 @@ export class ForestGrass {
     for (let i = 0; i < this.plans.length; i++) {
       const list = this.plans[i];
       if (!list) continue;
-      const stir = this.stir.get(i) ?? 0, crowd = near[i];
+      const stir = this.stir.get(i) ?? 0, crowd = near[i], blow = wind * windInCell(i);
       group.length = crowd;
       for (let q = 0; q < crowd; q++) group[q] = all[slots[i * CROWD + q]];
       const walkers = crowd ? group : undefined;
@@ -231,7 +232,7 @@ export class ForestGrass {
         // in bands, the wobble after someone passes...
         const sway = (sw.s1[j] * C1 + sw.c1[j] * S1) * 0.5 + (sw.s2[j] * C2 + sw.c2[j] * S2) * 0.2;
         const band = sw.s3[j] * C3 + sw.c3[j] * S3, gust = band > 0 ? band * band * band * 1.6 : 0;
-        let lean = b.splay + wind * (0.35 + sway * 0.45 + gust) + (stir ? stir * (sw.s4[j] * C4 + sw.c4[j] * S4) * 1.6 : 0);
+        let lean = b.splay + blow * (0.35 + sway * 0.45 + gust) + (stir ? stir * (sw.s4[j] * C4 + sw.c4[j] * S4) * 1.6 : 0);
         // ...and parted and pressed down round whoever walks through.
         let press = 0;
         if (walkers)
