@@ -18,6 +18,7 @@ import { CELLS_H, CELLS_W, cellInBounds, cellIndex, hash01 } from "./grid.ts";
 import { CellType, type CityMap } from "./citygen.ts";
 import { hasTree, pondDisc, pondField, treeCanopy } from "./park-geometry.ts";
 import { bareAt, groundArt, turfAt, type GroundArt } from "./ground-art.ts";
+import { windInCell } from "./scenery-looks.ts";
 
 /** Blade pixels per cell. */
 const ART = 8;
@@ -137,11 +138,11 @@ export class ParkGrass {
       const list = this.plans[i];
       if (!list?.length) continue;
       const cx = i % CELLS_W, cy = (i - cx) / CELLS_W;
-      const stir = this.stir.get(i) ?? 0, walkers = near.get(i);
+      const stir = this.stir.get(i) ?? 0, walkers = near.get(i), blow = wind * windInCell(i);
       for (const b of list) {
         const gx = cx * ART + b.i, gy = cy * ART + b.j;
         palette = (f.blight?.at(gx / ART, gy / ART) ?? 0) >= BLIGHT_TRAIL.grass ? DEAD_PALETTE32 : PALETTE32;
-        paintBlade(put, b, gx, gy, t, wind, stir, walkers, f.reduceMotion, 0);
+        paintBlade(put, b, gx, gy, t, blow, stir, walkers, f.reduceMotion, 0);
       }
     }
   }

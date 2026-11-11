@@ -32,6 +32,8 @@ import { darken, lawnCell, leanOf, outlinedSprite, rockSprite, stampInto, treeSp
 import { planCell } from "./forest-grass.ts";
 import { CURVE, PALETTE32, SHADOW, WIND } from "./park-grass.ts";
 import { paintFloorTile } from "./city-layer.ts";
+import { pixelKey } from "./pixel-sprites.ts";
+import { sceneryOutlinesOn, windAt } from "./scenery-looks.ts";
 
 /** Cells of wilds past each edge of the field: enough to fill an
  * ultra-wide or very tall view beside the square at its fit. */
@@ -237,7 +239,7 @@ export function mountainShade(): Uint8Array {
 function paintRanges(out: Uint32Array) {
   const { H, f, mossy } = rangeField();
   const ramp = [0x24262a, 0x34373a, 0x4a4d4c, 0x63665f, 0x81847a, 0xa2a497].map((c) => rgbaOf(c));
-  const moss = [0x4f6a32, 0x6f8f44].map((c) => rgbaOf(c)), edge = rgbaOf(0x141518);
+  const moss = [0x4f6a32, 0x6f8f44].map((c) => rgbaOf(c)), edge = sceneryOutlinesOn() ? rgbaOf(0x141518) : ramp[1];
   const inR = (X: number, Y: number) => X >= 0 && Y >= 0 && X < GW && Y < GH && f[Y * GW + X] > 0;
   for (let Y = 0; Y < GH; Y++)
     for (let X = 0; X < GW; X++) {
@@ -413,7 +415,11 @@ export class Wilds {
   /** The field's trees whose crowns reach past the board, by plan. */
   private overhang = new WeakMap<ForestPlan, ForestTree[]>();
 
+  private groundsArt = "";
+
   private ground(forest: boolean, area: AreaId) {
+    // Repainted when the art changes (scenery outlines turned on or off).
+    if (pixelKey() !== this.groundsArt) { this.groundsArt = pixelKey(); this.grounds.clear(); }
     const key = forest ? "forest" : area;
     let g = this.grounds.get(key);
     if (g) return g;
@@ -563,7 +569,7 @@ export class Wilds {
         const shade = shaded[gy * GW + gx] ? SHADOW : 0;
         const sway = (b.s1[k] * C1 + b.c1[k] * S1) * 0.5 + (b.s2[k] * C2 + b.c2[k] * S2) * 0.2;
         const band = b.s3[k] * C3 + b.c3[k] * S3, gust = band > 0 ? band * band * band * 1.6 : 0;
-        const lean = b.splay[k] + wind * (0.35 + sway * 0.45 + gust);
+        const lean = b.splay[k] + wind * windAt((gx - OX) / ART, (gy - OY) / ART) * (0.35 + sway * 0.45 + gust);
         const h = b.h[k], curve = CURVE[h], color = b.color[k];
         let lastX = gx, start = 0;
         for (let q = 1; q <= h; q++) {
@@ -584,7 +590,7 @@ export class Wilds {
   private paintCrowns(s: Strip, f: WildsFrame, t: number) {
     const { box, px } = s, w = box.x1 - box.x0;
     const draw = (tree: ForestTree) => {
-      const sp = outlinedSprite(treeSprite(tree.kind, tree.variant, leanOf(tree, t, f.treeWind), tree.size)), r = runs(sp);
+      const sp = outlinedSprite(treeSprite(tree.kind, tree.variant, leanOf(tree, t, f.treeWind * windAt(tree.x, tree.y)), tree.size)), r = runs(sp);
       const sx = Math.round(tree.x * ART) - sp.ox + OX, sy = Math.round(tree.y * ART) - sp.oy + OY;
       if (sx >= box.x1 || sy >= box.y1 || sx + sp.w <= box.x0 || sy + sp.h <= box.y0) return;
       for (let q = 0; q < r.length; q += 3) {

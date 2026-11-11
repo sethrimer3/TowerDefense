@@ -10,7 +10,7 @@ import { LANGUAGES, isLanguage, t } from "../i18n/index.ts";
 /** Gameplay settings, under their own heading first. */
 const GAMEPLAY = ["showEmpty"] as const satisfies readonly SettingKey[];
 const CONTROLS = ["dragRally", "dragCrosshair", "raiseDrag", "magnifier", "tripleTapFlag"] as const satisfies readonly SettingKey[];
-const PAGE = ["pixelArt", "legacyGraphics", "legacyWalls", "dayNightCycle", "fasterSunCatchup", "reduceMotion", "effectsOff", "simpleEnemies", "simpleTroops", "mergedOutlines", "pixelPortals", "crispZoom", "hdSand", "ultraGraphics", "highlightBuildings", "tileGrid", "soundOff", "ambienceOff", "pixelFont"] as const satisfies readonly SettingKey[];
+const PAGE = ["pixelArt", "legacyGraphics", "legacyWalls", "dayNightCycle", "fasterSunCatchup", "reduceMotion", "effectsOff", "simpleEnemies", "simpleTroops", "mergedOutlines", "sceneryOutlines", "stillAir", "pixelPortals", "crispZoom", "hdSand", "ultraGraphics", "highlightBuildings", "tileGrid", "soundOff", "ambienceOff", "pixelFont"] as const satisfies readonly SettingKey[];
 /** The dev options, under ALL ON. */
 const DEV = ["devMode", "devTowers", "devJournal", "instantResearch"] as const satisfies readonly SettingKey[];
 /** All research unlocked: the Smithy's rows and each skill tree. */

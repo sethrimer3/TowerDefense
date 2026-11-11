@@ -22,6 +22,7 @@ import { TilesPage } from "./ui/tiles-page.ts";
 import { Chamber, Descent } from "./ui/chamber.ts";
 import { paintIcon, type IconItem } from "./defend/structure-art.ts";
 import { onPixelArt, setPixelArt } from "./defend/pixel-sprites.ts";
+import { setSceneryOutlines, setStillAir } from "./defend/scenery-looks.ts";
 import { setLegacyWalls } from "./defend/city-layer.ts";
 import { renderSettingsPage } from "./ui/settings-page.ts";
 import type { Weather } from "./defend/weather.ts";
@@ -309,6 +310,8 @@ function refreshCurrencies() {
   document.documentElement.classList.toggle("legacy-graphics", save.settings.legacyGraphics);
   setPixelArt(save.settings.pixelArt);
   setLegacyWalls(save.settings.legacyWalls);
+  setSceneryOutlines(save.settings.sceneryOutlines);
+  setStillAir(save.settings.stillAir);
   const show = (id: string, n: number) => {
     const value = whole(n), before = shown.get(id);
     el(id).textContent = dev ? "∞" : compact(value);

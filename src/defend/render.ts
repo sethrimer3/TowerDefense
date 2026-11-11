@@ -52,6 +52,7 @@ import { drawBuildingOrders, drawInspect, type Armed } from "./inspect.ts";
 import { drawShimmer, drawShimmerFlash, drawHighlights, flashAlpha, closeFade, type Highlight } from "./placed-shimmer.ts";
 import { ART } from "./park-art.ts";
 import { Wilds } from "./wilds.ts";
+import { stirWind } from "./scenery-looks.ts";
 import { drawFlag, drawWarBanner } from "./structure-art.ts";
 import { RallyFlagArt } from "./rally-flag-art.ts";
 import { bannerReach } from "./war-banner.ts";
@@ -488,6 +489,8 @@ export class DefendRenderer {
     this.protectCombat = this.darkDrain.prepare(sim, opts.now, blightNight);
     this.refreshLayer(map, sim, opts.looks);
     if (opts.timings) this.timings.terrainMs = performance.now() - start;
+    // Still air: the wind reaches the grass and trees only near enemies.
+    stirWind(sim?.enemies ?? [], this.lastNow ? Math.min(0.25, (opts.now - this.lastNow) / 1000) : 0);
     // Beyond the board's edges: the area's impassable wilds (`wilds.ts`).
     this.ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.ctx.fillStyle = BEYOND;
