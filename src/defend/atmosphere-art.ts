@@ -25,7 +25,8 @@
  * black-outlined sprites in several sizes, over it. Presentation only: it
  * reads `sim.atmosphere` and changes nothing. */
 import { CELLS_W, CELLS_H, CELL_COUNT, cellIndex, hash } from "./grid.ts";
-import { sandTrailCanvases, trailId } from "./trail-art.ts";
+import { sandTrailCanvases, trailField, trailId } from "./trail-art.ts";
+import { CellType } from "./citygen.ts";
 import { DUNE_CREST, DUNE_PERIOD, WEED_SIZES, duneAt, periodicNoise, weatherNoise, type Atmosphere } from "./atmosphere.ts";
 import { ENEMIES } from "./catalog.ts";
 import { ART } from "./park-art.ts";
@@ -419,6 +420,43 @@ export function dunePixels() {
  * style): the wilds tile it past the board too, so the sand runs on to the
  * mountains. Its key is `duneLightKey()`. */
 export function duneTile() { return dunes(); }
+/** Where the dunes run down to a sand trail: from `TAPER.to` trail half
+ * widths off its middle (`trailField`'s `t`) their height eases down to the
+ * flat sheet at `TAPER.from`, so each swell slopes away into the trail
+ * rather than ending in a cliff; that run down is lit `TAPER.slope` as
+ * steep as it stands, so it reads as the sand sinking, not a new bowl. */
+export const TAPER = { from: 1, to: 3.2, slope: .35 };
+/** How much of the dunes' height stands at trail distance `t`, 0 to 1. */
+export function taperAt(t: number) {
+  const u = (t - TAPER.from) / (TAPER.to - TAPER.from);
+  return u >= 1 ? 1 : u <= 0 ? 0 : u * u * (3 - 2 * u);
+}
+/** The dunes run down to a trail: over a `w` by `h` box whose corner is
+ * board art pixel (`bx`, `by`), with `t` its trail distances, each pixel
+ * nearer than `TAPER.to` (and `open`) relit from its lowered height, RGBA,
+ * clear elsewhere; laid over the dune tile, it matches it where the taper
+ * ends. In the current light and style. */
+export function duneTaperPixels(t: Float32Array, w: number, h: number, bx: number, by: number, open: (X: number, Y: number) => boolean) {
+  const n = DUNE_PERIOD * ART, hts = duneHeights(), out = new Uint8ClampedArray(w * h * 4);
+  const s = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) s[i] = taperAt(t[i]);
+  const raw = (x: number, y: number) => { const X = bx + x, Y = by + y; return hts[((Y % n + n) % n) * n + ((X % n + n) % n)]; };
+  const sAt = (x: number, y: number) => s[(y < 0 ? 0 : y >= h ? h - 1 : y) * w + (x < 0 ? 0 : x >= w ? w - 1 : x)];
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      if (s[i] >= 1 || !open(bx + x, by + y)) continue;
+      const X = bx + x, Y = by + y, tx = (X % n + n) % n, ty = (Y % n + n) % n;
+      // The lowered swell's slope, its run down to the trail eased
+      // (`TAPER.slope`) so it reads as the sand sinking, not a new bowl.
+      const v = raw(x, y), k = s[i];
+      const gx = k * (raw(x + 1, y) - raw(x - 1, y)) * .5 + TAPER.slope * v * (sAt(x + 1, y) - sAt(x - 1, y)) * .5;
+      const gy = k * (raw(x, y + 1) - raw(x, y - 1)) * .5 + TAPER.slope * v * (sAt(x, y + 1) - sAt(x, y - 1)) * .5;
+      const col = duneColor(gx, gy, tx, ty, k > .9, true);
+      out[i * 4] = col[0]; out[i * 4 + 1] = col[1]; out[i * 4 + 2] = col[2]; out[i * 4 + 3] = 255;
+    }
+  return out;
+}
 let duneSprite: HTMLCanvasElement | null = null;
 let duneSpriteKey = "";
 function dunes() {
@@ -471,11 +509,16 @@ export class SandMarks {
   private oy = 0;
   private lightKey = light.key;
   private ground: Uint8Array = new Uint8Array(CELL_COUNT);
+  /** How much of the dunes stands at each board art pixel beside the sand
+   * trails (`taperAt`), or null with none. */
+  taper: Float32Array | null = null;
 
-  /** The dunes' own height at board art pixel (x, y), under the drift. */
+  /** The dunes' own height at board art pixel (x, y), under the drift,
+   * run down to any trail beside it. */
   base(x: number, y: number) {
     const n = DUNE_PERIOD * ART, h = duneHeights();
-    return h[(((y - this.oy) % n + n) % n) * n + (((x - this.ox) % n + n) % n)];
+    const v = h[(((y - this.oy) % n + n) % n) * n + (((x - this.ox) % n + n) % n)];
+    return this.taper ? v * this.taper[y * BW + x] : v;
   }
 
   /** Where the dunes lie and the drift they lie at; a change (or the light
@@ -839,6 +882,9 @@ export class AtmosphereArt {
     d.clearRect(0, 0, w, h);
     const sx = ((ox % size) + size) % size, sy = ((oy % size) + size) % size;
     for (let y = sy - size; y < h; y += size) for (let x = sx - size; x < w; x += size) d.drawImage(tile, x, y);
+    // The swells running down to the sand trails.
+    if (sim.trails?.style === "sand") d.drawImage(this.taperCanvas(sim, ox, oy), 0, 0);
+    else { this.marks.taper = null; this.taperPlan = null; }
     d.globalCompositeOperation = "destination-in";
     d.imageSmoothingEnabled = false;
     d.drawImage(this.mask!, 0, 0, w, h);
@@ -850,6 +896,27 @@ export class AtmosphereArt {
     d.globalCompositeOperation = "source-over";
     return this.dunes;
   }
+
+  private taperImage: HTMLCanvasElement | null = null;
+  /** The dunes run down to the field's sand trails (`duneTaperPixels`),
+   * at the drift: its marks' heights too. */
+  private taperCanvas(sim: DefendSim, ox: number, oy: number) {
+    const w = CELLS_W * ART, h = CELLS_H * ART, plan = sim.trails!, { t } = trailField(plan);
+    if (!this.marks.taper || this.taperPlan !== plan) {
+      this.taperPlan = plan;
+      const k = this.marks.taper = new Float32Array(w * h);
+      for (let i = 0; i < k.length; i++) k[i] = taperAt(t[i]);
+    }
+    const open = (X: number, Y: number) => sim.map.type[cellIndex(X >> 3, Y >> 3)] === CellType.OUT;
+    const data = duneTaperPixels(t, w, h, -ox, -oy, (X, Y) => open(X + ox, Y + oy));
+    const canvas = this.taperImage ??= document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    const c = canvas.getContext("2d")!, image = c.createImageData(w, h);
+    image.data.set(data);
+    c.putImageData(image, 0, 0);
+    return canvas;
+  }
+  private taperPlan: object | null = null;
 
   /** The marks' image, uploading only the chunks repainted this frame;
    * null while there are none. */

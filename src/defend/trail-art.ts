@@ -23,6 +23,8 @@ import { rgba } from "./damage-art.ts";
 const W = CELLS_W * ART, H = CELLS_H * ART;
 /** How far past a trail's half width (as a share of it) its ragged edge may reach. */
 const FRINGE = 1.25;
+/** How many half widths off a trail's middle its distance map reaches. */
+export const FIELD_REACH = 3.6;
 
 /** Each art pixel's distance from the nearest trail's middle as a share of
  * its half width (`t`, Infinity far from any), and that trail's wear. */
@@ -42,7 +44,8 @@ export function trailField(plan: TrailPlan): TrailField {
 function distanceField(lines: readonly TrailLine[], w: number, h: number, ox: number, oy: number): TrailField {
   const t = new Float32Array(w * h).fill(Infinity), level = new Float32Array(w * h);
   for (const line of lines) {
-    const R = line.half * ART, reach = R * FRINGE + 1;
+    // Far enough out for the dunes' run down to the trail (`TAPER` in atmosphere-art.ts).
+    const R = line.half * ART, reach = R * FIELD_REACH + 1;
     const pts = line.points.map((p) => ({ x: p.x * ART + ox, y: p.y * ART + oy }));
     for (let k = 0; k + 1 < pts.length; k++) {
       const a = pts[k], b = pts[k + 1];
@@ -120,7 +123,8 @@ export function roadPixel(v: number, X: number, Y: number): number {
 export function paintRoadLines(out: Uint32Array, ow: number, oh: number, ox: number, oy: number, lines: readonly { points: readonly { x: number; y: number }[]; half: number }[], keep: (i: number) => boolean): number[] {
   const t = new Map<number, number>();
   for (const line of lines) {
-    const R = line.half * ART, reach = R * FRINGE + 1;
+    // Far enough out for the dunes' run down to the trail (`TAPER` in atmosphere-art.ts).
+    const R = line.half * ART, reach = R * FIELD_REACH + 1;
     const pts = line.points.map((p) => ({ x: p.x * ART + ox, y: p.y * ART + oy }));
     for (let k = 0; k + 1 < pts.length; k++) {
       const a = pts[k], b = pts[k + 1];
@@ -234,16 +238,16 @@ function bankPixels(t: Float32Array, w: number, h: number, ox: number, oy: numbe
  * cells), cut and banked exactly as on the field (`sandTrailCanvases`) and
  * hashed in board coordinates, so they run on with no seam: for each run
  * of lines leaving the top or the bottom edge, its box in art pixels from
- * the board's corner, the sand to erase there and the banks to lay over
- * it. Nothing on the board itself. */
+ * the board's corner, its trail distances (`t`), the sand to erase there
+ * and the banks to lay over it. Nothing on the board itself. */
 export function sandReachCanvases(lines: readonly TrailLine[]) {
-  const out: { x: number; y: number; cut: HTMLCanvasElement; banks: HTMLCanvasElement }[] = [];
+  const out: { x: number; y: number; w: number; h: number; t: Float32Array; cut: HTMLCanvasElement; banks: HTMLCanvasElement }[] = [];
   for (const up of [true, false]) {
     const group = lines.filter((l) => (l.points[l.points.length - 1].y < CELLS_H / 2) === up);
     if (!group.length) continue;
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     for (const l of group) for (const p of l.points) {
-      const r = l.half * FRINGE + 1;
+      const r = l.half * FIELD_REACH + 1;
       x0 = Math.min(x0, p.x - r); x1 = Math.max(x1, p.x + r); y0 = Math.min(y0, p.y - r); y1 = Math.max(y1, p.y + r);
     }
     const X0 = Math.floor(x0 * ART), Y0 = Math.floor(y0 * ART), w = Math.ceil(x1 * ART) - X0, h = Math.ceil(y1 * ART) - Y0;
@@ -257,7 +261,7 @@ export function sandReachCanvases(lines: readonly TrailLine[]) {
       ctx.putImageData(image, 0, 0);
       return canvas;
     };
-    out.push({ x: X0, y: Y0, cut: make((d) => cutPixels(t, w, h, -X0, -Y0, off, d)), banks: make((d) => bankPixels(t, w, h, -X0, -Y0, off, d)) });
+    out.push({ x: X0, y: Y0, w, h, t, cut: make((d) => cutPixels(t, w, h, -X0, -Y0, off, d)), banks: make((d) => bankPixels(t, w, h, -X0, -Y0, off, d)) });
   }
   return out;
 }
