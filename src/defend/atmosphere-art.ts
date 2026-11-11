@@ -415,6 +415,10 @@ export function dunePixels() {
   for (let y = 0, i = 0; y < n; y++) for (let x = 0; x < n; x++, i++) words[i] = colors[sandTone(t[bins[i] + (cast[i] ? BINS * BINS : 0)], x, y, detail[i])];
   return { size: n, data: out };
 }
+/** The dune tile as drawn now (`dunePixels` in the current light and
+ * style): the wilds tile it past the board too, so the sand runs on to the
+ * mountains. Its key is `duneLightKey()`. */
+export function duneTile() { return dunes(); }
 let duneSprite: HTMLCanvasElement | null = null;
 let duneSpriteKey = "";
 function dunes() {
