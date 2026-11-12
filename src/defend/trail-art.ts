@@ -267,31 +267,45 @@ export function sandReachCanvases(lines: readonly TrailLine[]) {
   return out;
 }
 
-/** Sandstone, shadow to sunlit, and the rock's dark rim. */
-const SANDSTONE = [[132, 84, 48], [168, 112, 64], [196, 140, 84], [222, 172, 112]] as const, RIM = [92, 56, 34] as const;
+/** Moab's red sandstone: the rock's top, shadow to sunlit; its cliff side,
+ * light to its foot; and its dark rim. */
+const SANDSTONE = [[164, 70, 40], [190, 88, 48], [210, 106, 60], [230, 138, 84]] as const;
+const SIDE = [[136, 54, 34], [114, 44, 30], [94, 36, 26]] as const, RIM = [64, 26, 18] as const;
 
-/** A weathered sandstone rock at art pixel (x, y), `R` across, that a trail
- * bends round: a lumpy disc lit from the upper left, a dark rim, its shadow
- * down and to the right. */
+/** A red sandstone boulder at art pixel (x, y), `R` across, that a trail
+ * bends round, as Moab's are: a lumpy, flat-topped block lit from the upper
+ * left, its south side a short cliff of bedded rock darkening to its foot,
+ * a dark rim, its shadow down and to the right. */
 function trailRock(data: Uint8ClampedArray, x: number, y: number, R: number, seed: number) {
-  const ph = hash01(seed, 927) * 6.28;
+  const ph = hash01(seed, 927) * 6.28, tall = Math.max(3, Math.round(R * 0.7));
   const put = (X: number, Y: number, c: readonly number[], a = 255) => {
     if (X < 0 || Y < 0 || X >= W || Y >= H) return;
     const o = (Y * W + X) * 4;
     data[o] = c[0]; data[o + 1] = c[1]; data[o + 2] = c[2]; data[o + 3] = a;
   };
   const rim = (dx: number, dy: number) => R * (0.85 + 0.12 * Math.sin(Math.atan2(dy, dx) * 3 + ph) + 0.06 * Math.sin(Math.atan2(dy, dx) * 5 + ph * 2));
-  const inside = (dx: number, dy: number) => Math.hypot(dx, dy) < rim(dx, dy);
-  const x0 = Math.floor(x - R - 2), x1 = Math.ceil(x + R + 3), y0 = Math.floor(y - R - 2), y1 = Math.ceil(y + R + 3);
-  // Its shadow first, two pixels down and right.
+  // The top stands `tall` pixels above the ground; the block is the top swept down to it.
+  const top = (dx: number, dy: number) => Math.hypot(dx, dy + tall) < rim(dx, dy + tall);
+  const sideDepth = (dx: number, dy: number) => { for (let k = 0; k <= tall; k++) if (top(dx, dy - k)) return k; return -1; };
+  const solid = (dx: number, dy: number) => sideDepth(dx, dy) >= 0;
+  const x0 = Math.floor(x - R - 2), x1 = Math.ceil(x + R + 4), y0 = Math.floor(y - R - tall - 2), y1 = Math.ceil(y + R + 4);
+  // Its shadow first, down and right.
   for (let Y = y0; Y <= y1; Y++) for (let X = x0; X <= x1; X++)
-    if (inside(X + 0.5 - x - 2, Y + 0.5 - y - 2) && !inside(X + 0.5 - x, Y + 0.5 - y)) put(X, Y, RIM, 110);
+    if (solid(X + 0.5 - x - 2, Y + 0.5 - y - 2) && !solid(X + 0.5 - x, Y + 0.5 - y)) put(X, Y, RIM, 110);
   for (let Y = y0; Y <= y1; Y++) for (let X = x0; X <= x1; X++) {
     const dx = X + 0.5 - x, dy = Y + 0.5 - y;
-    if (!inside(dx, dy)) continue;
-    if (!inside(dx - 1, dy) || !inside(dx + 1, dy) || !inside(dx, dy - 1) || !inside(dx, dy + 1)) { put(X, Y, RIM); continue; }
-    const lit = (-dx - dy) / (R * 1.4) + (hash01(X, Y, seed, 928) - 0.5) * 0.5;
-    put(X, Y, SANDSTONE[Math.max(0, Math.min(3, Math.round(1.5 + lit * 1.6)))]);
+    if (!solid(dx, dy)) continue;
+    if (!solid(dx - 1, dy) || !solid(dx + 1, dy) || !solid(dx, dy - 1) || !solid(dx, dy + 1)) { put(X, Y, RIM); continue; }
+    const d = sideDepth(dx, dy);
+    if (d > 0) {
+      // The side: bedded, darkening toward its foot, a lip of light along its top.
+      if (d === 1) { put(X, Y, SANDSTONE[3]); continue; }
+      const k = Math.min(2, Math.floor(((d - 1) / tall) * 2) + (d % 2 === 0 ? 1 : 0));
+      put(X, Y, SIDE[k]);
+      continue;
+    }
+    const lit = (-dx - (dy + tall)) / (R * 1.4) + (hash01(X, Y, seed, 928) - 0.5) * 0.35;
+    put(X, Y, SANDSTONE[Math.max(0, Math.min(3, Math.round(1.6 + lit * 1.6)))]);
   }
 }
 
