@@ -272,15 +272,19 @@ const duneShades = new WeakMap<Float32Array, Uint8Array>();
 export function mountainShade(dunes: Float32Array | null = null): Uint8Array {
   const done = dunes ? duneShades.get(dunes) : shade;
   if (done) return done;
-  const { H } = rangeField(), S = new Float32Array(GW * GH), out = new Uint8Array(GW * GH);
+  // The desert's mesas cast theirs from their stepped strata, each cliff a
+  // wall of shade over the bench below.
+  const { H } = rangeField(), L = dunes ? mesaField().L : null, Sm = dunes ? mesaField().S : null, S = new Float32Array(GW * GH), out = new Uint8Array(GW * GH);
   const n = Math.round(Math.sqrt(dunes?.length ?? 0));
   for (let Y = 0; Y < GH; Y++) {
     const row = dunes ? (((Y - OY) % n + n) % n) * n : 0;
     for (let X = 0; X < GW; X++) {
       const i = Y * GW + X, up = X > 0 && Y > 0 ? S[i - GW - 1] - DROP : 0;
-      const g = H[i] + (dunes ? dunes[row + (((X - OX) % n + n) % n)] * DUNE_LIFT : 0);
-      if (up > g + 1) out[i] = 1;
-      S[i] = Math.max(g, up);
+      const g = (L ? (L[i] < 0 ? 0 : (L[i] + 1) * MOAB_STEP) : H[i]) + (dunes ? dunes[row + (((X - OX) % n + n) % n)] * DUNE_LIFT : 0);
+      if (up > g + (L && L[i] >= 0 ? MOAB_STEP * 0.6 : 1)) out[i] = 1;
+      // A mesa's crinkled rim ragged its shadow's edge, but its flat top
+      // takes shade only from a higher cliff.
+      S[i] = Math.max(L && L[i] >= 0 ? g + Math.max(0, H[i] - Sm![i]) * 0.6 : g, up);
     }
   }
   if (dunes) duneShades.set(dunes, out); else shade = out;
@@ -307,6 +311,111 @@ function paintRanges(out: Uint32Array) {
       out[i] = c;
     }
 }
+/** Moab's sandstone, a stratum a step of height up the ranges: dark red
+ * mudstone at the foot, red-orange cliff sandstone, bright orange slickrock,
+ * then buff and cream caprock on the heights (RGB). */
+const MOAB_STRATA = [0x9a4026, 0xb04c2a, 0xbe562e, 0xc86032, 0xd06c38, 0xd87c44, 0xe4a46c];
+/** How tall one stratum stands (the ranges' height units), and how many art
+ * pixels of cliff face a step of it shows to the south. */
+const MOAB_STEP = 30, MOAB_FACE = 11;
+/** Desert varnish: the dark streaks running down Moab's cliff faces. */
+const VARNISH = 0x4a2622, MOAB_RIM = 0x3c1a14;
+/** The sand drifted onto the benches, the dunes' own sunlit tone. */
+const MOAB_SAND = 0xe0a868;
+
+/** Box-blurs `a` (`w` by `h`) `r` pixels each way, twice: the ranges'
+ * crinkles smoothed into the rounded domes and fins of slickrock. */
+function blurred(a: Float32Array, w: number, h: number, r: number) {
+  let src: Float32Array = a, dst: Float32Array = new Float32Array(a.length);
+  for (let pass = 0; pass < 4; pass++) {
+    const horiz = pass % 2 === 0, n = horiz ? w : h, m = horiz ? h : w, step = horiz ? 1 : w, line = horiz ? w : 1;
+    for (let j = 0; j < m; j++) {
+      const base = j * line;
+      let sum = 0;
+      for (let k = -r; k <= r; k++) sum += src[base + Math.max(0, Math.min(n - 1, k)) * step];
+      for (let k = 0; k < n; k++) {
+        dst[base + k * step] = sum / (2 * r + 1);
+        sum += src[base + Math.min(n - 1, k + r + 1) * step] - src[base + Math.max(0, k - r) * step];
+      }
+    }
+    [src, dst] = [dst, pass === 0 ? new Float32Array(a.length) : src];
+  }
+  return src;
+}
+
+/** The desert's ranges as Moab sandstone, from `rangeField`: the height
+ * smoothed and stepped into strata, each a flat bench of slickrock lit from
+ * the upper left (dark red at the foot to cream caprock on top, jointed into
+ * fins on the heights), every step down to the south showing a red cliff
+ * face streaked with desert varnish, outlined in dark red-brown. */
+let mesas: { S: Float32Array; L: Int16Array } | null = null;
+/** The desert's ranges smoothed (`S`) and stepped into strata (`L`, -1
+ * off the ranges), once. */
+function mesaField() {
+  if (mesas) return mesas;
+  const { H, f } = rangeField(), S = blurred(H, GW, GH, 14);
+  const L = new Int16Array(GW * GH).fill(-1);
+  for (let Y = 0; Y < GH; Y++)
+    for (let X = 0; X < GW; X++) {
+      const i = Y * GW + X;
+      if (f[i] <= 0) continue;
+      // The strata's edges wander, eroded back unevenly.
+      L[i] = Math.max(0, Math.floor(S[i] / MOAB_STEP + 0.7 * (smoothNoise(X / 24, Y / 24, 741) - 0.5)));
+    }
+  return (mesas = { S, L });
+}
+
+function paintMesas(out: Uint32Array) {
+  const { S, L } = mesaField();
+  const tone = (c: number, k: number) => rgbaOf((Math.min(255, Math.round(((c >> 16) & 0xff) * k)) << 16) | (Math.min(255, Math.round(((c >> 8) & 0xff) * k)) << 8) | Math.min(255, Math.round((c & 0xff) * k)));
+  const layer = (n: number) => MOAB_STRATA[Math.min(MOAB_STRATA.length - 1, n)];
+  const rim = sceneryOutlinesOn() ? rgbaOf(0x24100c) : rgbaOf(MOAB_RIM);
+  const at = (X: number, Y: number) => (X >= 0 && Y >= 0 && X < GW && Y < GH ? L[Y * GW + X] : -1);
+  for (let Y = 0; Y < GH; Y++)
+    for (let X = 0; X < GW; X++) {
+      const i = Y * GW + X, l = L[i];
+      if (l < 0) continue;
+      if (at(X - 1, Y) < 0 || at(X + 1, Y) < 0 || at(X, Y - 1) < 0 || at(X, Y + 1) < 0) { out[i] = rim; continue; }
+      const dither = BAYER4[(Y & 3) * 4 + (X & 3)];
+      // A cliff face: a higher stratum stands just to the north, its face
+      // dropping toward the viewer.
+      let d = 0, up = l;
+      for (let k = 1; k <= MOAB_FACE * 3; k++) {
+        const u = at(X, Y - k);
+        if (u > l) { d = k; up = u; break; }
+      }
+      if (d && d <= MOAB_FACE * Math.min(3, up - l)) {
+        const tall = MOAB_FACE * Math.min(3, up - l);
+        if (d === tall) { out[i] = tone(layer(l), 0.55); continue; }
+        // The face darkens toward its foot; streaks of varnish, a few pixels
+        // wide, hang from the lip, each its own length; bedding lines cross it.
+        const v = smoothNoise(X / 3.2, up * 7.3, 743), len = (0.35 + 0.65 * smoothNoise(X / 5, up * 3.1, 744)) * tall;
+        const shade = 0.78 - 0.16 * (d / tall) + (dither - 0.5) * 0.08;
+        let c = tone(layer(up), d % 4 === 0 ? shade - 0.07 : shade);
+        if (v > 0.62 && d <= len) c = tone(VARNISH, 1.1 + 0.6 * (1 - d / len));
+        else if (v > 0.56 && d <= len && dither > 0.5) c = tone(VARNISH, 1.4);
+        if (d === 1) c = tone(layer(up), 0.92);
+        out[i] = c;
+        continue;
+      }
+      // The step's lip, lit from the upper left; the far side of a bench
+      // standing higher just below is outlined.
+      if (at(X, Y + 1) > l) { out[i] = tone(layer(l), 0.5); continue; }
+      const lower = (u: number) => u >= 0 && u < l;
+      let k = 1 + (S[i - 1] - S[i + 1]) * 0.05 + (S[i - GW] - S[i + GW]) * 0.04 + (dither - 0.5) * 0.12;
+      if (lower(at(X - 1, Y)) || lower(at(X, Y + 1))) k += 0.16;
+      else if (lower(at(X + 1, Y))) k -= 0.2;
+      // Sand blown into hollows on the lower benches.
+      const drift = smoothNoise(X / 40, Y / 40, 749) - (l < 2 ? 0 : 0.3) + (dither - 0.5) * 0.06;
+      if (drift > 0.7) { out[i] = tone(MOAB_SAND, k > 1.05 ? 1.06 : k > 0.82 ? 1 : 0.9); continue; }
+      // Cross-bedding: faint curved laminae sweeping across the slickrock.
+      const bed = (Y + 7 * Math.sin(X / 19 + 6 * smoothNoise(X / 70, Y / 70, 750))) / 6;
+      if (bed - Math.floor(bed) < 0.17 && smoothNoise(X / 30, Y / 30, 751) > 0.45) k -= 0.12;
+      const band = k > 1.1 ? 1.12 : k > 0.9 ? 1 : k > 0.75 ? 0.88 : 0.76;
+      out[i] = tone(layer(l), band + (hash01(X, Y, 748) < 0.06 ? -0.08 : 0));
+    }
+}
+const BAYER4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
 const rgbaOf = (c: number) => ((255 << 24) | ((c & 0xff) << 16) | (c & 0xff00) | ((c >> 16) & 0xff)) >>> 0;
 
 /** The wilds' still ground in art pixels over the whole extent: in the
@@ -314,7 +423,7 @@ const rgbaOf = (c: number) => ((255 << 24) | ((c & 0xff) << 16) | (c & 0xff00) |
  * the mountain ranges, rocks with their shadows, and in the forest the trees'
  * shadows. `turf` marks the lawn pixels left (where blades grow), `shaded`
  * those under a tree's shadow. */
-export function paintWilds(forest: boolean, stone?: Stone, reach: readonly TrailLine[] = [], rocks = true) {
+export function paintWilds(forest: boolean, stone?: Stone, reach: readonly TrailLine[] = [], rocks = true, moab = false) {
   const out = new Uint32Array(GW * GH), whole = wildsPlan();
   // The trees and rocks clear of the roads carried out here.
   const plan: WildsPlan = reach.length
@@ -336,7 +445,7 @@ export function paintWilds(forest: boolean, stone?: Stone, reach: readonly Trail
       const X = i % GW, Y = (i - X) / GW;
       return !(X >= OX && Y >= OY && X < OX + BW && Y < OY + BH);
     });
-  paintRanges(out);
+  if (moab) paintMesas(out); else paintRanges(out);
   // Rocks, back to front, each with its shadow down and right.
   const items: { y: number; draw: () => void }[] = [];
   // (None in the desert: its dunes run on over the wilds, as rockless as the field's.)
@@ -369,7 +478,7 @@ export function paintWilds(forest: boolean, stone?: Stone, reach: readonly Trail
   }
   items.sort((a, b) => a.y - b.y);
   for (const it of items) it.draw();
-  if (stone) recolour(out, GW, stone);
+  if (stone && !moab) recolour(out, GW, stone);
   const turf = new Uint8Array(GW * GH), shaded = new Uint8Array(GW * GH);
   if (lawn) {
     for (let i = 0; i < out.length; i++) turf[i] = out[i] !== 0 && out[i] === lawn[i] ? 1 : 0;
@@ -527,7 +636,7 @@ export class Wilds {
     if (g) return g;
     // Only the current city's roads are kept.
     if (forest) for (const k of [...this.grounds.keys()]) if (k.startsWith("forest:")) this.grounds.delete(k);
-    const painted = paintWilds(forest, forest ? undefined : STONES[area], reach?.lines ?? [], area !== "desert");
+    const painted = paintWilds(forest, forest ? undefined : STONES[area], reach?.lines ?? [], area !== "desert", area === "desert");
     const canvas = document.createElement("canvas");
     canvas.width = GW;
     canvas.height = GH;

@@ -228,11 +228,11 @@ function binOf(gx: number, gy: number, range: number) {
 }
 /** A dune pixel's colour from its surface's slope (gx, gy) at tile pixel
  * (tx, ty), in the current style and light. */
-function duneColor(gx: number, gy: number, tx: number, ty: number, cast = true, detail: boolean | "grain" = false) {
+function duneColor(gx: number, gy: number, tx: number, ty: number, cast = true, detail: boolean | "grain" | "ripple" = false) {
   const range = slopes().range, bin = binOf(gx, gy, range);
   if (style === "hd") return hdTone(bin < 0 ? hdLight(gx, gy) : shadeTable()[bin], tx, ty);
   const i = ty * DUNE_PERIOD * ART + tx, shadowed = cast && castShadows()[i] === 1;
-  return sandAt(bin < 0 ? duneShade(gx, gy, shadowed) : shadeTable()[bin + (shadowed ? BINS * BINS : 0)], tx, ty, detail === "grain" ? grainDetail()[i] : detail ? sandDetail()[i] : 0);
+  return sandAt(bin < 0 ? duneShade(gx, gy, shadowed) : shadeTable()[bin + (shadowed ? BINS * BINS : 0)], tx, ty, detail === "grain" ? grainDetail()[i] : detail === "ripple" ? rippleDetail()[i] : detail ? sandDetail()[i] : 0);
 }
 
 /** Where along a simple swell its crest stands: a long windward rise, then a
@@ -259,14 +259,14 @@ let detailCache: Int8Array | null = null;
  * pebble, a dark pixel lit at its upper left. The crest and ripples are
  * relief, so they fade by night with the light (`sandDetail` reads them
  * only while the sun shows shadows); the grains and pebbles stay. Tiles. */
-function detailPixels(relief: boolean) {
+function detailPixels(relief: boolean, crest = relief) {
   const n = DUNE_PERIOD * ART, p = DUNE_PERIOD, d = new Int8Array(n * n);
   for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
     const i = y * n + x, ph = swellPhase(x, y), f = ph - Math.floor(ph);
     if (relief) {
       // The crest: the last windward pixel before the slip face.
       const next = swellPhase(x - 1, y + 1) - Math.floor(ph);
-      if (f < SWELL_CREST && next >= SWELL_CREST - .002) { d[i] = 1; continue; }
+      if (f < SWELL_CREST && next >= SWELL_CREST - .002) { if (crest) d[i] = 1; continue; }
       const s = f / SWELL_CREST;
       if (f < SWELL_CREST && s > .12 && s < .88) {
         const cx = (x + .5) / ART, cy = (y + .5) / ART;
@@ -300,6 +300,13 @@ function sandDetail() {
 }
 /** Only the grains and pebbles: the sand's texture without its relief. */
 function grainDetail() { return flatDetail ??= detailPixels(false); }
+let rippleCache: Int8Array | null = null;
+/** The ripples, grains and pebbles without the crest lines, in the current
+ * light (as `sandDetail`). */
+function rippleDetail() {
+  if (light.contrast >= SHADOWS_FROM) return rippleCache ??= detailPixels(true, false);
+  return grainDetail();
+}
 
 const heightCache: Record<DuneStyle, Float32Array | null> = { simple: null, hd: null };
 /** The dunes' surface over one field period, art pixels high at `ART`
@@ -458,8 +465,9 @@ export function duneTaperPixels(t: Float32Array, w: number, h: number, bx: numbe
       // sooner their lit crest lines and ripples, so a crest dies away
       // before the trail rather than running on to its edge.
       const d = BAYER[(ty & 3) * 4 + (tx & 3)];
-      // The grains stay, so the sinking sand keeps its texture.
-      const col = duneColor(gx, gy, tx, ty, k > .35 + d * .6, k > .45 + d * .3 || "grain");
+      // The ripples and grains stay almost to the trail, so the sinking
+      // sand keeps the texture of the dunes round it.
+      const col = duneColor(gx, gy, tx, ty, k > .35 + d * .6, k > .45 + d * .3 || (k > .06 + d * .12 ? "ripple" : "grain"));
       out[i * 4] = col[0]; out[i * 4 + 1] = col[1]; out[i * 4 + 2] = col[2]; out[i * 4 + 3] = 255;
     }
   return out;
