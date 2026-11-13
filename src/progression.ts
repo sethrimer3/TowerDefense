@@ -1,4 +1,5 @@
 import { placedBattleOrders } from "./defend/building-orders.ts";
+import { recordWaveCleared } from "./defend/progress.ts";
 import { equipmentBonuses } from "./equipment.ts";
 /** Everything the player keeps between defenses beyond the city itself:
  * the Smithy's upgrades (timed ranks bought with the Smithy points the
@@ -235,11 +236,13 @@ export function bonuses(save: Save): Bonuses {
  * Record it with the payment so retries cannot award the same wave twice. */
 export function payWave(save: Save, wave: number) {
   const upgrade = Number.isInteger(wave) && wave > save.defend.bestWave ? 1 : 0;
+  // Defeating a wave unlocks it as a start (and a new zone's first wave).
+  const unlocked = recordWaveCleared(save.defend, wave);
   if (upgrade) {
-    save.defend.bestWave = wave;
+    save.defend.bestWave = Math.max(save.defend.bestWave, wave);
     save.upgradePoints++;
   }
-  return { upgrade };
+  return { upgrade, unlocked };
 }
 
 /** Shown as a whole number, rounded down. */

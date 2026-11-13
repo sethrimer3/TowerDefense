@@ -79,7 +79,7 @@ import { replay, sparksOver } from "../ui/flourish.ts";
 import { available, keptGroups, plainAvailable, recordWaveReached, setLayout, startingWave, type DefendSave } from "./progress.ts";
 import { ageWater } from "./boats.ts";
 import { defeatHTML } from "./defeat.ts";
-import { zoneStory } from "./zone-stories.ts";
+import { ZONE_STORIES, zoneStory, type ZoneStory } from "./zone-stories.ts";
 import { StoryScroll } from "../ui/story-scroll.ts";
 import { inspectable, type Armed } from "./inspect.ts";
 
@@ -92,7 +92,7 @@ export type DefendHost = {
   /** Knowledge was spent on an upgrade: store it and show the new count. */
   spentKnowledge?(): void;
   /** Awards an upgrade point for a new highest wave, recording it with payment. */
-  earnWave(wave: number): { upgrade: number };
+  earnWave(wave: number): { upgrade: number; unlocked?: number[] };
   /** Blight Essence from Dark One kills: add it, store and show it. */
   earnEssence?(amount: number): void;
   persist(): void;
@@ -289,7 +289,7 @@ export class DefendPage {
     const start = performance.now();
     if (this.sim && this.phase === "sim") {
       this.repeatSummon(time);
-      if (!this.journal?.open) this.sim.update(dt);
+      if (!this.journal?.open && !this.storyOpen) this.sim.update(dt);
     } else if (this.sim && this.phase === "over" && (this.sim.floods.length || this.sim.sinkings.length)) ageWater(this.sim, Math.min(dt, 0.25));
     const updated = performance.now();
     if (this.sim && this.phase === 'sim') {
@@ -505,25 +505,19 @@ export class DefendPage {
       this.bindSideToggle(el);
       el.querySelector<HTMLButtonElement>("#defend-wave")!.onclick = () => this.pickWave();
       el.querySelector<HTMLButtonElement>("#defend-start")!.onclick = () => {
-        // A zone's first wave opens with its story on a scroll; the run
-        // starts once the scroll is put away.
-        // Automated browsers (the browser checks) skip it unless they ask for
-        // it with `window.showStories`.
-        const automated = navigator.webdriver && !(window as { showStories?: boolean }).showStories;
-        const story = automated || (this.testerSelected && this.host.devMode()) ? null : zoneStory(startingWave(this.save));
+        // A zone's first wave opens with its story on a scroll, the first
+        // time; the run starts once the scroll is put away.
+        const story = this.testerSelected && this.host.devMode() ? null : this.unreadStory(startingWave(this.save));
         if (!story) {
           this.startRun();
           this.relayout();
           return;
         }
-        if (this.storyOpen) return;
-        this.storyOpen = true;
-        new StoryScroll(story, () => {
-          this.storyOpen = false;
+        this.tellStory(story, () => {
           if (this.phase !== "build") return;
           this.startRun();
           this.relayout();
-        }, this.host.reduceMotion());
+        });
       };
       center.prepend(el.querySelector("#defend-start")!);
       extra.append(el.querySelector("#defend-wave")!);
@@ -945,6 +939,46 @@ export class DefendPage {
     dialog.querySelector<HTMLElement>('[aria-pressed="true"]')?.scrollIntoView({ block: "center" });
   }
 
+  /** The story opening the zone that starts at `wave`, if it has not been
+   * read yet. Automated browsers (the browser checks) skip stories unless
+   * they ask for them with `window.showStories`. */
+  private unreadStory(wave: number): ZoneStory | null {
+    if (navigator.webdriver && !(window as { showStories?: boolean }).showStories) return null;
+    const story = zoneStory(wave);
+    return story && !this.save.storiesSeen.includes(areaForWave(wave).id) ? story : null;
+  }
+
+  /** Unrolls a zone's story over the page, marks it read, and holds the
+   * battle (if one is running) until it is put away. */
+  private tellStory(story: ZoneStory, then: () => void) {
+    if (this.storyOpen) return;
+    const area = (Object.keys(ZONE_STORIES) as AreaId[]).find((id) => ZONE_STORIES[id] === story);
+    if (area && !this.save.storiesSeen.includes(area)) {
+      this.save.storiesSeen.push(area);
+      this.host.persist();
+    }
+    this.storyOpen = true;
+    new StoryScroll(story, () => {
+      this.storyOpen = false;
+      this.lastTime = 0;
+      then();
+    }, this.host.reduceMotion());
+  }
+
+  /** "Wave N unlocked!" in gold beside the wave button's place. */
+  private announceUnlock(waves: number[]) {
+    const host = this.root.querySelector<HTMLElement>(".defend-right");
+    if (!host) return;
+    host.querySelector(".defend-unlocked")?.remove();
+    const note = document.createElement("p");
+    note.className = "defend-unlocked";
+    note.setAttribute("role", "status");
+    note.textContent = waves.length > 1 ? `Waves ${waves.join(" and ")} unlocked!` : `Wave ${waves[0]} unlocked!`;
+    host.append(note);
+    sparksOver(note, "gold");
+    setTimeout(() => note.remove(), 3600);
+  }
+
   private startRun() {
     this.stopSummoning();
     this.performance.finish('restarted');
@@ -1037,8 +1071,8 @@ export class DefendPage {
         const record = ev.wave > this.save.bestWave;
         const r = this.host.earnWave(ev.wave);
         const pay = r.upgrade ? " +1 upgrade point" : "";
+        if (r.unlocked?.length) this.announceUnlock(r.unlocked);
         if (record) {
-          this.save.bestWave = ev.wave;
           this.newRecord = ev.wave;
           this.host.persist();
           this.proclaim(`New record — wave ${ev.wave} survived!${pay}`, 3, "win");
@@ -1046,6 +1080,11 @@ export class DefendPage {
         } else {
           this.proclaim(`Wave ${ev.wave} cleared.${pay}`, 2, "win");
           play("wave");
+        }
+        // Reaching a new zone for the first time holds the battle on its story.
+        if (!sim.unitTester) {
+          const story = this.unreadStory(ev.wave + 1);
+          if (story) this.tellStory(story, () => {});
         }
       } else if (ev.type === "waveStart") {
         if (!sim.unitTester && recordWaveReached(this.save, ev.wave)) this.host.persist();

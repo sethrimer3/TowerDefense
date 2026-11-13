@@ -139,13 +139,14 @@ test("every tree node is a skill, each listed once, its requirements in the same
 test("DEFEND pays exactly one upgrade point per new highest wave and no resources", () => {
   const s = defaults();
   s.defend.bestWave = 4;
-  assert.deepEqual(payWave(s, 4), { upgrade: 0 });
-  assert.deepEqual(payWave(s, 5), { upgrade: 1 });
-  assert.deepEqual(payWave(s, 5), { upgrade: 0 }, "duplicate event cannot pay twice");
-  assert.deepEqual(payWave(s, 3), { upgrade: 0 });
-  assert.deepEqual(payWave(s, 10), { upgrade: 1 }, "a direct start pays one point, not skipped waves");
-  assert.deepEqual(payWave(s, NaN), { upgrade: 0 });
-  assert.deepEqual(payWave(s, 10.5), { upgrade: 0 });
+  const pay = (wave: number) => payWave(s, wave).upgrade;
+  assert.equal(pay(4), 0);
+  assert.equal(pay(5), 1);
+  assert.equal(pay(5), 0, "duplicate event cannot pay twice");
+  assert.equal(pay(3), 0);
+  assert.equal(pay(10), 1, "a direct start pays one point, not skipped waves");
+  assert.equal(pay(NaN), 0);
+  assert.equal(pay(10.5), 0);
   assert.equal(s.defend.bestWave, 10);
   assert.equal(s.upgradePoints, 2);
   assert.deepEqual(s.smithy, STARTING_METAL, "no metals from battle");
