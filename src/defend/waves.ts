@@ -72,9 +72,14 @@ const AUTHORED_WAVES: Readonly<Partial<Record<number, readonly EnemyKind[]>>> = 
   20: ["blightWorm"],
   ...Object.fromEntries(Object.entries(WORM_WAVES).map(([wave, roster]) => [wave, mix(roster)])),
   40: ["blightWorm", "blightWorm", "blightWorm"],
-  // Crystal Caves: Dark Blades on 50 and 55; every other wave holds a
+  // Crystal Caves: Lesser Dark Blades on 42–48's even waves, Dark Blades
+  // on 50 and 55; every other wave holds a
   // single Significant Darkling as a placeholder until it is authored.
   ...Object.fromEntries(Array.from({ length: 20 }, (_, i) => [41 + i, PLACEHOLDER_WAVE])),
+  42: [...Array<EnemyKind>(3).fill("lesserDarkBlade")],
+  44: [...Array<EnemyKind>(3).fill("lesserDarkBlade")],
+  46: [...Array<EnemyKind>(4).fill("lesserDarkBlade")],
+  48: [...Array<EnemyKind>(4).fill("lesserDarkBlade")],
   50: ["darkBlade"],
   55: ["darkBlade", "darkBlade", "darkBlade"],
 };

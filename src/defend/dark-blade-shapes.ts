@@ -1,6 +1,7 @@
 /** Pixel masks for the Dark Blade, sampled on the art lattice at each of
  * `DARK_BLADE_FACINGS` facings so a turning knight steps through crisp
- * silhouettes: a black pentagon body with one point forward, a black cloak
+ * silhouettes: a black pentagon body with one point forward (a square for
+ * the Lesser Dark Blade), a black cloak
  * flaring out behind it threaded with faint burning lines, and an orange and
  * black greatsword. Body-space coordinates run from the box centre in body
  * pixels, forward up (−y). Outline-free: the shared portal contour draws the
@@ -32,11 +33,11 @@ const hem = (w: number, x: number, sway: number) =>
   w * (.74 + .06 * Math.sin(x / w * 9 + sway * Math.PI * 2 / DARK_BLADE_SWAYS) + .04 * Math.sin(x / w * 23 - sway * 1.7));
 
 /** The colour at a body-space point, or 0 where nothing is. */
-function bodyAt(w: number, x: number, y: number, sway: number) {
-  if (inPentagon(x, y, w / 2)) {
-    // A faint burning rim along the two front edges, so the pentagon's
-    // point reads against the cloak.
-    if (y < 0 && !inPentagon(x * 1.22, (y + w * .06) * 1.22, w / 2)) return EMBER[0];
+function bodyAt(w: number, x: number, y: number, sway: number, square: boolean) {
+  if (square ? Math.max(Math.abs(x), Math.abs(y)) <= w / 2 - .5 : inPentagon(x, y, w / 2)) {
+    // A faint burning rim along the front edge(s), so the body's facing
+    // reads against the cloak.
+    if (square ? y < -w / 2 + .5 + .9 : y < 0 && !inPentagon(x * 1.22, (y + w * .06) * 1.22, w / 2)) return EMBER[0];
     return BLACK;
   }
   // The cloak hangs from the shoulders and flares toward a rippling hem.
@@ -56,20 +57,20 @@ function bodyAt(w: number, x: number, y: number, sway: number) {
 export function darkBladeBox(w: number) { return w + 2 * Math.ceil(w * .62); }
 
 /** The knight turned clockwise by `angle` (radians) on an `m`-pixel lattice. */
-export function darkBladeTurned(w: number, angle: number, sway = 0, m = darkBladeBox(w)): Uint32Array {
+export function darkBladeTurned(w: number, angle: number, sway = 0, m = darkBladeBox(w), square = false): Uint32Array {
   const data = new Uint32Array(m * m), cos = Math.cos(angle), sin = Math.sin(angle);
   for (let y = 0; y < m; y++) for (let x = 0; x < m; x++) {
     const sx = x + .5 - m / 2, sy = y + .5 - m / 2;
-    data[y * m + x] = bodyAt(w, cos * sx + sin * sy, -sin * sx + cos * sy, sway);
+    data[y * m + x] = bodyAt(w, cos * sx + sin * sy, -sin * sx + cos * sy, sway, square);
   }
   return data;
 }
 
 /** The pentagon body alone, upright on a `w`-pixel lattice: the replaceable
  * source for exports and artist PNGs. */
-export function darkBladeBodyPixels(w: number): Uint32Array {
+export function darkBladeBodyPixels(w: number, square = false): Uint32Array {
   const data = new Uint32Array(w * w);
-  for (let y = 0; y < w; y++) for (let x = 0; x < w; x++) if (inPentagon(x + .5 - w / 2, y + .5 - w / 2, w / 2)) data[y * w + x] = BLACK;
+  for (let y = 0; y < w; y++) for (let x = 0; x < w; x++) if (square || inPentagon(x + .5 - w / 2, y + .5 - w / 2, w / 2)) data[y * w + x] = BLACK;
   return data;
 }
 

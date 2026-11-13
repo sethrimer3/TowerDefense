@@ -13,9 +13,9 @@ type Brush = { c: CanvasRenderingContext2D; px: number };
 const TURN = Math.PI * 2 / DARK_BLADE_FACINGS;
 const facingStep = (angle: number) => ((Math.round(angle / TURN) % DARK_BLADE_FACINGS) + DARK_BLADE_FACINGS) % DARK_BLADE_FACINGS;
 
-function knightSprite(w: number, step: number, sway: number) {
+function knightSprite(w: number, step: number, sway: number, square: boolean) {
   const m = darkBladeBox(w);
-  return sprite(`darkBlade:${w}:${step}:${sway}`, m, m, () => darkBladeTurned(w, step * TURN, sway, m), false);
+  return sprite(`darkBlade:${w}:${step}:${sway}:${square}`, m, m, () => darkBladeTurned(w, step * TURN, sway, m, square), false);
 }
 function swordSprite(w: number, step: number) {
   const m = greatswordBox(w);
@@ -37,7 +37,7 @@ export function drawDarkBlade({ c, px }: Brush, e: Enemy, seconds: number, reduc
   } else {
     const sway = simple || reduceMotion ? 0 : Math.floor(seconds * 3 + e.id * .37) % DARK_BLADE_SWAYS;
     const size = darkBladeBox(w) * cell;
-    drawSprite(c, knightSprite(w, step, sway), Math.round(x - size / 2), Math.round(y - size / 2), size, size);
+    drawSprite(c, knightSprite(w, step, sway, e.kind === "lesserDarkBlade"), Math.round(x - size / 2), Math.round(y - size / 2), size, size);
   }
   // The sword hand sits at the right shoulder.
   const hx = w * .42, hy = -w * .05;
