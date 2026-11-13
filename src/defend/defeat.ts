@@ -28,7 +28,7 @@ export function defeatHTML({ wave, best, record, stats }: DefeatSummary): string
   const held = Math.max(0, wave - (waves[0]?.wave ?? wave));
   const note = record
     ? `<em>New record this run: wave ${record}</em>`
-    : wave - 1 < best ? `<em>Strengthen the city in the Smithy and the Study, then try again.</em>` : "";
+    : "";
   const tile = (label: string, value: string) => `<div class="defeat-stat"><b>${value}</b><small>${label}</small></div>`;
   const charts = waves.length
     ? `<div class="defeat-charts">${chart("Damage dealt", waves, (w) => w.dealt, "dealt")}${chart("Damage taken", waves, (w) => w.city + w.keep, "taken")}${chart("Enemy difficulty", waves, (w) => w.difficulty, "difficulty")}</div>`

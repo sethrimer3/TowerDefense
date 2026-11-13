@@ -15,7 +15,6 @@ export const BUILDING_MENU_TEXT = [
   row("settings.menuSizing.frame", "Camera frames the range"),
   row("settings.menuSizing.grow", "Menu shrinks gently as you zoom out"),
   row("settings.menuSizing.fixed", "Menu keeps one size"),
-  row("settings.menuSizingHint", "Framing glides the camera to fit a picked building's range inside its menu, and back when you close it."),
   row("menu.tree", "Upgrade tree"),
   row("menu.upgrade", "{name}, {gold} gold"),
   row("menu.tapToBuy", "Tap again to buy"),

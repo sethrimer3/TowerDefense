@@ -392,7 +392,6 @@ dialog > small {
 }
 .crew-member.fallen s { text-decoration-color: #c04030; text-decoration-thickness: 2px; }
 .crew-member .skull { color: #e8e0d0; text-shadow: 0 1px 0 #000; }
-.crew-hint { color: #b8a888; }
 .mine-view,
 .tiles-view {
   border: 2px solid #1a110a;
@@ -1308,12 +1307,11 @@ dialog .away-row .away-note {
 }
 .path-following { border-color: var(--hue-deep); }
 .path-following b { color: var(--hue); }
-.path-detail:not(.path-hint) { border-left: 3px solid var(--hue); }
+.path-detail { border-left: 3px solid var(--hue); }
 .path-detail small { color: var(--hue); }
 .path-detail h3 { color: #f0e2c4; }
 .path-detail em { color: #9c8b6b; }
 .path-detail .path-medal canvas { width: 22px; height: 22px; }
-.path-hint { color: #9c8b6b; }
 .path-done { color: var(--hue); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
 
 /* ── Motion: what moves when the keep answers the player ──
@@ -2226,7 +2224,6 @@ dialog .away-row .away-note {
 .ug-card-foot { margin-top: 5px; display: flex; justify-content: flex-end; align-items: center; gap: 8px; flex-wrap: wrap; }
 .ug-owned { color: #f2c95a; }
 .ug-locked { color: #8a9a9e; }
-.ug-hint { color: #8a9a9e; margin: 0; }
 .ug-buy {
   font-size: 10px; padding: 5px 10px; cursor: pointer; color: #08181b; border: 1px solid #000; border-radius: 2px;
   background: linear-gradient(#e9fbff, #57d6e0); box-shadow: 0 0 8px #57d6e080;

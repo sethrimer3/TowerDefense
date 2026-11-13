@@ -233,7 +233,6 @@ export class MinePage {
         </aside>
         <aside class="mine-crew" id="mine-crew" aria-label="The crew" aria-hidden="true">
           ${JOBS.map((j) => `<section class="crew-box" data-job="${j}" title="${TRADE[j].hint}"><h3><i class="job-mark job-${j}"></i>${TRADE[j].name} <b data-count="${j}">0</b></h3><ul></ul></section>`).join("")}
-          <p class="crew-hint">Drag a name to another trade. Tap one to follow them. Smiths on a Smithy upgrade stay put.</p>
         </aside>
         <div class="mine-view"><canvas id="mine-canvas" aria-label="The mine"></canvas><div id="mine-info" class="mine-info" hidden></div><p id="mine-away" class="mine-away" hidden></p></div>
       </div>`;
@@ -465,7 +464,7 @@ export class MinePage {
     // isn't lost to a count changing under it.
     if (box.dataset.id !== id || box.hidden) {
       box.dataset.id = id;
-      box.innerHTML = `<h3></h3><div class="info-stats"></div><div class="info-up"></div><p class="info-hint">Tap the building again, or elsewhere, to close.</p>`;
+      box.innerHTML = `<h3></h3><div class="info-stats"></div><div class="info-up"></div>`;
       this.shownInfo = this.shownUp = "";
       box.hidden = false;
     }

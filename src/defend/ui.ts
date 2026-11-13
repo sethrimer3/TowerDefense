@@ -604,8 +604,7 @@ export class DefendPage {
       <div class="defend-setting"><span>Palette side</span><span class="defend-seg">
         <button data-side="left" aria-pressed="${side === "left"}">Left</button><button data-side="right" aria-pressed="${side === "right"}">Right</button></span></div>
       <div class="defend-setting"><label for="defend-healthbars">Tough enemy healthbars</label><input type="checkbox" id="defend-healthbars" ${(this.host.healthbars?.() ?? true) ? "checked" : ""}></div>
-      <div class="defend-setting"><span>Board view</span><button id="defend-reset-view">Reset zoom</button></div>
-      <p class="hint">Scroll or pinch to zoom; drag open ground to pan.</p>`;
+      <div class="defend-setting"><span>Board view</span><button id="defend-reset-view">Reset zoom</button></div>`;
     el.querySelectorAll<HTMLButtonElement>("[data-side]").forEach((b) => {
       b.onclick = () => {
         this.save.paletteSide = b.dataset.side as "left" | "right";
@@ -621,7 +620,7 @@ export class DefendPage {
     this.stopSummoning();
     const el = this.root.querySelector<HTMLElement>("#defend-palette")!;
     if (this.sim?.unitTester && this.host.devMode()) {
-      el.innerHTML = `<small class="defend-palette-title">ENEMIES</small><small class="defend-palette-none">Tap to summon one. Hold to summon more.</small>` +
+      el.innerHTML = `<small class="defend-palette-title">ENEMIES</small>` +
         (Object.keys(ENEMIES) as EnemyKind[]).map(kind => `<button class="defend-item defend-enemy" data-enemy="${kind}" aria-label="Summon ${ENEMIES[kind].name}" title="Summon ${ENEMIES[kind].name}"><canvas data-portrait="${kind}" width="80" height="80" aria-hidden="true"></canvas><span>${ENEMIES[kind].name}</span></button>`).join("");
       paintPortraits(el);
       el.querySelectorAll<HTMLButtonElement>("[data-enemy]").forEach(button => {
@@ -668,7 +667,7 @@ export class DefendPage {
               <span class="defend-item-face"><canvas width="48" height="48" data-icon="${e.icon}"${e.look ?? ""}></canvas>${e.badge ?? ""}</span><span>${e.name}</span><b>×${e.count === Infinity ? "∞" : e.count}</b></button>`,
         )
         .join("") +
-      (entries.length ? "" : `<small class="defend-palette-none">None owned. Buy more in the Tiles tab.</small>`);
+      (entries.length ? "" : `<small class="defend-palette-none">None owned</small>`);
     el.querySelectorAll<HTMLCanvasElement>("canvas[data-icon]").forEach((c) => paintIcon(c, c.dataset.icon as IconItem));
     paintPathIcons(el);
     el.querySelectorAll<HTMLButtonElement>("[data-item]").forEach((b) => {

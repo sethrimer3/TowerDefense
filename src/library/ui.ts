@@ -189,7 +189,6 @@ export class LibraryPage {
       <div class="mine-body" id="library-body">
         <aside class="mine-crew" id="library-staff" aria-label="The staff" aria-hidden="true">
           ${ROLES.map((r) => `<section class="crew-box" data-role="${r}" title="${ROLE[r].hint}"><h3><i class="job-mark job-${r}"></i><span data-i18n="library.${r}s">${t(`library.${r}s`)}</span> <b data-count="${r}">0</b></h3><ul></ul></section>`).join("")}
-          <p class="crew-hint">Drag a name to another role. Tap one to follow them. Researchers work the lab below the nave: with none, Knowledge research in the Study can't be bought. The lab has room for one researcher a level: expand it for more.</p>
         </aside>
         <div class="mine-view library-view"><canvas id="library-canvas" aria-label="The library"></canvas><p id="library-away" class="mine-away" role="status" hidden></p><p id="library-alert" class="mine-away library-alert" role="status" hidden></p></div>
       </div>`;

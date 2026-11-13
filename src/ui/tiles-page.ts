@@ -220,7 +220,7 @@ export class TilesPage {
     const shelf = c.querySelector<HTMLElement>(".tiles-shelf")!, scroll = shelf.scrollTop;
     grid.innerHTML = stacks.length
       ? stacks.map((t) => this.stackHtml(t)).join("")
-      : `<p class="tiles-empty">${shop ? "Nothing of this type is for sale." : "No tiles of this type yet. Buy some in the Shop."}</p>`;
+      : `<p class="tiles-empty">${shop ? "Nothing of this type is for sale." : "No tiles of this type yet."}</p>`;
     shelf.scrollTop = scroll;
     grid.querySelectorAll<HTMLCanvasElement>("canvas[data-icon]").forEach((cv) => paintIcon(cv, cv.dataset.icon as IconItem));
     paintPathIcons(grid);
@@ -329,8 +329,8 @@ export class TilesPage {
   /** What tile `id` (wearing `wear`) shows: its basic stats and its
    * upgrades' abilities; a line saying what it does where it has no numbers. */
   private sheet(id: TileId, wear?: Wear): StatSheet & { about?: string } {
-    if (id === "keep") return {stats:[],abilities:[],about:"The heart of the city. Open its Knowledge tree for bastions, arrow loops, boiling oil and the city watch."};
-    if (id === "mine" || id === "library") return {stats:[],abilities:[],about:`Place the ${TILE_NAMES[id]} in the city to unlock its tab, production and upgrades.`};
+    if (id === "keep") return {stats:[],abilities:[],about:"The heart of the city."};
+    if (id === "mine" || id === "library") return {stats:[],abilities:[]};
     if (id === "bomb") return { stats: [`${Number((BOMB_DAMAGE * bonuses(this.save).bombDamage).toFixed(2))} damage`, `${BOMB_RADIUS.toFixed(1)} cell radius`], abilities: [] };
     if (isConsumable(id)) return { stats: [], abilities: [], about: CONSUMABLE_TEXT[id] };
     if (id === "cityTile") return { stats: [], abilities: [], about: "Expands the city limits; the wall moves out to enclose it." };

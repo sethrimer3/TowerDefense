@@ -12,7 +12,6 @@ export const AMBUSH_TEXT = [
   row("ambush.undo", "Undo this rank and above"),
   row("ambush.buyStars", "Buy ({stars} stars)"),
   row("ambush.starPool", "{stars} stars available"),
-  row("ambush.starAbout", "Improve best level ratings to earn stars. These upgrades affect Ambush only. Undo or respec freely."),
   row("ambush.boss", "Boss"),
   row("ambush.gold", "gold"),
   row("ambush.buildings", "Buildings"),
