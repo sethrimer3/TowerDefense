@@ -1,5 +1,6 @@
 import { isBlightFlier } from "./blight-fliers.ts";
 import { blightFlierPixels } from "./blight-flier-shapes.ts";
+import { darkBladeBodyPixels } from "./dark-blade-shapes.ts";
 /** Basic bodies, including flying Blight silhouettes, use replaceable sources.
  * Their equipment and status effects are independent layers. In particular
  * a Darkling's black body is material, not a baked rim. */
@@ -25,7 +26,7 @@ export function basicUnitPixels(kind: string, enemy = false, flash = false) {
     w = sourceWidth(kind, enemy),
     h = w;
   const data = sourcePixels(basicName(kind, enemy), w, h, () =>
-    enemy && isBlightFlier(kind as EnemyKind) ? blightFlierPixels(kind as EnemyKind, w) : new Uint32Array(w * h).fill(rgba(parseInt(def.color.slice(1), 16))),
+    enemy && isBlightFlier(kind as EnemyKind) ? blightFlierPixels(kind as EnemyKind, w) : enemy && kind === "darkBlade" ? darkBladeBodyPixels(w) : new Uint32Array(w * h).fill(rgba(parseInt(def.color.slice(1), 16))),
   );
   return { w, h, data: flash ? data.map((v) => (v ? rgba(0xffffff) : 0)) : data };
 }

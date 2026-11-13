@@ -26,7 +26,7 @@ test('authored opening is 30 minis and 5 Darklings, independent of RNG; waves 41
   assert.equal(wave.filter(k => k === 'darkling').length, 5);
   assert.equal(wave.reduce((sum, k) => sum + ENEMIES[k].cost, 0), waveDifficulty(1));
   for (let i = 0; i < 5; i++) assert.deepEqual(wave.splice(-7).reverse(), [...Array(6).fill('miniDarkling'), 'darkling']);
-  for (const n of [41, 60, 181, 200, 201, 202, 203, 204, 205, 1000]) assert.ok(buildWave(n, () => .5).every(k => !ENEMIES[k].scriptedOnly));
+  for (const n of [61, 80, 181, 200, 201, 202, 203, 204, 205, 1000]) assert.ok(buildWave(n, () => .5).every(k => !ENEMIES[k].scriptedOnly));
   assert.ok(buildDifficultyWave(100, () => .5).every(k => !ENEMIES[k].scriptedOnly));
 });
 

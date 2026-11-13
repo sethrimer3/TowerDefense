@@ -6,6 +6,7 @@ import { approachBuildingContact, approachDefenderContact, buildingContactPoint,
 import { enemySize } from "./catalog.ts";
 import { stepAbilities, enemyDamage, enemySpeed } from "./enemy-abilities.ts";
 import { hostileSpecial } from "./hostile-attacks.ts";
+import { stepDarkBlade } from "./dark-blade.ts";
 import { stepSiege } from "./siege.ts";
 import { stepBoat, meltIceCone } from "./boats.ts";
 import { baitBitten, baitStanding, lureOf } from "./bait.ts";
@@ -55,6 +56,7 @@ export function stepEnemy(sim: DefendSim, e: Enemy, dt: number) {
   }
   if (sim.crowd.queued(e)) return;
   if (hostileSpecial(sim, e, dt)) return;
+  if (e.kind === "darkBlade" && stepDarkBlade(sim, e, dt)) return;
   if (def.siege && stepSiege(sim, e, dt)) return;
   if (def.boat) return stepBoat(sim, e, dt);
   if (e.kind === "dragon" && breathe(sim, e, dt)) return;
