@@ -225,12 +225,10 @@ export class TilesPage {
     grid.querySelectorAll<HTMLCanvasElement>("canvas[data-icon]").forEach((cv) => paintIcon(cv, cv.dataset.icon as IconItem));
     paintPathIcons(grid);
     if (this.note && performance.now() > this.note.until) this.note = null;
-    const all = tileStacks(s, "all"), placed = all.reduce((a, t) => a + t.placed, 0), count = all.reduce((a, t) => a + (t.lasting ? 0 : t.count), 0);
-    c.querySelector(".tiles-foot")!.innerHTML = this.note
-      ? `<em>${this.note.text}</em>`
-      : shop
-      ? `Paid with Copper, Silver and Gold from the Mine · beat waves in Defend to open more of the shop · tap a row to read it`
-      : `<b>${count}</b> tiles · <b>${placed}</b> standing in the city · <span class="tile-legend"><i class="mark became"></i> became <i class="mark rank"></i> path rank</span> · tap a tile to open it, hold it for its upgrade tree`;
+    // The foot shows only a passing note (a tree that can't open mid-battle); no standing help text.
+    const foot = c.querySelector<HTMLElement>(".tiles-foot")!;
+    foot.hidden = !this.note;
+    foot.innerHTML = this.note ? `<em>${this.note.text}</em>` : "";
   }
 
   /** A kind's tiles: one stack when its copies are all alike (or in the
