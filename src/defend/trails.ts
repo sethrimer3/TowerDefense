@@ -1,6 +1,7 @@
-/** Worn monster trails across the open ground of Defend's first two areas:
- * the Mossbound Ruins' forest trails (`"road"`) and the Amber Desert's sand
- * trails (`"sand"`), natural game trails or pioneer paths.
+/** Worn monster trails across the open ground of Defend's first three areas:
+ * the Mossbound Ruins' forest trails (`"road"`), the Amber Desert's sand
+ * trails (`"sand"`) and the Crystal Caves' trodden ways through the gravel
+ * (`"cave"`), natural game trails or pioneer paths.
  *
  * They are the ways the Dark One's walkers have always come. Each is planned
  * from the map alone (`trailPlan`, memoised per map and style), so a placed
@@ -23,17 +24,18 @@
  * its own coin (`forkPick`). Only Defend's own maps carry trails
  * (`CityMap.trails`): Ambush and Siege battles are untouched, and so is every
  * replay without one. `forest.ts` keeps its trees, lakes and rocks off the
- * trails and `trail-art.ts` draws both kinds. */
+ * trails, `crystal-caves.ts` its rocks, ponds, crystals and mushrooms, and
+ * `trail-art.ts` draws all three kinds. */
 import { CELL_COUNT, CELLS_H, CELLS_W, cellIndex, hash, hash01 } from "./grid.ts";
 import { CellType, type CityMap } from "./citygen.ts";
 import { downhill, fillFlowField, openSteps, type Point } from "./pathing.ts";
 import { boulderPlan } from "./forest.ts";
 import type { AreaId } from "./areas.ts";
 
-export type TrailStyle = "road" | "sand";
+export type TrailStyle = "road" | "sand" | "cave";
 
 /** Which trails an area's open ground has, if any. */
-export const trailStyle = (area: AreaId): TrailStyle | null => (area === "moss" ? "road" : area === "desert" ? "sand" : null);
+export const trailStyle = (area: AreaId): TrailStyle | null => (area === "moss" ? "road" : area === "desert" ? "sand" : area === "drowned" ? "cave" : null);
 
 /** Tuning. `cost` is how much cheaper a fully worn cell is to walk than open
  * ground (1.25 a cell); `slack` how much dearer a branch at a fork may be and
@@ -50,6 +52,7 @@ export const TRAIL = {
   wormAhead: 3,
   road: { half: 2.2, heads: 3, tails: 1, meander: 1.6, scale: 9, rockEvery: 12, rock: [0.8, 1.3] },
   sand: { half: 2, heads: 4, tails: 2, meander: 1.8, scale: 10, rockEvery: 13, rock: [1, 1.6] },
+  cave: { half: 1.9, heads: 3, tails: 2, meander: 1.7, scale: 9, rockEvery: 12, rock: [1, 1.5] },
 };
 
 /** A trail's middle line (cells), how far either side of it is worn, and

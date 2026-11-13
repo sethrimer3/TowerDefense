@@ -50,7 +50,7 @@ The impassable, visible scenery beyond the board's edges, carrying on the area's
 _Avoid_: border, margin
 
 **Worn trail**:
-A way the Dark One's walkers have always come, worn into the open ground of Defend's first two areas from the top edge to the city and on out the bottom. Cheaper to walk, so ground enemies keep to it; it bends round whatever the player builds. They read as natural game trails or pioneer paths, swerving round rocks. In Mossbound Ruins, bare earth fading into the grass, running on under the mountains; in the Amber Desert, the sand carved away down to the old flagstones, its banks sloping in.
+A way the Dark One's walkers have always come, worn into the open ground of Defend's first three areas from the top edge to the city and on out the bottom. Cheaper to walk, so ground enemies keep to it; it bends round whatever the player builds. They read as natural game trails or pioneer paths, swerving round rocks. In Mossbound Ruins, bare earth fading into the grass, running on under the mountains; in the Amber Desert, the sand carved away down to the old flagstones, its banks sloping in; in the Crystal Caves, dust packed smooth through the gravel with pebbles kicked to its sides.
 _Avoid_: path, lane (an Ambush word)
 
 **Trailhead**:
