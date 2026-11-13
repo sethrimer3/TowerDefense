@@ -2,7 +2,10 @@
  * Scroll arrows in place of scrollbars: the menus listed in SCROLLERS hide
  * their scrollbars, and a small pixel arrow shows at the top middle while there
  * is more above, at the bottom middle while there is more below (left and right
- * middle for a row that scrolls sideways). Presentation only.
+ * middle for a row that scrolls sideways). A row that scrolls sideways (fixed
+ * in SIDEWAYS, or any of them whose overflow runs sideways, as the Defend
+ * palette's row along the bottom in the landscape layout) also scrolls by the
+ * mouse wheel, and its arrows scroll it a view's worth when clicked.
  *
  * Each arrow is a sibling of its menu, placed over the menu's edge in the
  * menu's containing block, so menus whose parents redraw get fresh arrows, and
@@ -16,7 +19,7 @@ const SIDEWAYS = ".siege-squads";
 /** How far in from the menu's edge an arrow sits, in CSS pixels. */
 const INSET = 3;
 
-type Arrows = { menu: HTMLElement; back: HTMLElement; on: HTMLElement; sideways: boolean; queued: boolean };
+type Arrows = { menu: HTMLElement; back: HTMLElement; on: HTMLElement; fixed: boolean; sideways: boolean; queued: boolean };
 const tracked = new WeakMap<HTMLElement, Arrows>();
 
 function arrow(dir: string): HTMLElement {
@@ -40,8 +43,14 @@ function boxIn(menu: HTMLElement, a: HTMLElement) {
 
 function update(t: Arrows) {
   t.queued = false;
-  const { menu, back, on, sideways } = t;
+  const { menu, back, on } = t;
   if (!menu.isConnected) return;
+  const sideways = t.fixed || menu.scrollWidth - menu.clientWidth > Math.max(1, menu.scrollHeight - menu.clientHeight);
+  if (sideways !== t.sideways) {
+    t.sideways = sideways;
+    back.className = `scroll-arrow scroll-arrow-${sideways ? "left" : "up"}`;
+    on.className = `scroll-arrow scroll-arrow-${sideways ? "right" : "down"}`;
+  }
   const parent = menu.parentElement;
   if (!parent) return;
   for (const a of [back, on]) if (a.parentElement !== parent) parent.appendChild(a);
@@ -74,10 +83,25 @@ function queue(t: Arrows) {
 
 function track(menu: HTMLElement) {
   const sideways = menu.matches(SIDEWAYS);
-  const t: Arrows = { menu, sideways, queued: false, back: arrow(sideways ? "left" : "up"), on: arrow(sideways ? "right" : "down") };
+  const t: Arrows = { menu, fixed: sideways, sideways, queued: false, back: arrow(sideways ? "left" : "up"), on: arrow(sideways ? "right" : "down") };
   tracked.set(menu, t);
   const again = () => queue(t);
   menu.addEventListener("scroll", again, { passive: true });
+  // A sideways row: the wheel turns it, and its arrows step it.
+  menu.addEventListener("wheel", (e) => {
+    if (!t.sideways || e.ctrlKey || Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return;
+    const room = menu.scrollWidth - menu.clientWidth;
+    if (room <= 1 || (e.deltaY < 0 && menu.scrollLeft <= 0) || (e.deltaY > 0 && menu.scrollLeft >= room - 1)) return;
+    e.preventDefault();
+    menu.scrollLeft += e.deltaMode === 1 ? e.deltaY * 32 : e.deltaY;
+  }, { passive: false });
+  const step = (dir: number) => (e: Event) => {
+    if (!t.sideways) return;
+    e.preventDefault();
+    menu.scrollBy({ left: dir * Math.max(80, menu.clientWidth * 0.8), behavior: "smooth" });
+  };
+  t.back.addEventListener("click", step(-1));
+  t.on.addEventListener("click", step(1));
   const sizes = new ResizeObserver(again);
   sizes.observe(menu);
   if (menu.parentElement) sizes.observe(menu.parentElement);
