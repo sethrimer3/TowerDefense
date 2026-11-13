@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { defaults } from "../src/save.ts";
 import { BOMB_PRICE, PALETTE_ITEMS, purchasePrice } from "../src/defend/catalog.ts";
 import { placeCityTile, placeStructure } from "../src/defend/layout.ts";
-import { CONSUMABLES, TILE_FILTERS, TILE_IDS, TILE_TYPE, buyTile, canBuyTile, higherTier, marksText, shopOffer, tileCopies, tileGroups, tileMarks, tileStack, tileStacks, tileTopic, tileTree, tileCopyAt, universal } from "../src/tiles.ts";
+import { CONSUMABLES, SHOP_UNLOCK_WAVE, TILE_FILTERS, shopLock, shortfallText, TILE_IDS, TILE_TYPE, buyTile, canBuyTile, higherTier, marksText, shopOffer, tileCopies, tileGroups, tileMarks, tileStack, tileStacks, tileTopic, tileTree, tileCopyAt, universal } from "../src/tiles.ts";
 import { buildingSheet } from "../src/ui/specialty.ts";
 import { topicHas } from "../src/ui/ledger.ts";
 
@@ -59,10 +59,36 @@ test("the shop sells only the basic buildings and the city's pieces, in metal, i
   assert.ok(!canBuyTile(s, "watchTower"));
   assert.equal(buyTile(s, "archerTower"), false, "not sold");
   s.smithy.copper = BOMB_PRICE.copper!;
+  s.defend.bestWave = 30;
   assert.ok(buyTile(s, "bomb"));
   assert.equal(buyTile(s, "warBanner"), false);
   s.settings.devMode = true;
   assert.ok(buyTile(s, "bomb") && buyTile(s, "meleeGuild"), "unlimited money buys for nothing");
+});
+
+test("the shop opens kinds as waves are beaten: basics first, everything by wave 30", () => {
+  const s = defaults();
+  s.smithy = { copper: 100, silver: 0, gold: 0 };
+  const sold = TILE_IDS.filter((id) => !("reason" in shopOffer(s, id)));
+  for (const id of sold) assert.ok((SHOP_UNLOCK_WAVE[id] ?? 0) <= 30, `${id} opens by wave 30`);
+  for (const id of ["watchTower", "meleeGuild", "rangedGuild", "repairShop"] as const) assert.ok(SHOP_UNLOCK_WAVE[id]! <= 8, `${id} is an essential basic`);
+  for (const id of ["monsterBait", "wallSpikes", "wallBallista"] as const) assert.ok(SHOP_UNLOCK_WAVE[id]! > 8, `${id} comes later`);
+  assert.equal(shopLock(s, "watchTower"), 0, "something to buy from the start");
+  assert.equal(shopLock(s, "meleeGuild"), 2);
+  assert.ok(!canBuyTile(s, "meleeGuild") && !buyTile(s, "meleeGuild"), "locked until wave 2 is beaten");
+  assert.equal(shortfallText(s, "meleeGuild"), "Beat wave 2 to unlock");
+  s.defend.bestWave = 2;
+  assert.equal(shopLock(s, "meleeGuild"), 0);
+  assert.ok(buyTile(s, "meleeGuild"));
+  s.settings.devMode = true;
+  assert.ok(!buyTile(s, "wallBallista"), "unlimited money doesn't skip the waves");
+  s.settings.devMode = false;
+  s.defend.bestWave = 30;
+  for (const id of sold) assert.equal(shopLock(s, id), 0, id);
+  s.smithy = { copper: 1, silver: 0, gold: 0 };
+  assert.match(shortfallText(s, "wallBallista"), /^Need \d+ more Copper$/);
+  s.smithy.copper = 1000;
+  assert.equal(shortfallText(s, "wallBallista"), "");
 });
 
 test("an upgraded building's tier: what it grew from, and the ultimate its line merges into", () => {

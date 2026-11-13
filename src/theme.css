@@ -1933,6 +1933,47 @@ dialog .away-row .away-note {
   box-shadow: 0 2px 0 #000, 0 0 0 1px #000, 0 0 14px #ffb44a70;
 }
 .tile.dear { opacity: 0.7; }
+/* The Shop's rows: each a tile laid along the keep's table. */
+.shop-row {
+  --tile-hue: #a08458;
+  color: #f0d9a8;
+  border: 2px solid #120d09;
+  border-left: 4px solid var(--tile-hue);
+  border-radius: 4px;
+  background:
+    linear-gradient(90deg, #ffffff10, transparent 40%),
+    linear-gradient(#ffffff0a, #00000050),
+    var(--wood),
+    #2a1c12;
+  box-shadow: 0 2px 0 #000, inset 0 1px 0 #ffd9a020;
+  text-shadow: 0 1px 0 #000;
+}
+.shop-row.type-city { --tile-hue: #7fa44e; }
+.shop-row.type-units { --tile-hue: #c0563c; }
+.shop-row.type-towers { --tile-hue: #7896c0; }
+.shop-row.type-consumables { --tile-hue: #e0a640; }
+.shop-row.open { border-color: #f0cf86; border-left-color: var(--tile-hue); box-shadow: 0 2px 0 #000, 0 0 12px #ffb44a60; }
+.shop-item, .shop-item:hover, .shop-item:active {
+  color: inherit;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+.shop-item .tile-name { color: #f6dca4; }
+.shop-price { color: #f4d999; }
+.shop-row.locked { filter: saturate(.35) brightness(.78); }
+.shop-row.locked .tile-sub { color: #d8b878; }
+.shop-buy.dear { filter: saturate(.55) brightness(.85); }
+.shop-buy.locked { color: #c8b083; }
+.tile-buy.dear { filter: saturate(.55) brightness(.85); }
+.buy-need {
+  color: #ffe1a8;
+  border: 1px solid #000;
+  border-radius: 3px;
+  background: linear-gradient(#5a1a14f0, #2e0c0af0);
+  box-shadow: 0 2px 0 #000, inset 0 1px 0 #ff9a7a40, 0 0 10px #000000a0;
+  text-shadow: 0 1px 0 #000;
+}
 .tile.placed .tile-face { box-shadow: inset 0 2px 5px #000, 0 0 0 1px var(--tile-hue); }
 .tile.placed .tile-sub { color: #d8c79a; }
 .tile.mini { --tile-hue: inherit; border-top-width: 2px; }

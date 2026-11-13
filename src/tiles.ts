@@ -10,7 +10,8 @@ import {CHRONO_PATHS} from "./chrono-upgrades.ts";
  * given (`tileCopies`, `tileMarks`); copies with the same upgrades stack
  * (`tileGroups`), and kinds whose upgrades every copy shares (`universal`)
  * are always one stack. The shop sells more of a
- * kind (`shopOffer`, `buyTile`); a kind's upgrades live where they are made,
+ * kind (`shopOffer`, `buyTile`), each once its wave is beaten
+ * (`SHOP_UNLOCK_WAVE`, `shopLock`); a kind's upgrades live where they are made,
  * the Mine's Smithy and the Library's Study (`tileTopic`); a kind's higher
  * tier is its line's ultimate (`higherTier`). Pure functions over the
  * save, so the page and the tests share them. */
@@ -223,9 +224,42 @@ export function shopOffer(save: Save, id: TileId): ShopOffer {
   return { price: purchasePrice(id, save.defend.owned[id]) };
 }
 
+/** The wave a kind's purchase unlocks with: the shop sells it once that
+ * Defend wave is beaten (`bestWave`). The essential basics open within the
+ * first few waves, the extras later, and everything by wave 30. Kinds not
+ * listed are never locked. */
+export const SHOP_UNLOCK_WAVE: Partial<Record<TileId, number>> = {
+  watchTower: 0, wallBlock: 0, cityTile: 0,
+  meleeGuild: 2, rangedGuild: 3, repairShop: 5, bomb: 8,
+  cityGate: 12, mine: 15, monsterBait: 18, wallSpikes: 22, library: 25, wallBallista: 30,
+};
+/** The wave still to beat before the shop sells `id`, or 0 when it is open. */
+export function shopLock(save: Save, id: TileId): number {
+  const wave = SHOP_UNLOCK_WAVE[id] ?? 0;
+  return save.defend.bestWave >= wave ? 0 : wave;
+}
+
+/** Why a Buy of `id` can't go through now, as the words that rise from the
+ * button ("Beat wave 5 to unlock", "Need 2 more Copper"), or "" when it can. */
+export function shortfallText(save: Save, id: TileId): string {
+  const offer = shopOffer(save, id);
+  if ("reason" in offer) return "Not sold";
+  const lock = shopLock(save, id);
+  if (lock) return `Beat wave ${lock} to unlock`;
+  if (save.settings.devMode) return "";
+  const short: string[] = [];
+  for (const k of METALS) {
+    const need = Math.ceil((offer.price[k] ?? 0) - save.smithy[k] - 1e-9);
+    // The metal's (translated) name, from a price of one.
+    if (need > 0) short.push(`${need} more ${metalPriceText({ [k]: 1 }).replace(/^1 /, "")}`);
+  }
+  return short.length ? `Need ${short.join(" and ")}` : "";
+}
+
 /** Whether the player can pay for the offer now. */
 export function canBuyTile(save: Save, id: TileId): boolean {
   const offer = shopOffer(save, id);
+  if (shopLock(save, id)) return false;
   if (save.settings.devMode) return !("reason" in offer);
   if ("price" in offer && offer.price) return canAfford({ ...save.smithy }, offer.price);
   return false;
@@ -234,7 +268,7 @@ export function canBuyTile(save: Save, id: TileId): boolean {
 /** Buys another copy with mine metal; free with Unlimited money. */
 export function buyTile(save: Save, id: TileId): boolean {
   const offer = shopOffer(save, id), free = save.settings.devMode;
-  if ("reason" in offer) return false;
+  if ("reason" in offer || shopLock(save, id)) return false;
   if (id === "keep" || id === "warBanner" || id === "necromancy" || id === "meteor" || id === "frostNova" || id === "reinforcements") return false;
   const w: Wallet = { ...save.smithy, free };
   if (!(id === "bomb" ? buyBomb(save.defend, w) : buyItem(save.defend, w, id))) return false;

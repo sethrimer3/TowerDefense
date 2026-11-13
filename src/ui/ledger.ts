@@ -786,7 +786,7 @@ const ROMAN = ["I", "II", "III", "IV", "V"];
 /** A small ingot of `metal`, as in the currency bar. */
 const metalIcon = (metal: (typeof METALS)[number]) => `<i class="metal-icon ${metal}" aria-hidden="true"></i>`;
 /** A bill as each of its metals' amounts by its ingot: copper, silver, gold. */
-const costHtml = (p: Price) => METALS.filter((k) => p[k]).map((k) =>
+export const costHtml = (p: Price) => METALS.filter((k) => p[k]).map((k) =>
   `<span class="cost-metal metal-${k}" role="img" aria-label="${p[k]} ${k}" title="${p[k]} ${k}">${metalIcon(k)}${p[k]}</span>`).join(" ");
 const bal = (s: { settings: { devMode: boolean } }, n: number) => (s.settings.devMode ? "∞" : Math.floor(n + 1e-9));
 

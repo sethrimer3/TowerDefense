@@ -55,6 +55,7 @@ node tests/defend-tile-hold.mjs # City tiles lifted only by a half-second hold (
 node tests/city-watch.mjs # 2 × 2 watchmen and 1 × 1 townsfolk gliding while building, the City watch mustering where they walked and spearing an orc in battle, desktop and phone (needs dev server)
 node tests/defend-keep.mjs # The keep dragged with its tile, its tree (side-by-side branches, respec, tapping again, hold), and its arrows and oil in battle, desktop and touch (needs dev server)
 node tests/tiles-marks.mjs # Tiles tab upgrade marks, spread-by-default copies, Stacked groups, always-stacked city tiles and walls, an opened tile's stats and coloured abilities, holding a tile to open its tree in Defend, desktop and phone (needs dev server)
+node tests/tiles-shop.mjs # Second tap on Tiles opens the Shop, the priced list, wave-locked rows after open ones, the words rising from a refused Buy, desktop and phone (needs dev server)
 node tests/upgrade-work.mjs # Timed Study/Forge purchases, shared staff, refunds, reload completion and mobile fit
 node tests/hold-repeat.mjs # Accelerating purchase holds, mouse/touch, cancellation and Mine/Library persistence (needs dev server)
 node tests/tab-icons.mjs # Selected procedural combat/Settings icons, review studies, live navigation and visual-setting refresh on desktop/phone (needs dev server)
