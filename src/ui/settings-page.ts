@@ -119,6 +119,7 @@ export function renderSettingsPage(ctx: AppContext) {
       `<button class="wide" id="dev-idle-day">${t("settings.idleDay")}</button>` +
       `<button class="wide" id="dev-waves">${t("settings.unlockWaves", {count: UNLOCK_WAVES})}</button>` +
       `<p class="hint" id="dev-waves-reach">${t("settings.waveHint", {wave: waveReach(ctx.save().defend)})}</p>`) : "") +
+    `<button class="wide" id="replay-tutorial">${t("settings.replayTutorial")}</button>` +
     `<button class="wide danger" id="erase">${t("settings.erase")}</button>`;
   bindSections();
   el("language").onclick = () => languageMenu(ctx);
@@ -179,6 +180,7 @@ export function renderSettingsPage(ctx: AppContext) {
     settings.menuSizing = sizing.value as typeof settings.menuSizing;
     ctx.update();
   };
+  el("replay-tutorial").onclick = () => ctx.replayTutorial();
   el("erase").onclick = () => confirmErase(ctx);
   if (!settings.developerMode) return;
   const all = el("dev-all") as HTMLInputElement;

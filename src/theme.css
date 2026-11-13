@@ -2571,3 +2571,122 @@ canvas.skill-icon, .ug-node canvas.skill-icon { width: 30px; height: 30px; image
 @media (prefers-reduced-motion: reduce) {
   .defend-unlocked { animation: none; }
 }
+
+/* The first-time tutorial (src/ui/tutorial.ts): the page dims smoothly
+ * around a lit window on what is being taught, a parchment card says what it
+ * is, and a brass pixel arrow points from the card to the window. */
+.tutorial {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  outline: none;
+  transition: opacity .3s ease-in;
+}
+.tutorial.leaving { opacity: 0; pointer-events: none; }
+.tutorial-hole {
+  position: fixed;
+  border-radius: 8px;
+  pointer-events: none;
+  /* A feathered rim inside the dark, then the dark over everything else. */
+  box-shadow: 0 0 22px 10px #0a0603a8, 0 0 0 200vmax #0a0603a8;
+  outline: 2px solid #f0cf8600;
+  transition: left .45s cubic-bezier(.3,.7,.2,1), top .45s cubic-bezier(.3,.7,.2,1),
+    width .45s cubic-bezier(.3,.7,.2,1), height .45s cubic-bezier(.3,.7,.2,1), opacity .35s;
+  opacity: 0;
+}
+.tutorial.shown .tutorial-hole { opacity: 1; }
+.tutorial-hole:not(.empty)::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 10px;
+  border: 2px solid #f0cf86;
+  box-shadow: 0 0 0 2px #2a1a0c, 0 0 14px #ff9a3c80, inset 0 0 0 1px #2a1a0c;
+  animation: tutorial-glow 1.6s ease-in-out infinite alternate;
+}
+@keyframes tutorial-glow {
+  from { opacity: .55; }
+  to { opacity: 1; }
+}
+.tutorial-arrow {
+  position: fixed;
+  display: block;
+  pointer-events: none;
+  transform: rotate(var(--turn, 0deg));
+  transition: left .45s cubic-bezier(.3,.7,.2,1), top .45s cubic-bezier(.3,.7,.2,1);
+  filter: drop-shadow(0 3px 0 #000a);
+}
+.tutorial-arrow[hidden] { display: none; }
+.tutorial-arrow canvas {
+  display: block;
+  image-rendering: pixelated;
+  animation: tutorial-bob .7s ease-in-out infinite alternate;
+}
+@keyframes tutorial-bob {
+  from { transform: translateY(-3px); }
+  to { transform: translateY(3px); }
+}
+.tutorial-card {
+  position: fixed;
+  box-sizing: border-box;
+  padding: 14px 16px 10px;
+  color: var(--ink);
+  text-shadow: none;
+  background: linear-gradient(#ffffff14, #5a3a1418), var(--parchment), #e9d4a4;
+  border: 3px solid #2a1a0c;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 2px #b98a3e, inset 0 0 0 4px #f6e8c470, inset 0 0 22px #8a5a2244,
+    0 4px 0 #000a, 0 12px 30px #000c;
+  transition: left .45s cubic-bezier(.3,.7,.2,1), top .45s cubic-bezier(.3,.7,.2,1);
+}
+.tutorial-card.turn { animation: tutorial-card-in .35s ease-out; }
+@keyframes tutorial-card-in {
+  from { opacity: 0; transform: translateY(6px); }
+}
+.tutorial-card h2 {
+  margin: 0 0 .35em;
+  font-size: 17px;
+  font-weight: 700;
+  color: #7d1a12;
+  letter-spacing: .03em;
+}
+.tutorial-card p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.tutorial-card footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+  min-height: 20px;
+}
+.tutorial-dots { display: flex; gap: 5px; }
+.tutorial-dots i {
+  width: 6px;
+  height: 6px;
+  background: #a37c4280;
+  box-shadow: 0 0 0 1px #2a1a0c60;
+}
+.tutorial-dots i.on { background: #7d1a12; box-shadow: 0 0 0 1px #2a1a0c; }
+/* The way on, greyed for the first second of each step, then ready. */
+.tutorial-go {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #7d1a12;
+  opacity: .22;
+  transition: opacity .3s;
+}
+.tutorial-go::after { content: " ▸"; }
+.tutorial-card.ready .tutorial-go { opacity: 1; animation: tutorial-glow 1s ease-in-out infinite alternate; }
+.tutorial.still *, .tutorial.still { transition: none !important; animation: none !important; }
+.tutorial.still .tutorial-hole { opacity: 1; }

@@ -81,6 +81,7 @@ import { ageWater } from "./boats.ts";
 import { defeatHTML } from "./defeat.ts";
 import { ZONE_STORIES, zoneStory, type ZoneStory } from "./zone-stories.ts";
 import { StoryScroll } from "../ui/story-scroll.ts";
+import type { Box, Tutorial } from "../ui/tutorial.ts";
 import { inspectable, type Armed } from "./inspect.ts";
 
 export type DefendHost = {
@@ -100,6 +101,9 @@ export type DefendHost = {
   researchers?(): number;
   openChamber?(where: "smithy" | "study", topic?: string): void;
   reduceMotion(): boolean;
+  /** The first-time tutorial: the page offers its lessons, and the battle
+   * holds still while one is open. */
+  tutorial?: Tutorial;
   /** The park grass and pond effects are on. */
   effects(): boolean;
   devMode(): boolean;
@@ -289,7 +293,7 @@ export class DefendPage {
     const start = performance.now();
     if (this.sim && this.phase === "sim") {
       this.repeatSummon(time);
-      if (!this.journal?.open && !this.storyOpen) this.sim.update(dt);
+      if (!this.journal?.open && !this.storyOpen && !this.host.tutorial?.open) this.sim.update(dt);
     } else if (this.sim && this.phase === "over" && (this.sim.floods.length || this.sim.sinkings.length)) ageWater(this.sim, Math.min(dt, 0.25));
     const updated = performance.now();
     if (this.sim && this.phase === 'sim') {
@@ -297,6 +301,7 @@ export class DefendPage {
       if (dt > 0) this.sounds.hear(this.sim);
     }
     this.fadeNight(dt);
+    this.teach();
     this.keepBricks?.step(dt);
     if (this.messageT > 0) {
       this.messageT -= dt;
@@ -936,6 +941,82 @@ export class DefendPage {
     });
     dialog.showModal();
     dialog.querySelector<HTMLElement>('[aria-pressed="true"]')?.scrollIntoView({ block: "center" });
+  }
+
+  /** Offers the first-time tutorial's Defend lessons when they may show:
+   * the build menu, Keep and horn before the first battle, and the enemies,
+   * the Keep's strength and the skills once the first wave is on the field
+   * (after its story scroll is put away). */
+  private teach() {
+    const tutorial = this.host.tutorial;
+    if (!tutorial || !this.renderer || this.pointers.session) return;
+    const q = (sel: string) => this.root.querySelector(sel);
+    // The palette when it's showing, else the button that opens it.
+    const side = () => {
+      const aside = q("#defend-side") as HTMLElement | null;
+      if (!aside || aside.offsetWidth <= 0 || aside.offsetHeight <= 0 || getComputedStyle(aside).visibility === "hidden") return q("#defend-side-toggle");
+      // Around the palette's buttons, not the empty run of its strip.
+      const strip = (q("#defend-palette") ?? aside).getBoundingClientRect();
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      for (const b of Array.from(aside.querySelectorAll("button"))) {
+        const r = b.getBoundingClientRect();
+        if (r.width <= 0 || r.right < strip.left || r.left > strip.right || r.bottom < strip.top || r.top > strip.bottom) continue;
+        x0 = Math.min(x0, r.left); y0 = Math.min(y0, r.top); x1 = Math.max(x1, r.right); y1 = Math.max(y1, r.bottom);
+      }
+      if (x0 === Infinity) return aside;
+      x0 = Math.max(x0, strip.left); y0 = Math.max(y0, strip.top); x1 = Math.min(x1, strip.right); y1 = Math.min(y1, strip.bottom);
+      return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+    };
+    if (this.phase === "build" && !this.picked && tutorial.wants("build")) {
+      tutorial.offer("build", { keep: () => this.boardBox("keep"), palette: side, tiles: () => q("#defend-upgrades"), start: () => q("#defend-start") });
+    } else if (this.phase === "sim" && this.sim && !this.sim.unitTester && tutorial.wants("battle") && this.enemyBox()) {
+      tutorial.offer("battle", { enemies: () => this.enemyBox(), keep: () => q(".defend-keep"), skills: side, journal: () => q("#defend-journal") });
+    }
+  }
+
+  /** Where a building of `kind` stands on the screen (the first one), or
+   * null when there is none or it is out of view. */
+  boardBox(kind: "keep" | "mine" | "library"): Box | null {
+    const r = this.renderer;
+    if (!r) return null;
+    const fit = fitLayout(this.save.layout);
+    const f = fit.ok ? fit.structures.find((s) => s.kind === kind) : null;
+    if (!f) return null;
+    const a = r.toClient(f.rect.x, f.rect.y), b = r.toClient(f.rect.x + f.rect.w, f.rect.y + f.rect.h);
+    return this.onBoard({ x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y });
+  }
+
+  /** Around the enemies in view on the board, or null while none are. */
+  private enemyBox(): Box | null {
+    const r = this.renderer, sim = this.sim;
+    if (!r || !sim) return null;
+    const view = this.root.querySelector("#defend-canvas")!.getBoundingClientRect();
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const e of sim.enemies) {
+      if (e.raidProxy || e.hp <= 0) continue;
+      const p = r.toClient(e.x, e.y);
+      // Well onto the field, not just stepping over its edge.
+      const inset = Math.max(24, Math.min(view.width, view.height) * 0.12);
+      if (p.x < view.left + inset || p.x > view.right - inset || p.y < view.top + inset || p.y > view.bottom - inset) continue;
+      x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y);
+    }
+    if (x0 === Infinity) return null;
+    const grow = (lo: number, hi: number) => { const m = (lo + hi) / 2, half = Math.max(28, (hi - lo) / 2 + 16); return [m - half, m + half]; };
+    const [l, rr] = grow(x0, x1), [t, b] = grow(y0, y1);
+    return this.onBoard({ x: l, y: t, w: rr - l, h: b - t });
+  }
+
+  /** `box` cut to the board's canvas on the screen. */
+  private onBoard(box: Box): Box | null {
+    const v = this.root.querySelector("#defend-canvas")!.getBoundingClientRect();
+    const x0 = Math.max(v.left, box.x), y0 = Math.max(v.top, box.y);
+    const x1 = Math.min(v.right, box.x + box.w), y1 = Math.min(v.bottom, box.y + box.h);
+    return x1 - x0 > 4 && y1 - y0 > 4 ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null;
+  }
+
+  /** In the build phase, with nothing held: a new lesson may show. */
+  get idle() {
+    return this.phase === "build" && !this.pointers.session && !this.picked;
   }
 
   /** The story opening the zone that starts at `wave`, if it has not been

@@ -33,6 +33,8 @@ export interface AppContext {
   changeLanguage(language: Language): void;
   /** Dev: adds `ms` of idle time, as if the game had been closed that long. */
   addIdle(ms: number): void;
+  /** Forgets which tutorial lessons were read, so each shows again. */
+  replayTutorial(): void;
   /** Replaces the save with a fresh one. */
   eraseAll(): void;
 }

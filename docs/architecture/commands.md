@@ -4,6 +4,7 @@ Per-feature browser checks (`.mjs`, need `npm run dev` running unless noted), fo
 
 ```sh
 node tests/story-scroll.mjs # Zone story scrolls (zones 1-4 from Start, shown once, mid-run hold) and gold wave-unlock lettering; phone and desktop screenshots to test-results/ (needs dev server)
+node tests/tutorial.mjs     # First-time tutorial: build and battle lessons after the wave-1 scroll, Mine/Library placed and tab lessons, the 1-second tap lock, saved once; phone and desktop screenshots to test-results/ (needs dev server)
 node tests/dark-blade.mjs # Dark Blade idle/wind-up/cut/recovery frames, its tear closing and journal portrait, to test-results/dark-blade.png (needs dev server)
 node tests/blight-performance.mjs # Paired Blight worm lookup, portal raster area and packed contour benchmark (needs dev server; PLAYWRIGHT_EXECUTABLE supported)
 node tests/scenery-performance.mjs # Frozen-reference forest/lighting pixels, cache invalidation, allocation bounds and paired timings (needs dev server)
