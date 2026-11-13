@@ -60,7 +60,6 @@ const duration = (ms: number) => {
 export function economyCard(save: Save, kind: EconomyBuilding, node: string, researchers: number): string {
   const step = economyNodeSkill(kind, node), name = kind === 'mine' ? 'Mine' : 'Library';
   if (!step) return `<div class="ug-card-head"><b>${name}</b><small>Knowledge tree</small></div>
-    <p>Choose a branch to research upgrades for the ${name}. Each rank grows from the previous one. Research uses the Library's lab and the same upgrades shown in the Study.</p>
     <button class="ug-buy" data-economy-smithy="${kind}" ${realmActive(save, 'mine') ? '' : 'disabled'}>Smithy upgrades<small>Efficiency and power · metal equipment</small></button>`;
   const skill = SKILLS[step.id], level = skillRank(save, step.id), offer = skillPurchase(save, step.id), owned = step.rank <= level;
   const next = step.rank === level + 1, job = save.researchJob;

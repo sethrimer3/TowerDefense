@@ -18,7 +18,7 @@ test('journal discovery and unread entries persist and reject unknown save value
 });
 
 test('journal shows only discovered enemies and describes their actual special abilities', () => {
-  assert.match(journalHTML([]), /Encounter enemies/);
+  assert.doesNotMatch(journalHTML([]), /<article>/);
   const html = journalHTML(['roach', 'poisonSovereign', 'aegis']);
   assert.match(html, /Instantly kills player units/);
   assert.match(html, /Permanent shield/);

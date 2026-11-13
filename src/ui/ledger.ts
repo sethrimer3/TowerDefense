@@ -266,7 +266,7 @@ export class Ledger {
   private galleryHtml(subject: Subject) {
     const ids = new Set(subject.topics.flatMap(t=>topicItems(t)));
     const stacks = tileStacks(this.save,'all').filter(s=>subject.id==='all'||(s.id==='keep'?subject.id==='realm':ids.has(s.id as never)||subject.id==='spells'&&s.type==='consumables'));
-    return `<div class="ledger-collection"><p class="ledger-note">Choose a tile. Towers and troop buildings unfold into their copies, each upgraded on its own.</p><div class="tiles-grid ledger-tiles">${stacks.map(stack=>{
+    return `<div class="ledger-collection"><div class="tiles-grid ledger-tiles">${stacks.map(stack=>{
       const id=stack.id, open=this.openTile===id, unfolds=this.individual(id);
       const button=`<button class="tile type-${stack.type} ${open?'open':''}" data-ledger-stack="${id}" ${unfolds?`aria-expanded="${open}"`:`aria-pressed="${open}"`} aria-label="${TILE_NAMES[id]}, ${stack.count} owned"><span class="tile-face"><canvas width="48" height="48" data-icon="${id==='warBanner'?'banner':id}"></canvas></span><span class="tile-name">${TILE_NAMES[id]}</span><b class="tile-count">×${stack.count}</b></button>`;
       if(!open||!unfolds)return button;
@@ -428,14 +428,14 @@ export class Ledger {
         : `<button class="training-box training-cost metal-${metal}" data-train="${t.id}" ${affordable && free.length ? "" : "disabled"} aria-label="Upgrade ${t.name} to ${shown(next)} for ${price}, taking one smith ${takes}" title="${why}">${costHtml({ [metal]: amount })}</button>`;
       return `<div class="training-row${job ? " active" : ""}" role="listitem" data-training-row="${t.id}"><span class="training-label">${t.name}<small>${t.seconds ? `+${t.seconds} s a rank, up to ${shown(t.max * t.per)}` : `+${t.per}% a rank, up to ${t.max * t.per}%`}${maxed ? "" : ` · one smith takes ${takes}`}</small></span><span class="training-box">${shown(now)}</span><span class="training-arrow" aria-hidden="true">→</span><span class="training-box next">${shown(next)}</span>${buy}</div>`;
     };
-    return `<h4 class="training-group">At the smithy</h4><p class="ledger-note"><small>Metal costs and work grow quadratically. Assigned smiths share the time.</small></p>
+    return `<h4 class="training-group">At the smithy</h4>
       <div class="training-table" role="list" aria-label="Smithy upgrades">${ids.map((id) => row(TRAINING.find((t) => t.id === id)!)).join("")}</div>`;
   }
 
   // ── The Study ───────────────────────────────────────────────────────────
   private knowledgeHtml() {
     const save = this.save, researchers = this.ctx.researchers();
-    return `<p class="ledger-note chamber-wallet">You have <b class="knowledge">${whole(save.knowledge)}</b> Knowledge${researchers ? ` · ${researchers} ${researchers === 1 ? "researcher" : "researchers"} in the lab` : " · put a librarian to the alchemy lab to research"}<small>One project at a time; all researchers share its work.</small></p>`;
+    return `<p class="ledger-note chamber-wallet">You have <b class="knowledge">${whole(save.knowledge)}</b> Knowledge${researchers ? ` · ${researchers} ${researchers === 1 ? "researcher" : "researchers"} in the lab` : " · no researchers"}</p>`;
   }
 
   /** The active upgrade occupies the exact center of the existing circle.
@@ -536,16 +536,16 @@ export class Ledger {
     };
     if (t.id === "warBanner") {
       const selected = t.skills!.find(id => id === this.picked.warBanner) ?? "warBanner";
-      return `<div class="banner-research"><h3>War banner · Knowledge tree</h3><p class="ledger-note">Master Rapid deployment, then learn Sheltering standard and Broad standard. The tree branches into damage, marching speed, and life with regeneration. You can research every branch.</p><div data-banner-tree></div><div class="banner-tree-detail" aria-live="polite">${skillCard(selected)}</div></div>`;
+      return `<div class="banner-research"><h3>War banner · Knowledge tree</h3><div data-banner-tree></div><div class="banner-tree-detail" aria-live="polite">${skillCard(selected)}</div></div>`;
     }
     if (t.id === "battle") {
       const level = skillRank(save, "gunpowder"), key = this.picked.battle ?? `gunpowder:${Math.min(level, 2)}`;
       const rank = Number(key.split(":")[1]), learned = rank < level;
       const detail = key === "bomb"
-        ? `<article class="ledger-skill"><div><h3>Bomb</h3><p>Drag bombs from Skills during a defense. Research Gunpowder to strengthen every bomb. Damage training and Shaped charges are in the Smithy's Spells → Bombs.</p></div></article>`
+        ? `<article class="ledger-skill"><div><h3>Bomb</h3></div></article>`
         : rank === level ? skillCard("gunpowder", `Gunpowder ${ROMAN[rank]}`)
         : `<article class="ledger-skill ${learned ? "owned" : "locked"}"><span class="ledger-glyph" aria-hidden="true">${SKILLS.gunpowder.icon}</span><div><small>RANK ${ROMAN[rank]}</small><h3>Gunpowder ${ROMAN[rank]}</h3><p>+${SKILLS.gunpowder.effect.per}% bomb damage this rank; +${SKILLS.gunpowder.effect.per * (rank + 1)}% from Gunpowder in total.</p></div><button disabled>${learned ? "Researched" : "Learn the previous rank first"}</button></article>`;
-      return `<div class="banner-research"><h3>Bomb · Knowledge tree</h3><p class="ledger-note">Research Gunpowder I, II and III in order. Each rank adds 20% bomb damage. Select a node to inspect or research it.</p><div data-bomb-tree></div><div class="banner-tree-detail" aria-live="polite">${detail}</div></div>`;
+      return `<div class="banner-research"><h3>Bomb · Knowledge tree</h3><div data-bomb-tree></div><div class="banner-tree-detail" aria-live="polite">${detail}</div></div>`;
     }
     if(t.id==='mine'||t.id==='library'){
       const picked=this.picked[t.id]??`k:${t.id}`;
@@ -594,9 +594,8 @@ export class Ledger {
     const save = this.save, on = save.spellPaths[spell];
     const choice = (path: PathId | "", name: string, note: string, hue = "") => `<button class="spell-choice ${hue}" data-spell="${spell}" data-spell-path="${path}" aria-pressed="${(on ?? "") === path}">${name}<small>${note}</small></button>`;
     const paths = pathsOf(spell).filter((p) => pathState(save, p.id).rank);
-    return `<div class="spell-setup"><p class="ledger-scope">CAST WITH · one path at a time, at its furthest researched rank. Used from the next defense on.</p>
-      <div class="spell-choices" role="group" aria-label="Path the spell casts with">${choice("", "Plain", UNSPECIALIZED[spell])}${paths.map((p) => choice(p.id, p.name, `Rank ${ROMAN[pathState(save, p.id).rank - 1]}`, `hue-${p.hue}`)).join("")}</div>
-      ${paths.length ? "" : `<p class="ledger-note"><small>Research a path below to cast with it.</small></p>`}</div>`;
+    return `<div class="spell-setup"><p class="ledger-scope">CAST WITH</p>
+      <div class="spell-choices" role="group" aria-label="Path the spell casts with">${choice("", "Plain", UNSPECIALIZED[spell])}${paths.map((p) => choice(p.id, p.name, `Rank ${ROMAN[pathState(save, p.id).rank - 1]}`, `hue-${p.hue}`)).join("")}</div></div>`;
   }
 
   /** A topic's paths as a tree: the building at the root, a branch to each
@@ -628,8 +627,7 @@ export class Ledger {
         : "";
       return `<div class="path-col hue-${p.hue} ${state}"><header class="path-banner"><h4>${p.name}</h4><small>${st.sealed ? "Sealed" : p.motto}</small></header>${ranks}${crown}</div>`;
     }).join("");
-    const following = `<p class="ledger-scope">${isSpell(t.id) ? "RESEARCH ONCE · then choose above which path the spell casts with." : `RESEARCH ONCE · every ${t.name} can wear what you unlock. Choose a path for each as you place it in Defend.`}</p>`;
-    return `${following}<div class="path-tree" style="--paths:${n}" data-motes="${t.id}"><canvas class="path-motes" aria-hidden="true"></canvas>
+    return `<div class="path-tree" style="--paths:${n}" data-motes="${t.id}"><canvas class="path-motes" aria-hidden="true"></canvas>
         <div class="path-root"><span class="path-medal root"><canvas width="44" height="44" data-icon="${t.item ?? t.icon}"></canvas></span><span>${t.name}</span></div>
         <svg class="path-fan" viewBox="0 0 ${w} 40" preserveAspectRatio="none" aria-hidden="true">${fan}</svg>
         <div class="path-cols">${cols}</div>
@@ -640,7 +638,7 @@ export class Ledger {
   private pickedHtml(t: Topic, paths: KnowledgePath[]) {
     const [id, at] = (this.picked[t.id] ?? "").split(":");
     const p = paths.find((p) => p.id === id);
-    if (!p) return `<p class="path-detail path-hint">Tap a rank to research it for your collection. Unlock any number of paths, then mix them across your city: each building wears the one you choose as you place it.</p>`;
+    if (!p) return "";
     const save = this.save, st = pathState(save, p.id), researchers = this.ctx.researchers();
     if (at === "crown" && p.legacyCrown) {
       const e = p.legacyCrown;
@@ -659,7 +657,7 @@ export class Ledger {
     else {
       const active = save.researchJob?.kind === "path" && save.researchJob.id === p.id;
       const why = save.researchJob ? "Researchers are working on the current project" : !researchers && !save.settings.instantResearch ? "Put a librarian to the alchemy lab to research" : !st.affordable ? `Needs ${r.cost} Knowledge, have ${whole(save.knowledge)}` : "";
-      action = active ? `<span data-research-timer>${this.researchTimeLeft()}</span>` : `<button data-learn-path="${p.id}" ${why ? "disabled" : ""}>Research unlock<small>${r.cost} Knowledge</small><small>${this.researchHint(st.rank)}</small></button>${why ? `<em>${why}.</em>` : i === 0 ? `<em>${isSpell(t.id) ? "Unlocks this path for the spell. Choose it to cast with above." : `Unlocks this rank for every ${t.name}. Choose it as you place one in Defend.`}</em>` : ""}`;
+      action = active ? `<span data-research-timer>${this.researchTimeLeft()}</span>` : `<button data-learn-path="${p.id}" ${why ? "disabled" : ""}>Research unlock<small>${r.cost} Knowledge</small><small>${this.researchHint(st.rank)}</small></button>${why ? `<em>${why}.</em>` : i === 0 ? `<em>${isSpell(t.id) ? "Unlocks this path for the spell." : `Unlocks this rank for every ${t.name}. Choose it as you place one in Defend.`}</em>` : ""}`;
     }
     return `<div class="path-detail hue-${p.hue}"><span class="path-medal"><canvas data-path-icon="${r.icon}:${p.hue}"></canvas></span>
       <div><small>${p.name.toUpperCase()} · RANK ${ROMAN[i]} OF ${ROMAN[p.ranks.length - 1]}</small><h3>${r.name}</h3><p>${r.text}.</p></div><div class="path-act">${action}</div></div>`;

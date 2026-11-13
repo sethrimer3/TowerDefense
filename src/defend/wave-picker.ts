@@ -35,8 +35,6 @@ export function wavePickerHTML(save: DefendSave, developerMode = false, testerSe
       `<span class="wave-difficulty" title="Difficulty ${difficulty.toLocaleString("en-US")}"><small>Difficulty</small>${difficultyLabel(difficulty)}</span></button>`);
   }
   return `<small>THE WATCH AWAITS ITS ORDERS</small><h2 id="defend-wave-title">${t("control.startingWave")}</h2>
-    <p>Your next defense starts on <b>Wave ${chosen}</b>. Choose any unlocked wave below.</p>
-    <p>A wave unlocks once you defeat it; a new zone's first wave unlocks as soon as you reach it. Unlocked through <b>Wave ${reach}</b>.</p>
     <div class="wave-list">${developerMode ? `<button class="wave-row" data-unit-tester aria-pressed="${testerSelected}"><span class="wave-name">Unit tester</span><span>Summon enemies manually</span></button>` : ""}${rows.join("")}</div>
     <div class="dialog-actions"><button data-wave-close>${t("common.close")}</button></div>`;
 }

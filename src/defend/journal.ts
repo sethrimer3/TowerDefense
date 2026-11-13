@@ -130,6 +130,6 @@ export function journalHTML(discovered: EnemyKind[]): string {
       if (k === "bombBird") notes.push("Dives for 0.6 seconds, then explodes in a 2.5-cell radius. Kill it before it lands.");
       if (k === "voidSparrow") notes.push("Creates a black hole 1.5 tiles across: 300 damage every half-second for eight seconds.");
       return `<article><canvas class="defend-journal-portrait" data-portrait="${k}" width="80" height="80" aria-hidden="true"></canvas><div><h3>${d.name}</h3><p class="defend-journal-stats">Difficulty ${d.cost.toLocaleString()} · HP ${(d.fortress ? d.fortress.turrets * d.fortress.partHp : d.hp).toLocaleString()} · Attack ${d.damage} · Speed ${d.speed}</p><p>${notes.join(" ")}</p></div></article>`;
-    }).join("")}</section>`).join("") : "<p>Encounter enemies during a defense to record them here.</p>"}</div>
+    }).join("")}</section>`).join("") : ""}</div>
     <div class="dialog-actions"><button data-journal-close autofocus>Close journal</button></div>`;
 }

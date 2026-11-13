@@ -315,7 +315,7 @@ export function mapCount(kind: PaletteItem | "wallSpikes", found: ReadonlySet<st
  * only: upgrades are bought in the tree. */
 export function mapCardHtml(save: Save, kind: PaletteItem | "wallSpikes", found: ReadonlySet<string>, here: ReadonlySet<string>, id: string): string {
   const n = fullTree(kind === "wallSpikes" ? kind : rootOf(kind as never)).find((o) => o.id === id);
-  if (!n) return `<p class="ug-hint">Tap an upgrade to see what it does.</p>`;
+  if (!n) return "";
   let title: string, text: string, level = "", stats = "";
   if (n.kind && !n.path) {
     ({ title, text } = nodeText(save, n));
@@ -338,7 +338,7 @@ export function mapCardHtml(save: Save, kind: PaletteItem | "wallSpikes", found:
 export function treeCardHtml(save: Save, kind: PaletteItem | "wallSpikes", wear: Wear | undefined, id: string): string {
   if (kind === "repairShop" && id === "repair:mending") return `<div class="ug-card-head"><b>Mending</b><small>Initial skill</small></div><p>Available from the beginning. Masons leave an intact Repair shop to repair damaged buildings and towers and rebuild destroyed ones, the keep included while it stands. Wall masonry unlocks walls, gates and wall ballistas.</p><b class="ug-owned">Owned from the beginning · free</b>`;
   const n = buildingTree(kind as never, wear).find((o) => o.id === id);
-  if (!n) return `<p class="ug-hint">Tap a node to see what it does.</p>`;
+  if (!n) return "";
   const free = save.settings.devMode;
   let can = free || save.knowledge >= n.cost;
   let title: string, text: string, level = "", stats = "", partners = "";
@@ -444,10 +444,10 @@ function sideStep<Id extends string>(tree: SideTree<Id>, ranks: Ranks<Id>, id: s
 function sideCardHtml<Id extends string>(save: Save, tree: SideTree<Id>, ranks: Ranks<Id>, id: string, name: string, about: string, stats: (ranks: Ranks<Id>) => string): string {
   const free = save.settings.devMode;
   if (id === tree.root)
-    return `<div class="ug-card-head"><b>${name}</b></div><p>${about} Its branches climb side by side: buy a rank of any of them.</p><p class="ug-stats">${stats(ranks)}</p><div class="ug-card-foot" data-ug-ignore><b class="ug-owned">${tree.every}</b>${sideBeyond(tree, ranks, id) ? AGAIN_SELL : ""}</div>`;
+    return `<div class="ug-card-head"><b>${name}</b></div><p>${about}</p><p class="ug-stats">${stats(ranks)}</p><div class="ug-card-foot" data-ug-ignore><b class="ug-owned">${tree.every}</b>${sideBeyond(tree, ranks, id) ? AGAIN_SELL : ""}</div>`;
   const [, path, r] = id.split(":"), p = tree.paths.find((o) => o.id === path), rank = Number(r);
   const step = p?.ranks[rank - 1];
-  if (!p || !step) return `<p class="ug-hint">Tap a node to see what it does.</p>`;
+  if (!p || !step) return "";
   const have = sideRank(ranks, p.id), cost = step.cost, can = free || save.knowledge >= cost;
   let back = 0;
   for (let i = rank; i <= have; i++) back += p.ranks[i - 1].cost;

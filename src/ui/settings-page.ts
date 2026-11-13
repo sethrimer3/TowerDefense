@@ -55,24 +55,21 @@ function highlightControls(ctx: AppContext): string {
 function resolutionControls(ctx: AppContext) {
   const row = SETTINGS.resolution, value = ctx.save().settings.resolution;
   return `<label class="setting setting-grid" id="resolution-row">${t("setting.resolution")}<select id="${row.page.id}">` +
-    row.choices.map(([v]) => `<option value="${v}" ${value === v ? "selected" : ""}>${t(`settings.resolution.${v}`)}</option>`).join("") + `</select></label>` +
-    `<p class="hint">${t("settings.resolutionHint")}</p>`;
+    row.choices.map(([v]) => `<option value="${v}" ${value === v ? "selected" : ""}>${t(`settings.resolution.${v}`)}</option>`).join("") + `</select></label>`;
 }
 
 /** How the building menu sizes as the board zooms. */
 function menuSizingControls(ctx: AppContext) {
   const row = SETTINGS.menuSizing, value = ctx.save().settings.menuSizing;
   return `<label class="setting setting-grid" id="menu-sizing-row">${t("setting.menuSizing")}<select id="${row.page.id}">` +
-    row.choices.map(([v]) => `<option value="${v}" ${value === v ? "selected" : ""}>${t(`settings.menuSizing.${v}`)}</option>`).join("") + `</select></label>` +
-    `<p class="hint">${t("settings.menuSizingHint")}</p>`;
+    row.choices.map(([v]) => `<option value="${v}" ${value === v ? "selected" : ""}>${t(`settings.menuSizing.${v}`)}</option>`).join("") + `</select></label>`;
 }
 
 /** Disabling the cycle uses the selected, persistent time of day. */
 function daylightControls(ctx: AppContext) {
   const settings = ctx.save().settings;
   return `<label class="setting setting-grid" id="time-of-day-row">${t("setting.timeOfDay")}<select id="time-of-day" ${settings.dayNightCycle ? "disabled" : ""}>` +
-    SETTINGS.timeOfDay.choices.map(([value]) => `<option value="${value}" ${settings.timeOfDay === value ? "selected" : ""}>${t(`settings.time.${value}`)}</option>`).join("") + `</select></label>` +
-    `<p class="hint">${t("settings.dayCycleHint")}</p>`;
+    SETTINGS.timeOfDay.choices.map(([value]) => `<option value="${value}" ${settings.timeOfDay === value ? "selected" : ""}>${t(`settings.time.${value}`)}</option>`).join("") + `</select></label>`;
 }
 
 /** Sections folded shut this session, by key; the page redraws with them still shut. */
@@ -108,11 +105,11 @@ export function renderSettingsPage(ctx: AppContext) {
   const settings = ctx.save().settings, allOn = ALL_DEV.every((k) => settings[k]);
   el("settings").innerHTML =
     `<div class="page-title"><small>${t("settings.tagline")}</small><h2>${t("nav.settings")}</h2></div>` +
-    `<div class="setting language-setting"><span>${t("settings.language")}</span><button id="language" class="language-current" aria-haspopup="dialog" aria-label="${t("settings.chooseLanguage")}">${LANGUAGES.find(l => l.code === settings.language)!.name} ▾</button></div><p class="hint language-note">${t("settings.languageNote")}</p>` +
+    `<div class="setting language-setting"><span>${t("settings.language")}</span><button id="language" class="language-current" aria-haspopup="dialog" aria-label="${t("settings.chooseLanguage")}">${LANGUAGES.find(l => l.code === settings.language)!.name} ▾</button></div>` +
     section("gameplay", t("settings.gameplay"), GAMEPLAY.map((key) => control(key, ctx)).join("")) +
     section("controls", t("settings.controls"), menuSizingControls(ctx) + CONTROLS.map((key) => control(key,ctx)).join("")) +
     section("display", t("settings.display"),
-      PAGE.map((key) => control(key, ctx) + (key === "tileGrid" ? gridControls(ctx) : key === "highlightBuildings" ? highlightControls(ctx) : key === "dayNightCycle" ? daylightControls(ctx) : key === "fasterSunCatchup" ? `<p class="hint">${t("settings.fasterSunCatchupHint")}</p>` : key === "crispZoom" ? resolutionControls(ctx) : key === "ultraGraphics" ? `<p class="hint">${t("settings.ultraGraphicsHint")}</p>` : "")).join("") +
+      PAGE.map((key) => control(key, ctx) + (key === "tileGrid" ? gridControls(ctx) : key === "highlightBuildings" ? highlightControls(ctx) : key === "dayNightCycle" ? daylightControls(ctx) : key === "crispZoom" ? resolutionControls(ctx) : "")).join("") +
       control("developerMode", ctx)) +
     (settings.developerMode ? section("dev", t("settings.dev"),
       `<label class="setting setting-all">${t("settings.allOn")}<input type="checkbox" id="dev-all" ${allOn ? "checked" : ""}></label>` +
@@ -122,7 +119,7 @@ export function renderSettingsPage(ctx: AppContext) {
       `<button class="wide" id="dev-idle-day">${t("settings.idleDay")}</button>` +
       `<button class="wide" id="dev-waves">${t("settings.unlockWaves", {count: UNLOCK_WAVES})}</button>` +
       `<p class="hint" id="dev-waves-reach">${t("settings.waveHint", {wave: waveReach(ctx.save().defend)})}</p>`) : "") +
-    `<p class="hint">${t("settings.saveHint")}</p><button class="wide danger" id="erase">${t("settings.erase")}</button>`;
+    `<button class="wide danger" id="erase">${t("settings.erase")}</button>`;
   bindSections();
   el("language").onclick = () => languageMenu(ctx);
   el("developer-mode").onchange = (event) => {
@@ -207,9 +204,7 @@ function languageMenu(ctx: AppContext) {
   if (modal.open) return;
   modal.classList.add("language-dialog");
   modal.setAttribute("aria-labelledby", "language-title");
-  modal.setAttribute("aria-describedby", "language-description");
   modal.innerHTML = `<small>${t("nav.settings")}</small><h2 id="language-title">${t("settings.chooseLanguage")}</h2>
-    <p id="language-description">${t("settings.languageNote")}</p>
     <div class="language-grid" role="group" aria-label="${t("settings.language")}">${LANGUAGES.map(l => `<button class="language-option" data-language="${l.code}" lang="${l.code}" aria-pressed="${l.code === ctx.save().settings.language}">${l.name}</button>`).join("")}</div>
     <div class="dialog-actions"><button data-language-close>${t("common.close")}</button></div>`;
   modal.querySelectorAll<HTMLButtonElement>("[data-language]").forEach(button => button.onclick = () => {

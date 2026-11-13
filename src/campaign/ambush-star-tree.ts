@@ -108,7 +108,7 @@ export class AmbushStarTree {
       r = p?.ranks[rank - 1],
       card = this.dialog.querySelector<HTMLElement>(".ambush-star-card")!;
     if (!p || !r) {
-      card.innerHTML = "<p>" + t("ambush.starAbout") + "</p>";
+      card.innerHTML = "";
       return;
     }
     const have = this.progress.ranks?.[p.id] ?? 0,
