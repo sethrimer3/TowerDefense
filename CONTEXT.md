@@ -16,6 +16,9 @@ The marked road that ground enemies follow through an Ambush level.
 **Lane**:
 One of an Ambush track's ways in, from its own entry at the board's edge to the keep. Later levels have two or three; lanes may join on the way.
 
+**Story scroll**:
+The scroll that unrolls before a zone's first wave in Defend, with that zone's chapter of the story written on it.
+
 **Bridge**:
 A plank deck where a road crosses water; the only way over a river on foot.
 
