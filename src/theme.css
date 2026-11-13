@@ -2374,3 +2374,7 @@ nav button:disabled {opacity:.45;}
 .building-menu { animation: bm-open 140ms ease-out; transform-origin: center; }
 :root.reduce-motion .building-menu { animation: none; }
 @media (prefers-reduced-motion: reduce) { .building-menu { animation: none; } }
+
+/* Mine and Library skill icons: 15 × 15 pixel art (outline included) at 2×. */
+canvas.skill-icon, .ug-node canvas.skill-icon { width: 30px; height: 30px; image-rendering: pixelated; }
+.research-skill-glyph canvas.skill-icon { width: 45px; height: 45px; }

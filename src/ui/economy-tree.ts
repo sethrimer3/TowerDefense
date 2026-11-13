@@ -7,6 +7,7 @@ import { SKILLS, TREES, skillCost, type SkillId } from '../skill-trees.ts';
 import { skillPurchase, skillRank } from '../progression.ts';
 import { researchLeft, researchSeconds, startResearch } from '../research-jobs.ts';
 import type { GraphNode } from './upgrade-graph.ts';
+import { skillFace } from './skill-icons.ts';
 export { isEconomyBuilding } from '../realm.ts';
 
 export const economySkills = (kind: EconomyBuilding) => SUBJECTS.find(s => s.id === 'realm')!.topics.find(t => t.id === kind)!.skills!;
@@ -34,7 +35,7 @@ export function economyTree(save: Save, kind: EconomyBuilding): GraphNode[] {
       id: economyNode(id, rank),
       parent: rank > 1 ? economyNode(id, rank - 1) : prerequisite ? economyNode(prerequisite, 1) : root,
       state: rank <= level ? 'owned' : rank === level + 1 && available ? 'next' : 'locked',
-      face: `<span class="banner-node-glyph" aria-hidden="true">${skill.icon}</span>`,
+      face: skillFace(id),
       tag: `${skill.name} ${rank}`, hue: kind === 'mine' ? 'hue-verdant' : 'hue-storm',
     });
   }
