@@ -189,7 +189,7 @@ test("waves 21–39 have exact escalating worm rosters, no RNG, interleaving, fu
   assert.equal(hp, 63000); assert.equal(bodies, 4760);
   assert.equal(waveCap(20), 7000); assert.equal(waveCap(40), 21000);
   for (const n of [19, 21, 39, 41, 181, 200, 201]) assert.equal(waveCap(n), 5000);
-  for (const n of [41, 181, 201]) assert.ok(buildWave(n, () => .5).every(k => !ENEMIES[k].scriptedOnly));
+  for (const n of [61, 181, 201]) assert.ok(buildWave(n, () => .5).every(k => !ENEMIES[k].scriptedOnly));
 });
 
 test("wave 40 releases three independent boss worms and the entire 20400-body tree fits and spawns", () => {

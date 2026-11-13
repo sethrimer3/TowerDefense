@@ -44,12 +44,12 @@ test('every themed zone has at least fifteen species and all native additions ap
       assert.ok(AREA_ENEMIES[area.id].includes(kind));
       assert.ok(AREA_ENEMIES.nadir.includes(kind));
       assert.ok(AREAS.filter(a => a.id !== area.id && a.id !== 'nadir').every(a => !AREA_ENEMIES[a.id].includes(kind)));
-      // Mossbound and Amber Desert are authored on their first visit; native
-      // species return on their first procedural revisit, waves 221–260.
+      // Mossbound, Amber Desert and the Crystal Caves are authored on their first visit; native
+      // species return on their first procedural revisit, waves 221–280 (Crystal Caves 261–280).
       const first = AREAS.indexOf(area) * 20 + 1;
-      const wave = first <= 40 ? first + AREAS.length * 20 : first;
+      const wave = first <= 60 ? first + AREAS.length * 20 : first;
       assert.equal(areaForWave(wave).id, area.id);
-      // Affordable within the visit (Drowned Temple's biggest come late in its waves 41–60).
+      // Affordable within the visit.
       assert.ok(ENEMIES[kind].cost <= waveDifficulty(wave + 19), `${kind} affordable during the visit`);
       let selected = false;
       const rolls = AREA_ENEMIES[area.id].length * 2;

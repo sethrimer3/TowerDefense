@@ -4,6 +4,7 @@ import { drawFortressFootfalls } from "./fortress-footfall-art.ts";
 import { drawBlightFortress, drawBlightLasers } from "./blight-fortress-art.ts";
 import { isBlightFlier } from "./blight-fliers.ts";
 import { drawBlightFlier } from "./blight-flier-art.ts";
+import { drawDarkBlade, drawTears } from "./dark-blade-art.ts";
 import { drawWormShadow, wormBodyVisible } from "./blight-worm-art.ts";
 import { basicUnitSprite } from "./basic-unit-art.ts";
 import { blightDrawnPixels } from "./blight-size.ts";
@@ -138,6 +139,7 @@ export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, hea
   drawFortressFootfalls(b, sim, simple.reduceMotion);
   for (const e of sim.enemies) drawWormShadow(b, e, sim.time, simple.effects !== false, simple.reduceMotion);
   drawBlackHoles(b, sim);
+  drawTears(b, sim, simple.reduceMotion);
   drawPoisonClouds(b, sim);
   drawWatchRadii(b, sim);
   const start = timing ? performance.now() : 0;
@@ -682,6 +684,7 @@ export function drawEnemyArt(b: Brush, e: Enemy, sim: DefendSim, under = b, redu
   if (def.fortress && !def.blightFortress) return drawFortress(b, e, sim, reduceMotion);
   if (def.blightFortress) return drawBlightFortress(b, e, sim.time, reduceMotion);
   if (isBlightFlier(e.kind)) return drawBlightFlier(b, e, sim.time, reduceMotion, under);
+  if (e.kind === "darkBlade") return drawDarkBlade(b, e, sim.time, reduceMotion);
   if (def.darkPixels) {
     // No sprite lookup, rims, shading, torch, or animated decoration.
     const d = b.px / ART * blightDrawnPixels(e.kind)!;

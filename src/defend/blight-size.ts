@@ -13,6 +13,6 @@ export const BLIGHT_DRAW_GROWTH = 1;
 export function blightDrawnPixels(kind: EnemyKind): number | undefined {
   const def = ENEMIES[kind];
   if (def.darkPixels) return def.darkPixels + BLIGHT_DRAW_GROWTH;
-  if (isBlightFlier(kind)) return Math.round(def.size * ART) + BLIGHT_DRAW_GROWTH;
+  if (isBlightFlier(kind) || kind === "darkBlade") return Math.round(def.size * ART) + BLIGHT_DRAW_GROWTH;
   return undefined;
 }

@@ -770,6 +770,12 @@ A very slow flying Blight shaped like a black equilateral triangle with nested s
 **Greater Blight Prism**:
 A larger, tougher and slower Blight Prism with four nested spinning triangles. Releases the same three Blight Darts when destroyed.
 
+**Dark Blade**:
+A Blight knight: a black pentagon body pointed the way it faces, a black cloak threaded with faint burning lines, and an orange and black greatsword. It swings very slowly but devastatingly, a long wind-up then a wide crescent cut that strikes every building and defender inside it. One leads Crystal Caves wave 50 and three wave 55.
+
+**Tear** (in space):
+The ragged, burning-lipped crescent a Dark Blade's cut leaves on the board. It slowly closes and does no damage.
+
 
 **Blight trail**:
 Dead grass and withered vegetation left where the Blight has walked. Repeated passage and stronger Blight kill larger plants; the damage lasts for the current battle run.
