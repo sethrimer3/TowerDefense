@@ -41,6 +41,7 @@ import { setLanguage, translateWithin } from "./i18n/index.ts";
 import { installSeal } from "./ui/seal-art.ts";
 import { EssenceGlob } from "./ui/currency-icons.ts";
 import { installScrollArrows } from "./ui/scroll-arrows.ts";
+import { Tutorial } from "./ui/tutorial.ts";
 
 // Wires the pages together: builds the shell, loads the save, and routes
 // navigation, the currency bar and the frame loop between the pages.
@@ -101,7 +102,13 @@ const ctx: AppContext = {
     renderSettingsPage(ctx);
   },
   addIdle,
+  replayTutorial: () => {
+    save.tutorial = [];
+    store();
+    navigate("defend");
+  },
   eraseAll: () => {
+    tutorial.close();
     save = defaults();
     dayClock.elapsed = 0; dayClock.reset();
     awayMs = 0;
@@ -114,6 +121,15 @@ const ctx: AppContext = {
   },
 };
 const reduced = () => save.settings.reduceMotion || matchMedia("(prefers-reduced-motion: reduce)").matches;
+/** The first-time tutorial; each lesson, once read, is kept in the save. */
+const tutorial = new Tutorial({
+  seen: () => save.tutorial,
+  finish: (id) => {
+    if (!save.tutorial.includes(id)) save.tutorial.push(id);
+    store();
+  },
+  reduceMotion: reduced,
+});
 const combatTab = new CombatTab(document.querySelector<HTMLButtonElement>('nav [data-tab="defend"]')!, reduced, () => save.settings.legacyGraphics);
 const tilesPage = new TilesPage(ctx, el("tiles"));
 /** The rooms below the Mine and the Library, and the way down to each. */
@@ -151,6 +167,7 @@ const defendPage = new DefendPage(el("defend"), {
   earnEssence: (amount) => { save.essence += amount; store(); refreshCurrencies(); },
   persist: store,
   reduceMotion: () => save.settings.reduceMotion,
+  tutorial,
   healthbars: () => save.settings.showHealthbars,
   simpleEnemies: () => save.settings.simpleEnemies,
   simpleTroops: () => save.settings.simpleTroops,
@@ -402,6 +419,24 @@ function idleTimers() {
   }
 }
 
+/** Offers the tutorial's Realm lessons: the Mine and the Library once one
+ * is first placed, and each tab's buttons the first time it is open (the
+ * Defend page offers its own). */
+function teach() {
+  if (tutorial.open) return;
+  const q = (sel: string) => document.querySelector(sel);
+  if (tab === "defend" && combatMode === "defend" && defendPage.idle) {
+    for (const id of ["mine", "library"] as const) {
+      const lesson = id === "mine" ? "minePlaced" : "libraryPlaced";
+      if (realmActive(save, id) && tutorial.wants(lesson) && tutorial.offer(lesson, { building: () => defendPage.boardBox(id), tab: () => q(`nav [data-tab="${id}"]`) })) return;
+    }
+  }
+  if (tab === "mine" && !mineDown.below && tutorial.wants("mineTab"))
+    tutorial.offer("mineTab", { hire: () => q("#mine-hire"), crew: () => q("#mine-crew-toggle"), buildings: () => q("#mine-buildings-toggle"), metal: () => q("#currencies"), smithy: () => q("#mine-smithy") });
+  if (tab === "library" && !libraryDown.below && tutorial.wants("libraryTab"))
+    tutorial.offer("libraryTab", { shelf: () => q("#library-shelf"), hire: () => q("#library-hire"), lab: () => q("#library-lab-up"), staff: () => q("#library-staff-toggle"), study: () => q("#library-study") });
+}
+
 /** The Smithy's upgrades are worked on the wall clock, whatever page shows; so do the
  * mine's and the library's work, saved every half minute they pay. */
 let lastTick = 0, lastMineSave = 0;
@@ -431,6 +466,7 @@ function frame(time: number) {
     store();
   }
   welcome.refresh();
+  teach();
   hear(save.settings.ambienceOff ? QUIET : tab === "defend" ? defendPage.ambience() : tab === "mine" ? minePage.ambience() : tab === "library" ? libraryPage.ambience() : QUIET);
   if (time - lastTick >= 1000) {
     lastTick = time;

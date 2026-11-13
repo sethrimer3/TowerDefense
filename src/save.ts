@@ -17,6 +17,7 @@ import { METALS, decodeMineSave, type MineSave, type Metals } from "./mine/sim.t
 import { decodeLibrarySave, type LibrarySave } from "./library/sim.ts";
 import { decodeResearchJob, type ResearchJob } from "./research-jobs.ts";
 import { decodeForgeJob, type ForgeJob } from "./forge-jobs.ts";
+import { decodeTutorial, type LessonId } from "./ui/tutorial.ts";
 
 import { decodeFound, migrateCards, migrateGunLine, migrateResearch, migrateTopicPaths, migrateTrees, refundRetiredAssassins } from "./specializations.ts";
 
@@ -78,6 +79,8 @@ export type Save = {
   library: LibrarySave | null;
   /** Foreground scenery time only; never includes time away. */
   dayClock?: number;
+  /** The first-time tutorial's lessons this player has read (`ui/tutorial.ts`). */
+  tutorial: LessonId[];
   settings: Settings;
 };
 
@@ -103,6 +106,7 @@ export function defaults(): Save {
     campaigns: emptyCampaigns(),
     mine: null,
     library: null,
+    tutorial: [],
     settings: defaultSettings(),
   };
   return save;
@@ -185,7 +189,19 @@ export function decode(raw: string | null): Save {
   d.forgeJob = decodeForgeJob(s.forgeJob, d);
   d.forgeClock = num(s.forgeClock, 0);
   refundRetired(d);
+  d.tutorial = Array.isArray(s.tutorial) ? decodeTutorial(s.tutorial) : pastLessons(d);
   return d;
+}
+
+/** For a save from before the tutorial: the lessons a player who has
+ * already fought, or already placed the Mine or the Library, has outgrown. */
+function pastLessons(d: Save): LessonId[] {
+  const out: LessonId[] = [];
+  if (d.defend.bestWave > 0 || d.defend.furthestWave > 0) out.push("build", "battle");
+  const placed = (kind: string) => d.defend.layout.structures.some((s) => s.kind === kind);
+  if (placed("mine")) out.push("minePlaced", "mineTab");
+  if (placed("library")) out.push("libraryPlaced", "libraryTab");
+  return out;
 }
 
 /** Ranks in work on known rows, one per row, short of the row's most ranks,
