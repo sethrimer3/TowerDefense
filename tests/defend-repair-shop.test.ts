@@ -33,7 +33,7 @@ function placeAtWork(s: ReturnType<typeof scene>, c = s.sim.civilians[0]) { Obje
 
 test('Repair shop is a purchasable 2 by 1 quarter-grid building; a city without it never recruits masons', () => {
   assert.equal(STRUCTURES.repairShop.w, 4); assert.equal(STRUCTURES.repairShop.h, 2);
-  const save = defaults(); save.settings.devMode = true;
+  const save = defaults(); save.settings.devMode = true; save.defend.bestWave = 5;
   assert.ok(!('reason' in shopOffer(save, 'repairShop'))); assert.ok(buyTile(save, 'repairShop'));
   const s = scene({}, 0); ruins(s);
   for (let i = 0; i < 100; i++) tick(s);

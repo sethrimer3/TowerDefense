@@ -377,6 +377,8 @@ function navigate(id: Tab) {
 }
 document.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((b) => (b.onclick = () => {
   if (b.dataset.tab === "defend" && tab === "defend") combatMode = nextCombatMode(combatMode);
+  // A second tap on Tiles turns to the Shop (and another back to the collection).
+  if (b.dataset.tab === "tiles" && tab === "tiles") return tilesPage.toggleShop();
   navigate(b.dataset.tab as Tab);
 }));
 

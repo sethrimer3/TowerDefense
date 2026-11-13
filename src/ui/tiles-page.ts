@@ -15,8 +15,12 @@ import { buildingSheet, type StatSheet } from "./specialty.ts";
  * held on a tile (`HOLD_MS`, as on the Defend board) turns to Defend with
  * that copy's upgrade tree open (`tileTree`), where each building is
  * upgraded. The filters show one type at a time; the stacks can be spread
- * into single tiles and gathered again; the Shop shows every kind for
- * sale. Every change of layout animates
+ * into single tiles and gathered again; the Shop lists every kind for
+ * sale, a row each with its price and a Buy button, the kinds still locked
+ * (`shopLock`, opened by beating Defend waves) under the open ones; a Buy
+ * that can't go through sends up words saying what it still needs
+ * (`shortfallText`). A second tap on the Tiles tab turns to the Shop
+ * (`toggleShop`). Every change of layout animates
  * (`flip`): tiles slide to their new places, copies gather into their
  * stacks and spill out of them. */
 import { play } from "../sound.ts";
@@ -26,10 +30,10 @@ import { HOLD_MS } from "../defend/board-pointers.ts";
 import { bonuses } from "../progression.ts";
 import { paintIcon, type IconItem } from "../defend/structure-art.ts";
 import {
-  CONSUMABLE_TEXT, TILE_FILTERS, TILE_NAMES, TILE_TYPE, TILE_TYPE_NAMES, buyTile, canBuyTile, isConsumable, marksText, offerText, shopOffer, tileCopies, tileCopyAt,
+  CONSUMABLE_TEXT, TILE_FILTERS, TILE_NAMES, TILE_TYPE, TILE_TYPE_NAMES, buyTile, canBuyTile, isConsumable, marksText, offerText, shopLock, shopOffer, shortfallText, tileCopies, tileCopyAt,
   tileGroups, tileMarks, tileStacks, tileTopic, tileTree, universal, type TileFilter, type TileId, type TileMark, type TileStack,
 } from "../tiles.ts";
-import { topicHas } from "./ledger.ts";
+import { costHtml, topicHas } from "./ledger.ts";
 import { Chamber } from "./chamber.ts";
 import { flip } from "./flip.ts";
 import { replay, sparksOver } from "./flourish.ts";
@@ -57,6 +61,8 @@ export class TilesPage {
   private held = false;
   /** A note shown in the foot for a moment (a tree that can't open mid-battle). */
   private note: { text: string; until: number } | null = null;
+  /** When words last rose from a Buy that couldn't go through (one at a time while held). */
+  private deniedAt = 0;
 
   constructor(private ctx: AppContext, private root: HTMLElement) {}
 
@@ -65,6 +71,16 @@ export class TilesPage {
   }
   private get reduced() {
     return this.save.settings.reduceMotion || matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+
+  /** The Tiles tab tapped again while it shows: turns between the collection and the Shop. */
+  toggleShop() {
+    if (!this.chamber) this.build();
+    play("knock");
+    this.relayout(() => {
+      this.mode = this.mode === "shop" ? "collection" : "shop";
+      this.open = null;
+    });
   }
 
   /** The tab is shown: builds the hall once, then lays out the tiles. */
@@ -195,9 +211,12 @@ export class TilesPage {
       const n = tileStacks(s, f.id, shop).reduce((a, t) => a + (shop ? 1 : t.count), 0);
       return `<button data-filter="${f.id}" class="filter-${f.id}" aria-pressed="${f.id === this.filter}">${f.id === "city" ? "Realm" : tr((f.id === "all" ? "filter.all" : f.id === "consumables" ? "control.skills" : f.id === "units" ? "filter.units" : `subject.${f.id}`) as MessageKey)}<b>${n}</b></button>`;
     }).join("");
-    const stacks = tileStacks(s, this.filter, shop);
+    let stacks = tileStacks(s, this.filter, shop);
+    // The Shop lists what can be bought now first, then the locked kinds by the wave that opens them.
+    if (shop) stacks = stacks.map((t, i) => ({ t, i, lock: shopLock(s, t.id) })).sort((a, b) => a.lock - b.lock || a.i - b.i).map((x) => x.t);
     if (this.open && !stacks.some((t) => t.id === this.open)) this.open = null;
     const grid = c.querySelector<HTMLElement>(".tiles-grid")!;
+    grid.classList.toggle("shop-list", shop);
     const shelf = c.querySelector<HTMLElement>(".tiles-shelf")!, scroll = shelf.scrollTop;
     grid.innerHTML = stacks.length
       ? stacks.map((t) => this.stackHtml(t)).join("")
@@ -210,7 +229,7 @@ export class TilesPage {
     c.querySelector(".tiles-foot")!.innerHTML = this.note
       ? `<em>${this.note.text}</em>`
       : shop
-      ? `Paid with Copper, Silver and Gold from the Mine · tap a tile to buy`
+      ? `Paid with Copper, Silver and Gold from the Mine · beat waves in Defend to open more of the shop · tap a row to read it`
       : `<b>${count}</b> tiles · <b>${placed}</b> standing in the city · <span class="tile-legend"><i class="mark became"></i> became <i class="mark rank"></i> path rank</span> · tap a tile to open it, hold it for its upgrade tree`;
   }
 
@@ -219,6 +238,7 @@ export class TilesPage {
    * and its opened panel. */
   private stackHtml(t: TileStack) {
     const shop = this.mode === "shop", open = this.open === t.id, offer = shopOffer(this.save, t.id);
+    if (shop) return this.shopRowHtml(t) + (open ? this.detailHtml(t) : "");
     const name = TILE_NAMES[t.id], type = `type-${t.type}`;
     const face = (wear?: Wear) => `<span class="tile-face"><canvas width="48" height="48" data-icon="${iconOf(t.id)}"${wear ? pathLook(t.id, wear.path) : ""}></canvas>${pathBadge(wear)}</span>`;
     const layers = (n: number) => (n > 2 ? " layers-2" : n > 1 ? " layers-1" : "");
@@ -240,6 +260,25 @@ export class TilesPage {
       }).join("");
     }
     return tiles + (open ? this.detailHtml(t) : "");
+  }
+
+  /** A kind for sale as a row of the Shop's list: its tile, name and how
+   * many are owned, its price, and Buy; a locked kind names the wave that
+   * opens it. Tapping the row opens the kind below it. */
+  private shopRowHtml(t: TileStack) {
+    const s = this.save, offer = shopOffer(s, t.id), lock = shopLock(s, t.id), open = this.open === t.id, name = TILE_NAMES[t.id];
+    const price = "price" in offer ? costHtml(offer.price) || tr("common.free") : "";
+    const sub = lock ? `Unlocks after wave ${lock}` : `${TILE_TYPE_NAMES[t.type]} · owned ${t.count}`;
+    const buy = lock
+      ? `<button class="shop-buy locked" data-buy-tile="${t.id}" aria-label="Locked until wave ${lock} is beaten"><span>Locked</span><small>Wave ${lock}</small></button>`
+      : `<button class="shop-buy${canBuyTile(s, t.id) ? "" : " dear"}" data-buy-tile="${t.id}">Buy</button>`;
+    return `<div class="shop-row type-${t.type}${lock ? " locked" : ""}${open ? " open" : ""}" data-key="${t.id}">
+        <button class="shop-item" data-tile="${t.id}" aria-expanded="${open}" title="${name}">
+          <span class="tile-face"><canvas width="48" height="48" data-icon="${iconOf(t.id)}"></canvas></span>
+          <span class="shop-text"><span class="tile-name">${name}</span><small class="tile-sub">${sub}</small></span>
+        </button>
+        <span class="shop-price">${price}</span>${buy}
+      </div>`;
   }
 
   /** A tile's Knowledge upgrades as a row of marks, in the order taken: a
@@ -265,9 +304,10 @@ export class TilesPage {
       ? `<div class="tile-copies" aria-label="Each ${name}">${tileCopies(s, t, isConsumable(t.id) ? SHOWN : Infinity).map((c) =>
         `<span class="tile mini type-${t.type}${c.placed ? " placed" : ""}" data-key="${c.key}" title="${c.placed ? "Standing in the city" : "Waiting in the palette"}"><span class="tile-face"><canvas width="32" height="32" data-icon="${iconOf(t.id)}"></canvas></span><small>${c.placed ? "City" : "Ready"}</small></span>`).join("")}${isConsumable(t.id) && t.count > SHOWN ? `<span class="tile-more">+${t.count - SHOWN} more</span>` : ""}</div>`
       : "";
-    const buy = "reason" in offer
+    // The Shop's row carries its own Buy.
+    const buy = "reason" in offer || shop
       ? ""
-      : `<button class="tile-buy" data-buy-tile="${t.id}" ${canBuyTile(s, t.id) ? "" : "disabled"}>Buy one<small>${offerText(offer)}</small></button>`;
+      : `<button class="tile-buy${canBuyTile(s, t.id) ? "" : " dear"}" data-buy-tile="${t.id}">Buy one<small>${shopLock(s, t.id) ? `Beat wave ${shopLock(s, t.id)}` : offerText(offer)}</small></button>`;
     const go = (where: "smithy" | "study") => topicHas(topic, where)
       ? `<button class="tile-go go-${where}" data-go="${where}" data-topic="${topic.id}">${where === "smithy" ? `⚒ ${tr("control.smithy")}` : `✦ ${tr("control.study")}`}<small>${where === "smithy" ? "below the Mine" : "below the Library"}</small></button>`
       : "";
@@ -300,6 +340,7 @@ export class TilesPage {
   }
 
   private buy(id: TileId) {
+    if (!canBuyTile(this.save, id)) return this.deny(id);
     if (!buyTile(this.save, id)) return;
     this.ctx.update();
     play("coin");
@@ -307,6 +348,25 @@ export class TilesPage {
     const button = this.root.querySelector<HTMLElement>(`[data-buy-tile="${id}"]`);
     replay(this.root.querySelector(`[data-key="${id}"]`), "bought");
     sparksOver(button, "gold");
+  }
+
+  /** A Buy that can't go through: words rise out of the button saying what
+   * it still needs (a wave to beat, or the metal short), and it shakes. */
+  private deny(id: TileId) {
+    const now = performance.now(), button = this.root.querySelector<HTMLElement>(`[data-buy-tile="${id}"]`);
+    if (!button || now - this.deniedAt < 700) return;
+    this.deniedAt = now;
+    play("stone");
+    const r = button.getBoundingClientRect(), words = document.createElement("span");
+    words.className = `buy-need${this.reduced ? " still" : ""}`;
+    words.textContent = shortfallText(this.save, id) || "Can't buy this now";
+    words.setAttribute("role", "status");
+    words.style.left = `${r.left + r.width / 2}px`;
+    words.style.top = `${r.top + r.height / 2}px`;
+    document.body.append(words);
+    words.addEventListener("animationend", () => words.remove());
+    window.setTimeout(() => words.remove(), 2500);
+    if (!this.reduced) replay(button, "refused");
   }
 
   /** Each frame while the tab shows: the hall's torches and the light through its window. */
