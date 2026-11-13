@@ -2378,3 +2378,123 @@ nav button:disabled {opacity:.45;}
 /* Mine and Library skill icons: 15 × 15 pixel art (outline included) at 2×. */
 canvas.skill-icon, .ug-node canvas.skill-icon { width: 30px; height: 30px; image-rendering: pixelated; }
 .research-skill-glyph canvas.skill-icon { width: 45px; height: 45px; }
+
+/* The story scroll (src/ui/story-scroll.ts): a pixel-art scroll unrolled over
+ * the page at a zone's first wave, the story scribbled on in ink. Its size
+ * comes from the script in whole art pixels (--px). */
+.story-scroll {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
+  background: radial-gradient(ellipse at center, #0a0705a0, #050302e0);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  outline: none;
+  animation: story-in .3s ease-out;
+  transition: opacity .42s ease-in;
+}
+.story-scroll.leaving {
+  opacity: 0;
+  pointer-events: none;
+}
+@keyframes story-in {
+  from { opacity: 0; }
+}
+.story-scroll-body {
+  position: relative;
+  width: var(--scroll-w);
+  height: var(--scroll-h);
+  filter: drop-shadow(0 calc(var(--px) * 2) 0 #000a) drop-shadow(0 10px 24px #000c);
+}
+.story-scroll-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+.story-scroll-page {
+  position: absolute;
+  top: calc(var(--roller) + var(--px) * 4);
+  bottom: calc(var(--roller) + var(--px) * 4);
+  left: calc(var(--inset) + var(--px) * 6);
+  right: calc(var(--inset) + var(--px) * 6);
+  overflow: hidden auto;
+  scrollbar-width: none;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.45;
+  text-shadow: none;
+  opacity: 0;
+  transition: opacity .15s;
+}
+.story-scroll-page::-webkit-scrollbar { display: none; }
+.story-scroll.unrolled .story-scroll-page { opacity: 1; }
+.story-scroll-page h2 {
+  margin: 0 0 .7em;
+  text-align: center;
+  font-size: 1.3em;
+  font-weight: 700;
+  color: #7d1a12;
+  letter-spacing: .03em;
+}
+.story-scroll-page p {
+  margin: 0 0 .65em;
+}
+.story-scroll-page .story-greeting {
+  font-weight: 700;
+}
+.story-scroll-page .story-signature {
+  margin: 1em 0 0;
+  text-align: right;
+  font-style: italic;
+  color: var(--ink-soft);
+}
+.story-unwritten {
+  visibility: hidden;
+}
+/* The quill: a zero-width mark after the last letter, its nib on the line. */
+.story-quill {
+  position: relative;
+  display: inline-block;
+  width: 0;
+  height: 1em;
+  vertical-align: baseline;
+}
+.story-quill canvas {
+  position: absolute;
+  left: 0;
+  bottom: -.15em;
+  image-rendering: pixelated;
+  transform-origin: 0 100%;
+  animation: story-scribble .16s steps(2) infinite alternate;
+  pointer-events: none;
+}
+@keyframes story-scribble {
+  from { transform: translate(0, 0) rotate(0deg); }
+  to { transform: translate(calc(var(--px) * -1), calc(var(--px) * -1)) rotate(-6deg); }
+}
+.story-scroll-hint {
+  margin: 0;
+  color: #e8d3a4;
+  font-size: 13px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  opacity: .8;
+  animation: story-hint 1.6s ease-in-out infinite alternate;
+}
+@keyframes story-hint {
+  to { opacity: .45; }
+}
+@media (min-width: 700px) {
+  .story-scroll-page { font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .story-scroll, .story-quill canvas, .story-scroll-hint { animation: none; }
+}

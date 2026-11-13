@@ -79,6 +79,8 @@ import { replay, sparksOver } from "../ui/flourish.ts";
 import { available, keptGroups, plainAvailable, recordWaveReached, setLayout, startingWave, type DefendSave } from "./progress.ts";
 import { ageWater } from "./boats.ts";
 import { defeatHTML } from "./defeat.ts";
+import { zoneStory } from "./zone-stories.ts";
+import { StoryScroll } from "../ui/story-scroll.ts";
 import { inspectable, type Armed } from "./inspect.ts";
 
 export type DefendHost = {
@@ -227,6 +229,8 @@ export class DefendPage {
   private sounds = new BattleSound();
   /** Abandon needs a second click within a few seconds. */
   private abandonArmed = 0;
+  /** Whether a zone's story scroll is open over the page, waiting to start the run. */
+  private storyOpen = false;
   private settingsOpen = false;
   /** The build palette's category, and whether its list of categories is
    * open. */
@@ -501,8 +505,25 @@ export class DefendPage {
       this.bindSideToggle(el);
       el.querySelector<HTMLButtonElement>("#defend-wave")!.onclick = () => this.pickWave();
       el.querySelector<HTMLButtonElement>("#defend-start")!.onclick = () => {
-        this.startRun();
-        this.relayout();
+        // A zone's first wave opens with its story on a scroll; the run
+        // starts once the scroll is put away.
+        // Automated browsers (the browser checks) skip it unless they ask for
+        // it with `window.showStories`.
+        const automated = navigator.webdriver && !(window as { showStories?: boolean }).showStories;
+        const story = automated || (this.testerSelected && this.host.devMode()) ? null : zoneStory(startingWave(this.save));
+        if (!story) {
+          this.startRun();
+          this.relayout();
+          return;
+        }
+        if (this.storyOpen) return;
+        this.storyOpen = true;
+        new StoryScroll(story, () => {
+          this.storyOpen = false;
+          if (this.phase !== "build") return;
+          this.startRun();
+          this.relayout();
+        }, this.host.reduceMotion());
       };
       center.prepend(el.querySelector("#defend-start")!);
       extra.append(el.querySelector("#defend-wave")!);
