@@ -2501,3 +2501,35 @@ canvas.skill-icon, .ug-node canvas.skill-icon { width: 30px; height: 30px; image
 @media (prefers-reduced-motion: reduce) {
   .story-scroll, .story-quill canvas, .story-scroll-hint { animation: none; }
 }
+
+/* "Wave N unlocked!": gold lettering under the wave button's corner when a
+ * defeated wave opens as a start. */
+.defend-right { position: relative; }
+.defend-unlocked {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 12;
+  margin: 0;
+  padding: 3px 8px;
+  border: 1px solid #d8b57280;
+  border-radius: 2px;
+  background: #140c06d8;
+  box-shadow: 0 2px 8px #000a;
+  white-space: nowrap;
+  pointer-events: none;
+  color: #ffd76a;
+  font-weight: 700;
+  font-size: 15px;
+  text-shadow: 0 1px 0 #000, 0 0 6px #b8741a, 0 0 14px #ffb84080;
+  animation: defend-unlocked 3.6s ease-out forwards;
+}
+@keyframes defend-unlocked {
+  0% { opacity: 0; transform: translateY(6px) scale(.9); }
+  10% { opacity: 1; transform: none; }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-4px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .defend-unlocked { animation: none; }
+}

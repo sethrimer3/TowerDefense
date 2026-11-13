@@ -3,7 +3,7 @@
 Per-feature browser checks (`.mjs`, need `npm run dev` running unless noted), focused Node tests, benchmarks and tools. Moved from `AGENTS.md`; the topic docs in this folder name the checks for each feature too.
 
 ```sh
-node tests/story-scroll.mjs # Zone story scroll: Start on waves 1/21/41/61 unrolls, writes, fills on tap, fades into the run; phone and desktop screenshots to test-results/ (needs dev server)
+node tests/story-scroll.mjs # Zone story scrolls (zones 1-4 from Start, shown once, mid-run hold) and gold wave-unlock lettering; phone and desktop screenshots to test-results/ (needs dev server)
 node tests/dark-blade.mjs # Dark Blade idle/wind-up/cut/recovery frames, its tear closing and journal portrait, to test-results/dark-blade.png (needs dev server)
 node tests/blight-performance.mjs # Paired Blight worm lookup, portal raster area and packed contour benchmark (needs dev server; PLAYWRIGHT_EXECUTABLE supported)
 node tests/scenery-performance.mjs # Frozen-reference forest/lighting pixels, cache invalidation, allocation bounds and paired timings (needs dev server)

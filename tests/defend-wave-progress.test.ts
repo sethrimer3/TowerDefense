@@ -2,96 +2,89 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { defaults } from "../src/save.ts";
 import { payWave } from "../src/progression.ts";
-import { MAX_START_WAVE, decodeDefendSave, defaultDefendSave, furthestWave, recordWaveReached, startingWave, unlockWaves, waveReach } from "../src/defend/progress.ts";
+import { MAX_START_WAVE, decodeDefendSave, defaultDefendSave, furthestWave, recordWaveCleared, recordWaveReached, startingWave, unlockWaves, waveReach } from "../src/defend/progress.ts";
 import { wavePickerHTML } from "../src/defend/wave-picker.ts";
 
-test("new reached records select the previous wave, with early progress clamped to wave one", () => {
+test("a wave unlocks as a start only once it is defeated, and selects itself", () => {
   const save = defaultDefendSave();
-  assert.equal(furthestWave(save), 0);
   assert.equal(startingWave(save), 1);
-  for (const wave of [1, 2, 3, 10]) {
-    assert.equal(recordWaveReached(save, wave), true);
-    assert.equal(save.furthestWave, wave);
-    assert.equal(startingWave(save), Math.max(1, wave - 1));
-    assert.equal(waveReach(save), Math.max(1, wave - 1));
+  assert.equal(recordWaveReached(save, 5), true);
+  assert.equal(waveReach(save), 1, "reaching a wave does not unlock it");
+  assert.deepEqual(recordWaveCleared(save, 1), [], "wave one is always open");
+  for (const wave of [2, 3, 19]) {
+    assert.deepEqual(recordWaveCleared(save, wave), [wave]);
+    assert.equal(waveReach(save), wave);
+    assert.equal(startingWave(save), wave);
   }
-  assert.equal(save.bestWave, 0, "entering a wave does not claim it was cleared");
 });
 
-test("manual earlier starts survive retries and equal records until a genuinely further wave is entered", () => {
+test("a new zone's first wave unlocks as soon as it is reached", () => {
   const save = defaultDefendSave();
-  recordWaveReached(save, 10);
-  save.startWave = 3;
-  for (const wave of [3, 4, 9, 10]) {
-    assert.equal(recordWaveReached(save, wave), false);
-    assert.equal(startingWave(save), 3);
-  }
-  const restored = decodeDefendSave(JSON.parse(JSON.stringify(save)));
-  assert.equal(startingWave(restored), 3);
-  assert.equal(recordWaveReached(restored, 11), true);
-  assert.equal(startingWave(restored), 10);
-  assert.equal(restored.bestWave, 0);
-  const html = wavePickerHTML(restored);
-  assert.match(html, /data-wave="3"/);
-  assert.match(html, /data-wave="10" aria-pressed="true"/);
-  assert.doesNotMatch(html, /data-wave="11"/);
+  recordWaveCleared(save, 19);
+  assert.deepEqual(recordWaveCleared(save, 20), [20, 21]);
+  assert.equal(waveReach(save), 21);
+  assert.equal(startingWave(save), 21);
+  assert.deepEqual(recordWaveCleared(save, 21), [], "already unlocked when reached");
+  assert.deepEqual(recordWaveCleared(save, 22), [22]);
 });
 
-test("highest entered progress and cleared-wave rewards remain independent", () => {
+test("losing a wave sends no one back past an unlocked choice", () => {
+  const save = defaultDefendSave();
+  recordWaveCleared(save, 30);
+  save.startWave = 20;
+  for (const wave of [20, 21, 25, 31]) recordWaveReached(save, wave);
+  assert.equal(startingWave(save), 20, "an unlocked choice is kept after a loss");
+  for (const wave of [20, 21, 30]) assert.deepEqual(recordWaveCleared(save, wave), []);
+  assert.equal(startingWave(save), 20, "clearing already-unlocked waves keeps the choice");
+  save.startWave = 35;
+  assert.equal(startingWave(save), 30, "a locked choice moves back to the furthest unlocked wave");
+  const html = wavePickerHTML(save);
+  assert.match(html, /data-wave="30"/);
+  assert.doesNotMatch(html, /data-wave="31"/);
+});
+
+test("rewards follow cleared waves and report what unlocked", () => {
   const save = defaults();
-  recordWaveReached(save.defend, 10);
-  assert.equal(save.upgradePoints, 0);
-  assert.deepEqual(payWave(save, 9), { upgrade: 1 });
-  assert.equal(save.defend.bestWave, 9);
-  assert.equal(save.defend.furthestWave, 10);
-  assert.equal(startingWave(save.defend), 9);
-  assert.deepEqual(payWave(save, 9), { upgrade: 0 });
-  save.defend.startWave = 2;
-  assert.deepEqual(payWave(save, 10), { upgrade: 1 });
-  assert.equal(startingWave(save.defend), 2, "clearing alone does not reset a manual choice");
-  assert.equal(recordWaveReached(save.defend, 11), true);
-  assert.equal(startingWave(save.defend), 10);
-  assert.equal(save.upgradePoints, 2);
+  assert.deepEqual(payWave(save, 1), { upgrade: 1, unlocked: [] });
+  assert.deepEqual(payWave(save, 1), { upgrade: 0, unlocked: [] });
+  assert.equal(save.defend.bestWave, 1);
+  for (let w = 2; w < 20; w++) payWave(save, w);
+  assert.deepEqual(payWave(save, 20), { upgrade: 1, unlocked: [20, 21] });
+  assert.equal(save.upgradePoints, 20);
 });
 
-test("old saves retain unlocked progress and manual selections; missing selections use previous reached wave", () => {
+test("old saves keep their cleared waves unlocked and their selections where unlocked", () => {
   const old = decodeDefendSave({ bestWave: 12 });
   assert.equal(old.furthestWave, 13);
   assert.equal(waveReach(old), 12);
   assert.equal(startingWave(old), 12);
-  assert.equal(startingWave(decodeDefendSave({ bestWave: 12, startWave: 1 })), 12, "old wave-one default advances on migration");
   assert.equal(startingWave(decodeDefendSave({ bestWave: 12, startWave: 3 })), 3);
-  assert.equal(startingWave(decodeDefendSave({ bestWave: 9, furthestWave: 10, startWave: 1 })), 1, "current deliberate wave-one choice stays selected");
-  const current = decodeDefendSave({ bestWave: 8, furthestWave: 12, startWave: 11 });
-  assert.equal(current.furthestWave, 12);
-  assert.equal(startingWave(current), 11);
-  assert.equal(decodeDefendSave({ bestWave: 12, furthestWave: 5 }).furthestWave, 12, "cannot have cleared a wave never reached");
+  assert.equal(startingWave(decodeDefendSave({ bestWave: 8, furthestWave: 12, startWave: 11 })), 8);
+  assert.equal(waveReach(decodeDefendSave({ bestWave: 40 })), 41);
+  assert.deepEqual(decodeDefendSave({ storiesSeen: ["moss", "nope", 3, "moss", "desert"] }).storiesSeen, ["moss", "desert"]);
+  assert.deepEqual(decodeDefendSave({}).storiesSeen, []);
   for (const invalid of [-1, 1.5, Infinity, "12", NaN])
     assert.equal(decodeDefendSave({ bestWave: 3, furthestWave: invalid }).furthestWave, 4);
+  assert.equal(furthestWave(decodeDefendSave({ bestWave: 12, furthestWave: 5 })), 12);
 });
 
-test("developer unlocks remain available without claiming new reached progress", () => {
+test("developer unlocks open more starts without claiming cleared waves", () => {
   const save = defaultDefendSave();
-  assert.equal(unlockWaves(save), 100);
-  assert.equal(save.furthestWave, 0);
+  assert.equal(unlockWaves(save), 101);
   save.startWave = 90;
   assert.equal(startingWave(save), 90);
-  assert.equal(recordWaveReached(save, 90), true);
-  assert.equal(startingWave(save), 89);
-  assert.equal(waveReach(save), 100);
-  assert.equal(unlockWaves(save), 200);
-  save.startWave = 2;
-  assert.equal(recordWaveReached(save, 89), false);
-  assert.equal(startingWave(save), 2);
+  assert.equal(save.bestWave, 0);
+  assert.equal(unlockWaves(save), 201);
 });
 
-test("invalid reached events do not mutate progress and the highest selectable wave stays within its limit", () => {
+test("invalid waves change nothing, and starts stay within the limit", () => {
   const save = defaultDefendSave(), before = JSON.stringify(save);
-  for (const wave of [0, -1, 1.5, NaN, Infinity, MAX_START_WAVE + 2]) assert.equal(recordWaveReached(save, wave), false);
+  for (const wave of [0, -1, 1.5, NaN, Infinity, MAX_START_WAVE + 2]) {
+    assert.equal(recordWaveReached(save, wave), false);
+    assert.deepEqual(recordWaveCleared(save, wave), []);
+  }
   assert.equal(JSON.stringify(save), before);
-  assert.equal(recordWaveReached(save, MAX_START_WAVE + 1), true);
+  save.bestWave = MAX_START_WAVE;
+  save.startWave = MAX_START_WAVE + 5;
   assert.equal(startingWave(save), MAX_START_WAVE);
-  const restored = decodeDefendSave(JSON.parse(JSON.stringify(save)));
-  assert.equal(restored.furthestWave, MAX_START_WAVE + 1);
-  assert.equal(startingWave(restored), MAX_START_WAVE);
 });

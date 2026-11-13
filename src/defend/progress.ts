@@ -1,4 +1,5 @@
 import { decodeOrders } from "./building-orders.ts";
+import { AREAS, WAVES_PER_AREA, type AreaId } from "./areas.ts";
 import { decodeRepairRanks, type RepairRanks } from "../repair-upgrades.ts";
 import { decodeChronoRanks, type ChronoRanks } from "../chrono-upgrades.ts";
 /** Persistent DEFEND state: the city layout the player designed, what they
@@ -72,14 +73,19 @@ export type DefendSave = {
   levels: Record<UpgradeId, number>;
   legacyCompact?: PlacedKind[];
   bombs: number;
-  /** Highest wave cleared; used only for records and first-clear rewards. */
+  /** Highest wave cleared. Every wave up to it is unlocked as a start
+   * (waves are unlocked by defeating them), as is the first wave of the zone
+   * after it once reached. */
   bestWave: number;
   /** Highest wave actually entered, separate from clearing it. */
   furthestWave: number;
   /** The furthest wave the dev option has opened to start from, past the best (0 when never used). */
   unlockedWave: number;
-  /** Next starting wave; new reached records select furthestWave - 1. */
+  /** Next starting wave; a newly unlocked wave selects itself, and a choice
+   * is only moved back when it is not unlocked. */
   startWave: number;
+  /** Zones whose story scroll has been read (zone-stories.ts); each shows once. */
+  storiesSeen: AreaId[];
   discovered: EnemyKind[];
   journalRead: EnemyKind[];
   paletteSide: "left" | "right";
@@ -154,6 +160,7 @@ export function defaultDefendSave(seed?: number): DefendSave {
     furthestWave: 0,
     unlockedWave: 0,
     startWave: 1,
+    storiesSeen: [],
     discovered: [],
     journalRead: [],
     paletteSide: "left",
@@ -292,17 +299,33 @@ export const UNLOCK_WAVES = 100;
 /** Highest entered wave, with cleared progress as a consistency floor. */
 export const furthestWave = (save: DefendSave) => Math.max(save.furthestWave, save.bestWave);
 
-/** A new reached record advances the next start; retries preserve manual choices. */
+/** Records the highest wave entered; it no longer moves the starting wave. */
 export function recordWaveReached(save: DefendSave, wave: number): boolean {
   if (!Number.isInteger(wave) || wave < 1 || wave > MAX_START_WAVE + 1 || wave <= furthestWave(save)) return false;
   save.furthestWave = wave;
-  save.startWave = Math.max(1, wave - 1);
   return true;
 }
 
-/** Start up to the previous reached wave, or what the dev option opened. */
+/** The furthest unlocked start: every defeated wave, the first wave of the
+ * next zone once the zone before it is cleared, or what the dev option
+ * opened. */
 export function waveReach(save: DefendSave): number {
-  return Math.max(1, furthestWave(save) - 1, save.unlockedWave);
+  const best = save.bestWave;
+  const zoneStart = best > 0 && best % WAVES_PER_AREA === 0 ? best + 1 : 0;
+  return Math.min(MAX_START_WAVE, Math.max(1, best, zoneStart, save.unlockedWave));
+}
+
+/** A wave defeated: records it as the best and, when that unlocks new
+ * starts, selects the furthest one. Returns the waves newly unlocked: the one
+ * defeated, and the next zone's first wave when this reached it. */
+export function recordWaveCleared(save: DefendSave, wave: number): number[] {
+  if (!Number.isInteger(wave) || wave < 1 || wave > MAX_START_WAVE || wave <= save.bestWave) return [];
+  const before = waveReach(save);
+  save.bestWave = wave;
+  const after = waveReach(save);
+  if (after <= before) return [];
+  save.startWave = after;
+  return [wave, wave + 1].filter((w) => w > before && w <= after);
 }
 
 /** The wave the next defense starts on, kept within reach. */
@@ -312,7 +335,7 @@ export function startingWave(save: DefendSave): number {
 
 /** Dev: opens `UNLOCK_WAVES` more waves past the furthest the player can start on now. */
 export function unlockWaves(save: DefendSave): number {
-  save.unlockedWave = Math.min(MAX_START_WAVE, Math.max(0, furthestWave(save) - 1, save.unlockedWave) + UNLOCK_WAVES);
+  save.unlockedWave = Math.min(MAX_START_WAVE, waveReach(save) + UNLOCK_WAVES);
   return save.unlockedWave;
 }
 
@@ -380,6 +403,8 @@ export function decodeDefendSave(raw: any): DefendSave {
   d.seed = intOr(s.seed, 0, 2 ** 32, d.seed);
   const kinds = Object.keys(ENEMIES) as EnemyKind[];
   d.discovered = kinds.filter(k => Array.isArray(s.discovered) && s.discovered.includes(k));
+  const areaIds: readonly string[] = AREAS.map((a) => a.id);
+  d.storiesSeen = Array.isArray(s.storiesSeen) ? [...new Set<AreaId>((s.storiesSeen as unknown[]).filter((id): id is AreaId => typeof id === "string" && areaIds.includes(id)))] : [];
   d.journalRead = d.discovered.filter(k => Array.isArray(s.journalRead) && s.journalRead.includes(k));
   const wallRanks = decodeWallRanks(s.wallRanks);
   if (wallRanks) d.wallRanks = wallRanks;
