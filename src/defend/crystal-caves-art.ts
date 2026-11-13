@@ -15,6 +15,7 @@ import {
   type CrystalCavesPlan, type CrystalCluster, type LightShaft, type MushroomCluster,
 } from "./crystal-caves.ts";
 import { artPen } from "./pixel-fx.ts";
+import { caveTrailPixel, trailField } from "./trail-art.ts";
 
 const W = CELLS_W * ART, H = CELLS_H * ART;
 
@@ -74,6 +75,28 @@ function rockHeights(plan: CrystalCavesPlan) {
   return h;
 }
 
+/** The cavern floor's gravel and pebbles at any art pixel (board
+ * coordinates, past the board too), as `cavePixels` lays them on the open
+ * ground, for the wilds to carry on with no seam. RGBA. */
+export function caveGravelPixel(x: number, y: number) {
+  const v = wash(x, y, 40, 860) * 0.65 + wash(x, y, 9, 861) * 0.35 + (hash01(x, y, 862) - 0.5) * 0.45;
+  let c = GRAVEL[Math.max(0, Math.min(GRAVEL.length - 1, Math.floor(v * GRAVEL.length)))];
+  // The pebbles of this cell and those up and to the left, which may reach here.
+  for (const [ox, oy] of [[0, 0], [-1, 0], [0, -1], [-1, -1]])
+    for (let k = 0; k < 3; k++) {
+      const cx = Math.floor((x + ox) / ART), cy = Math.floor((y + oy) / ART);
+      const px = cx * ART + (hash(cx, cy, k, 863) % ART), py = cy * ART + (hash(cx, cy, k, 864) % ART), big = hash(cx, cy, k, 865) % 3 === 0;
+      if (px === x && py === y) c = big ? PEBBLE.lit : PEBBLE.mid;
+      else if (big && ((px + 1 === x && py === y) || (px === x && py + 1 === y))) c = PEBBLE.mid;
+      else if (px + 1 === x && py + 1 === y) c = PEBBLE.dark;
+    }
+  return rgba(c);
+}
+
+/** RGBA pixel `v` lit warm by the full daylight through the great opening
+ * (as `drawFloor` lights the floor under it), for the wilds. */
+export const sunlitPixel = (v: number) => sunlit(v, 1);
+
 /** The cavern floor over every open cell, as RGBA. */
 export function cavePixels(plan: CrystalCavesPlan): Uint32Array {
   const img: Img = { px: new Uint32Array(W * H), w: W, h: H };
@@ -99,6 +122,17 @@ export function cavePixels(plan: CrystalCavesPlan): Uint32Array {
         if (openAt(x + 1, y + 1)) set(img, x + 1, y + 1, PEBBLE.dark);
       }
     }
+  // The worn trails: packed dust through the gravel, pebbles kicked to their sides.
+  if (plan.trails) {
+    const { t } = trailField(plan.trails);
+    for (let y = 0; y < H; y++)
+      for (let x = 0; x < W; x++) {
+        const i = y * W + x;
+        if (t[i] > 1.3 || !openAt(x, y)) continue;
+        const c = caveTrailPixel(t[i], x, y);
+        if (c) out[i] = c;
+      }
+  }
   // The rocks: shaded by their slope toward the upper left, glossy where it
   // faces the light, outlined at their foot, casting a shadow down and right.
   const h = rockHeights(plan);
@@ -478,7 +512,13 @@ export class CrystalCavesArt {
     c.imageSmoothingEnabled = false;
     c.globalAlpha = Math.min(1, base * (0.04 + 0.13 * night));
     const m = this.mask();
+    // Only over the field: the wilds light their own floor (`wilds.ts`).
+    c.save();
+    c.beginPath();
+    c.rect(0, 0, CELLS_W * px, CELLS_H * px);
+    c.clip();
     c.drawImage(m, ((ox - OPEN_PAD) / ART) * px, ((oy - OPEN_PAD) / ART) * px, (m.width / ART) * px, (m.height / ART) * px);
+    c.restore();
     // Pixel details: pond glints, spores and dust, on the art grid.
     c.globalCompositeOperation = "lighter";
     c.imageSmoothingEnabled = false;

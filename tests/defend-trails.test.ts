@@ -1,7 +1,8 @@
 // The worn monster trails (src/defend/trails.ts, trail-art.ts): the
-// Mossbound Ruins' forest trails and the Amber Desert's sand trails, where
+// Mossbound Ruins' forest trails, the Amber Desert's sand trails and the
+// Crystal Caves' trodden ways, where
 // they run, that only Defend's own cities have them, that the forest keeps
-// off the roads, that ground enemies enter at the trailheads and walk them,
+// and the caves off the roads, that ground enemies enter at the trailheads and walk them,
 // and that forks split a crowd by each enemy's own coin.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -10,6 +11,7 @@ import { CellType, generateCity, type CityMap } from "../src/defend/citygen.ts";
 import { CELL_COUNT, CELLS_H, CELLS_W, cellIndex } from "../src/defend/grid.ts";
 import { TRAIL, forkPick, trailCost, trailPlan, trailStyle } from "../src/defend/trails.ts";
 import { forestPlan } from "../src/defend/forest.ts";
+import { crystalCavesPlan } from "../src/defend/crystal-caves.ts";
 import { paintRoads, onTrailPixel } from "../src/defend/trail-art.ts";
 import { DefendSim } from "../src/defend/sim.ts";
 import { defaultDefendSave } from "../src/defend/progress.ts";
@@ -24,10 +26,12 @@ const city = (seed = 7, trails = true, layout = defaultLayout()): CityMap => {
 };
 const cellOf = (x: number, y: number) => cellIndex(Math.max(0, Math.min(CELLS_W - 1, Math.floor(x))), Math.max(0, Math.min(CELLS_H - 1, Math.floor(y))));
 
-test("only the first two areas wear trails, and only on Defend's own cities", () => {
+test("only the first three areas wear trails, and only on Defend's own cities", () => {
   assert.equal(trailStyle("moss"), "road");
   assert.equal(trailStyle("desert"), "sand");
-  assert.equal(trailStyle("drowned"), null);
+  assert.equal(trailStyle("drowned"), "cave");
+  assert.equal(trailStyle("ember"), null);
+  assert.equal(trailPlan(city(7, false), "cave"), null);
   assert.equal(trailPlan(city(7, false), "road"), null);
   assert.equal(trailPlan(city(7, false), "sand"), null);
   const map = city();
@@ -78,7 +82,7 @@ test("the forest keeps its trees, lakes and rocks off the roads", () => {
 });
 
 test("both areas' trails bend round rocks beside them, never over them", () => {
-  for (const style of ["road", "sand"] as const) {
+  for (const style of ["road", "sand", "cave"] as const) {
     const map = city(), plan = trailPlan(map, style)!;
     assert.ok(plan.heads.length >= 3, `${style}: several trailheads`);
     assert.ok(plan.rocks.length >= 4, `${style}: rocks to bend round (${plan.rocks.length})`);
@@ -93,6 +97,17 @@ test("both areas' trails bend round rocks beside them, never over them", () => {
   // The forest draws the roads' rocks.
   const map = city(), roads = trailPlan(map, "road")!, forest = forestPlan(map);
   for (const r of roads.rocks) assert.ok(forest.rocks.some((o) => o.x === r.x && o.y === r.y && o.size > 1.5));
+});
+
+test("the caves keep their rocks, ponds, crystals and mushrooms off the trails, but draw the trails' rocks", () => {
+  const map = city(), caves = crystalCavesPlan(map), trails = caves.trails!;
+  assert.ok(trails && trails.style === "cave");
+  for (const p of caves.ponds) assert.ok(trails.wear[cellOf(p.x, p.y)] === 0, "no pond on a trail");
+  for (const c of caves.crystals) assert.ok(trails.wear[cellOf(c.x, c.y)] === 0, "no crystal on a trail");
+  for (const m of caves.mushrooms) assert.ok(trails.wear[cellOf(m.x, m.y)] === 0, "no mushroom on a trail");
+  for (const r of trails.rocks) assert.ok(caves.rocks.some((o) => o.x === r.x && o.y === r.y), "the trail's rock is drawn");
+  for (const o of caves.rocks) if (!trails.rocks.some((r) => r.x === o.x && r.y === o.y)) assert.ok(trails.wear[cellOf(o.x, o.y)] === 0, "no other rock on a trail");
+  assert.equal(crystalCavesPlan(city(7, false)).trails, null);
 });
 
 test("a worn trail is cheaper to walk than open ground", () => {
@@ -161,6 +176,14 @@ test("in the desert, the surfaced Blight worms slither down the sand trails", ()
   assert.equal(sim.trails?.style, "sand");
   assert.ok(samples > 100, `enough walkers (${samples})`);
   assert.ok(share > 0.8, `on the trails ${Math.round(share * 100)}% of the time`);
+});
+
+test("in the Crystal Caves, ground enemies keep to the trodden trails", () => {
+  // (Most of the caves' roster sails or flies; the brine crabs walk.)
+  const map = city(), { sim, samples, share } = march(map, 45, 60);
+  assert.equal(sim.trails?.style, "cave");
+  assert.ok(samples > 30, `enough walkers (${samples})`);
+  assert.ok(share > 0.7, `on the trails ${Math.round(share * 100)}% of the time`);
 });
 
 test("a map without trails battles exactly as before", () => {

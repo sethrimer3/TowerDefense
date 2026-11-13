@@ -10,6 +10,7 @@ import { CELLS_H, CELLS_W, cellIndex, hash, hash01 } from "./grid.ts";
 import { CellType, type CityMap } from "./citygen.ts";
 import type { AreaId } from "./areas.ts";
 import { clearOf } from "./forest.ts";
+import { trailPlan, type TrailPlan } from "./trails.ts";
 import type { Sun } from "../daylight.ts";
 
 /** The areas floored as the Crystal Caves. */
@@ -40,6 +41,8 @@ export type LightShaft = { x: number; y: number; r: number; seed: number };
 /** The plan: `open` is 1 on each open-ground cell, which alone the gravel covers. */
 export type CrystalCavesPlan = {
   open: Uint8Array; rocks: RockFormation[]; ponds: CavePond[]; crystals: CrystalCluster[]; mushrooms: MushroomCluster[]; shafts: LightShaft[];
+  /** The worn trails through the gravel (Defend's own cities only). */
+  trails: TrailPlan | null;
 };
 
 const plans = new WeakMap<CityMap, CrystalCavesPlan>();
@@ -61,7 +64,17 @@ function plan_(map: CityMap): CrystalCavesPlan {
     return out.sort((a, b) => a[2] - b[2] || a[1] - b[1] || a[0] - b[0]);
   };
   const taken: { x: number; y: number; r: number }[] = [];
-  const free = (x: number, y: number, r: number) => taken.every((t) => (t.x - x) ** 2 + (t.y - y) ** 2 >= (t.r + r + CRYSTAL_CAVES.apart) ** 2);
+  // The worn trails (Defend's own cities only): nothing lies on them but the
+  // rocks they bend round.
+  const trails = trailPlan(map, "cave");
+  const onTrail = (x: number, y: number, r: number) => {
+    if (!trails) return false;
+    for (let cy = Math.floor(y - r); cy <= Math.floor(y + r); cy++)
+      for (let cx = Math.floor(x - r); cx <= Math.floor(x + r); cx++)
+        if (cx >= 0 && cy >= 0 && cx < CELLS_W && cy < CELLS_H && (cx + 0.5 - x) ** 2 + (cy + 0.5 - y) ** 2 < r * r && trails.wear[cellIndex(cx, cy)] > 0.1) return true;
+    return false;
+  };
+  const free = (x: number, y: number, r: number) => !onTrail(x, y, r + 0.5) && taken.every((t) => (t.x - x) ** 2 + (t.y - y) ** 2 >= (t.r + r + CRYSTAL_CAVES.apart) ** 2);
   const range = (lo: number, hi: number, u: number) => lo + u * (hi - lo);
 
   const ponds: CavePond[] = [];
@@ -95,6 +108,16 @@ function plan_(map: CityMap): CrystalCavesPlan {
     taken.push({ x, y, r });
   }
   const rocks: RockFormation[] = [];
+  // The rocks the trails bend round, first.
+  for (const t of trails?.rocks ?? []) {
+    const seed = hash(Math.round(t.x * 8), Math.round(t.y * 8), 838), lobes = [{ x: t.x, y: t.y, r: t.r * 0.85 }];
+    for (let k = 1; k < 3; k++) {
+      const a = hash01(seed, k, 834) * Math.PI * 2, d = t.r * (0.25 + hash01(seed, k, 835) * 0.3);
+      lobes.push({ x: t.x + Math.cos(a) * d, y: t.y + Math.sin(a) * d, r: t.r * (0.45 + hash01(seed, k, 836) * 0.25) });
+    }
+    rocks.push({ x: t.x, y: t.y, r: t.r, seed, lobes });
+    taken.push({ x: t.x, y: t.y, r: t.r });
+  }
   for (const [cx, cy] of spots(831)) {
     if (rocks.length >= CRYSTAL_CAVES.rocks) break;
     const r = range(...CRYSTAL_CAVES.rock, hash01(cx, cy, 832) ** 1.5), x = cx + 0.5, y = cy + 0.5;
@@ -119,7 +142,7 @@ function plan_(map: CityMap): CrystalCavesPlan {
     if (shafts.some((s) => (s.x - x) ** 2 + (s.y - y) ** 2 < CRYSTAL_CAVES.shaftApart ** 2)) continue;
     shafts.push({ x, y, r, seed: hash(cx, cy, 843) });
   }
-  return { open, rocks, ponds, crystals, mushrooms, shafts };
+  return { open, rocks, ponds, crystals, mushrooms, shafts, trails };
 }
 
 /** The great opening in the cave's roof over the top of the board: how far

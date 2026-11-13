@@ -117,10 +117,40 @@ export function roadPixel(v: number, X: number, Y: number): number {
   return rgba(c);
 }
 
+/** The caves' trodden floor, darkest to palest: the dust the walkers have
+ * packed smooth, a little paler than the loose gravel round it; and the
+ * pebbles their feet have kicked into a ridge along each side. */
+const TROD = [0x1c1d23, 0x212228, 0x26272e, 0x2b2c34, 0x313239];
+const KICKED = { lit: 0x3a3d46, mid: 0x2a2c33, dark: 0x0a0b0d };
+
+/** A cave trail's pixel at board art pixel (X, Y), `v` of its half width
+ * from its middle: packed dust down the middle, pale where it is most worn,
+ * with a scuff here and there; along the edge a broken ridge of kicked
+ * pebbles, lit from the upper left; 0 where the gravel shows. The wilds carry
+ * the trails on past the board with it. */
+export function caveTrailPixel(v: number, X: number, Y: number): number {
+  if (v > FRINGE) return 0;
+  const u = v / edgeAt(X, Y, 5), h = hash(X, Y, 941);
+  if (u >= 1.12) return 0;
+  if (u > 0.82) {
+    // The ridge: pebbles, a few pixels each, every so often.
+    const p = hash(X >> 1, Y >> 1, 942) % 7;
+    if (p > 2) return 0;
+    return rgba(p === 0 ? KICKED.lit : p === 1 ? KICKED.mid : KICKED.dark);
+  }
+  // Ragged where the packed floor gives way to gravel.
+  if (u > 0.68 && hash01(X, Y, 943) < (u - 0.68) / 0.14) return 0;
+  const worn = 1 - u + (blotch(X, Y, 4, 944) - 0.5) * 0.6;
+  let c = TROD[Math.max(0, Math.min(4, Math.round(worn * 3.6 + (h % 3) - 1)))];
+  if (h % 61 === 0) c = KICKED.dark;
+  else if (h % 61 === 1) c = KICKED.lit;
+  return rgba(c);
+}
+
 /** As `paintRoads`, for lines (cells, `half` wide) into any `ow × oh` buffer
  * whose board corner is at (ox, oy) art pixels; `keep` says which pixels
  * the road may cover. The pixels it covered. */
-export function paintRoadLines(out: Uint32Array, ow: number, oh: number, ox: number, oy: number, lines: readonly { points: readonly { x: number; y: number }[]; half: number }[], keep: (i: number) => boolean): number[] {
+export function paintRoadLines(out: Uint32Array, ow: number, oh: number, ox: number, oy: number, lines: readonly { points: readonly { x: number; y: number }[]; half: number }[], keep: (i: number) => boolean, pixel: (v: number, X: number, Y: number) => number = roadPixel): number[] {
   const t = new Map<number, number>();
   for (const line of lines) {
     // Far enough out for the dunes' run down to the trail (`TAPER` in atmosphere-art.ts).
@@ -138,7 +168,7 @@ export function paintRoadLines(out: Uint32Array, ow: number, oh: number, ox: num
   const covered: number[] = [];
   for (const [i, v] of t) {
     if (!keep(i)) continue;
-    const c = roadPixel(v, (i % ow) - ox, Math.floor(i / ow) - oy);
+    const c = pixel(v, (i % ow) - ox, Math.floor(i / ow) - oy);
     if (c) (out[i] = c), covered.push(i);
   }
   return covered;

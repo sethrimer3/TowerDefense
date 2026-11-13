@@ -34,7 +34,8 @@ import { CURVE, PALETTE32, SHADOW, WIND } from "./park-grass.ts";
 import { paintFloorTile } from "./city-layer.ts";
 import { pixelKey } from "./pixel-sprites.ts";
 import { sceneryOutlinesOn, windAt } from "./scenery-looks.ts";
-import { paintRoadLines, sandReachCanvases } from "./trail-art.ts";
+import { caveTrailPixel, paintRoadLines, sandReachCanvases } from "./trail-art.ts";
+import { caveGravelPixel, openingLight, sunlitPixel } from "./crystal-caves-art.ts";
 import { duneHeights, duneLightKey, duneTaperPixels, duneTile } from "./atmosphere-art.ts";
 import { segmentDistance, type TrailLine, type TrailPlan } from "./trails.ts";
 
@@ -415,6 +416,127 @@ function paintMesas(out: Uint32Array) {
       out[i] = tone(layer(l), band + (hash01(X, Y, 748) < 0.06 ? -0.08 : 0));
     }
 }
+/** The Crystal Caves' basalt, a column's top dark to pale, its sides lit to
+ * shaded, and the cracks between the columns (RGB). */
+const BASALT_TOP = [0x252a36, 0x2e3442, 0x383f50, 0x434b5e, 0x58617a];
+const BASALT_SIDE = [0x1d212b, 0x161920, 0x111318, 0x0c0d11];
+const BASALT_CRACK = 0x07080b;
+/** Cave moss, purple and blue, dark to bright. */
+const MOSS = [[0x2e1748, 0x48246e, 0x6a3a9c, 0x9262c8], [0x142c50, 0x1f467a, 0x2f66a8, 0x4c8ad0]];
+/** Mushroom caps (rim, cap, lit), teal and lilac as on the cave floor, and their stems. */
+const SHROOM = [[0x10403e, 0x2fa894, 0x7aeccf], [0x3a1858, 0x9a62d8, 0xcfa2f6]];
+const SHROOM_STEM = 0x8a9894;
+/** How far apart the basalt columns stand (art pixels), how many art
+ * pixels of side a unit of height shows to the south, and the most. */
+const COLUMN = 11, SIDE_PER = 0.8, SIDE_MAX = 18;
+
+/** The Crystal Caves' ranges as basalt, from `rangeField`: a field of
+ * columns, each a jittered hexagon (nearest of a staggered grid of
+ * centres, so they read as hexagons yet stay rough), standing to its own
+ * height (the ranges' height there plus a little of its own), its top lit
+ * from the upper left with a pale rim and dark cracks between, its side
+ * showing to the south wherever it stands over a lower column or the floor,
+ * faceted and darkening to its foot; purple and blue moss creeping over the
+ * tops in patches and dripping down the sides; small glowing mushrooms in
+ * the moss. */
+function paintBasalt(out: Uint32Array) {
+  const { H, f } = rangeField(), dy = COLUMN * 0.866;
+  const rows = Math.ceil(GH / dy) + 3, cols = Math.ceil(GW / COLUMN) + 3;
+  const cxs = new Float32Array(rows * cols), cys = new Float32Array(rows * cols), ch = new Float32Array(rows * cols);
+  for (let r = 0; r < rows; r++)
+    for (let c = 0; c < cols; c++) {
+      const j = r * cols + c, x = (c - 1 + (r & 1 ? 0.5 : 0)) * COLUMN + (hash01(c, r, 761) - 0.5) * 4.4, y = (r - 1) * dy + (hash01(c, r, 762) - 0.5) * 4;
+      cxs[j] = x; cys[j] = y;
+      const X = Math.max(0, Math.min(GW - 1, Math.round(x))), Y = Math.max(0, Math.min(GH - 1, Math.round(y))), i = Y * GW + X;
+      // Stepped in clusters, each column a little above or below its neighbours.
+      ch[j] = f[i] > 0 ? 8 + Math.floor((H[i] * 0.45 + 6 * smoothNoise(x / 40, y / 40, 760)) / 9) * 9 + hash01(c, r, 763) * 7 : 0;
+    }
+  // Each pixel's column.
+  const id = new Int32Array(GW * GH);
+  for (let Y = 0; Y < GH; Y++) {
+    const r0 = Math.round(Y / dy) + 1;
+    for (let X = 0; X < GW; X++) {
+      let best = -1, bd = Infinity;
+      for (let r = Math.max(0, r0 - 1); r <= Math.min(rows - 1, r0 + 1); r++) {
+        const c0 = Math.round(X / COLUMN - (r & 1 ? 0.5 : 0)) + 1;
+        for (let c = Math.max(0, c0 - 1); c <= Math.min(cols - 1, c0 + 1); c++) {
+          const j = r * cols + c, d = (cxs[j] - X) ** 2 + (cys[j] - Y) ** 2;
+          if (d < bd) (bd = d), (best = j);
+        }
+      }
+      id[Y * GW + X] = best;
+    }
+  }
+  const on = (i: number) => f[i] > 0;
+  const tone = (c: number) => rgbaOf(c);
+  const rim = sceneryOutlinesOn() ? rgbaOf(0x040406) : rgbaOf(BASALT_CRACK);
+  const mossAt = (X: number, Y: number, j: number) => {
+    const m = smoothNoise(X / 44, Y / 44, 764) * 0.85 + hash01(j, 765) * 0.25 - ch[j] * 0.002 + (BAYER4[(Y & 3) * 4 + (X & 3)] - 0.5) * 0.08;
+    return m > 0.6 ? (smoothNoise(X / 55, Y / 55, 766) > 0.5 ? 0 : 1) : -1;
+  };
+  for (let Y = 0; Y < GH; Y++)
+    for (let X = 0; X < GW; X++) {
+      const i = Y * GW + X;
+      if (X >= OX && Y >= OY && X < OX + BW && Y < OY + BH) continue;
+      const j = id[i], hc = on(i) ? ch[j] : 0;
+      // A column's side, dropping toward the viewer from a taller one just north.
+      let face = -1, d = 0;
+      for (let k = 1; k <= SIDE_MAX && Y - k >= 0; k++) {
+        const q = i - k * GW, jq = id[q];
+        if (jq === j && on(q) === on(i)) continue;
+        if (on(q) && ch[jq] > hc && (ch[jq] - hc) * SIDE_PER >= k) { face = jq; d = k; }
+        break;
+      }
+      if (face >= 0) {
+        const tall = Math.min(SIDE_MAX, Math.floor((ch[face] - hc) * SIDE_PER));
+        if (d === tall) { out[i] = rim; continue; }
+        // Facets: lit on the column's left, shaded on its right.
+        const side = X - cxs[face], facet = side < -COLUMN * 0.2 ? 0 : side < COLUMN * 0.2 ? 1 : 2;
+        let c = BASALT_SIDE[Math.min(3, facet + (d > tall * 0.6 ? 1 : 0))];
+        if (d === 1) c = BASALT_TOP[3];
+        const mh = mossAt(Math.round(cxs[face]), Math.round(cys[face]), face);
+        if (mh >= 0 && d <= 2 + hash01(X, face, 767) * tall * 0.7) c = MOSS[mh][d < 3 ? 1 : 0];
+        out[i] = tone(c);
+        continue;
+      }
+      if (!on(i)) continue;
+      if (!on(i - 1) || !on(i + 1) || !on(i - GW) || !on(i + GW)) { out[i] = rim; continue; }
+      // Cracks to the lower right, a pale rim to the upper left.
+      if (id[i + 1] !== j || id[i + GW] !== j) { out[i] = rim; continue; }
+      const lip = id[i - 1] !== j || id[i - GW] !== j;
+      const m = mossAt(X, Y, j);
+      if (m >= 0) {
+        const lit = (cxs[j] - X + cys[j] - Y) / COLUMN + (hash01(X, Y, 768) - 0.5) * 1.2;
+        out[i] = tone(MOSS[m][lip ? 3 : Math.max(0, Math.min(3, Math.round(1.4 + lit)))]);
+        continue;
+      }
+      // In the shade of a taller column up and to the left?
+      let shaded = false;
+      for (let k = 2; k <= 8 && !shaded; k += 2) {
+        const q = i - k * GW - k;
+        if (q >= 0 && on(q) && ch[id[q]] > hc + k * 1.4) shaded = true;
+      }
+      if (lip) { out[i] = tone(BASALT_TOP[shaded ? 2 : 4]); continue; }
+      // The higher tiers paler, the lower darker, so the formations read in depth.
+      const base = Math.min(2.4, 0.4 + hc / 40) + (hash(j, 769) % 2) * 0.5, lit = (cxs[j] - X + cys[j] - Y) / (COLUMN * 1.2) + (hash01(X, Y, 770) - 0.5) * 0.5;
+      out[i] = tone(BASALT_TOP[Math.max(0, Math.min(3, Math.round(base + lit - (shaded ? 1.6 : 0))))]);
+    }
+  // Mushrooms in the moss, a few to a column here and there.
+  const put = (X: number, Y: number, c: number) => { if (X >= 0 && Y >= 0 && X < GW && Y < GH && on(Y * GW + X)) out[Y * GW + X] = rgbaOf(c); };
+  for (let j = 0; j < rows * cols; j++) {
+    if (ch[j] <= 0 || hash01(j, 771) > 0.3) continue;
+    const X0 = Math.round(cxs[j]), Y0 = Math.round(cys[j]);
+    if (X0 < 2 || Y0 < 2 || X0 >= GW - 2 || Y0 >= GH - 2 || mossAt(X0, Y0, j) < 0 || id[Y0 * GW + X0] !== j) continue;
+    if (X0 >= OX && Y0 >= OY && X0 < OX + BW && Y0 < OY + BH) continue;
+    const hue = hash01(j, 772) < 0.6 ? 0 : 1, n = 1 + (hash(j, 773) % 3);
+    for (let k = 0; k < n; k++) {
+      const x = X0 + (hash(j, k, 774) % 7) - 3, y = Y0 + (hash(j, k, 775) % 5) - 2, [rimC, cap, lit] = SHROOM[hue];
+      put(x, y + 1, SHROOM_STEM); put(x, y + 2, SHROOM_STEM);
+      put(x - 2, y, rimC); put(x - 1, y, cap); put(x, y, cap); put(x + 1, y, cap); put(x + 2, y, rimC);
+      put(x - 1, y - 1, cap); put(x, y - 1, lit); put(x + 1, y - 1, cap);
+    }
+  }
+}
 const BAYER4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
 const rgbaOf = (c: number) => ((255 << 24) | ((c & 0xff) << 16) | (c & 0xff00) | ((c >> 16) & 0xff)) >>> 0;
 
@@ -423,7 +545,8 @@ const rgbaOf = (c: number) => ((255 << 24) | ((c & 0xff) << 16) | (c & 0xff00) |
  * the mountain ranges, rocks with their shadows, and in the forest the trees'
  * shadows. `turf` marks the lawn pixels left (where blades grow), `shaded`
  * those under a tree's shadow. */
-export function paintWilds(forest: boolean, stone?: Stone, reach: readonly TrailLine[] = [], rocks = true, moab = false) {
+export function paintWilds(forest: boolean, stone?: Stone, reach: readonly TrailLine[] = [], rocks = true, look: "ranges" | "moab" | "basalt" = "ranges") {
+  const moab = look === "moab", basalt = look === "basalt";
   const out = new Uint32Array(GW * GH), whole = wildsPlan();
   // The trees and rocks clear of the roads carried out here.
   const plan: WildsPlan = reach.length
@@ -445,7 +568,22 @@ export function paintWilds(forest: boolean, stone?: Stone, reach: readonly Trail
       const X = i % GW, Y = (i - X) / GW;
       return !(X >= OX && Y >= OY && X < OX + BW && Y < OY + BH);
     });
-  if (moab) paintMesas(out); else paintRanges(out);
+  // The caves' gravel floor carried on past the board, its trails too (lit
+  // under the great opening by `Wilds.caveLight`).
+  if (basalt) {
+    for (let Y = 0; Y < GH; Y++)
+      for (let X = 0; X < GW; X++) {
+        if (X >= OX && Y >= OY && X < OX + BW && Y < OY + BH) continue;
+        out[Y * GW + X] = caveGravelPixel(X - OX, Y - OY);
+      }
+    if (reach.length)
+      paintRoadLines(out, GW, GH, OX, OY, reach, (i) => {
+        const X = i % GW, Y = (i - X) / GW;
+        return !(X >= OX && Y >= OY && X < OX + BW && Y < OY + BH);
+      }, caveTrailPixel);
+  }
+  const bare = basalt ? out.slice() : null;
+  if (moab) paintMesas(out); else if (basalt) paintBasalt(out); else paintRanges(out);
   // Rocks, back to front, each with its shadow down and right.
   const items: { y: number; draw: () => void }[] = [];
   // (None in the desert: its dunes run on over the wilds, as rockless as the field's.)
@@ -478,7 +616,7 @@ export function paintWilds(forest: boolean, stone?: Stone, reach: readonly Trail
   }
   items.sort((a, b) => a.y - b.y);
   for (const it of items) it.draw();
-  if (stone && !moab) recolour(out, GW, stone);
+  if (stone && look === "ranges") recolour(out, GW, stone);
   const turf = new Uint8Array(GW * GH), shaded = new Uint8Array(GW * GH);
   if (lawn) {
     for (let i = 0; i < out.length; i++) turf[i] = out[i] !== 0 && out[i] === lawn[i] ? 1 : 0;
@@ -496,7 +634,9 @@ export function paintWilds(forest: boolean, stone?: Stone, reach: readonly Trail
         }
     }
   }
-  return { px: out, turf, shaded, plan };
+  // The floor left bare between the basalt (for the opening's light).
+  const floor = bare ? Uint8Array.from(out, (v, i) => (v !== 0 && v === bare[i] ? 1 : 0)) : null;
+  return { px: out, turf, shaded, plan, floor };
 }
 
 /** The waving blades of the wilds' lawn, as flat arrays: each blade's root
@@ -579,6 +719,9 @@ export type WildsFrame = {
   /** The desert's dunes, on the field now: they run on out here to the
    * mountains, the field's sand trails carved on through them. */
   sand?: { trails: TrailPlan | null } | null;
+  /** The Crystal Caves' trails, carried on out here through the gravel, and
+   * how strong the day is through the great opening (0..1, `ShaftLight.day`). */
+  caves?: { trails: TrailPlan | null; day: number } | null;
   /** The day's colour washed over the board (soft light), so the wilds take it too. */
   tint?: { color: string; strength: number };
   /** How dark the board's own night is at its edge (its ambient's opacity),
@@ -611,7 +754,34 @@ function nightShade() {
 
 /** The wilds' still ground painted for one area (and, in the forest, one
  * city's roads), the trees and rocks it was painted with, and its blades. */
-type Ground = { canvas: HTMLCanvasElement; turf: Uint8Array; shaded: Uint8Array; plan: WildsPlan; blades: Blades | null };
+type Ground = { canvas: HTMLCanvasElement; turf: Uint8Array; shaded: Uint8Array; plan: WildsPlan; blades: Blades | null; open: { lit: HTMLCanvasElement; moon: HTMLCanvasElement } | null };
+
+/** The Crystal Caves' wilds under the great opening: the bare floor `px`
+ * (`floor`) as the full daylight lights it, faded by how much of the sky's
+ * light reaches each pixel (`lit`), and that light alone in white (`moon`,
+ * for the night). */
+function caveOpening(px: Uint32Array, floor: Uint8Array) {
+  const lit = new Uint32Array(GW * GH), moon = new Uint32Array(GW * GH);
+  for (let Y = 0; Y < GH; Y++)
+    for (let X = 0; X < GW; X++) {
+      const i = Y * GW + X;
+      if (!floor[i]) continue;
+      const k = openingLight(X - OX, Y - OY);
+      if (k <= 0) continue;
+      const a = Math.round(255 * k);
+      lit[i] = ((sunlitPixel(px[i]) & 0xffffff) | (a << 24)) >>> 0;
+      moon[i] = ((a << 24) | 0xdcf4ff) >>> 0;
+    }
+  const canvasOf = (data: Uint32Array) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = GW; canvas.height = GH;
+    const ctx = canvas.getContext("2d")!, img = ctx.createImageData(GW, GH);
+    new Uint32Array(img.data.buffer).set(data);
+    ctx.putImageData(img, 0, 0);
+    return canvas;
+  };
+  return { lit: canvasOf(lit), moon: canvasOf(moon) };
+}
 
 /** Draws the wilds, kept by the renderer. */
 export class Wilds {
@@ -630,20 +800,21 @@ export class Wilds {
   private ground(forest: boolean, area: AreaId, roads: TrailPlan | null = null) {
     // Repainted when the art changes (scenery outlines turned on or off).
     if (pixelKey() !== this.groundsArt) { this.groundsArt = pixelKey(); this.grounds.clear(); }
-    const reach = forest && roads ? this.reach(roads) : null;
-    const key = forest ? `forest:${reach?.key ?? ""}` : area;
+    const caves = area === "drowned", trailed = forest || caves;
+    const reach = trailed && roads ? this.reach(roads) : null;
+    const key = trailed ? `${forest ? "forest" : "caves"}:${reach?.key ?? ""}` : area;
     let g = this.grounds.get(key);
     if (g) return g;
     // Only the current city's roads are kept.
-    if (forest) for (const k of [...this.grounds.keys()]) if (k.startsWith("forest:")) this.grounds.delete(k);
-    const painted = paintWilds(forest, forest ? undefined : STONES[area], reach?.lines ?? [], area !== "desert", area === "desert");
+    if (trailed) for (const k of [...this.grounds.keys()]) if (k.startsWith(forest ? "forest:" : "caves:")) this.grounds.delete(k);
+    const painted = paintWilds(forest, forest ? undefined : STONES[area], reach?.lines ?? [], area !== "desert" && !caves, area === "desert" ? "moab" : caves ? "basalt" : "ranges");
     const canvas = document.createElement("canvas");
     canvas.width = GW;
     canvas.height = GH;
     const ctx = canvas.getContext("2d")!, img = ctx.createImageData(GW, GH);
     new Uint32Array(img.data.buffer).set(painted.px);
     ctx.putImageData(img, 0, 0);
-    g = { canvas, turf: painted.turf, shaded: painted.shaded, plan: painted.plan, blades: null };
+    g = { canvas, turf: painted.turf, shaded: painted.shaded, plan: painted.plan, blades: null, open: painted.floor ? caveOpening(painted.px, painted.floor) : null };
     this.grounds.set(key, g);
     return g;
   }
@@ -716,9 +887,11 @@ export class Wilds {
       ctx.drawImage(src, sx, sy, b.x1 - b.x0, b.y1 - b.y0, x, y, Math.round(toX(b.x1)) - x, Math.round(toY(b.y1)) - y);
     };
     if (f.sand) blit(this.sand(f.sand.trails), view);
-    const g = this.ground(forest, f.area, f.forest?.plan.roads);
+    const g = this.ground(forest, f.area, f.forest?.plan.roads ?? f.caves?.trails ?? null);
     blit(g.canvas, view);
     if (forest && f.effects) this.life(ctx, f, g, view, blit);
+    // The caves' floor lit through the great opening, as the field's is.
+    if (g.open) { ctx.globalAlpha = 0.55 * (0.3 + 0.7 * (f.caves?.day ?? 1)); blit(g.open.lit, view); ctx.globalAlpha = 1; }
     if (f.tint?.strength) {
       ctx.globalCompositeOperation = "soft-light";
       ctx.globalAlpha = f.tint.strength;
@@ -737,6 +910,15 @@ export class Wilds {
       ctx.imageSmoothingEnabled = true;
       const x = toX(0), y = toY(0);
       ctx.drawImage(nightShade(), x, y, toX(GW) - x, toY(GH) - y);
+      ctx.globalAlpha = 1;
+      ctx.imageSmoothingEnabled = false;
+    }
+    // And by night the opening's pale moonlight over it, as over the field.
+    if (g.open) {
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = 0.04 + 0.13 * Math.max(0, Math.min(1, f.night));
+      blit(g.open.moon, view);
+      ctx.globalCompositeOperation = "source-over";
       ctx.globalAlpha = 1;
     }
     ctx.restore();
