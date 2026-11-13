@@ -914,6 +914,9 @@ span.training-timer {
 .scroll-arrow.show {
   opacity: 1;
 }
+/* A sideways row's arrows step it when clicked. */
+.scroll-arrow-left.show,
+.scroll-arrow-right.show { pointer-events: auto; cursor: pointer; width: 27px; height: 18px; }
 .scroll-arrow-up { transform: translate(-50%, 0) rotate(180deg); }
 .scroll-arrow-down { transform: translate(-50%, -100%); }
 .scroll-arrow-left { transform: translate(-3px, -50%) rotate(90deg); }
