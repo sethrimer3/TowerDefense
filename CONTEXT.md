@@ -773,6 +773,9 @@ A larger, tougher and slower Blight Prism with four nested spinning triangles. R
 **Dark Blade**:
 A Blight knight: a black pentagon body pointed the way it faces, a black cloak threaded with faint burning lines, and an orange and black greatsword. It swings very slowly but devastatingly, a long wind-up then a wide crescent cut that strikes every building and defender inside it. One leads Crystal Caves wave 50 and three wave 55.
 
+**Lesser Dark Blade**:
+A smaller Dark Blade with a square body and a short sword. It cuts far more often but for much less damage, leaving small, short-lived tears. A few come on each even Crystal Caves wave from 42 to 48.
+
 **Tear** (in space):
 The ragged, burning-lipped crescent a Dark Blade's cut leaves on the board. It slowly closes and does no damage.
 

@@ -38,6 +38,10 @@ try {
       ['tear at 3 s', knight({ blade: { wind: 0, dx: 0, dy: 1, lx: 0, ly: 0 }, cd: cd - 3 }), [tear(3)]],
       ['tear at 6 s', knight({ facing: { x: -.7, y: .7 } }), [tear(6)]],
       ['tear at 8.5 s', knight({ facing: { x: -1, y: 0 } }), [tear(8.5)]],
+      ['lesser: idle', knight({ kind: 'lesserDarkBlade' }), []],
+      ['lesser: winding up', knight({ kind: 'lesserDarkBlade', facing: { x: 1, y: 0 }, blade: { wind: .2, dx: 1, dy: 0, lx: 0, ly: 0 } }), []],
+      ['lesser: the cut', knight({ kind: 'lesserDarkBlade', blade: { wind: 0, dx: 0, dy: 1, lx: 0, ly: 0 }, cd: ENEMIES.lesserDarkBlade.cooldown - .11 }), [{ ...tear(.11), r: 1.3, life: 4 }]],
+      ['lesser: tear at 2 s', knight({ kind: 'lesserDarkBlade', facing: { x: -.7, y: .7 } }), [{ ...tear(2), r: 1.3, life: 4 }]],
     ];
     setPixelArt(true);
     const outline = new UnitOutline();
@@ -51,8 +55,10 @@ try {
       const d = c.getImageData(0, 0, S, S).data; for (let i = 3; i < d.length; i += 4) if (d[i]) tearPixels++;
       const t = document.createElement('div'); t.textContent = label; card.append(t, cv); gallery.append(card);
     }
-    const p = document.createElement('canvas'); paintPortrait(p, 'darkBlade'); p.style.cssText = 'width:96px;height:96px;image-rendering:pixelated';
+    for (const kind of ['darkBlade', 'lesserDarkBlade']) {
+    const p = document.createElement('canvas'); paintPortrait(p, kind); p.style.cssText = 'width:96px;height:96px;image-rendering:pixelated';
     const card = document.createElement('div'); card.style.cssText = 'background:#302b32;padding:6px'; card.append('journal', document.createElement('br'), p); gallery.append(card);
+    }
     return { tearPixels };
   });
   assert.deepEqual(errors, []);

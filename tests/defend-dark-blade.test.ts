@@ -5,7 +5,7 @@ import { DefendSim, type Levels } from "../src/defend/sim.ts";
 import { generateCity } from "../src/defend/citygen.ts";
 import { defaultLayout, fitLayout } from "../src/defend/layout.ts";
 import { buildWave, waveDifficulty } from "../src/defend/waves.ts";
-import { DARK_BLADE, bladeSwing, inCrescent } from "../src/defend/dark-blade.ts";
+import { DARK_BLADE, LESSER_DARK_BLADE, bladeSwing, inCrescent } from "../src/defend/dark-blade.ts";
 import { darkBladeBodyPixels, darkBladeBox, darkBladeTurned, greatswordTurned, greatswordBox, inPentagon } from "../src/defend/dark-blade-shapes.ts";
 import { blightDrawnPixels } from "../src/defend/blight-size.ts";
 import { journalHTML } from "../src/defend/journal.ts";
@@ -21,6 +21,11 @@ test("Crystal Caves waves: one Dark Blade on 50, three on 55, one placeholder Bl
   assert.deepEqual(buildWave(55, () => { throw Error("authored wave rolled"); }), ["darkBlade", "darkBlade", "darkBlade"]);
   for (let wave = 41; wave <= 60; wave++) {
     if (wave === 50 || wave === 55) continue;
+    if (wave <= 48 && wave % 2 === 0) {
+      const q = buildWave(wave, () => { throw Error("authored wave rolled"); });
+      assert.ok(q.length >= 3 && q.every(k => k === "lesserDarkBlade"), `wave ${wave}`);
+      continue;
+    }
     const q = buildWave(wave, () => { throw Error("authored wave rolled"); });
     assert.equal(q.length, 1, `wave ${wave}`);
     assert.equal(ENEMIES[q[0]].faction, "darkOne");
@@ -67,6 +72,24 @@ test("it winds up, cuts once for heavy damage, tears space, then waits out its c
   // The tear closes.
   for (let i = 0; i < Math.ceil(DARK_BLADE.tearLife / dt); i++) sim.step(dt);
   assert.ok(sim.tears.every(t => t.t < DARK_BLADE.tearLife));
+});
+
+test("the Lesser Dark Blade is smaller, square, quicker and much weaker", () => {
+  const big = ENEMIES.darkBlade, small = ENEMIES.lesserDarkBlade;
+  assert.ok(small.scriptedOnly && small.faction === "darkOne");
+  assert.ok(small.hp < big.hp / 5 && small.damage < big.damage / 4 && small.cooldown < big.cooldown / 2 && small.size < big.size);
+  assert.ok(LESSER_DARK_BLADE.reach < DARK_BLADE.reach && LESSER_DARK_BLADE.windup < DARK_BLADE.windup);
+  const w = blightDrawnPixels("lesserDarkBlade")!;
+  assert.equal(w, 7);
+  assert.ok(darkBladeBodyPixels(w, true).every(Boolean), "square body");
+  assert.ok(greatswordTurned(w, 0).filter(Boolean).length < greatswordTurned(11, 0).filter(Boolean).length, "smaller sword");
+  const sim = fixture(), e = sim.spawnAuxiliary("lesserDarkBlade", 20, 10)!;
+  const b = sim.map.buildings.find(x => sim.intact(x) && x.kind !== "keep")!;
+  e.x = b.rect.x - .5; e.y = b.rect.y + b.rect.h / 2;
+  const dt = 1 / 30;
+  for (let i = 0; i < Math.ceil((LESSER_DARK_BLADE.windup + small.cooldown * 2 + .2) / dt) && sim.enemies.includes(e); i++) sim.step(dt);
+  assert.ok(sim.tears.length >= 2, "cuts again quickly");
+  assert.ok(sim.tears.every(t => t.r === LESSER_DARK_BLADE.reach && t.life === LESSER_DARK_BLADE.tearLife), "smaller, shorter tears");
 });
 
 test("pixel masks: pentagon points forward; the turned knight and sword fit their boxes", () => {
