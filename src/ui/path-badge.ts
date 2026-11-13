@@ -5,6 +5,7 @@ import { pathById, type PathId } from "../knowledge-paths.ts";
 import { specialtyLabel } from "../specializations.ts";
 import { artLook } from "../defend/tower-art.ts";
 import { paintPathIcon } from "./path-icons.ts";
+import { paintSkillIcons } from "./skill-icons.ts";
 
 const ROMAN = ["", "I", "II", "III", "IV", "V"];
 
@@ -21,10 +22,12 @@ export function pathLook(kind: string, path?: PathId): string {
   return look ? ` data-look="${look}"` : "";
 }
 
-/** Paints every path icon (`data-path-icon="icon:hue"`) under `root`. */
+/** Paints every path icon (`data-path-icon="icon:hue"`) under `root`, and
+ * every skill icon (`data-skill-icon`). */
 export function paintPathIcons(root: ParentNode) {
   root.querySelectorAll<HTMLCanvasElement>("canvas[data-path-icon]").forEach((c) => {
     const [icon, hue] = c.dataset.pathIcon!.split(":");
     paintPathIcon(c, icon as never, hue as never);
   });
+  paintSkillIcons(root);
 }

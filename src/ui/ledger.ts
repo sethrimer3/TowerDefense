@@ -14,6 +14,7 @@ import { UNSPECIALIZED, equipSpell, isSpell, pathById, pathState, pathsOf, unlea
 import { cancelResearch, researchLeft, researchSeconds, startResearch } from "../research-jobs.ts";
 import { addForgeSmith, cancelForge, forgeLeft, forgeSeconds, removeForgeSmith, startForge, type ForgeRequest } from "../forge-jobs.ts";
 import { paintPathIcons } from "./path-badge.ts";
+import { skillIcon } from "./skill-icons.ts";
 import { TrainingParticles } from "../training-particles.ts";
 import { trainingSeconds } from "../training-jobs.ts";
 import { ITEM_NAMES, SPEED3_PRICE, UPGRADES, upgradePrice, type Price, type UpgradeId } from "../defend/catalog.ts";
@@ -445,7 +446,7 @@ export class Ledger {
     if (job.kind === "skill") {
       const skill = SKILLS[job.id];
       name = skill.name; text = skill.text; label = `Rank ${job.rank + 1} / ${skill.max}`;
-      icon = `<span class="research-skill-glyph" aria-hidden="true">${skill.icon}</span>`;
+      icon = `<span class="research-skill-glyph" aria-hidden="true">${skillIcon(job.id)}</span>`;
       this.researchFocus = `[data-learn="${job.id}"]`;
     } else {
       const path = pathById(job.id), crown = job.kind === "evolution";
@@ -530,7 +531,7 @@ export class Ledger {
       const active = save.researchJob?.kind === "skill" && save.researchJob.id === id;
       const busy = !!save.researchJob;
       const why = maxed || active ? "" : busy ? "Researchers are working on the current project" : missing.length ? `Needs ${missing.join(" and ")} first` : !available ? "Locked" : !canBuy ? `Needs ${price} Knowledge, have ${whole(save.knowledge)}` : "";
-      return `<article class="ledger-skill ${level ? "owned" : ""} ${available ? "" : "locked"}"><span class="ledger-glyph" aria-hidden="true">${skill.icon}</span><div><small>${level} / ${skill.max} RANKS</small><h3>${name}</h3><p>${skill.text}.${why ? ` <em>${why}.</em>` : ""}</p></div>
+      return `<article class="ledger-skill ${level ? "owned" : ""} ${available ? "" : "locked"}"><span class="ledger-glyph" aria-hidden="true">${skillIcon(id)}</span><div><small>${level} / ${skill.max} RANKS</small><h3>${name}</h3><p>${skill.text}.${why ? ` <em>${why}.</em>` : ""}</p></div>
         <button data-learn="${id}" ${maxed || !canBuy || busy || (!researchers && !save.settings.instantResearch) ? "disabled" : ""}>${maxed ? tr("common.mastered") : active ? `Researching<small data-research-timer>${this.researchTimeLeft()}</small>` : `${tr("common.learn")}<small>${price} Knowledge</small><small>${this.researchHint(level)}</small>`}</button></article>`;
     };
     if (t.id === "warBanner") {
@@ -576,6 +577,7 @@ export class Ledger {
         el.title = label;
         el.onclick = event => { if (event.detail === 0) select(id); };
         el.querySelectorAll<HTMLCanvasElement>("[data-icon]").forEach(c => paintIcon(c, c.dataset.icon as IconItem));
+        paintPathIcons(el);
       },
     });
     this.skillGraph.el.classList.add("ug-host", bomb ? "bomb-tree" : "banner-tree");
