@@ -2763,6 +2763,22 @@ nav button[data-mode] > .tab-label { min-height: 2.4em; }
 :root.landscape .defend-palette-none { align-self: center; max-width: 140px; text-shadow: 0 1px 0 #000, 0 0 6px #000; }
 :root.landscape .defend-category { align-self: center; padding: 8px 10px; }
 :root.landscape .defend-categories { flex-direction: row; align-items: center; padding: 0; border: 0; }
+/* While building, Build and Tiles stand in the bottom-left corner, the
+ * palette beside them (fixed: the Defend page fills the window here). */
+:root.landscape .defend-head.defend-building #defend-left {
+  position: fixed;
+  left: calc(max(5px, var(--safe-left)) + var(--ls-left));
+  bottom: calc(max(5px, var(--safe-bottom)) + var(--ls-in));
+  width: 104px;
+  height: 92px;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 6px;
+}
+:root.landscape .defend-head.defend-building #defend-left button { flex: 1 1 0; min-height: 0; justify-content: center; box-shadow: 0 2px 0 #000, 0 3px 8px #000000c0; }
+:root.landscape .defend-head.defend-building .defend-center { grid-column: 2; }
+:root.landscape .defend-head.defend-building .defend-right { grid-column: 3; }
+:root.landscape #defend:has(.defend-head.defend-building) .defend-side { left: calc(var(--ls-left) + 112px); }
 :root.landscape .defend-crisp { top: calc(var(--ls-in) + 52px); bottom: auto; right: calc(var(--ls-in) - 5px); }
 
 /* Ambush and Siege: the same, the plaque and buildings floating along the bottom. */
