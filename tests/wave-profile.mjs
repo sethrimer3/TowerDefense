@@ -1,5 +1,6 @@
 // Manual: profile a real Defend battle in the full app at a chosen wave.
-// PROFILE_WAVE (21), PROFILE_SECONDS (20), PROFILE_WIDTH (1280), PROFILE_LABEL.
+// PROFILE_WAVE (21), PROFILE_SECONDS (20), PROFILE_WIDTH (1280), PROFILE_LABEL, PROFILE_WAIT (0:
+// seconds on the build screen first, as a player spends there).
 import { chromium } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 const wave = Number(process.env.PROFILE_WAVE || 21), seconds = Number(process.env.PROFILE_SECONDS || 20);
@@ -29,6 +30,7 @@ try {
   });
   await page.waitForFunction(() => window.__dp);
   await page.evaluate(k => { window.__kill = k; }, Number(process.env.PROFILE_KILL || 0));
+  await page.waitForTimeout(Number(process.env.PROFILE_WAIT || 0) * 1000);
   const cdp = await context.newCDPSession(page);
   await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 200 }); await cdp.send('Profiler.start');
   // Straight into the run: the Start button may first open the zone's story scroll.

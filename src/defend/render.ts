@@ -77,7 +77,9 @@ import { ParkTrees, type Under } from "./park-trees.ts";
 import { FloodArt } from "./flood-art.ts";
 import { ChimneySmoke } from "./chimney-smoke.ts";
 import { Ghosts } from "./ghosts.ts";
-import { AtmosphereArt } from "./atmosphere-art.ts";
+import { AtmosphereArt, warmBoardSand, warmDunes } from "./atmosphere-art.ts";
+import { trailPlan, trailStyle, type TrailPlan } from "./trails.ts";
+import { trailField } from "./trail-art.ts";
 import { ForestArt } from "./forest-art.ts";
 import { ForestGrass } from "./forest-grass.ts";
 import { hasForest } from "./forest.ts";
@@ -489,6 +491,8 @@ export class DefendRenderer {
     }
     this.areaMix = this.previousArea ? areaFade(opts.now - this.areaChangedAt, opts.reduceMotion) : 1;
     if (!sim) { this.areaMix = 1; this.previousArea = null; }
+    if (sim) this.warm = null;
+    else { this.warmSun = this.worldLighting ? opts.sun : undefined; this.warmDesert(map, !!opts.hdSand); }
     if (this.areaMix === 1) this.previousArea = null;
     this.lastWeather = opts.weather;
     this.protectCombat = this.darkDrain.prepare(sim, opts.now, blightNight);
@@ -620,6 +624,32 @@ export class DefendRenderer {
     if (opts.lifting) drawLifting(this.ctx, this.px, opts.lifting.tile, opts.lifting.t);
     this.ctx.setTransform(1, 0, 0, 1, 0, 0);
     if (opts.timings) this.timings.effectsMs = performance.now() - start - this.timings.terrainMs - this.timings.entityMs;
+  }
+
+  /** Ahead of a desert battle, while the player builds: the dunes' tables
+   * and the sand trails' art its first frame would make (a second's work),
+   * a step at a time when the page is idle. The battle's fresh city plans
+   * the same trails over the same ground and finds them made. */
+  private warm: { map: CityMap; hd: boolean; phase: number; step: number; plan: TrailPlan | null } | null = null;
+  /** The sky's sun as the board last took it. */
+  private warmSun: DrawOptions['sun'];
+  private warmDesert(map: CityMap, hd: boolean) {
+    if (typeof requestIdleCallback !== "function" || this.area !== "desert" || !map.trails || trailStyle(this.area) !== "sand") return;
+    if (this.warm && this.warm.map === map && this.warm.hd === hd) return;
+    const w = this.warm = { map, hd, phase: 0, step: 0, plan: null as TrailPlan | null };
+    const run = () => {
+      if (this.warm !== w) return;
+      let more = true;
+      if (w.phase === 0) more = warmDunes(hd, this.warmSun, w.step);
+      else if (w.phase === 1) { if (w.step === 0) w.plan = trailPlan(map, "sand"); else trailField(w.plan!); more = w.step === 0; }
+      else if (w.phase === 2) more = warmBoardSand(map, w.plan!, w.step);
+      else if (w.phase === 3) more = this.wilds.warmSand(w.plan, w.step);
+      else return;
+      if (more) w.step++;
+      else { w.phase++; w.step = 0; }
+      requestIdleCallback(run);
+    };
+    requestIdleCallback(run);
   }
 
   /** The canvas less the board's inside, one device pixel in from each
