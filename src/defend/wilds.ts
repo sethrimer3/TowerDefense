@@ -73,9 +73,19 @@ export function rangeAt(x: number, y: number) {
 function smoothNoise(x: number, y: number, salt: number) {
   const ix = Math.floor(x), iy = Math.floor(y), u = x - ix, v = y - iy;
   const cub = (p0: number, p1: number, p2: number, p3: number, t: number) => p1 + 0.5 * t * (p2 - p0 + t * (2 * p0 - 5 * p1 + 4 * p2 - p3 + t * (3 * (p1 - p2) + p3 - p0)));
-  const row = (j: number) => cub(hash01(ix - 1, iy + j, salt), hash01(ix, iy + j, salt), hash01(ix + 1, iy + j, salt), hash01(ix + 2, iy + j, salt), u);
-  return Math.max(0, Math.min(1, cub(row(-1), row(0), row(1), row(2), v)));
+  // Neighbouring samples mostly share a lattice cell: its sixteen hashed
+  // corners are kept by salt, so a sweep hashes each cell about once.
+  let k = lattice.get(salt);
+  if (!k) lattice.set(salt, (k = { ix: NaN, iy: 0, h: new Float64Array(16) }));
+  const h = k.h;
+  if (k.ix !== ix || k.iy !== iy) {
+    k.ix = ix; k.iy = iy;
+    for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) h[j * 4 + i] = hash01(ix - 1 + i, iy - 1 + j, salt);
+  }
+  const row = (j: number) => cub(h[j * 4], h[j * 4 + 1], h[j * 4 + 2], h[j * 4 + 3], u);
+  return Math.max(0, Math.min(1, cub(row(0), row(1), row(2), row(3), v)));
 }
+const lattice = new Map<number, { ix: number; iy: number; h: Float64Array }>();
 const smooth = (a: number, b: number, v: number) => {
   const t = Math.max(0, Math.min(1, (v - a) / (b - a)));
   return t * t * (3 - 2 * t);
@@ -783,6 +793,9 @@ function caveOpening(px: Uint32Array, floor: Uint8Array) {
   return { lit: canvasOf(lit), moon: canvasOf(moon) };
 }
 
+/** The key `duneTaperPixels` keeps the reaches' geometry by: their `open` is always off the board. */
+const OFF_BOARD = {};
+
 /** Draws the wilds, kept by the renderer. */
 export class Wilds {
   private grounds = new Map<string, Ground>();
@@ -950,7 +963,7 @@ export class Wilds {
       for (const r of cuts) {
         // The swells running down to the trail (where off the board).
         const img = c.createImageData(r.w, r.h);
-        img.data.set(duneTaperPixels(r.t, r.w, r.h, r.x, r.y, (X, Y) => X < 0 || Y < 0 || X >= BW || Y >= BH));
+        img.data.set(duneTaperPixels(r.t, r.w, r.h, r.x, r.y, (X, Y) => X < 0 || Y < 0 || X >= BW || Y >= BH, OFF_BOARD));
         const tc = document.createElement("canvas");
         tc.width = r.w; tc.height = r.h;
         tc.getContext("2d")!.putImageData(img, 0, 0);

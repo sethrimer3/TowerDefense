@@ -49,11 +49,20 @@ const wrap = (v: number, n: number) => ((v % n) + n) % n;
 export function periodicNoise(x: number, y: number, px: number, py: number, salt: number) {
   const ix = Math.floor(x), iy = Math.floor(y), dx = x - ix, dy = y - iy;
   const sx = dx * dx * (3 - 2 * dx), sy = dy * dy * (3 - 2 * dy);
-  const value = (x: number, y: number) => (hash(wrap(x, px), wrap(y, py), salt) % 1000) / 1000;
-  const a = value(ix, iy) * (1 - sx) + value(ix + 1, iy) * sx;
-  const b = value(ix, iy + 1) * (1 - sx) + value(ix + 1, iy + 1) * sx;
+  // Neighbouring pixels mostly share a lattice cell: its four corners are
+  // kept by salt, so a sweep over a tile hashes each cell about once.
+  let k = corners.get(salt);
+  if (!k) corners.set(salt, (k = { ix: NaN, iy: 0, px: 0, py: 0, v00: 0, v10: 0, v01: 0, v11: 0 }));
+  if (k.ix !== ix || k.iy !== iy || k.px !== px || k.py !== py) {
+    const value = (x: number, y: number) => (hash(wrap(x, px), wrap(y, py), salt) % 1000) / 1000;
+    k.ix = ix; k.iy = iy; k.px = px; k.py = py;
+    k.v00 = value(ix, iy); k.v10 = value(ix + 1, iy); k.v01 = value(ix, iy + 1); k.v11 = value(ix + 1, iy + 1);
+  }
+  const a = k.v00 * (1 - sx) + k.v10 * sx;
+  const b = k.v01 * (1 - sx) + k.v11 * sx;
   return a * (1 - sy) + b * sy;
 }
+const corners = new Map<number, { ix: number; iy: number; px: number; py: number; v00: number; v10: number; v01: number; v11: number }>();
 /** Cells from one dune crest to the next, across the field's grain. */
 export const DUNE_WAVE = 24;
 /** Where along a dune's wave its crest stands: a long windward rise, then the

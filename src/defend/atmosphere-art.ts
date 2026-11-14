@@ -474,12 +474,37 @@ export function taperAt(t: number) {
  * nearer than `TAPER.to` (and `open`) relit from its lowered height, RGBA,
  * clear elsewhere; laid over the dune tile, it matches it where the taper
  * ends. In the current light and style. */
-export function duneTaperPixels(t: Float32Array, w: number, h: number, bx: number, by: number, open: (X: number, Y: number) => boolean) {
-  const n = DUNE_PERIOD * ART, hts = duneHeights(), out = new Uint8ClampedArray(w * h * 4);
+export function duneTaperPixels(t: Float32Array, w: number, h: number, bx: number, by: number, open: (X: number, Y: number) => boolean, key?: object) {
+  const out = new Uint8ClampedArray(w * h * 4), g = taperGeometry(t, w, h, bx, by, open, key);
+  for (let k = 0; k < g.at.length; k++) {
+    const i = g.at[k], how = g.how[k];
+    const col = duneColor(g.gx[k], g.gy[k], g.tx[k], g.ty[k], (how & 4) !== 0, DETAIL[how & 3]);
+    out[i * 4] = col[0]; out[i * 4 + 1] = col[1]; out[i * 4 + 2] = col[2]; out[i * 4 + 3] = 255;
+  }
+  return out;
+}
+/** `duneColor`'s detail argument by `TaperGeometry.how & 3`. */
+const DETAIL = [true, "ripple", "grain"] as const;
+/** What `duneTaperPixels` needs of each pixel it lights, in no particular
+ * light: its index, lowered slope, tile pixel, and (`how`) whether it takes
+ * cast shadows (4) and which detail (`DETAIL`). Relit, only the colours are
+ * looked up again. */
+type TaperGeometry = { at: Int32Array; gx: Float64Array; gy: Float64Array; tx: Int16Array; ty: Int16Array; how: Uint8Array };
+/** Geometry by caller's key (what `open` reads), trail distances, then box
+ * and dune heights (the style). */
+const taperCache = new WeakMap<object, WeakMap<Float32Array, Map<string, TaperGeometry>>>();
+function taperGeometry(t: Float32Array, w: number, h: number, bx: number, by: number, open: (X: number, Y: number) => boolean, key?: object): TaperGeometry {
+  const hts = duneHeights(), id = `${w}:${h}:${bx}:${by}:${style}`;
+  const byT = key ? taperCache.get(key) ?? (taperCache.set(key, new WeakMap()), taperCache.get(key)!) : null;
+  const byBox = byT ? byT.get(t) ?? (byT.set(t, new Map()), byT.get(t)!) : null;
+  const hit = byBox?.get(id);
+  if (hit) return hit;
+  const n = DUNE_PERIOD * ART;
   const s = new Float32Array(w * h);
   for (let i = 0; i < w * h; i++) s[i] = taperAt(t[i]);
   const raw = (x: number, y: number) => { const X = bx + x, Y = by + y; return hts[((Y % n + n) % n) * n + ((X % n + n) % n)]; };
   const sAt = (x: number, y: number) => s[(y < 0 ? 0 : y >= h ? h - 1 : y) * w + (x < 0 ? 0 : x >= w ? w - 1 : x)];
+  const at: number[] = [], gxs: number[] = [], gys: number[] = [], txs: number[] = [], tys: number[] = [], hows: number[] = [];
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
       const i = y * w + x;
@@ -496,10 +521,12 @@ export function duneTaperPixels(t: Float32Array, w: number, h: number, bx: numbe
       const d = BAYER[(ty & 3) * 4 + (tx & 3)];
       // The ripples and grains stay almost to the trail, so the sinking
       // sand keeps the texture of the dunes round it.
-      const col = duneColor(gx, gy, tx, ty, k > .35 + d * .6, k > .45 + d * .3 || (k > .06 + d * .12 ? "ripple" : "grain"));
-      out[i * 4] = col[0]; out[i * 4 + 1] = col[1]; out[i * 4 + 2] = col[2]; out[i * 4 + 3] = 255;
+      const detail = k > .45 + d * .3 ? 0 : k > .06 + d * .12 ? 1 : 2;
+      at.push(i); gxs.push(gx); gys.push(gy); txs.push(tx); tys.push(ty); hows.push((k > .35 + d * .6 ? 4 : 0) | detail);
     }
-  return out;
+  const g: TaperGeometry = { at: Int32Array.from(at), gx: Float64Array.from(gxs), gy: Float64Array.from(gys), tx: Int16Array.from(txs), ty: Int16Array.from(tys), how: Uint8Array.from(hows) };
+  byBox?.set(id, g);
+  return g;
 }
 let duneSprite: HTMLCanvasElement | null = null;
 let duneSpriteKey = "";
@@ -952,7 +979,8 @@ export class AtmosphereArt {
       for (let i = 0; i < k.length; i++) k[i] = taperAt(t[i]);
     }
     const open = (X: number, Y: number) => sim.map.type[cellIndex(X >> 3, Y >> 3)] === CellType.OUT;
-    const data = duneTaperPixels(t, w, h, -ox, -oy, (X, Y) => open(X + ox, Y + oy));
+    // Its geometry is kept by the map (what `open` reads), so a relight only recolours.
+    const data = duneTaperPixels(t, w, h, -ox, -oy, (X, Y) => open(X + ox, Y + oy), sim.map);
     const canvas = this.taperImage ??= document.createElement("canvas");
     canvas.width = w; canvas.height = h;
     const c = canvas.getContext("2d")!, image = c.createImageData(w, h);
