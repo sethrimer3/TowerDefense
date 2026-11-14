@@ -61,11 +61,19 @@ function distanceField(lines: readonly TrailLine[], w: number, h: number, ox: nu
       const a = pts[k], b = pts[k + 1];
       const x0 = Math.max(0, Math.floor(Math.min(a.x, b.x) - reach)), x1 = Math.min(w - 1, Math.ceil(Math.max(a.x, b.x) + reach));
       const y0 = Math.max(0, Math.floor(Math.min(a.y, b.y) - reach)), y1 = Math.min(h - 1, Math.ceil(Math.max(a.y, b.y) + reach));
-      for (let Y = y0; Y <= y1; Y++)
-        for (let X = x0; X <= x1; X++) {
-          const i = Y * w + X, v = segmentDistance(X + 0.5, Y + 0.5, a, b) / R;
-          if (v < t[i]) (t[i] = v), (level[i] = line.level);
+      // `segmentDistance` written out, with the same arithmetic in the same
+      // order (so the same values), its segment's numbers read once.
+      const ax = a.x, ay = a.y, dx = b.x - ax, dy = b.y - ay, len2 = dx * dx + dy * dy, lv = line.level;
+      for (let Y = y0; Y <= y1; Y++) {
+        const y = Y + 0.5, py = (y - ay) * dy;
+        for (let X = x0, i = Y * w + x0; X <= x1; X++, i++) {
+          const x = X + 0.5;
+          const u = len2 ? Math.max(0, Math.min(1, ((x - ax) * dx + py) / len2)) : 0;
+          const ex = ax + dx * u - x, ey = ay + dy * u - y;
+          const v = Math.sqrt(ex * ex + ey * ey) / R;
+          if (v < t[i]) (t[i] = v), (level[i] = lv);
         }
+      }
     }
   }
   return { t, level };
@@ -163,8 +171,8 @@ export function caveTrailPixel(v: number, X: number, Y: number): number {
 export function paintRoadLines(out: Uint32Array, ow: number, oh: number, ox: number, oy: number, lines: readonly { points: readonly { x: number; y: number }[]; half: number }[], keep: (i: number) => boolean, pixel: (v: number, X: number, Y: number) => number = roadPixel): number[] {
   const t = new Map<number, number>();
   for (const line of lines) {
-    // Far enough out for the dunes' run down to the trail (`TAPER` in atmosphere-art.ts).
-    const R = line.half * ART, reach = R * FIELD_REACH + 1;
+    // Only pixels within the ragged edge's reach (`FRINGE` half widths) are painted.
+    const R = line.half * ART, reach = R * FRINGE + 1;
     const pts = line.points.map((p) => ({ x: p.x * ART + ox, y: p.y * ART + oy }));
     for (let k = 0; k + 1 < pts.length; k++) {
       const a = pts[k], b = pts[k + 1];
