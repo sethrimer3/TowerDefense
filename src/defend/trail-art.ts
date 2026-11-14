@@ -50,23 +50,47 @@ export function trailField(plan: TrailPlan): TrailField {
 }
 
 /** `trailField` for any lines over a `w` by `h` art pixel box whose corner
- * lies (`ox`, `oy`) art pixels before the board's. */
+ * lies (`ox`, `oy`) art pixels before the board's, out to `FIELD_REACH`
+ * half widths (Infinity further out, where nothing reads it).
+ *
+ * A pixel's nearest point on a line lies inside one of its pieces, where
+ * the pixel is square across from that piece, or at a bend, in the wedge
+ * beyond both pieces meeting there. So each piece is measured only over the
+ * strip square across from it and the wedges at its ends (each a pixel
+ * wider, to be sure), not over its whole box: the nearest piece still
+ * reaches every pixel, and with the same arithmetic as `segmentDistance`,
+ * so it gives the same value as ever. */
 function distanceField(lines: readonly TrailLine[], w: number, h: number, ox: number, oy: number): TrailField {
   const t = new Float32Array(w * h).fill(Infinity), level = new Float32Array(w * h);
   for (const line of lines) {
     // Far enough out for the dunes' run down to the trail (`TAPER` in atmosphere-art.ts).
-    const R = line.half * ART, reach = R * FIELD_REACH + 1;
+    const R = line.half * ART, reach = R * FIELD_REACH + 1, lv = line.level;
     const pts = line.points.map((p) => ({ x: p.x * ART + ox, y: p.y * ART + oy }));
-    for (let k = 0; k + 1 < pts.length; k++) {
+    const n = pts.length - 1;
+    /** Measures piece `k` over the pixels of rows `ya..yb` meeting every
+     * band `lo ≤ A·x + B·y ≤ hi` of `bands` (x, y a pixel's middle). */
+    const measure = (k: number, ya: number, yb: number, bands: readonly number[]) => {
       const a = pts[k], b = pts[k + 1];
-      const x0 = Math.max(0, Math.floor(Math.min(a.x, b.x) - reach)), x1 = Math.min(w - 1, Math.ceil(Math.max(a.x, b.x) + reach));
-      const y0 = Math.max(0, Math.floor(Math.min(a.y, b.y) - reach)), y1 = Math.min(h - 1, Math.ceil(Math.max(a.y, b.y) + reach));
-      // `segmentDistance` written out, with the same arithmetic in the same
-      // order (so the same values), its segment's numbers read once.
-      const ax = a.x, ay = a.y, dx = b.x - ax, dy = b.y - ay, len2 = dx * dx + dy * dy, lv = line.level;
-      for (let Y = y0; Y <= y1; Y++) {
-        const y = Y + 0.5, py = (y - ay) * dy;
-        for (let X = x0, i = Y * w + x0; X <= x1; X++, i++) {
+      const ax = a.x, ay = a.y, dx = b.x - ax, dy = b.y - ay, len2 = dx * dx + dy * dy;
+      const Y0 = Math.max(0, Math.floor(ya)), Y1 = Math.min(h - 1, Math.ceil(yb));
+      for (let Y = Y0; Y <= Y1; Y++) {
+        const y = Y + 0.5;
+        let xl = -Infinity, xr = Infinity;
+        for (let j = 0; j < bands.length; j += 4) {
+          const A = bands[j], B = bands[j + 1], lo = bands[j + 2] - B * y, hi = bands[j + 3] - B * y;
+          if (Math.abs(A) < 1e-9) {
+            if (lo > 0 || hi < 0) xl = Infinity;
+            continue;
+          }
+          const p = lo / A, q = hi / A;
+          xl = Math.max(xl, Math.min(p, q));
+          xr = Math.min(xr, Math.max(p, q));
+        }
+        if (!(xl <= xr)) continue;
+        const X0 = Math.max(0, Math.floor(xl - 0.5) - 1), X1 = Math.min(w - 1, Math.ceil(xr - 0.5) + 1);
+        // `segmentDistance` written out, with the same arithmetic in the same order.
+        const py = (y - ay) * dy;
+        for (let X = X0, i = Y * w + X0; X <= X1; X++, i++) {
           const x = X + 0.5;
           const u = len2 ? Math.max(0, Math.min(1, ((x - ax) * dx + py) / len2)) : 0;
           const ex = ax + dx * u - x, ey = ay + dy * u - y;
@@ -74,6 +98,34 @@ function distanceField(lines: readonly TrailLine[], w: number, h: number, ox: nu
           if (v < t[i]) (t[i] = v), (level[i] = lv);
         }
       }
+    };
+    /** Every pixel within `reach` of point `p` (as a box). */
+    const around = (p: { x: number; y: number }) => [1, 0, p.x - reach, p.x + reach];
+    const span = (k: number) => {
+      const a = pts[k], b = pts[k + 1];
+      return { dx: b.x - a.x, dy: b.y - a.y, L: Math.hypot(b.x - a.x, b.y - a.y) };
+    };
+    for (let k = 0; k < n; k++) {
+      const a = pts[k], b = pts[k + 1], { dx, dy, L } = span(k);
+      if (!L) {
+        measure(k, a.y - reach, a.y + reach, around(a));
+        continue;
+      }
+      // The strip square across from the piece: along it from a pixel before
+      // to a pixel past, and out to `reach` (and a pixel) either side.
+      const along = dx * a.x + dy * a.y, across = -dy * a.x + dx * a.y, far = (reach + 1) * L;
+      const ys = [a.y, b.y];
+      measure(k, Math.min(...ys) - reach - 2, Math.max(...ys) + reach + 2, [dx, dy, along - L, along + L * L + L, -dy, dx, across - far, across + far]);
+      // The wedge beyond this piece's end and the next piece's start (or all
+      // beyond the line's end), measured by both pieces.
+      const next = k + 1 < n ? span(k + 1) : undefined;
+      const atB = dx * b.x + dy * b.y;
+      const wedge = [...around(b), dx, dy, atB - L, Infinity];
+      if (next && next.L) wedge.push(next.dx, next.dy, -Infinity, next.dx * b.x + next.dy * b.y + next.L);
+      if (next && !next.L) wedge.length = 4;
+      measure(k, b.y - reach, b.y + reach, wedge);
+      if (next) measure(k + 1, b.y - reach, b.y + reach, wedge);
+      if (k === 0) measure(0, a.y - reach, a.y + reach, [...around(a), dx, dy, -Infinity, along + L]);
     }
   }
   return { t, level };
