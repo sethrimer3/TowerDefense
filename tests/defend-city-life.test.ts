@@ -136,3 +136,21 @@ test('residents request gates only for an upcoming passage', () => {
  assert.equal(life.nearGate(b),true,'heading outside');
  p.hidden=true;assert.equal(life.nearGate(b),false,'hidden residents cannot request a gate');
 });
+
+test('townsfolk walk on through a building placed while building, not all sent back indoors', () => {
+  const life = new CityLife();
+  life.sync(city(), null, false);
+  tick(life, 20, false);
+  const out = life.people.filter(p => p.mode === 'walk' && !p.hidden).map(p => ({ id: p.id, x: p.x, y: p.y }));
+  assert.ok(out.length > 0, 'some are out walking');
+  // The same city regenerated, as after a placement.
+  life.sync(city(), null, false);
+  for (const p of out) {
+    const now = life.people.find(q => q.id === p.id)!;
+    assert.deepEqual({ x: now.x, y: now.y, hidden: now.hidden }, { x: p.x, y: p.y, hidden: false });
+  }
+  // A new battle's city starts them afresh, indoors.
+  const sim = new DefendSim(city(), defaultDefendSave().levels, 1);
+  life.sync(sim.map, sim, false);
+  assert.ok(life.people.every(p => p.hidden && p.mode === 'indoors'));
+});

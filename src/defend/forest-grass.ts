@@ -112,12 +112,27 @@ export type ForestGrassFrame = GrassFrame & { alpha: number; damage: ForestDamag
  * sin(a + t) = sin a cos t + cos a sin t takes only products a frame. */
 type Swaying = { gx: Int16Array; gy: Int16Array; s1: Float32Array; c1: Float32Array; s2: Float32Array; c2: Float32Array; s3: Float32Array; c3: Float32Array; s4: Float32Array; c4: Float32Array };
 
-function swaying(plans: readonly (Blade[] | null)[]): Swaying {
+/** `swaying` for `plans`; a cell whose blades stand and sway as in
+ * `prior`'s (`before`) has its numbers copied over, not worked out again. */
+function swaying(plans: readonly (Blade[] | null)[], prior?: { sway: Swaying; plans: readonly (Blade[] | null)[] }): Swaying {
   const n = plans.reduce((k, b) => k + (b?.length ?? 0), 0);
   const o: Swaying = { gx: new Int16Array(n), gy: new Int16Array(n), s1: new Float32Array(n), c1: new Float32Array(n), s2: new Float32Array(n), c2: new Float32Array(n), s3: new Float32Array(n), c3: new Float32Array(n), s4: new Float32Array(n), c4: new Float32Array(n) };
-  let k = 0;
+  let k = 0, from = 0;
+  const same = (a: readonly Blade[] | null, b: readonly Blade[] | null) => {
+    if (a === b) return true;
+    if (!a || !b || a.length !== b.length) return false;
+    for (let q = 0; q < a.length; q++) if (a[q].i !== b[q].i || a[q].j !== b[q].j || a[q].phase !== b[q].phase) return false;
+    return true;
+  };
   plans.forEach((list, i) => {
-    const cx = i % CELLS_W, cy = (i - cx) / CELLS_W;
+    const cx = i % CELLS_W, cy = (i - cx) / CELLS_W, was = prior?.plans[i] ?? null;
+    if (prior && list?.length && same(was, list)) {
+      const p = prior.sway, m = list.length;
+      for (const key of ["gx", "gy", "s1", "c1", "s2", "c2", "s3", "c3", "s4", "c4"] as const) (o[key] as Float32Array).set((p[key] as Float32Array).subarray(from, from + m), k);
+      k += m; from += m;
+      return;
+    }
+    from += was?.length ?? 0;
     for (const b of list ?? []) {
       const gx = cx * ART + b.i, gy = cy * ART + b.j, a1 = b.phase + gx * 0.06, a2 = b.phase * 2, a3 = gx * 0.021 + gy * 0.009;
       o.gx[k] = gx, o.gy[k] = gy;
@@ -145,9 +160,11 @@ export class ForestGrass {
   sync(plan: ForestPlan) {
     if (plan === this.plan) return;
     const edit = planEdit(plan);
-    this.plans = forestBlades(plan, edit && edit.from === this.plan ? { plan: edit.from, blades: this.plans, boxes: edit.boxes } : undefined);
+    const prior = edit && edit.from === this.plan ? { plan: edit.from, blades: this.plans, boxes: edit.boxes } : undefined;
+    const before = prior && this.sway ? { sway: this.sway, plans: this.plans } : undefined;
+    this.plans = forestBlades(plan, prior);
     this.plan = plan;
-    this.sway = swaying(this.plans);
+    this.sway = swaying(this.plans, before);
     this.stir.clear();
     this.builtAt = -Infinity;
   }

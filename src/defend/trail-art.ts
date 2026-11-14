@@ -23,6 +23,8 @@ import { rgba } from "./damage-art.ts";
 const W = CELLS_W * ART, H = CELLS_H * ART;
 /** How far past a trail's half width (as a share of it) its ragged edge may reach. */
 const FRINGE = 1.25;
+/** `FRINGE`, for what repaints round a changed trail. */
+export const ROAD_FRINGE = FRINGE;
 /** How many half widths off a trail's middle its distance map reaches. */
 export const FIELD_REACH = 9.1;
 
