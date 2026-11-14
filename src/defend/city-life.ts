@@ -42,6 +42,9 @@ export class CityLife {
    * absent, a few by the city's size. */
   sync(map: CityMap, sim: DefendSim | null, forest: boolean, watchmen?: number) {
     const fresh = map !== this.map || watchmen !== this.watchmen;
+    // A building placed, moved or taken up while building regenerates the
+    // city: its people carry on where they are, not all sent back indoors.
+    const edited = fresh && !!this.map && watchmen === this.watchmen && !sim && !this.sim ? this.people.slice() : null;
     this.watchmen = watchmen;
     const fighting = !!sim?.bonuses.watch;
     if (this.fighting && !fighting) for (const p of this.people) if (p.role === 'watchman' && p.mode === 'walk' && p.hidden) { p.hidden = false; p.path = []; p.wait = .5; }
@@ -77,13 +80,21 @@ export class CityLife {
       for(let i=0;i<CELL_COUNT;i++) if(nearWall[i]&&!map.city[i]&&!this.solid[i]&&map.type[i]===CellType.OUT) this.exterior.push(i);
     }
     if (fresh) {
-      this.people.length = 0; this.clock = 0; this.sampled = -Infinity;
+      this.people.length = 0;
+      if (!edited) { this.clock = 0; this.sampled = -Infinity; }
       if (!this.doors.length) return;
       const citizens = Math.min(CITY_LIFE.townsfolk, Math.max(2, Math.ceil(this.doors.length / 3)));
       const guards = watchmen ?? Math.min(CITY_LIFE.watchmen, Math.max(2, Math.ceil(this.doors.length / 12)));
       for(let n=0;n<citizens+guards;n++) {
-        const d=this.doors[n%this.doors.length];
-        this.people.push({id:900000+n,role:n<citizens?'townsfolk':'watchman',x:d.x,y:d.y,size:.35,mode:'indoors',hidden:true,path:[],wait:n*.35,turn:0});
+        const d=this.doors[n%this.doors.length], role=n<citizens?'townsfolk':'watchman';
+        const was=edited?.find(p=>p.id===900000+n&&p.role===role);
+        // One still on open ground walks on; one the edit built over goes
+        // in at a door.
+        if(was && (was.mode==='indoors' || (cellInBounds(was.x,was.y) && !this.solid[cellAt(was.x,was.y)]))) {
+          this.people.push(was.mode==='indoors' ? {...was,x:d.x,y:d.y,path:[]} : {...was,path:[],wait:0});
+          continue;
+        }
+        this.people.push({id:900000+n,role,x:d.x,y:d.y,size:.35,mode:'indoors',hidden:true,path:[],wait:edited?.5+n*.1:n*.35,turn:0});
       }
     } else for(const p of this.people) { p.path=[]; p.wait=0; }
   }

@@ -34,7 +34,7 @@ import type { Footprint } from "./shadow-art.ts";
 import type { DefendSim } from "./sim.ts";
 import { BURN, ForestDamage, MOUNTAIN, VARIANTS, canopyRadius, forestPlan, type Boulder, type Felled, type ForestPlan, type ForestTree, type Lake, type TreeKind, type TreeSize } from "./forest.ts";
 import { ART } from "./park-art.ts";
-import { paintRoads } from "./trail-art.ts";
+import { ROAD_FRINGE, paintRoads } from "./trail-art.ts";
 import { BANK, FOAM, GLINT, LILY, REED, SAND, WATER, bayer } from "./water-palette.ts";
 import { Birds, roosting } from "./forest-birds.ts";
 import { paintRiver, riverBed, riverCanvas, riverShape, type RiverShape } from "./river-art.ts";
@@ -356,25 +356,67 @@ export const planEdit = (plan: ForestPlan) => planEdits.get(plan);
  * of the same forest, where its floor must be painted again, or null when
  * so much does (its boulders, lakes or trails' lines) that it all must. */
 export function forestChanges(a: ForestPlan, b: ForestPlan): Box[] | null {
-  const key = (p: ForestPlan) => JSON.stringify([p.lakes, p.boulders, p.roads?.lines ?? null]);
-  if (key(a) !== key(b)) return null;
-  const boxes: Box[] = [];
-  const add = (x: number, y: number, reach: number) =>
-    boxes.push({ x0: Math.floor((x - reach) * ART), y0: Math.floor((y - reach) * ART), x1: Math.ceil((x + reach) * ART), y1: Math.ceil((y + reach) * ART) });
+  if (JSON.stringify(a.lakes) !== JSON.stringify(b.lakes) || !a.roads !== !b.roads) return null;
   const differ = <T,>(xs: readonly T[], ys: readonly T[], k: (v: T) => string, at: (v: T) => void) => {
     const inA = new Set(xs.map(k)), inB = new Set(ys.map(k));
     for (const v of xs) if (!inB.has(k(v))) at(v);
     for (const v of ys) if (!inA.has(k(v))) at(v);
   };
+  const boxes: Box[] = [];
+  const add = (x: number, y: number, reach: number) =>
+    boxes.push({ x0: Math.floor((x - reach) * ART), y0: Math.floor((y - reach) * ART), x1: Math.ceil((x + reach) * ART), y1: Math.ceil((y + reach) * ART) });
+  // A boulder or mountain paints its stones, crags and shadows over its
+  // cells and a little past (a mountain over its sprite and shadow).
+  differ(a.boulders, b.boulders, (v) => `${v.seed}:${v.cells.join(",")}`, (v) => {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const c of v.cells) { const x = c % CELLS_W, y = Math.floor(c / CELLS_W); x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x + 1); y1 = Math.max(y1, y + 1); }
+    boxes.push({ x0: (x0 - 3) * ART, y0: (y0 - 3) * ART, x1: (x1 + 3) * ART, y1: (y1 + 3) * ART });
+    if (v.cells.length >= MOUNTAIN) { const m = mountainSource(v); boxes.push({ x0: m.x - 2, y0: m.y - 2, x1: m.x + m.w + 6, y1: m.y + m.h + 6 }); }
+  });
+  // A trail's dirt reaches its ragged edge (`FRINGE` half widths) past its
+  // middle: round each piece only one plan has, the dirt can differ.
+  const pieces = (p: ForestPlan) => (p.roads?.lines ?? []).flatMap((l) => l.points.slice(1).map((q, k) => ({ a: l.points[k], b: q, half: l.half, level: l.level })));
+  differ(pieces(a), pieces(b), (v) => `${v.half},${v.level}:${v.a.x},${v.a.y},${v.b.x},${v.b.y}`, (v) => {
+    const r = v.half * ROAD_FRINGE + 1;
+    boxes.push({ x0: Math.floor((Math.min(v.a.x, v.b.x) - r) * ART), y0: Math.floor((Math.min(v.a.y, v.b.y) - r) * ART), x1: Math.ceil((Math.max(v.a.x, v.b.x) + r) * ART), y1: Math.ceil((Math.max(v.a.y, v.b.y) + r) * ART) });
+  });
   // Each tree's shadow falls up to its own breadth away.
   differ(a.trees, b.trees, treeKey, (t) => add(t.x, t.y, t.r * 2 + 2));
   differ(a.rocks, b.rocks, (r) => `${r.x},${r.y},${r.size},${r.seed}`, (r) => add(r.x, r.y, r.size + 1.5));
   differ(a.pads, b.pads, (p) => `${p.x},${p.y},${p.r},${p.seed}`, (p) => add(p.x, p.y, p.r * 1.3 + 1.5));
   const wear = (p: ForestPlan, i: number) => p.roads?.wear[i] ?? 0;
   for (let i = 0; i < CELL_COUNT; i++) if (a.open[i] !== b.open[i] || wear(a, i) !== wear(b, i)) add((i % CELLS_W) + 0.5, Math.floor(i / CELLS_W) + 0.5, 3);
-  let area = 0;
-  for (const box of boxes) area += (box.x1 - box.x0) * (box.y1 - box.y0);
-  return area > W * H * 0.4 ? null : boxes;
+  return mergeBoxes(boxes);
+}
+
+/** `boxes` (art pixels) as fewer boxes over the same cells and no fewer
+ * pixels, overlaps painted once: the cells they touch, in runs along each
+ * row, a run carried down while the rows below repeat it. Null when they
+ * cover so much that one whole repaint is cheaper. */
+function mergeBoxes(boxes: readonly Box[]): Box[] | null {
+  const on = new Uint8Array(CELL_COUNT);
+  let count = 0;
+  for (const b of boxes)
+    for (let cy = Math.max(0, Math.floor(b.y0 / ART)); cy < Math.min(CELLS_H, Math.ceil(b.y1 / ART)); cy++)
+      for (let cx = Math.max(0, Math.floor(b.x0 / ART)); cx < Math.min(CELLS_W, Math.ceil(b.x1 / ART)); cx++)
+        if (!on[cellIndex(cx, cy)]) { on[cellIndex(cx, cy)] = 1; count++; }
+  if (count > CELL_COUNT * 0.4) return null;
+  const out: Box[] = [], open = new Map<string, Box>();
+  for (let cy = 0; cy <= CELLS_H; cy++) {
+    const runs = new Set<string>();
+    for (let cx = 0; cy < CELLS_H && cx < CELLS_W; cx++) {
+      if (!on[cellIndex(cx, cy)]) continue;
+      const x0 = cx;
+      while (cx < CELLS_W && on[cellIndex(cx, cy)]) cx++;
+      const key = `${x0},${cx}`;
+      runs.add(key);
+      const box = open.get(key);
+      if (box) box.y1 = (cy + 1) * ART;
+      else open.set(key, { x0: x0 * ART, y0: cy * ART, x1: cx * ART, y1: (cy + 1) * ART });
+    }
+    for (const [key, box] of open) if (!runs.has(key)) { out.push(box); open.delete(key); }
+  }
+  return out;
 }
 
 export function paintFloor(out: Uint32Array, plan: ForestPlan, damage: ForestDamage | null, box: Box, river: ForestRiver | null = null, covered?: Uint8Array, blight?: BlightTrail, sun?: Sun) {
@@ -684,13 +726,21 @@ export function waterGlints(plan: ForestPlan) {
  * on its gentler slopes, a long shadow to the lower right. */
 export type MountainSource = Sprite & { x: number; y: number; name: string; crags: { x: number; y: number; deep: number; seed: number }[] };
 let mountains = new WeakMap<Boulder, { key: string; source: MountainSource }>();
+/** The same, by their key, newest last. */
+const mountainsByKey = new Map<string, MountainSource>();
 export function mountainSource(b: Boulder): MountainSource {
   // The native plan is stable, but keep direct/export callers correct when
   // cells, seed or replacement art change. A distant floor patch must not
   // regenerate every mountain's noise, height field and distance transform.
   const key = `${pixelKey()}:${b.seed}:${b.cells.join(',')}`, cached = mountains.get(b);
   if (cached?.key === key) return cached.source;
-  const made = mountainOf(b.cells.map((c) => ({ x: c % CELLS_W, y: Math.floor(c / CELLS_W) })), b.seed);
+  // A replanned forest (a building placed outside the walls) makes new
+  // boulders, mostly the same as before: those are found by what they are.
+  let made = mountainsByKey.get(key);
+  if (made) mountainsByKey.delete(key);
+  else made = mountainOf(b.cells.map((c) => ({ x: c % CELLS_W, y: Math.floor(c / CELLS_W) })), b.seed);
+  mountainsByKey.set(key, made);
+  if (mountainsByKey.size > 24) mountainsByKey.delete(mountainsByKey.keys().next().value!);
   mountains.set(b, { key, source: made });
   return made;
 }
@@ -1610,5 +1660,5 @@ export function forestPieces(): ArtPiece[] {
   }
   return pieces;
 }
-onPixelArt(()=>{sprites.length=0;rocks.clear();stumps.clear();charred.clear();mountains=new WeakMap();});
+onPixelArt(()=>{sprites.length=0;rocks.clear();stumps.clear();charred.clear();mountains=new WeakMap();mountainsByKey.clear();});
 export const outlinedSprite = (s: Sprite): Sprite => outlinedScenery(s);
