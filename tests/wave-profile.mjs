@@ -29,12 +29,13 @@ try {
   });
   await page.waitForFunction(() => window.__dp);
   await page.evaluate(k => { window.__kill = k; }, Number(process.env.PROFILE_KILL || 0));
-  await page.locator('#defend-start').click({ force: true });
-  await page.evaluate(() => { const p = window.__dp; p.sim.hp[p.sim.keepId] = p.sim.maxHp[p.sim.keepId] = 1e12; window.__rows = []; defendFrameTimes(true);
-    // PROFILE_KILL: damage per second spread over enemies, standing in for a strong city so worms split into crowds.
-    const kill = Number(window.__kill || 0); if (kill) setInterval(() => { const sim = p.sim; if (!sim) return; for (const e of sim.enemies) if (e.hp > 0 && Math.random() < .3) sim.hurtEnemy(e, kill / 10, false); }, 100); });
   const cdp = await context.newCDPSession(page);
   await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 200 }); await cdp.send('Profiler.start');
+  // Straight into the run: the Start button may first open the zone's story scroll.
+  await page.evaluate(() => { const p = window.__dp; window.__rows = []; p.startRun(); p.relayout(); for (const d of document.querySelectorAll('dialog[open]')) d.close(); });
+  await page.evaluate(() => { const p = window.__dp; p.sim.hp[p.sim.keepId] = p.sim.maxHp[p.sim.keepId] = 1e12; defendFrameTimes(true);
+    // PROFILE_KILL: damage per second spread over enemies, standing in for a strong city so worms split into crowds.
+    const kill = Number(window.__kill || 0); if (kill) setInterval(() => { const sim = p.sim; if (!sim) return; for (const e of sim.enemies) if (e.hp > 0 && Math.random() < .3) sim.hurtEnemy(e, kill / 10, false); }, 100); });
   await page.waitForTimeout(seconds * 1000);
   const { profile } = await cdp.send('Profiler.stop');
   const rows = await page.evaluate(() => window.__rows);

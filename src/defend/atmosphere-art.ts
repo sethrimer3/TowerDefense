@@ -244,15 +244,56 @@ function swellAt(f: number) {
   return 1 - Math.sin((f - SWELL_CREST) / (1 - SWELL_CREST) * Math.PI * .5);
 }
 /** The simple swells' wave place at tile pixel (x, y): whole numbers its troughs. */
-function swellPhase(x: number, y: number) {
+function swellAt0(x: number, y: number) {
   const p = DUNE_PERIOD, cx = (x + .5) / ART, cy = (y + .5) / ART;
   return (cy - cx * SWELL_LEAN) / SWELL + periodicNoise(cx / 32, cy / 32, p / 32, p / 32, 821) * .45;
+}
+/** `swellAt0` over the tile and a pixel past its left and bottom edges
+ * (where `detailPixels` looks for crests), worked out once: the tile and its
+ * three detail layers read it a few million times. */
+let phases: Float64Array | null = null;
+function swellPhase(x: number, y: number) {
+  const n = DUNE_PERIOD * ART, w = n + 1;
+  if (x < -1 || x >= n || y < 0 || y > n) return swellAt0(x, y);
+  if (!phases) {
+    phases = new Float64Array(w * w);
+    for (let Y = 0; Y <= n; Y++) for (let X = -1; X < n; X++) phases[Y * w + X + 1] = swellAt0(X, Y);
+  }
+  return phases[y * w + x + 1];
 }
 /** Wind ripples a swell's wave (a whole number, so they tile): about one
  * every six art pixels. */
 const RIPPLES = 56;
 
 let detailCache: Int8Array | null = null;
+/** `reliefPixels`' mark for a crest pixel. */
+const CREST = 2;
+let reliefCache: Int8Array | null = null;
+/** Each simple tile pixel's relief, the same in every light: `CREST` on the
+ * one-pixel line along every crest, else its wind ripple's tone step (1
+ * lit, -1 dark, 0 none). Shared by both relief layers of `detailPixels`. */
+function reliefPixels() {
+  if (reliefCache) return reliefCache;
+  const n = DUNE_PERIOD * ART, p = DUNE_PERIOD, d = new Int8Array(n * n);
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const i = y * n + x, ph = swellPhase(x, y), f = ph - Math.floor(ph);
+    // The crest: the last windward pixel before the slip face.
+    const next = swellPhase(x - 1, y + 1) - Math.floor(ph);
+    if (f < SWELL_CREST && next >= SWELL_CREST - .002) { d[i] = CREST; continue; }
+    const s = f / SWELL_CREST;
+    if (f < SWELL_CREST && s > .12 && s < .88) {
+      const cx = (x + .5) / ART, cy = (y + .5) / ART;
+      const patch = periodicNoise(cx / 6, cy / 6, p / 6, p / 6, 841);
+      const bit = periodicNoise(cx / 1.5, cy / 1.5, p / 1.5, p / 1.5, 843);
+      if (patch > .55 && bit > .45) {
+        const wob = periodicNoise(cx / 3, cy / 3, p / 3, p / 3, 845) * .6;
+        const r = ph * RIPPLES + wob, rf = r - Math.floor(r);
+        if (rf < .16) d[i] = 1; else if (rf < .32) d[i] = -1;
+      }
+    }
+  }
+  return reliefCache = d;
+}
 /** Each simple tile pixel's tones up or down from its light: a one-pixel lit
  * line along every crest; short, bent pairs of light-over-dark wind ripples
  * scattered over the windward rises; a rare grain a tone off; and the odd
@@ -260,24 +301,12 @@ let detailCache: Int8Array | null = null;
  * relief, so they fade by night with the light (`sandDetail` reads them
  * only while the sun shows shadows); the grains and pebbles stay. Tiles. */
 function detailPixels(relief: boolean, crest = relief) {
-  const n = DUNE_PERIOD * ART, p = DUNE_PERIOD, d = new Int8Array(n * n);
+  const n = DUNE_PERIOD * ART, d = new Int8Array(n * n), r = relief ? reliefPixels() : null;
   for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
-    const i = y * n + x, ph = swellPhase(x, y), f = ph - Math.floor(ph);
-    if (relief) {
-      // The crest: the last windward pixel before the slip face.
-      const next = swellPhase(x - 1, y + 1) - Math.floor(ph);
-      if (f < SWELL_CREST && next >= SWELL_CREST - .002) { if (crest) d[i] = 1; continue; }
-      const s = f / SWELL_CREST;
-      if (f < SWELL_CREST && s > .12 && s < .88) {
-        const cx = (x + .5) / ART, cy = (y + .5) / ART;
-        const patch = periodicNoise(cx / 6, cy / 6, p / 6, p / 6, 841);
-        const bit = periodicNoise(cx / 1.5, cy / 1.5, p / 1.5, p / 1.5, 843);
-        if (patch > .55 && bit > .45) {
-          const wob = periodicNoise(cx / 3, cy / 3, p / 3, p / 3, 845) * .6;
-          const r = ph * RIPPLES + wob, rf = r - Math.floor(r);
-          if (rf < .16) d[i] = 1; else if (rf < .32) d[i] = -1;
-        }
-      }
+    const i = y * n + x;
+    if (r) {
+      if (r[i] === CREST) { if (crest) d[i] = 1; continue; }
+      d[i] = r[i];
     }
     const g = hash(x, y, 851) % 53;
     if (g === 0) d[i] += 1; else if (g === 1) d[i] -= 1;

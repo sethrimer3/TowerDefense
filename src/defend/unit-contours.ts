@@ -8,7 +8,10 @@ type Ctx = CanvasRenderingContext2D;
 type Stroke = { path: Path2D; width: number; cap: CanvasLineCap; join: CanvasLineJoin; miter: number; radius?: number; filled?: boolean };
 type Bounds = { x0: number; y0: number; x1: number; y1: number };
 type PixelRow = { y: number; h: number; radius: number; spans: [number, number][]; sorted: boolean };
-type Channel = { pixels: Path2D[]; pixelRows: Map<string, PixelRow>; pixelBounds: Bounds | null; radius: number; unbounded: boolean; mergePixels: boolean; bounds: Bounds | null; faded: boolean; rectangles: Path2D; expanded: Path2D; path: Path2D; strokes: Map<string, Stroke>; canvas: HTMLCanvasElement; c: Ctx };
+type Box = { x: number; y: number; w: number; h: number };
+/** The part of a scratch canvas that may hold paint: null when clear. */
+type Held = Box | null;
+type Channel = { held: Held; pixels: Path2D[]; pixelRows: Map<string, PixelRow>; pixelBounds: Bounds | null; radius: number; unbounded: boolean; mergePixels: boolean; bounds: Bounds | null; faded: boolean; rectangles: Path2D; expanded: Path2D; path: Path2D; strokes: Map<string, Stroke>; canvas: HTMLCanvasElement; c: Ctx };
 export class UnitContours {
   private channels = new Map<string, Channel>();
   private ink: string | undefined;
@@ -25,6 +28,8 @@ export class UnitContours {
   private portal: HTMLCanvasElement | null = null;
   private portalFire: HTMLCanvasElement | null = null;
   private portalPixels: HTMLCanvasElement | null = null;
+  private portalHeld: Held = null;
+  private innerHeld: Held = null;
   /** Wall-clock seconds the portal dimension has scrolled to. */
   seconds = 0;
   /** Portal contours as pixel art: the dimension and its cut both on a
@@ -43,9 +48,9 @@ export class UnitContours {
     for (const [ink, channel] of this.channels) {
       channel.pixels = [new Path2D(), new Path2D(), new Path2D()]; channel.pixelRows.clear(); channel.pixelBounds = null; channel.radius = this.radiusOf(ink); channel.unbounded = false; channel.path = new Path2D(); channel.rectangles = new Path2D(); channel.expanded = new Path2D(); channel.strokes.clear(); channel.faded = false; channel.mergePixels = false; channel.bounds = null;
       if (channel.canvas.width !== c.canvas.width || channel.canvas.height !== c.canvas.height) {
-        channel.canvas.width = c.canvas.width; channel.canvas.height = c.canvas.height;
+        channel.canvas.width = c.canvas.width; channel.canvas.height = c.canvas.height; channel.held = null;
       }
-      channel.c.clearRect(0, 0, c.canvas.width, c.canvas.height);
+      channel.held = wipe(channel.c, channel.held);
     }
   }
   select(ink?: string) { this.ink = ink; this.pixelMode = false; }
@@ -56,7 +61,7 @@ export class UnitContours {
     let channel = this.channels.get(this.ink);
     if (!channel) {
       const canvas = document.createElement('canvas'), c = canvas.getContext('2d')!;
-      this.channels.set(this.ink, (channel = { pixels: [new Path2D(), new Path2D(), new Path2D()], pixelRows: new Map(), pixelBounds: null, radius: this.radiusOf(this.ink), unbounded: false, mergePixels: false, bounds: null, faded: false, rectangles: new Path2D(), expanded: new Path2D(), path: new Path2D(), strokes: new Map(), canvas, c }));
+      this.channels.set(this.ink, (channel = { held: null, pixels: [new Path2D(), new Path2D(), new Path2D()], pixelRows: new Map(), pixelBounds: null, radius: this.radiusOf(this.ink), unbounded: false, mergePixels: false, bounds: null, faded: false, rectangles: new Path2D(), expanded: new Path2D(), path: new Path2D(), strokes: new Map(), canvas, c }));
     }
     return channel;
   }
@@ -191,8 +196,15 @@ export class UnitContours {
         }
       }
       const { c, canvas, path, strokes } = channel;
-      if (canvas.width !== bodies.width || canvas.height !== bodies.height) { canvas.width = bodies.width; canvas.height = bodies.height; }
-      c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, canvas.width, canvas.height);
+      if (canvas.width !== bodies.width || canvas.height !== bodies.height) { canvas.width = bodies.width; canvas.height = bodies.height; channel.held = null; }
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      channel.held = wipe(c, channel.held);
+      // Everything a channel draws lies within its bounds (`box`): clip to
+      // them, so its buffers are cleared, cut and copied there only.
+      const box = this.box(channel, canvas);
+      if (!box) continue;
+      channel.held = box;
+      c.save(); c.beginPath(); c.rect(box.x, box.y, box.w, box.h); c.clip();
       c.globalCompositeOperation = 'source-over'; c.strokeStyle = ink; c.fillStyle = ink;
       c.fill(channel.expanded);
       c.lineWidth = 2 * channel.radius; c.lineJoin = 'miter'; c.lineCap = 'butt'; c.miterLimit = 10;
@@ -213,8 +225,9 @@ export class UnitContours {
           c.stroke(stroke.path);
         }
       }
-      c.drawImage(bodies, 0, 0);
+      c.drawImage(bodies, box.x, box.y, box.w, box.h, box.x, box.y, box.w, box.h);
       c.globalCompositeOperation = 'source-over';
+      c.restore();
     }
     // Keep actual bodies out of the rings before inserting soft joins. The
     // portal mixes those joins into its opaque fire, rather than punching
@@ -231,20 +244,23 @@ export class UnitContours {
     const { pixelBounds: b, pixels } = channel, r = channel.radius;
     this.portal ??= document.createElement('canvas');
     const canvas = this.portal;
-    if (canvas.width !== bodies.width || canvas.height !== bodies.height) { canvas.width = bodies.width; canvas.height = bodies.height; }
+    if (canvas.width !== bodies.width || canvas.height !== bodies.height) { canvas.width = bodies.width; canvas.height = bodies.height; this.portalHeld = null; }
     const source = canvas.getContext('2d')!;
-    source.setTransform(1, 0, 0, 1, 0, 0); source.clearRect(0, 0, canvas.width, canvas.height);
+    source.setTransform(1, 0, 0, 1, 0, 0); this.portalHeld = wipe(source, this.portalHeld);
     source.globalCompositeOperation = "source-over"; source.fillStyle = "#000";
     source.globalAlpha = .35; source.fill(pixels[0]);
     source.globalAlpha = .65; source.fill(pixels[1]);
     source.globalAlpha = 1; source.fill(pixels[2]);
     this.inner ??= document.createElement("canvas");
-    if (this.inner.width !== canvas.width || this.inner.height !== canvas.height) { this.inner.width = canvas.width; this.inner.height = canvas.height; }
+    if (this.inner.width !== canvas.width || this.inner.height !== canvas.height) { this.inner.width = canvas.width; this.inner.height = canvas.height; this.innerHeld = null; }
     const c = this.inner.getContext("2d")!;
-    c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, canvas.width, canvas.height);
+    c.setTransform(1, 0, 0, 1, 0, 0); this.innerHeld = wipe(c, this.innerHeld);
     const x = Math.max(0, Math.floor(b!.x0 - r * 2 - 2)), y = Math.max(0, Math.floor(b!.y0 - r * 2 - 2));
     const w = Math.min(canvas.width, Math.ceil(b!.x1 + r * 2 + 2)) - x, h = Math.min(canvas.height, Math.ceil(b!.y1 + r * 2 + 2)) - y;
+    // The bands reach `r` past the bodies at most: all inside the box.
+    if (w > 0 && h > 0) this.portalHeld = { x, y, w, h };
     if (w <= 0 || h <= 0) return;
+    this.innerHeld = { x, y, w, h };
     this.innerChannel = channel;
     c.save(); c.beginPath(); c.rect(x, y, w, h); c.clip();
     c.globalCompositeOperation = "source-over"; c.drawImage(canvas, 0, 0);
@@ -258,13 +274,24 @@ export class UnitContours {
     CanvasRenderingContext2D.prototype.drawImage.call(body, this.inner, x, y, w, h, x, y, w, h); body.restore();
   }
 
+  /** A channel's paint's box on `canvas`, in whole pixels: its bounds and
+   * the contour's reach (the whole canvas for unbounded paths), null if empty. */
+  private box(channel: Channel, canvas: HTMLCanvasElement): Box | null {
+    if (channel.unbounded) return { x: 0, y: 0, w: canvas.width, h: canvas.height };
+    const b = channel.bounds, pad = channel.radius * 2 + 2;
+    if (!b) return null;
+    const x = Math.max(0, Math.floor(b.x0 - pad)), y = Math.max(0, Math.floor(b.y0 - pad));
+    const w = Math.min(canvas.width, Math.ceil(b.x1 + pad)) - x, h = Math.min(canvas.height, Math.ceil(b.y1 + pad)) - y;
+    return w > 0 && h > 0 ? { x, y, w, h } : null;
+  }
+
   /** Every channel onto `c`; the portal's shows the burning dimension
    * through it unless `plain` (a mask for the torchlight's shine). */
   draw(c: Ctx, plain = false) {
     c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
     for (const [ink, channel] of this.channels) {
       if (ink === PORTAL_UNIT_INK) this.drawPortal(c, channel, plain);
-      else c.drawImage(channel.canvas, 0, 0);
+      else if (channel.held) { const b = channel.held; c.drawImage(channel.canvas, b.x, b.y, b.w, b.h, b.x, b.y, b.w, b.h); }
     }
     c.restore();
   }
@@ -338,6 +365,12 @@ export class UnitContours {
     c.drawImage(low, 0, 0, gw, gh, x0, y0, gw * k, gh * k);
     c.imageSmoothingEnabled = smooth;
   }
+}
+
+/** Clears what `c` (identity transform) holds; it then holds nothing. */
+function wipe(c: Ctx, held: Held): Held {
+  if (held) c.clearRect(held.x, held.y, held.w, held.h);
+  return null;
 }
 
 /** Cached body geometry from the same small sprite readback used to remove

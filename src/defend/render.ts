@@ -229,6 +229,10 @@ export class DefendRenderer {
   private combatLayer: HTMLCanvasElement | null = null;
   private combatSim: DefendSim | null = null;
   private combatKey = '';
+  /** Frames in a row the combat cache was repainted, and whether the last
+   * combat was painted straight onto the board (the cache then stale). */
+  private combatMisses = 0;
+  private combatDirect = false;
   private outline: UnitOutline | null = null;
   px = 8;
   private wilds = new Wilds();
@@ -494,27 +498,37 @@ export class DefendRenderer {
     stirWind(sim?.enemies ?? [], this.lastNow ? Math.min(0.25, (opts.now - this.lastNow) / 1000) : 0);
     // Beyond the board's edges: the area's impassable wilds (`wilds.ts`).
     this.ctx.setTransform(1, 0, 0, 1, 0, 0);
-    this.ctx.fillStyle = BEYOND;
-    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-    {
-      const w = sim ? opts.weather : null, still = opts.reduceMotion || !(opts.effects ?? true);
-      this.wilds.draw(this.ctx, {
-        area: this.area, px: this.px, cam: this.cam, night: opts.night, now: opts.now,
-        grassWind: sim && opts.weather?.rain ? "rain" : opts.weather ? "cloud" : "calm",
-        treeWind: still ? 0 : w?.rain ? 2 : w && !w.clear ? 1.4 : 1,
-        reduceMotion: opts.reduceMotion, effects: opts.effects ?? true,
-        forest: hasForest(this.area) && this.forest.forestPlan ? { plan: this.forest.forestPlan, damage: this.forest.damage } : null,
-        sand: sim?.atmosphere?.mode === "sand" ? { trails: sim.trails?.style === "sand" ? sim.trails : null } : null,
-        caves: hasCrystalCaves(this.area) ? { trails: this.caves.plan?.trails ?? null, day: shaftLight(this.worldLighting ? opts.sun : undefined).day } : null,
-        // The day's tint, as the board takes it (in battle, or by night).
-        tint: sim || opts.night > .001 ? opts.tint : undefined,
-        // The board's own darkness, which the wilds' night meets at its edge.
-        dark: (() => {
-          if (!opts.weather || !(sim || opts.night > .001)) return undefined;
-          const a = ambientFor(opts.weather, opts.night, this.previousArea ? this.previousWeather : null, this.areaMix);
-          return opts.sun ? a.alpha * Math.min(1, opts.night * 3) : a.alpha;
-        })(),
-      });
+    // The city layer is opaque and covers the board, so the dark beyond and
+    // the wilds are painted only round it (a pixel under its edge), a strip
+    // at a time: one rectangle clip each keeps their pixels exactly as before.
+    for (const strip of this.beyondStrips()) {
+      this.ctx.save();
+      this.ctx.beginPath();
+      this.ctx.rect(strip.x, strip.y, strip.w, strip.h);
+      this.ctx.clip();
+      this.ctx.fillStyle = BEYOND;
+      this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+      {
+        const w = sim ? opts.weather : null, still = opts.reduceMotion || !(opts.effects ?? true);
+        this.wilds.draw(this.ctx, {
+          area: this.area, px: this.px, cam: this.cam, night: opts.night, now: opts.now,
+          grassWind: sim && opts.weather?.rain ? "rain" : opts.weather ? "cloud" : "calm",
+          treeWind: still ? 0 : w?.rain ? 2 : w && !w.clear ? 1.4 : 1,
+          reduceMotion: opts.reduceMotion, effects: opts.effects ?? true,
+          forest: hasForest(this.area) && this.forest.forestPlan ? { plan: this.forest.forestPlan, damage: this.forest.damage } : null,
+          sand: sim?.atmosphere?.mode === "sand" ? { trails: sim.trails?.style === "sand" ? sim.trails : null } : null,
+          caves: hasCrystalCaves(this.area) ? { trails: this.caves.plan?.trails ?? null, day: shaftLight(this.worldLighting ? opts.sun : undefined).day } : null,
+          // The day's tint, as the board takes it (in battle, or by night).
+          tint: sim || opts.night > .001 ? opts.tint : undefined,
+          // The board's own darkness, which the wilds' night meets at its edge.
+          dark: (() => {
+            if (!opts.weather || !(sim || opts.night > .001)) return undefined;
+            const a = ambientFor(opts.weather, opts.night, this.previousArea ? this.previousWeather : null, this.areaMix);
+            return opts.sun ? a.alpha * Math.min(1, opts.night * 3) : a.alpha;
+          })(),
+        });
+      }
+      this.ctx.restore();
     }
     this.douse(sim, opts);
     const dt = this.lastNow ? (opts.now - this.lastNow) / 1000 : 0;
@@ -606,6 +620,21 @@ export class DefendRenderer {
     if (opts.lifting) drawLifting(this.ctx, this.px, opts.lifting.tile, opts.lifting.t);
     this.ctx.setTransform(1, 0, 0, 1, 0, 0);
     if (opts.timings) this.timings.effectsMs = performance.now() - start - this.timings.terrainMs - this.timings.entityMs;
+  }
+
+  /** The canvas less the board's inside, one device pixel in from each
+   * edge so its rounded rim is still painted under: up to four rectangles
+   * (above, below, left and right of it), the whole canvas when the board is
+   * smaller than that. Nothing is lost: the opaque city layer covers the rest. */
+  private beyondStrips() {
+    const { W, H } = this.board, cw = this.canvas.width, ch = this.canvas.height;
+    const x0 = Math.max(0, Math.ceil(this.cam.x) + 1), y0 = Math.max(0, Math.ceil(this.cam.y) + 1);
+    const x1 = Math.min(cw, Math.floor(this.cam.x + W * this.cam.s) - 1), y1 = Math.min(ch, Math.floor(this.cam.y + H * this.cam.s) - 1);
+    if (x1 <= x0 || y1 <= y0) return [{ x: 0, y: 0, w: cw, h: ch }];
+    return [
+      { x: 0, y: 0, w: cw, h: y0 }, { x: 0, y: y1, w: cw, h: ch - y1 },
+      { x: 0, y: y0, w: x0, h: y1 - y0 }, { x: x1, y: y0, w: cw - x1, h: y1 - y0 },
+    ].filter((r) => r.w > 0 && r.h > 0);
   }
 
   /** The building grid (brighter during a drag) and the drag's overlay. */
@@ -805,19 +834,30 @@ export class DefendRenderer {
       // Combat art advances on the fixed simulation clock. Keep screen pixels
       // (including artPen's camera snapping), never rescale a cached frame.
       const key = `${sim.time}:${sim.mapVersion}:${sim.effects.length}:${sim.scorches.length}:${sim.enemies.length}:${sim.soldiers.length}:${sim.civilians.length}:${this.px}:${c.canvas.width}:${c.canvas.height}:${this.cam.s}:${this.cam.x}:${this.cam.y}:${!!torches}:${opts.healthbars === true}:${!!opts.simpleEnemies}:${!!opts.simpleTroops}:${!!opts.mergedOutlines}:${opts.reduceMotion}:${this.protectCombat}:${pixelKey()}${opts.sides ? ":" + sim.soldiers.map(u => `${u.id}=${opts.sides!.ink(u.id) ?? ""}`).join(",") : ""}`;
-      this.combatLayer ??= document.createElement('canvas');
-      const layer = this.combatLayer;
-      if (sim !== this.combatSim || key !== this.combatKey) {
-        this.combatSim = sim; this.combatKey = key;
-        if (layer.width !== c.canvas.width || layer.height !== c.canvas.height) {
-          layer.width = c.canvas.width; layer.height = c.canvas.height;
+      // Below the simulation's 30 Hz every frame repaints the cache: the extra
+      // screen-sized clear and copy only add to the frame, so paint straight
+      // onto the board until a frame comes round that the cache would have kept.
+      const repeat = sim === this.combatSim && key === this.combatKey;
+      this.combatSim = sim;
+      this.combatMisses = repeat ? 0 : this.combatMisses + 1;
+      if (this.combatMisses > 3) {
+        this.combatKey = key; this.combatDirect = true;
+        this.paintCombat(c, sim, torches, opts);
+      } else {
+        this.combatLayer ??= document.createElement('canvas');
+        const layer = this.combatLayer;
+        if (!repeat || this.combatDirect) {
+          this.combatKey = key; this.combatDirect = false;
+          if (layer.width !== c.canvas.width || layer.height !== c.canvas.height) {
+            layer.width = c.canvas.width; layer.height = c.canvas.height;
+          }
+          const off = layer.getContext('2d')!;
+          off.setTransform(1, 0, 0, 1, 0, 0); off.clearRect(0, 0, layer.width, layer.height);
+          off.setTransform(c.getTransform()); off.imageSmoothingEnabled = false;
+          this.paintCombat(off, sim, torches, opts);
         }
-        const off = layer.getContext('2d')!;
-        off.setTransform(1, 0, 0, 1, 0, 0); off.clearRect(0, 0, layer.width, layer.height);
-        off.setTransform(c.getTransform()); off.imageSmoothingEnabled = false;
-        this.paintCombat(off, sim, torches, opts);
+        c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(layer, 0, 0); c.restore();
       }
-      c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(layer, 0, 0); c.restore();
     }
     // Chilled enemies twinkle on wall time, independently of simulation ticks.
     this.wizard.drawChill(c, this.px, sim, opts.now);
