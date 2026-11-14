@@ -13,7 +13,8 @@
  * bare patches, with `bare` marking the park pixels gone to dirt (the
  * live grass keeps off them) and `turf` the street pixels grassed over
  * (the live grass grows on them too). Presentation only. */
-import { CELLS_H, CELLS_W, cellInBounds, cellIndex, hash, hash01 } from "./grid.ts";
+import { CELL_COUNT, CELLS_H, CELLS_W, cellInBounds, cellIndex, hash, hash01 } from "./grid.ts";
+import { editedFrom, grow } from "./map-change.ts";
 import { CellType, type CityMap } from "./citygen.ts";
 import { ART } from "./park-art.ts";
 
@@ -32,6 +33,8 @@ const hex = (s: string) => parseInt(s.slice(1), 16);
 const TURF = { patch: GRASS.patch.map(hex), dark: hex(GRASS.dark), light: hex(GRASS.light) };
 
 export type GroundArt = {
+  /** The art's pixels, kept to patch the next city's from (`patch`). */
+  px: Uint32Array;
   /** The street dirt, grass edges and bare patches, `W × H` art pixels. */
   canvas: HTMLCanvasElement | null;
   /** 1 on park art pixels worn to bare dirt. */
@@ -49,7 +52,10 @@ const cache = new WeakMap<CityMap, GroundArt>(), grassyCache = new WeakMap<CityM
 export function groundArt(map: CityMap, grassy = false): GroundArt {
   const store = grassy ? grassyCache : cache;
   let art = store.get(map);
-  if (!art) store.set(map, (art = bake(map, grassy)));
+  if (art) return art;
+  // A city regenerated after an edit: patched round the change.
+  const edit = editedFrom(map), prior = edit && store.get(edit.from);
+  store.set(map, (art = prior ? patch(prior, map, grassy, edit.changed) : bake(map, grassy)));
   return art;
 }
 
@@ -108,23 +114,7 @@ function nearest(cx: number, cy: number, x: number, y: number, want: (i: number)
 
 function bake(map: CityMap, grassy: boolean): GroundArt {
   const px = new Uint32Array(W * H), bare = new Uint8Array(W * H), turf = new Uint8Array(W * H);
-  const g = ground(map, grassy);
-  for (let cy = 0; cy < CELLS_H; cy++)
-    for (let cx = 0; cx < CELLS_W; cx++) {
-      const i = cellIndex(cx, cy), t = map.type[i];
-      // Outside the city a structure stands on the open floor, not a lot of dirt.
-      if (t === CellType.STRUCT && !map.city[i]) continue;
-      if (g.dirt(i)) paintStreet(g, px, turf, cx, cy);
-      else if (t === CellType.PARK) paintBare(g, px, bare, cx, cy);
-    }
-  // Where the edge turns steeply, a bare park pixel can still touch turf
-  // across the cells' boundary: the park keeps its grass there.
-  for (let k = 0; k < W * H; k++) {
-    if (!bare[k]) continue;
-    const x = k % W;
-    if ((x > 0 && turf[k - 1]) || (x < W - 1 && turf[k + 1]) || (k >= W && turf[k - W]) || (k + W < W * H && turf[k + W]))
-      (bare[k] = 0), (px[k] = 0);
-  }
+  paintCells(map, grassy, px, bare, turf, null);
   let canvas: HTMLCanvasElement | null = null;
   if (typeof document !== "undefined") {
     canvas = document.createElement("canvas");
@@ -135,7 +125,66 @@ function bake(map: CityMap, grassy: boolean): GroundArt {
     new Uint32Array(img.data.buffer).set(px);
     c.putImageData(img, 0, 0);
   }
-  return { canvas, bare, turf };
+  return { px, canvas, bare, turf };
+}
+
+/** `prior`'s art made over for `map`, which looks different only on the
+ * `changed` cells: a cell's art reads its eight neighbours and the last
+ * pass a pixel's four, so the cells within two of a change are painted
+ * again, exactly as a whole bake paints them, and the rest copied. */
+function patch(prior: GroundArt, map: CityMap, grassy: boolean, changed: Uint8Array): GroundArt {
+  const px = prior.px.slice(), bare = prior.bare.slice(), turf = prior.turf.slice();
+  const redo = grow(changed, 2);
+  let x0 = CELLS_W, y0 = CELLS_H, x1 = -1, y1 = -1;
+  for (let i = 0; i < CELL_COUNT; i++) {
+    if (!redo[i]) continue;
+    const cx = i % CELLS_W, cy = (i - cx) / CELLS_W;
+    x0 = Math.min(x0, cx), y0 = Math.min(y0, cy), x1 = Math.max(x1, cx), y1 = Math.max(y1, cy);
+    for (let j = 0; j < ART; j++) {
+      const k = (cy * ART + j) * W + cx * ART;
+      px.fill(0, k, k + ART), bare.fill(0, k, k + ART), turf.fill(0, k, k + ART);
+    }
+  }
+  paintCells(map, grassy, px, bare, turf, redo);
+  let canvas: HTMLCanvasElement | null = null;
+  if (typeof document !== "undefined" && prior.canvas) {
+    canvas = document.createElement("canvas");
+    canvas.width = W;
+    canvas.height = H;
+    const c = canvas.getContext("2d")!;
+    c.drawImage(prior.canvas, 0, 0);
+    if (x1 >= 0) {
+      const w = (x1 - x0 + 1) * ART, h = (y1 - y0 + 1) * ART, img = c.createImageData(w, h), out = new Uint32Array(img.data.buffer);
+      for (let y = 0; y < h; y++) out.set(px.subarray((y0 * ART + y) * W + x0 * ART, (y0 * ART + y) * W + x0 * ART + w), y * w);
+      c.clearRect(x0 * ART, y0 * ART, w, h);
+      c.putImageData(img, x0 * ART, y0 * ART);
+    }
+  }
+  return { px, canvas, bare, turf };
+}
+
+/** Paints the streets and bare patches of every cell (or only those `only`
+ * marks, cleared first), then gives turf back its grass. */
+function paintCells(map: CityMap, grassy: boolean, px: Uint32Array, bare: Uint8Array, turf: Uint8Array, only: Uint8Array | null) {
+  const g = ground(map, grassy);
+  for (let cy = 0; cy < CELLS_H; cy++)
+    for (let cx = 0; cx < CELLS_W; cx++) {
+      const i = cellIndex(cx, cy), t = map.type[i];
+      if (only && !only[i]) continue;
+      // Outside the city a structure stands on the open floor, not a lot of dirt.
+      if (t === CellType.STRUCT && !map.city[i]) continue;
+      if (g.dirt(i)) paintStreet(g, px, turf, cx, cy);
+      else if (t === CellType.PARK) paintBare(g, px, bare, cx, cy);
+    }
+  // Where the edge turns steeply, a bare park pixel can still touch turf
+  // across the cells' boundary: the park keeps its grass there.
+  for (let k = 0; k < W * H; k++) {
+    if (!bare[k]) continue;
+    const x = k % W;
+    if (only && !only[cellIndex(Math.floor(x / ART), Math.floor(k / W / ART))]) continue;
+    if ((x > 0 && turf[k - 1]) || (x < W - 1 && turf[k + 1]) || (k >= W && turf[k - W]) || (k + W < W * H && turf[k + W]))
+      (bare[k] = 0), (px[k] = 0);
+  }
 }
 
 /** Where grass gives way to dirt near art pixel (x, y), in art pixels from

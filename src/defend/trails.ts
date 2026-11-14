@@ -31,6 +31,7 @@ import { CellType, type CityMap } from "./citygen.ts";
 import { downhill, fillFlowField, openSteps, type Point } from "./pathing.ts";
 import { boulderPlan } from "./forest.ts";
 import type { AreaId } from "./areas.ts";
+import { outskirts } from "./outskirts.ts";
 
 export type TrailStyle = "road" | "sand" | "cave";
 
@@ -62,14 +63,15 @@ export type TrailLine = { points: Point[]; half: number; level: number };
  * trailheads' x along the top edge, and the lines to draw. */
 export type TrailPlan = { style: TrailStyle; wear: Float32Array; heads: number[]; lines: TrailLine[]; rocks: TrailRock[] };
 
-const plans = new WeakMap<CityMap, Map<TrailStyle, TrailPlan>>();
+/** Planned once per outskirts (`outskirts.ts`), not per map. */
+const plans = new WeakMap<object, Map<TrailStyle, TrailPlan>>();
 
 /** `map`'s trails of `style`, planned on first use; null on a map without
  * trails (anything but a Defend city). */
 export function trailPlan(map: CityMap, style: TrailStyle): TrailPlan | null {
   if (!map.trails) return null;
-  let byStyle = plans.get(map);
-  if (!byStyle) plans.set(map, (byStyle = new Map()));
+  let byStyle = plans.get(outskirts(map));
+  if (!byStyle) plans.set(outskirts(map), (byStyle = new Map()));
   let plan = byStyle.get(style);
   if (!plan) byStyle.set(style, (plan = planTrails(map, map.trails.seed, style)));
   return plan;

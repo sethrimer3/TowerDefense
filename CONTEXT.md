@@ -55,6 +55,10 @@ The unit the player builds with: the board is 12 × 12 of them. Only the middle 
 The impassable, visible scenery beyond the board's edges, carrying on the area's own ground: in the forest its grass and trees, then whole mountain ranges (in the desert, sandstone cliffs over flagstones). Nothing happens there; it fills the view so no dark space shows at any window shape.
 _Avoid_: border, margin
 
+**Outskirts**:
+What a Defend city's scenery is planned from beyond its buildings: which ground is open, walled, fenced, water, gate or keep. A building placed inside the walls leaves the outskirts as they were, so the forest and the worn trails stay exactly as they stood.
+_Avoid_: terrain (also used for the render pass)
+
 **Worn trail**:
 A way the Dark One's walkers have always come, worn into the open ground of Defend's first three areas from the top edge to the city and on out the bottom. Cheaper to walk, so ground enemies keep to it; it bends round whatever the player builds. They read as natural game trails or pioneer paths, swerving round rocks. In Mossbound Ruins, bare earth fading into the grass, running on under the mountains; in the Amber Desert, the sand carved away down to the old flagstones, its banks sloping in; in the Crystal Caves, dust packed smooth through the gravel with pebbles kicked to its sides.
 _Avoid_: path, lane (an Ambush word)

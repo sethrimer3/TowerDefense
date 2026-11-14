@@ -18,6 +18,7 @@ import { CELLS_H, CELLS_W, cellInBounds, cellIndex, hash01 } from "./grid.ts";
 import { CellType, type CityMap } from "./citygen.ts";
 import { hasTree, pondDisc, pondField, treeCanopy } from "./park-geometry.ts";
 import { bareAt, groundArt, turfAt, type GroundArt } from "./ground-art.ts";
+import { editedFrom, grow } from "./map-change.ts";
 import { windInCell } from "./scenery-looks.ts";
 
 /** Blade pixels per cell. */
@@ -69,10 +70,14 @@ export class ParkGrass {
   /** Plans the blades for `map` (once per city). */
   sync(map: CityMap) {
     if (map === this.map) return;
+    // A city regenerated after an edit: a cell's blades read the cells two
+    // round it and the street art (itself redone two round the change), so
+    // only the cells within four of a change are planned again.
+    const edit = editedFrom(map), redo = edit && edit.from === this.map && this.plans.length ? grow(edit.changed, 4) : null;
     this.map = map;
     this.stir.clear();
     this.builtAt = -Infinity;
-    this.plans = Array.from({ length: CELLS_W * CELLS_H }, (_, i) => plan(map, i % CELLS_W, Math.floor(i / CELLS_W)));
+    this.plans = redo ? this.plans.map((b, i) => (redo[i] ? plan(map, i % CELLS_W, Math.floor(i / CELLS_W)) : b)) : Array.from({ length: CELLS_W * CELLS_H }, (_, i) => plan(map, i % CELLS_W, Math.floor(i / CELLS_W)));
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
     this.plans.forEach((b, i) => {
       if (!b?.length) return;

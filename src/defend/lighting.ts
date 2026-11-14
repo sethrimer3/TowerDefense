@@ -235,21 +235,50 @@ export class DefendLighting {
 
   /** Null retains standalone/legacy rendering; live scenes use solar time. */
   solarTime: number | null = null;
-  /** How brightly light `l` burns now. */
+  /** How brightly light `l` burns now. Its dusk offset follows where it
+   * stands, not its id, which a building placed elsewhere can renumber. */
   burn(l: Light) {
-    return (this.burning ? this.burning(l) : 1) * (this.solarTime === null ? 1 : torchLevel(this.solarTime, l.id, l.x, l.y));
+    return (this.burning ? this.burning(l) : 1) * (this.solarTime === null ? 1 : torchLevel(this.solarTime, 0, l.x, l.y));
   }
 
-  /** Point the lighting at a (new) city. */
-  setMap(map: CityMap) {
-    if (map === this.map) return;
+  /** Point the lighting at a (new) city. With `changed` (the cells whose
+   * look differs from the last city's, `map-change.ts`), every light still
+   * standing just where it stood keeps its bake, so it burns on while the
+   * lights near the change are baked again (the new ones as soon as they
+   * can be); returns the lights that came or went, which the city layer
+   * draws brackets for. Without, every light is baked afresh. */
+  setMap(map: CityMap, changed?: Uint8Array): Light[] {
+    if (map === this.map) return [];
+    const was = this.map ? this.lights : [], old = this.bakes, oldMap = this.map;
     this.map = map;
     this.lights = cityLights(map);
     this.stones = roadStones(map);
-    this.bakes.clear();
-    this.queue = new Set(this.lights.map((l) => l.id));
+    this.bakes = new Map();
     this.domDirty = true;
     this.reliefKey = "";
+    this.lastOn = "";
+    if (!changed || !oldMap) {
+      this.queue = new Set(this.lights.map((l) => l.id));
+      return [];
+    }
+    const key = (m: CityMap, l: Light) => `${l.kind}|${l.x}|${l.y}|${l.radius}|${l.strength}|${l.inside}|${l.pillars.join(",")}|${lot(m.buildings[l.owner])}`;
+    const lot = (b: Building | undefined) => (b ? `${b.kind},${b.rect.x},${b.rect.y},${b.rect.w},${b.rect.h}` : "-");
+    const before = new Map<string, Light>();
+    for (const l of was) before.set(key(oldMap, l), l);
+    const moved: Light[] = [];
+    this.queue = new Set();
+    for (const l of this.lights) {
+      const k = key(map, l), prior = before.get(k), bake = prior && old.get(prior.id);
+      before.delete(k);
+      if (bake) this.bakes.set(l.id, bake);
+      else this.queue.add(l.id);
+      if (!prior) moved.push(l);
+    }
+    moved.push(...before.values());
+    const cells: number[] = [];
+    for (let i = 0; i < changed.length; i++) if (changed[i]) cells.push(i);
+    this.invalidate(cells);
+    return moved;
   }
 
   /** Takes what stands from cached building art, including its outline.
@@ -285,8 +314,9 @@ export class DefendLighting {
   patchMasks(boxes: readonly CellBox[]) {
     const m = this.masks;
     if (!m) return;
-    this.tintKey = this.buildingGrownKey = "";
-    this.upKey = "";
+    // The masks drawn up to the board, their tint and their grown copy are
+    // redrawn only inside the boxes too, next time they're asked for.
+    if (this.upKey) this.upPatches.push(...boxes);
     const cells = new Set<number>();
     for (const box of boxes) for (const i of readMasks(m.body, m.rim, box, m.covered, m.pixels)) cells.add(i);
     this.invalidate([...cells]);
@@ -502,18 +532,33 @@ export class DefendLighting {
     let grown: HTMLCanvasElement;
     if (fixed) grown = this.buildingGrown = sized(this.buildingGrown, width, height);
     else grown = this.grown = sized(this.grown, width, height);
-    if (!fixed || key !== this.buildingGrownKey) {
+    const whole = !fixed || key !== this.buildingGrownKey;
+    if (whole || this.grownPatches.length) {
       const g = grown.getContext("2d")!;
-      g.globalCompositeOperation = "source-over";
-      g.clearRect(0, 0, width, height);
-      for (const dy of [-by, 0, by]) for (const dx of [-by, 0, by]) g.drawImage(body, dx, dy);
-      if (fixed) this.buildingGrownKey = key;
+      for (const r of whole ? [{ x: 0, y: 0, w: width, h: height }] : this.grownPatches) {
+        // A patch grows past its box by `by`, as the body inside it does.
+        const x = Math.floor(r.x - by), y = Math.floor(r.y - by), w = Math.ceil(r.w + 2 * by) + 1, h = Math.ceil(r.h + 2 * by) + 1;
+        g.save();
+        g.beginPath();
+        g.rect(x, y, w, h);
+        g.clip();
+        g.globalCompositeOperation = "source-over";
+        g.clearRect(x, y, w, h);
+        for (const dy of [-by, 0, by]) for (const dx of [-by, 0, by]) g.drawImage(body, dx, dy);
+        g.restore();
+      }
+      if (fixed) this.buildingGrownKey = key, this.grownPatches = [];
     }
     r.setTransform(1, 0, 0, 1, 0, 0);
     r.globalCompositeOperation = "destination-in";
     r.drawImage(grown, 0, 0);
   }
   private grown: HTMLCanvasElement | null = null;
+  /** Boxes (cells) the masks were patched in since they were drawn up. */
+  private upPatches: CellBox[] = [];
+  /** Board regions where the drawn-up masks changed, still to redo in the tint and grown copy. */
+  private tintPatches: Region[] = [];
+  private grownPatches: Region[] = [];
 
   /** The masks drawn up to the board at this zoom, or null before any. */
   private masksAt(W: number, H: number) {
@@ -522,8 +567,20 @@ export class DefendLighting {
     const key = `${W}x${H}`;
     if (key !== this.upKey || !this.bodyUp || !this.rimUp) {
       this.upKey = key;
+      this.upPatches = [];
+      this.tintKey = this.buildingGrownKey = "";
       this.bodyUp = nearest(this.bodyUp, m.body, W, H);
       this.rimUp = nearest(this.rimUp, m.rim, W, H);
+    } else if (this.upPatches.length) {
+      // Only some buildings changed: redraw round them (`patchMasks`).
+      const regions = this.upPatches.map((b) => region(b, W, H));
+      this.upPatches = [];
+      for (const r of regions) {
+        nearest(this.bodyUp, m.body, W, H, r);
+        nearest(this.rimUp, m.rim, W, H, r);
+      }
+      this.tintPatches.push(...regions);
+      this.grownPatches.push(...regions);
     }
     return { body: this.bodyUp, rim: this.rimUp };
   }
@@ -538,21 +595,28 @@ export class DefendLighting {
     gl.drawImage(body, 0, 0);
     gl.globalCompositeOperation = "source-over";
     const key = `${body.width}:${body.height}:${ambient.color}`;
-    if (key !== this.tintKey || !this.tint) {
+    const whole = key !== this.tintKey || !this.tint;
+    for (const r of whole ? [{ x: 0, y: 0, w: body.width, h: body.height }] : this.tintPatches) {
       this.tintKey = key;
       const t = (this.tint = sized(this.tint, body.width, body.height)).getContext("2d")!;
+      t.save();
+      t.beginPath();
+      t.rect(r.x, r.y, r.w, r.h);
+      t.clip();
       t.globalCompositeOperation = "source-over";
-      t.clearRect(0, 0, body.width, body.height);
+      t.clearRect(r.x, r.y, r.w, r.h);
       t.drawImage(body, 0, 0);
       t.globalCompositeOperation = "source-in";
       t.fillStyle = ambient.color;
-      t.fillRect(0, 0, body.width, body.height);
+      t.fillRect(r.x, r.y, r.w, r.h);
+      t.restore();
     }
+    this.tintPatches = [];
     dk.globalCompositeOperation = "destination-out";
     dk.drawImage(body, 0, 0);
     dk.globalCompositeOperation = "source-over";
     dk.globalAlpha = ambient.alpha;
-    dk.drawImage(this.tint, 0, 0);
+    dk.drawImage(this.tint!, 0, 0);
     dk.globalAlpha = 1;
   }
 
@@ -828,15 +892,30 @@ function readMasks(body: HTMLCanvasElement, rim: HTMLCanvasElement, box: CellBox
 }
 
 /** `src` drawn up to w × h without smoothing. */
-function nearest(cv: HTMLCanvasElement | null, src: HTMLCanvasElement, w: number, h: number) {
+function nearest(cv: HTMLCanvasElement | null, src: HTMLCanvasElement, w: number, h: number, only?: Region) {
   const out = sized(cv, w, h);
   const c = out.getContext("2d")!;
+  c.save();
   c.setTransform(1, 0, 0, 1, 0, 0);
+  if (only) {
+    c.beginPath();
+    c.rect(only.x, only.y, only.w, only.h);
+    c.clip();
+  }
   c.globalCompositeOperation = "source-over";
   c.clearRect(0, 0, w, h);
   c.imageSmoothingEnabled = false;
   c.drawImage(src, 0, 0, w, h);
+  c.restore();
   return out;
+}
+
+/** A box of canvas pixels. */
+type Region = { x: number; y: number; w: number; h: number };
+/** Cell box `b` on a `w` × `h` board, out to whole pixels. */
+function region(b: CellBox, w: number, h: number): Region {
+  const x = Math.floor((b.x0 * w) / CELLS_W), y = Math.floor((b.y0 * h) / CELLS_H);
+  return { x, y, w: Math.ceil((b.x1 * w) / CELLS_W) - x, h: Math.ceil((b.y1 * h) / CELLS_H) - y };
 }
 
 /** What an outline rings and how far out its shining half reaches. */

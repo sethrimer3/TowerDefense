@@ -39,6 +39,9 @@ export class ParkTrees {
   sync(map: CityMap) {
     const key = pixelKey();
     if (map === this.map && key === this.artKey) return;
+    // A city regenerated after an edit that left the parks alone shares
+    // their art (`parkArt`): the trees stand and fade on as they were.
+    if (key === this.artKey && this.map && parkArt(map).trees === this.trees) { this.map = map; return; }
     this.artKey = key;
     this.map = map;
     this.trees = parkArt(map).trees;

@@ -344,6 +344,39 @@ export function floorPixels(plan: ForestPlan, damage: ForestDamage | null, river
  * as the city layer paints it, so its banks lie on the forest's grass. Pixels
  * marked in `covered` (a scenario's buildings, raised after the plan) are left
  * clear, so the city layer's building shows through. */
+/** A tree, whatever its id (a replan renumbers them). */
+export const treeKey = (t: ForestTree) => `${t.kind},${t.x},${t.y},${t.size},${t.variant}`;
+
+const planEdits = new WeakMap<ForestPlan, { from: ForestPlan; boxes: Box[] }>();
+/** The plan `plan` replaced in the forest art, differing only inside
+ * `boxes` (art pixels), if it did (`forestChanges`). */
+export const planEdit = (plan: ForestPlan) => planEdits.get(plan);
+
+/** The boxes (art pixels) round everything that differs between two plans
+ * of the same forest, where its floor must be painted again, or null when
+ * so much does (its boulders, lakes or trails' lines) that it all must. */
+export function forestChanges(a: ForestPlan, b: ForestPlan): Box[] | null {
+  const key = (p: ForestPlan) => JSON.stringify([p.lakes, p.boulders, p.roads?.lines ?? null]);
+  if (key(a) !== key(b)) return null;
+  const boxes: Box[] = [];
+  const add = (x: number, y: number, reach: number) =>
+    boxes.push({ x0: Math.floor((x - reach) * ART), y0: Math.floor((y - reach) * ART), x1: Math.ceil((x + reach) * ART), y1: Math.ceil((y + reach) * ART) });
+  const differ = <T,>(xs: readonly T[], ys: readonly T[], k: (v: T) => string, at: (v: T) => void) => {
+    const inA = new Set(xs.map(k)), inB = new Set(ys.map(k));
+    for (const v of xs) if (!inB.has(k(v))) at(v);
+    for (const v of ys) if (!inA.has(k(v))) at(v);
+  };
+  // Each tree's shadow falls up to its own breadth away.
+  differ(a.trees, b.trees, treeKey, (t) => add(t.x, t.y, t.r * 2 + 2));
+  differ(a.rocks, b.rocks, (r) => `${r.x},${r.y},${r.size},${r.seed}`, (r) => add(r.x, r.y, r.size + 1.5));
+  differ(a.pads, b.pads, (p) => `${p.x},${p.y},${p.r},${p.seed}`, (p) => add(p.x, p.y, p.r * 1.3 + 1.5));
+  const wear = (p: ForestPlan, i: number) => p.roads?.wear[i] ?? 0;
+  for (let i = 0; i < CELL_COUNT; i++) if (a.open[i] !== b.open[i] || wear(a, i) !== wear(b, i)) add((i % CELLS_W) + 0.5, Math.floor(i / CELLS_W) + 0.5, 3);
+  let area = 0;
+  for (const box of boxes) area += (box.x1 - box.x0) * (box.y1 - box.y0);
+  return area > W * H * 0.4 ? null : boxes;
+}
+
 export function paintFloor(out: Uint32Array, plan: ForestPlan, damage: ForestDamage | null, box: Box, river: ForestRiver | null = null, covered?: Uint8Array, blight?: BlightTrail, sun?: Sun) {
   clip = { x0: Math.max(0, box.x0), y0: Math.max(0, box.y0), x1: Math.min(W, box.x1), y1: Math.min(H, box.y1) };
   for (let Y = clip.y0; Y < clip.y1; Y++) out.fill(0, Y * W + clip.x0, Y * W + clip.x1);
@@ -897,6 +930,19 @@ export class ForestArt {
       this.floorStale = [WHOLE];
       this.dirty = true;
     }
+    // A city regenerated after a building was placed or moved keeps its
+    // outskirts, and so its forest plan (`outskirts.ts`): keep the floor,
+    // the trees' fading and the birds as they are. A building placed out on
+    // the open ground replans the forest, but only round it: repaint just
+    // there, while nothing in the forest has been damaged.
+    if (map !== this.map && this.plan && !this.river && !riverBed(map)) {
+      const next = forestPlan(map);
+      if (next === this.plan) this.map = map;
+      else if (sim === null && this.sim === null && this.untouched()) {
+        const boxes = forestChanges(this.plan, next);
+        if (boxes) this.adopt(map, next, boxes);
+      }
+    }
     if (map !== this.map) {
       this.map = map;
       this.plan = forestPlan(map);
@@ -923,6 +969,29 @@ export class ForestArt {
       this.dirty = true;
       this.floorStale = [WHOLE];
     }
+  }
+
+  /** Nothing in the forest is damaged, burning, flying or heaped. */
+  private untouched() {
+    const d = this.damage;
+    return !this.debris.length && !this.piles.length && !this.flying.size && (!d || (!d.craters.length && !d.stumps.length && !d.ash.length && !d.burning.length && !d.clearings.length));
+  }
+
+  /** Takes up `plan` for `map` in place of the current plan, which differs
+   * from it only inside `boxes` (art pixels): the trees standing in both
+   * keep their fading, and only the boxes are painted again. */
+  private adopt(map: CityMap, plan: ForestPlan, boxes: Box[]) {
+    const was0 = this.plan!, was = new Map(was0.trees.map((t) => [treeKey(t), this.alpha[t.id]]));
+    this.map = map;
+    this.plan = plan;
+    this.roosts = plan.trees.filter((t) => roosting(t) > 0);
+    this.glints = null;
+    this.alpha = Float32Array.from(plan.trees, (t) => was.get(treeKey(t)) ?? 1);
+    this.witherStages = new Uint8Array(plan.trees.length);
+    this.damage = new ForestDamage(plan);
+    this.dirty = true;
+    for (const b of boxes) this.stale(b);
+    planEdits.set(plan, { from: was0, boxes });
   }
 
   /** The floor's art pixels a scenario's buildings stand on, left clear,

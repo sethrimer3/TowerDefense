@@ -13,7 +13,7 @@ import { BLIGHT_TRAIL } from "./blight-trail.ts";
 import { DEAD_PALETTE32 } from "./park-grass.ts";
 import { CELLS_H, CELLS_W, cellIndex, hash01 } from "./grid.ts";
 import type { ForestDamage, ForestPlan } from "./forest.ts";
-import { lakeDepth, shadedAt, turfAt } from "./forest-art.ts";
+import { lakeDepth, planEdit, shadedAt, treeKey, turfAt, type Box } from "./forest-art.ts";
 import { ART } from "./park-art.ts";
 import { windInCell } from "./scenery-looks.ts";
 import { CURVE, PALETTE32, SHADOW, WIND, paintBlade, type Blade, type GrassFrame, type Walker } from "./park-grass.ts";
@@ -51,8 +51,24 @@ export function planCell(cx: number, cy: number, keep: (x: number, y: number) =>
 }
 
 /** The blades of `plan`'s open ground, by cell (null where none grow). */
-export function forestBlades(plan: ForestPlan): (ForestBlade[] | null)[] {
+export function forestBlades(plan: ForestPlan, prior?: { plan: ForestPlan; blades: readonly (ForestBlade[] | null)[]; boxes: readonly Box[] }): (ForestBlade[] | null)[] {
   const out: (ForestBlade[] | null)[] = new Array(CELLS_W * CELLS_H).fill(null);
+  // Replanned round an edit (`planEdit`): outside its boxes every cell's
+  // blades are as before, but the trees they hide under renumbered.
+  let redo: Uint8Array | null = null;
+  if (prior) {
+    redo = new Uint8Array(CELLS_W * CELLS_H);
+    for (const b of prior.boxes)
+      for (let cy = Math.max(0, Math.floor(b.y0 / ART) - 1); cy <= Math.min(CELLS_H - 1, Math.floor(b.y1 / ART) + 1); cy++)
+        for (let cx = Math.max(0, Math.floor(b.x0 / ART) - 1); cx <= Math.min(CELLS_W - 1, Math.floor(b.x1 / ART) + 1); cx++) redo[cellIndex(cx, cy)] = 1;
+    const ids = new Map(plan.trees.map((t) => [treeKey(t), t.id]));
+    const renumber = prior.plan.trees.map((t) => ids.get(treeKey(t)) ?? -1);
+    for (let k = 0; k < out.length; k++) {
+      const list = prior.blades[k];
+      if (redo[k] || !list) continue;
+      out[k] = list.some((b) => b.under >= 0) ? list.map((b) => (b.under >= 0 ? { ...b, under: renumber[b.under] } : b)) : list;
+    }
+  }
   // What no blade grows on, by the cells it may reach.
   const near: { x: number; y: number; r: number }[][] = Array.from({ length: CELLS_W * CELLS_H }, () => []);
   const add = (x: number, y: number, r: number) => {
@@ -72,7 +88,7 @@ export function forestBlades(plan: ForestPlan): (ForestBlade[] | null)[] {
   for (let cy = 0; cy < CELLS_H; cy++)
     for (let cx = 0; cx < CELLS_W; cx++) {
       const k = cellIndex(cx, cy);
-      if (!plan.open[k]) continue;
+      if (!plan.open[k] || (redo && !redo[k])) continue;
       const list = planCell(cx, cy, (x, y) => {
         if (near[k].some((d) => (x - d.x) ** 2 + (y - d.y) ** 2 < d.r * d.r)) return -2;
         const X = Math.floor(x * ART), Y = Math.floor(y * ART);
@@ -128,8 +144,9 @@ export class ForestGrass {
   /** Plans the blades for `plan` (once a forest). */
   sync(plan: ForestPlan) {
     if (plan === this.plan) return;
+    const edit = planEdit(plan);
+    this.plans = forestBlades(plan, edit && edit.from === this.plan ? { plan: edit.from, blades: this.plans, boxes: edit.boxes } : undefined);
     this.plan = plan;
-    this.plans = forestBlades(plan);
     this.sway = swaying(this.plans);
     this.stir.clear();
     this.builtAt = -Infinity;

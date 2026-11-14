@@ -30,12 +30,22 @@ export const FIELD_REACH = 9.1;
  * its half width (`t`, Infinity far from any), and that trail's wear. */
 export type TrailField = { t: Float32Array; level: Float32Array };
 const fields = new WeakMap<TrailPlan, TrailField>();
+/** The fields made lately, by their lines, oldest first: a building placed
+ * on the open ground replans the trails (`outskirts.ts`), which mostly run
+ * just as before, so their distance map needn't be made again. */
+const byLines = new Map<string, TrailField>();
 
 /** `plan`'s distance map, made on first use. */
 export function trailField(plan: TrailPlan): TrailField {
   let f = fields.get(plan);
   if (f) return f;
-  fields.set(plan, (f = distanceField(plan.lines, W, H, 0, 0)));
+  const key = plan.lines.map((l) => `${l.half},${l.level}:${l.points.map((p) => `${p.x},${p.y}`).join(" ")}`).join("|");
+  f = byLines.get(key);
+  if (f) byLines.delete(key);
+  else f = distanceField(plan.lines, W, H, 0, 0);
+  byLines.set(key, f);
+  if (byLines.size > 4) byLines.delete(byLines.keys().next().value!);
+  fields.set(plan, f);
   return f;
 }
 
