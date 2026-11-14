@@ -31,7 +31,8 @@ import { enemySize } from "./catalog.ts";
  * planted war banner, the magic boats' water (flood-art.ts) over the ground, the wizards' fire, the building grid and drag overlay (edit-overlay.ts), then
  * rain in screen space. */
 import { onPixelArt, pixelArtOn, pixelKey } from "./pixel-sprites.ts";
-import { CELL_COUNT, CELLS_H, CELLS_W, boardSize, cellIndex, hash01, type TilePos } from "./grid.ts";
+import { CELL_COUNT, CELLS_H, CELLS_W, boardSize, cellInBounds, cellIndex, hash01, type TilePos } from "./grid.ts";
+import { changeBoxes, changedCells, noteEdit } from "./map-change.ts";
 import type { CityMap } from "./citygen.ts";
 import type { DefendSim } from "./sim.ts";
 import { DefendLighting, MASK, type CellBox, type LightFrame } from "./lighting.ts";
@@ -991,12 +992,19 @@ export class DefendRenderer {
     // section): repaint just round them, not the whole city and its
     // lighting masks (a hitch of a tenth of a second or more on a big city,
     // many times a second while a worm tears through it and masons rebuild).
-    const base = `${W}:${k}:${this.worldLighting}:${this.area}:${pixelKey()}:${looks ? Object.entries(looks).join(",") : ""}`;
-    const boxes = map === this.map && sim && sim === this.stagedSim && base === this.baseKey && !this.previousArea ? this.damageBoxes(map, sim) : null;
+    const frame = `${W}:${k}:${this.worldLighting}:${this.area}:${pixelKey()}`;
+    const base = `${frame}:${looks ? Object.entries(looks).join(",") : ""}`;
+    const boxes = map === this.map && sim && sim === this.stagedSim && base === this.baseKey && !this.previousArea ? this.damageBoxes(map, sim)
+      : map !== this.map && !sim && !this.stagedSim && frame === this.frameKey && !this.previousArea ? this.mapBoxes(map, looks)
+      : null;
     this.baseKey = base;
+    this.frameKey = frame;
+    this.paintedLooks = looks;
     this.stagedSim = sim;
     this.recordStages(map, sim);
     if (boxes) {
+      this.map = map;
+      this.maskMap = map;
       this.layerKey = key;
       this.maskKey = maskKey;
       const P = this.px * k;
@@ -1074,6 +1082,28 @@ export class DefendRenderer {
     for (const b of boxes) area += (b.x1 - b.x0) * (b.y1 - b.y0);
     return area > CELLS_W * CELLS_H * 0.4 ? null : boxes;
   }
+  /** The boxes (in cells) round where a city regenerated after an edit
+   * (a building placed, moved or taken up) differs from the one painted,
+   * with the lighting already pointed at it (keeping the bakes of the
+   * lights that didn't move), or null when so much changed that one full
+   * repaint is best. Only while building with the shared sky, whose sun
+   * shadows aren't in the layer. */
+  private mapBoxes(map: CityMap, looks?: Readonly<Record<number, string>>): CellBox[] | null {
+    if (!this.map || !this.worldLighting || this.maskMap !== this.map || !this.layer.width) return null;
+    const changed = changedCells(this.map, map, this.paintedLooks, looks);
+    if (!changed) return null;
+    const moved = this.lighting.setMap(map, changed);
+    // The brackets the lanterns that came or went hang from.
+    for (const l of moved) for (let y = Math.floor(l.y) - 1; y <= Math.floor(l.y) + 1; y++) for (let x = Math.floor(l.x) - 1; x <= Math.floor(l.x) + 1; x++) if (cellInBounds(x, y)) changed[cellIndex(x, y)] = 1;
+    noteEdit(this.map, map, changed);
+    const boxes = changeBoxes(changed, DAMAGE_MARGIN);
+    let area = 0;
+    for (const b of boxes) area += (b.x1 - b.x0) * (b.y1 - b.y0);
+    return boxes.length <= MAX_DAMAGE_BOXES && area <= CELLS_W * CELLS_H * 0.4 ? boxes : null;
+  }
+  private paintedLooks: Readonly<Record<number, string>> | undefined;
+  private frameKey = "";
+
   /** Each building's look (`buildingState`) and kind and lot as last painted. */
   private recordStages(map: CityMap, sim: DefendSim | null) {
     this.stages.clear();
@@ -1228,9 +1258,12 @@ const MAX_DAMAGE_BOXES = 64;
 
 /** Repaints `box` (cells, at `P` pixels a cell) of `c`'s canvas alone:
  * cleared and painted again through a clip, exactly as a whole repaint
- * paints those pixels. */
+ * paints those pixels. Only the pixels wholly inside it: at a fractional
+ * scale one straddling its edge also holds art from beyond the box, which
+ * a repaint of the box leaves out, and what changed lies well inside it. */
 function repaintBox(c: CanvasRenderingContext2D, P: number, box: CellBox, paint: (c: CanvasRenderingContext2D) => void) {
-  const x = Math.floor(box.x0 * P), y = Math.floor(box.y0 * P), w = Math.ceil(box.x1 * P) - x, h = Math.ceil(box.y1 * P) - y;
+  const x = Math.ceil(box.x0 * P), y = Math.ceil(box.y0 * P), w = Math.floor(box.x1 * P) - x, h = Math.floor(box.y1 * P) - y;
+  if (w <= 0 || h <= 0) return;
   c.save();
   c.setTransform(1, 0, 0, 1, 0, 0);
   c.globalAlpha = 1;

@@ -54,7 +54,22 @@ export type ParkArt = {
 };
 
 let cache = new WeakMap<CityMap, ParkArt>();
-onPixelArt(()=>{cache=new WeakMap();});
+/** Recent art by what it's painted from, oldest first (`parksKey`). */
+let recent = new Map<string, ParkArt>();
+onPixelArt(()=>{cache=new WeakMap();recent=new Map();});
+
+/** What the parks' art is painted from, one letter a cell: park, pond and
+ * bridged water, so a city regenerated after an edit that left its parks
+ * alone shares their art (and its ducks and ripples carry on). Null with a
+ * river, whose banks read every cell. */
+function parksKey(map: CityMap): string | null {
+  if (riverBed(map)) return null;
+  const codes = new Uint8Array(map.type.length);
+  for (let i = 0; i < codes.length; i++) codes[i] = map.type[i] === CellType.PARK ? 112 : map.type[i] === CellType.WATER ? 119 : map.bridges?.[i] === 2 ? 98 : 46;
+  let key = "";
+  for (let i = 0; i < codes.length; i += 4096) key += String.fromCharCode(...codes.subarray(i, i + 4096));
+  return key;
+}
 
 /** Whether art pixel (x, y) is open water. */
 export const openAt = (art: ParkArt, x: number, y: number) =>
@@ -63,7 +78,16 @@ export const openAt = (art: ParkArt, x: number, y: number) =>
 /** `map`'s park art, baked on first use. */
 export function parkArt(map: CityMap): ParkArt {
   let art = cache.get(map);
-  if (!art) cache.set(map, (art = bake(map)));
+  if (art) return art;
+  const key = parksKey(map);
+  art = key === null ? undefined : recent.get(key);
+  if (key !== null) recent.delete(key);
+  art ??= bake(map);
+  if (key !== null) {
+    recent.set(key, art);
+    if (recent.size > 4) recent.delete(recent.keys().next().value!);
+  }
+  cache.set(map, art);
   return art;
 }
 

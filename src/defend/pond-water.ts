@@ -74,6 +74,8 @@ export class PondWater {
 
   sync(map: CityMap) {
     if (map === this.map) return;
+    // Parks left alone by an edit share their art: the ducks swim on.
+    if (this.map && this.art && parkArt(map) === this.art) { this.map = map; return; }
     this.map = map;
     this.art = parkArt(map);
     this.ponds = findPonds(map);

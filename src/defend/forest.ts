@@ -13,6 +13,7 @@ import { CELLS_H, CELLS_W, SUB, cellInBounds, cellIndex, hash, hash01 } from "./
 import { CellType, type CityMap } from "./citygen.ts";
 import type { AreaId } from "./areas.ts";
 import { trailPlan, type TrailPlan } from "./trails.ts";
+import { outskirts } from "./outskirts.ts";
 
 /** The areas with a forest outside their walls. */
 export const FOREST_AREAS: readonly AreaId[] = ["moss"];
@@ -90,7 +91,8 @@ export const BOULDERS = { chance: 0.006, clear: 2, apart: 3, top: SUB, mountains
 /** A heap this many cells or more is drawn as a small mountain. */
 export const MOUNTAIN = 9;
 
-const boulderPlans = new WeakMap<CityMap, Boulder[]>();
+/** Planned once per outskirts (`outskirts.ts`), not per map. */
+const boulderPlans = new WeakMap<object, Boulder[]>();
 
 /** `map`'s boulders, planned on first use: a lone boulder (one cell or a
  * 2 × 2 block) or a cluster of three to six cells, on open ground kept
@@ -98,7 +100,7 @@ const boulderPlans = new WeakMap<CityMap, Boulder[]>();
  * of the spawn rows, and `apart` cells from each other, so they can never
  * wall in ground or block the way to the city. */
 export function boulderPlan(map: CityMap): Boulder[] {
-  let plan = boulderPlans.get(map);
+  let plan = boulderPlans.get(outskirts(map));
   if (plan) return plan;
   plan = [];
   const taken = new Uint8Array(CELLS_W * CELLS_H);
@@ -180,22 +182,49 @@ export function boulderPlan(map: CityMap): Boulder[] {
         plan.push({ cells: cells.map(([x, y]) => cellIndex(x, y)), seed: hash(cx, cy, 506) });
       } else grow(cx, cy, roll < 0.8 ? 3 + (hash(cx, cy, 503) % 4) : 7 + (hash(cx, cy, 503) % 6));
     }
-  boulderPlans.set(map, plan);
+  boulderPlans.set(outskirts(map), plan);
   return plan;
 }
 
-const plans = new WeakMap<CityMap, ForestPlan>();
+/** Planned once per outskirts (`outskirts.ts`), not per map. */
+const plans = new WeakMap<object, ForestPlan>();
 
 /** `map`'s forest, planned on first use. */
 export function forestPlan(map: CityMap): ForestPlan {
-  let plan = plans.get(map);
-  if (!plan) plans.set(map, (plan = plan_(map)));
+  let plan = plans.get(outskirts(map));
+  if (!plan) plans.set(outskirts(map), (plan = plan_(map)));
   return plan;
 }
 
 /** Whether (x, y) lies within `pad` cells of any of the discs. */
-const inDiscs = (discs: readonly { x: number; y: number; r: number }[], x: number, y: number, pad = 0) =>
-  discs.some((d) => (x - d.x) ** 2 + (y - d.y) ** 2 < (d.r + pad) ** 2);
+const inDiscs = (discs: Discs, x: number, y: number, pad = 0) => discs.some(x, y, pad);
+
+/** Discs bucketed by where they lie, so asking whether a point is near any
+ * looks only at the buckets within reach (the plan asks for every open
+ * cell, of hundreds of discs). */
+class Discs {
+  private static readonly B = 4;
+  private readonly bw = Math.ceil(CELLS_W / Discs.B);
+  private readonly bh = Math.ceil(CELLS_H / Discs.B);
+  private readonly buckets: { x: number; y: number; r: number }[][] = Array.from({ length: this.bw * this.bh }, () => []);
+  private maxR = 0;
+  private bx = (x: number) => Math.max(0, Math.min(this.bw - 1, Math.floor(x / Discs.B)));
+  private by = (y: number) => Math.max(0, Math.min(this.bh - 1, Math.floor(y / Discs.B)));
+  push(...discs: { x: number; y: number; r: number }[]) {
+    for (const d of discs) {
+      this.buckets[this.by(d.y) * this.bw + this.bx(d.x)].push(d);
+      this.maxR = Math.max(this.maxR, d.r);
+    }
+  }
+  /** Whether (x, y) lies within `pad` cells of any disc. */
+  some(x: number, y: number, pad: number) {
+    const reach = this.maxR + Math.max(0, pad);
+    for (let j = this.by(y - reach), j1 = this.by(y + reach); j <= j1; j++)
+      for (let i = this.bx(x - reach), i1 = this.bx(x + reach); i <= i1; i++)
+        for (const d of this.buckets[j * this.bw + i]) if ((x - d.x) ** 2 + (y - d.y) ** 2 < (d.r + pad) ** 2) return true;
+    return false;
+  }
+}
 
 function plan_(map: CityMap): ForestPlan {
   const trees: ForestTree[] = [], rocks: Rock[] = [], pads: Pad[] = [], lakes: Lake[] = [];
@@ -215,8 +244,8 @@ function plan_(map: CityMap): ForestPlan {
     return false;
   };
   // What keeps the rest away: lakes, big canopies and the boulders.
-  const keep: { x: number; y: number; r: number }[] = [];
-  const stones: { x: number; y: number; r: number }[] = [];
+  const keep = new Discs();
+  const stones = new Discs();
   for (const b of boulders) for (const c of b.cells) stones.push({ x: (c % CELLS_W) + 0.5, y: Math.floor(c / CELLS_W) + 0.5, r: 0.8 });
   const each = (visit: (cx: number, cy: number) => void) => {
     for (let cy = 0; cy < CELLS_H; cy++) for (let cx = 0; cx < CELLS_W; cx++) if (map.type[cellIndex(cx, cy)] === CellType.OUT) visit(cx, cy);
