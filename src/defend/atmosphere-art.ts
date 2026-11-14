@@ -25,8 +25,9 @@
  * black-outlined sprites in several sizes, over it. Presentation only: it
  * reads `sim.atmosphere` and changes nothing. */
 import { CELLS_W, CELLS_H, CELL_COUNT, cellIndex, hash } from "./grid.ts";
-import { sandTrailCanvases, trailField, trailId } from "./trail-art.ts";
-import { CellType } from "./citygen.ts";
+import { openKey, sandTrailCanvases, trailField, trailId } from "./trail-art.ts";
+import type { TrailPlan } from "./trails.ts";
+import { CellType, type CityMap } from "./citygen.ts";
 import { DUNE_CREST, DUNE_PERIOD, WEED_SIZES, duneAt, periodicNoise, weatherNoise, type Atmosphere } from "./atmosphere.ts";
 import { ENEMIES } from "./catalog.ts";
 import { ART } from "./park-art.ts";
@@ -474,13 +475,16 @@ export function taperAt(t: number) {
  * nearer than `TAPER.to` (and `open`) relit from its lowered height, RGBA,
  * clear elsewhere; laid over the dune tile, it matches it where the taper
  * ends. In the current light and style. */
-export function duneTaperPixels(t: Float32Array, w: number, h: number, bx: number, by: number, open: (X: number, Y: number) => boolean, key?: object) {
-  const out = new Uint8ClampedArray(w * h * 4), g = taperGeometry(t, w, h, bx, by, open, key);
+export function duneTaperPixels(t: Float32Array, w: number, h: number, bx: number, by: number, open: (X: number, Y: number) => boolean, key?: string) {
+  const g = taperGeometry(t, w, h, bx, by, open, key);
+  if (g.colors?.light === light.key) return g.colors.px;
+  const out = new Uint8ClampedArray(w * h * 4);
   for (let k = 0; k < g.at.length; k++) {
     const i = g.at[k], how = g.how[k];
     const col = duneColor(g.gx[k], g.gy[k], g.tx[k], g.ty[k], (how & 4) !== 0, DETAIL[how & 3]);
     out[i * 4] = col[0]; out[i * 4 + 1] = col[1]; out[i * 4 + 2] = col[2]; out[i * 4 + 3] = 255;
   }
+  g.colors = { light: light.key, px: out };
   return out;
 }
 /** `duneColor`'s detail argument by `TaperGeometry.how & 3`. */
@@ -489,32 +493,41 @@ const DETAIL = [true, "ripple", "grain"] as const;
  * light: its index, lowered slope, tile pixel, and (`how`) whether it takes
  * cast shadows (4) and which detail (`DETAIL`). Relit, only the colours are
  * looked up again. */
-type TaperGeometry = { at: Int32Array; gx: Float64Array; gy: Float64Array; tx: Int16Array; ty: Int16Array; how: Uint8Array };
-/** Geometry by caller's key (what `open` reads), trail distances, then box
- * and dune heights (the style). */
-const taperCache = new WeakMap<object, WeakMap<Float32Array, Map<string, TaperGeometry>>>();
-function taperGeometry(t: Float32Array, w: number, h: number, bx: number, by: number, open: (X: number, Y: number) => boolean, key?: object): TaperGeometry {
-  const hts = duneHeights(), id = `${w}:${h}:${bx}:${by}:${style}`;
-  const byT = key ? taperCache.get(key) ?? (taperCache.set(key, new WeakMap()), taperCache.get(key)!) : null;
-  const byBox = byT ? byT.get(t) ?? (byT.set(t, new Map()), byT.get(t)!) : null;
-  const hit = byBox?.get(id);
-  if (hit) return hit;
+type TaperGeometry = { at: Int32Array; gx: Float64Array; gy: Float64Array; tx: Int16Array; ty: Int16Array; how: Uint8Array; colors?: { light: string; px: Uint8ClampedArray } };
+/** Geometry by trail distances, then the caller's key (naming what `open`
+ * reads), box and dune heights (the style), a few of each, newest last. */
+const taperCache = new WeakMap<Float32Array, Map<string, TaperGeometry>>();
+function taperGeometry(t: Float32Array, w: number, h: number, bx: number, by: number, open: (X: number, Y: number) => boolean, key?: string): TaperGeometry {
+  const hts = duneHeights(), id = `${key}:${w}:${h}:${bx}:${by}:${style}`;
+  const byId = key === undefined ? null : taperCache.get(t) ?? (taperCache.set(t, new Map()), taperCache.get(t)!);
+  const hit = byId?.get(id);
+  if (hit) { byId!.delete(id); byId!.set(id, hit); return hit; }
   const n = DUNE_PERIOD * ART;
   const s = new Float32Array(w * h);
   for (let i = 0; i < w * h; i++) s[i] = taperAt(t[i]);
-  const raw = (x: number, y: number) => { const X = bx + x, Y = by + y; return hts[((Y % n + n) % n) * n + ((X % n + n) % n)]; };
+  // Each column's and row's place on the tile, a pixel past the box either
+  // side (for the slopes), and the pixels it lights, counted first.
+  const col = new Int32Array(w + 2), row = new Int32Array(h + 2);
+  for (let x = -1; x <= w; x++) col[x + 1] = ((bx + x) % n + n) % n;
+  for (let y = -1; y <= h; y++) row[y + 1] = ((by + y) % n + n) % n;
+  const lit = new Uint8Array(w * h);
+  let count = 0;
+  for (let y = 0, i = 0; y < h; y++)
+    for (let x = 0; x < w; x++, i++) if (s[i] < 1 && open(bx + x, by + y)) { lit[i] = 1; count++; }
+  const g: TaperGeometry = { at: new Int32Array(count), gx: new Float64Array(count), gy: new Float64Array(count), tx: new Int16Array(count), ty: new Int16Array(count), how: new Uint8Array(count) };
   const sAt = (x: number, y: number) => s[(y < 0 ? 0 : y >= h ? h - 1 : y) * w + (x < 0 ? 0 : x >= w ? w - 1 : x)];
-  const at: number[] = [], gxs: number[] = [], gys: number[] = [], txs: number[] = [], tys: number[] = [], hows: number[] = [];
-  for (let y = 0; y < h; y++)
+  let m = 0;
+  for (let y = 0; y < h; y++) {
+    const ty = row[y + 1], here = ty * n, above = row[y] * n, below = row[y + 2] * n;
     for (let x = 0; x < w; x++) {
       const i = y * w + x;
-      if (s[i] >= 1 || !open(bx + x, by + y)) continue;
-      const X = bx + x, Y = by + y, tx = (X % n + n) % n, ty = (Y % n + n) % n;
+      if (!lit[i]) continue;
+      const tx = col[x + 1];
       // The lowered swell's slope, its run down to the trail eased
       // (`TAPER.slope`) so it reads as the sand sinking, not a new bowl.
-      const v = raw(x, y), k = s[i];
-      const gx = k * (raw(x + 1, y) - raw(x - 1, y)) * .5 + TAPER.slope * v * (sAt(x + 1, y) - sAt(x - 1, y)) * .5;
-      const gy = k * (raw(x, y + 1) - raw(x, y - 1)) * .5 + TAPER.slope * v * (sAt(x, y + 1) - sAt(x, y - 1)) * .5;
+      const v = hts[here + tx], k = s[i];
+      const gx = k * (hts[here + col[x + 2]] - hts[here + col[x]]) * .5 + TAPER.slope * v * (sAt(x + 1, y) - sAt(x - 1, y)) * .5;
+      const gy = k * (hts[below + tx] - hts[above + tx]) * .5 + TAPER.slope * v * (sAt(x, y + 1) - sAt(x, y - 1)) * .5;
       // The swells' cast shadows thin out in a dither as they sink, and
       // sooner their lit crest lines and ripples, so a crest dies away
       // before the trail rather than running on to its edge.
@@ -522,12 +535,52 @@ function taperGeometry(t: Float32Array, w: number, h: number, bx: number, by: nu
       // The ripples and grains stay almost to the trail, so the sinking
       // sand keeps the texture of the dunes round it.
       const detail = k > .45 + d * .3 ? 0 : k > .06 + d * .12 ? 1 : 2;
-      at.push(i); gxs.push(gx); gys.push(gy); txs.push(tx); tys.push(ty); hows.push((k > .35 + d * .6 ? 4 : 0) | detail);
+      g.at[m] = i; g.gx[m] = gx; g.gy[m] = gy; g.tx[m] = tx; g.ty[m] = ty; g.how[m] = (k > .35 + d * .6 ? 4 : 0) | detail;
+      m++;
     }
-  const g: TaperGeometry = { at: Int32Array.from(at), gx: Float64Array.from(gxs), gy: Float64Array.from(gys), tx: Int16Array.from(txs), ty: Int16Array.from(tys), how: Uint8Array.from(hows) };
-  byBox?.set(id, g);
+  }
+  if (byId) {
+    byId.set(id, g);
+    if (byId.size > 8) byId.delete(byId.keys().next().value!);
+  }
   return g;
 }
+/** The tables a desert battle's first frame reads, in the HD Sand setting
+ * (`hd`) and the light of the sky's `sun`, worked out ahead while the player builds
+ * (`DefendRenderer`'s warm-up): the same tables, only sooner. One step a
+ * call, `step` from 0; whether any are left. */
+export function warmDunes(hd: boolean, sun: Sun | undefined, step: number) {
+  setDuneStyle(hd);
+  // The battle's dunes turn toward the sky's sun as it starts: turned now.
+  if (step === 0) setDuneLight(sun);
+  const steps = [duneHeights, slopes, castShadows, shadeTable, sandDetail, grainDetail, rippleDetail, () => { if (typeof document !== "undefined") dunes(); }];
+  steps[step]?.();
+  return step + 1 < steps.length;
+}
+/** `duneTaperPixels` for the same arguments, made ahead in the light shown now. */
+export function warmDuneTaper(t: Float32Array, w: number, h: number, bx: number, by: number, open: (X: number, Y: number) => boolean, key: string) {
+  duneTaperPixels(t, w, h, bx, by, open, key);
+}
+/** The board's sand trail art that a desert battle's first frame makes
+ * (`taperCanvas`'s run down from the dunes, still air, and the trails' cut
+ * and banks), made ahead for `map` and its trails `plan`. */
+export function warmBoardSand(map: CityMap, plan: TrailPlan, step: number) {
+  const w = CELLS_W * ART, h = CELLS_H * ART;
+  const steps = [
+    () => warmDuneTaper(trailField(plan).t, w, h, 0, 0, (X, Y) => map.type[cellIndex(X >> 3, Y >> 3)] === CellType.OUT, boardTaperKey(map)),
+    () => { if (typeof document !== "undefined") sandTrailCanvases(plan, map); },
+  ];
+  steps[step]?.();
+  return step + 1 < steps.length;
+}
+/** The board's `taperCanvas` key for `map`. */
+export function boardTaperKey(map: CityMap) {
+  let ground = openKeys.get(map);
+  if (ground === undefined) openKeys.set(map, (ground = openKey(map)));
+  return `board:${ground}`;
+}
+/** Each city's `openKey`, worked out once. */
+const openKeys = new WeakMap<object, string>();
 let duneSprite: HTMLCanvasElement | null = null;
 let duneSpriteKey = "";
 function dunes() {
@@ -979,8 +1032,9 @@ export class AtmosphereArt {
       for (let i = 0; i < k.length; i++) k[i] = taperAt(t[i]);
     }
     const open = (X: number, Y: number) => sim.map.type[cellIndex(X >> 3, Y >> 3)] === CellType.OUT;
-    // Its geometry is kept by the map (what `open` reads), so a relight only recolours.
-    const data = duneTaperPixels(t, w, h, -ox, -oy, (X, Y) => open(X + ox, Y + oy), sim.map);
+    // Its geometry is kept by the open ground (what `open` reads), so a
+    // relight only recolours, and the next run's fresh city finds it made.
+    const data = duneTaperPixels(t, w, h, -ox, -oy, (X, Y) => open(X + ox, Y + oy), boardTaperKey(sim.map));
     const canvas = this.taperImage ??= document.createElement("canvas");
     canvas.width = w; canvas.height = h;
     const c = canvas.getContext("2d")!, image = c.createImageData(w, h);

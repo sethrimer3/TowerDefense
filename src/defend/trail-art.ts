@@ -35,11 +35,21 @@ const fields = new WeakMap<TrailPlan, TrailField>();
  * just as before, so their distance map needn't be made again. */
 const byLines = new Map<string, TrailField>();
 
+/** A plan's lines as text: plans with the same lines share their art. */
+const linesKey = (plan: TrailPlan) => plan.lines.map((l) => `${l.half},${l.level}:${l.points.map((p) => `${p.x},${p.y}`).join(" ")}`).join("|");
+/** Which of `map`'s cells are open ground, as text: what the sand trails'
+ * art reads of the city. */
+export function openKey(map: CityMap) {
+  let s = "";
+  for (let i = 0; i < map.type.length; i++) s += map.type[i] === CellType.OUT ? "1" : "0";
+  return s;
+}
+
 /** `plan`'s distance map, made on first use. */
 export function trailField(plan: TrailPlan): TrailField {
   let f = fields.get(plan);
   if (f) return f;
-  const key = plan.lines.map((l) => `${l.half},${l.level}:${l.points.map((p) => `${p.x},${p.y}`).join(" ")}`).join("|");
+  const key = linesKey(plan);
   f = byLines.get(key);
   if (f) byLines.delete(key);
   else f = distanceField(plan.lines, W, H, 0, 0);
@@ -245,6 +255,8 @@ export function paintRoadLines(out: Uint32Array, ow: number, oh: number, ox: num
 }
 
 const cuts = new WeakMap<TrailPlan, { cut: HTMLCanvasElement; banks: HTMLCanvasElement }>();
+/** The same, by the plan's lines and rocks and the ground they cross, newest last. */
+const cutsByContent = new Map<string, { cut: HTMLCanvasElement; banks: HTMLCanvasElement }>();
 const ids = new WeakMap<TrailPlan, number>();
 let nextId = 1;
 /** A number for each plan, for caches keyed on which trails they drew. */
@@ -262,6 +274,15 @@ export function trailId(plan: TrailPlan) {
 export function sandTrailCanvases(plan: TrailPlan, map: CityMap) {
   let c = cuts.get(plan);
   if (c) return c;
+  // A fresh city every run plans the same trails over the same ground: its
+  // art is made once (or ahead of the battle, `warmSandTrails`).
+  const key = `${linesKey(plan)}|${plan.rocks.map((r) => `${r.x},${r.y},${r.r}`).join(" ")}|${openKey(map)}`;
+  c = cutsByContent.get(key);
+  if (c) {
+    cutsByContent.delete(key); cutsByContent.set(key, c);
+    cuts.set(plan, c);
+    return c;
+  }
   const make = (fill: (d: Uint8ClampedArray) => void) => {
     const canvas = document.createElement("canvas");
     canvas.width = W; canvas.height = H;
@@ -272,6 +293,8 @@ export function sandTrailCanvases(plan: TrailPlan, map: CityMap) {
   };
   c = { cut: make((d) => sandCutPixels(plan, map, d)), banks: make((d) => sandBankPixels(plan, map, d)) };
   cuts.set(plan, c);
+  cutsByContent.set(key, c);
+  if (cutsByContent.size > 2) cutsByContent.delete(cutsByContent.keys().next().value!);
   return c;
 }
 

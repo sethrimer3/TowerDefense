@@ -36,7 +36,7 @@ import { pixelKey } from "./pixel-sprites.ts";
 import { sceneryOutlinesOn, windAt } from "./scenery-looks.ts";
 import { caveTrailPixel, paintRoadLines, sandReachCanvases } from "./trail-art.ts";
 import { caveGravelPixel, openingLight, sunlitPixel } from "./crystal-caves-art.ts";
-import { duneHeights, duneLightKey, duneTaperPixels, duneTile } from "./atmosphere-art.ts";
+import { duneHeights, duneLightKey, duneTaperPixels, duneTile, warmDuneTaper } from "./atmosphere-art.ts";
 import { segmentDistance, type TrailLine, type TrailPlan } from "./trails.ts";
 
 /** Cells of wilds past each edge of the field: enough to fill an
@@ -794,7 +794,8 @@ function caveOpening(px: Uint32Array, floor: Uint8Array) {
 }
 
 /** The key `duneTaperPixels` keeps the reaches' geometry by: their `open` is always off the board. */
-const OFF_BOARD = {};
+const OFF_BOARD = "off";
+const offBoard = (X: number, Y: number) => X < 0 || Y < 0 || X >= BW || Y >= BH;
 
 /** Draws the wilds, kept by the renderer. */
 export class Wilds {
@@ -842,7 +843,45 @@ export class Wilds {
     return r;
   }
 
-  private shadeCanvas: { canvas: HTMLCanvasElement; box: Box; dunes: Float32Array | null } | null = null;
+  /** `makeShade`'s canvases, plain and over the dunes. */
+  private shades = new Map<Float32Array | null, { canvas: HTMLCanvasElement; box: Box }>();
+  /** The desert's art past the board that its first battle frame makes,
+   * made ahead while the player builds (`DefendRenderer`'s warm-up): the
+   * mountains' shadows over the dunes, then the sand trails' reaches past
+   * the board, cut, banked and their run down from the dunes. One step a
+   * call, `step` from 0; whether any are left. */
+  warmSand(trails: TrailPlan | null, step: number) {
+    if (typeof document === "undefined") return false;
+    const reach = trails ? this.reach(trails) : null;
+    const steps: (() => void)[] = [() => this.makeShade(duneHeights())];
+    if (reach) {
+      steps.push(() => this.reachCuts(reach.lines));
+      steps.push(() => { for (const r of this.reachCuts(reach.lines)) warmDuneTaper(r.t, r.w, r.h, r.x, r.y, offBoard, OFF_BOARD); });
+    }
+    steps[step]?.();
+    return step + 1 < steps.length;
+  }
+
+  /** The mountains' shadow mask as a canvas, for the ground `dunes` lift (`mountainShade`). */
+  private makeShade(dunes: Float32Array | null) {
+    const made = this.shades.get(dunes);
+    if (made) return made;
+    const m = mountainShade(dunes);
+    let x0 = GW, y0 = GH, x1 = 0, y1 = 0;
+    for (let Y = 0; Y < GH; Y++)
+      for (let X = 0; X < GW; X++)
+        if (m[Y * GW + X]) { if (X < x0) x0 = X; if (X >= x1) x1 = X + 1; if (Y < y0) y0 = Y; if (Y >= y1) y1 = Y + 1; }
+    if (x1 <= x0) { x0 = y0 = 0; x1 = y1 = 1; }
+    const w = x1 - x0, h = y1 - y0, canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    const c = canvas.getContext("2d")!, img = c.createImageData(w, h), px = new Uint32Array(img.data.buffer);
+    for (let Y = y0; Y < y1; Y++) for (let X = x0; X < x1; X++) if (m[Y * GW + X]) px[(Y - y0) * w + X - x0] = SHADE_INK;
+    c.putImageData(img, 0, 0);
+    const shade = { canvas, box: { x0, y0, x1, y1 } };
+    this.shades.set(dunes, shade);
+    return shade;
+  }
+
   /** The mountains' long shadows over the field and the wilds, drawn once
    * the field's ground, buildings and trees are down (`mountainShade`),
    * fading out at night. */
@@ -851,21 +890,8 @@ export class Wilds {
     const alpha = 1 - Math.min(1, f.night * 1.4);
     if (alpha <= 0.01) return;
     const dunes = f.sand ? duneHeights() : null;
-    if (!this.shadeCanvas || this.shadeCanvas.dunes !== dunes) {
-      const m = mountainShade(dunes);
-      let x0 = GW, y0 = GH, x1 = 0, y1 = 0;
-      for (let Y = 0; Y < GH; Y++)
-        for (let X = 0; X < GW; X++)
-          if (m[Y * GW + X]) { if (X < x0) x0 = X; if (X >= x1) x1 = X + 1; if (Y < y0) y0 = Y; if (Y >= y1) y1 = Y + 1; }
-      if (x1 <= x0) { x0 = y0 = 0; x1 = y1 = 1; }
-      const w = x1 - x0, h = y1 - y0, canvas = document.createElement("canvas");
-      canvas.width = w; canvas.height = h;
-      const c = canvas.getContext("2d")!, img = c.createImageData(w, h), px = new Uint32Array(img.data.buffer);
-      for (let Y = y0; Y < y1; Y++) for (let X = x0; X < x1; X++) if (m[Y * GW + X]) px[(Y - y0) * w + X - x0] = SHADE_INK;
-      c.putImageData(img, 0, 0);
-      this.shadeCanvas = { canvas, box: { x0, y0, x1, y1 }, dunes };
-    }
-    const k = (f.px * f.cam.s) / ART, cw = ctx.canvas.width, ch = ctx.canvas.height, b = this.shadeCanvas.box;
+    const shade = this.makeShade(dunes);
+    const k = (f.px * f.cam.s) / ART, cw = ctx.canvas.width, ch = ctx.canvas.height, b = shade.box;
     const v: Box = {
       x0: Math.max(b.x0, Math.floor(-f.cam.x / k) + OX), y0: Math.max(b.y0, Math.floor(-f.cam.y / k) + OY),
       x1: Math.min(b.x1, Math.ceil((cw - f.cam.x) / k) + OX), y1: Math.min(b.y1, Math.ceil((ch - f.cam.y) / k) + OY),
@@ -877,7 +903,7 @@ export class Wilds {
     ctx.imageSmoothingEnabled = false;
     ctx.globalAlpha = alpha;
     ctx.globalCompositeOperation = "multiply";
-    ctx.drawImage(this.shadeCanvas.canvas, v.x0 - b.x0, v.y0 - b.y0, v.x1 - v.x0, v.y1 - v.y0, toX(v.x0), toY(v.y0), toX(v.x1) - toX(v.x0), toY(v.y1) - toY(v.y0));
+    ctx.drawImage(shade.canvas, v.x0 - b.x0, v.y0 - b.y0, v.x1 - v.x0, v.y1 - v.y0, toX(v.x0), toY(v.y0), toX(v.x1) - toX(v.x0), toY(v.y1) - toY(v.y0));
     ctx.restore();
   }
 
@@ -937,8 +963,20 @@ export class Wilds {
     ctx.restore();
   }
 
+  /** The sand trails' reaches past the board, cut and banked, by their lines. */
+  private reachCuts(lines: TrailLine[]) {
+    const key = lines.map((l) => `${l.half},${l.level}:${l.points.map((p) => `${p.x},${p.y}`).join(" ")}`).join("|");
+    let cuts = this.sandReach.get(key);
+    if (cuts) this.sandReach.delete(key);
+    else cuts = sandReachCanvases(lines);
+    this.sandReach.set(key, cuts);
+    if (this.sandReach.size > 2) this.sandReach.delete(this.sandReach.keys().next().value!);
+    return cuts;
+  }
+
   private sandCanvas: HTMLCanvasElement | null = null;
-  private sandReach = new WeakMap<TrailPlan, ReturnType<typeof sandReachCanvases>>();
+  /** The reaches' cuts and banks by their lines, newest last. */
+  private sandReach = new Map<string, ReturnType<typeof sandReachCanvases>>();
   private sandKey = "";
   /** The desert's dunes over all the wilds, at `ART` pixels a cell: the
    * field's own dune tile laid on from the board's corner (so the board's
@@ -958,12 +996,11 @@ export class Wilds {
     c.clearRect(0, 0, GW, GH);
     for (let y = OY - Math.ceil(OY / n) * n; y < GH; y += n) for (let x = OX - Math.ceil(OX / n) * n; x < GW; x += n) c.drawImage(tile, x, y);
     if (reach) {
-      let cuts = this.sandReach.get(trails!);
-      if (!cuts) this.sandReach.set(trails!, (cuts = sandReachCanvases(reach.lines)));
+      const cuts = this.reachCuts(reach.lines);
       for (const r of cuts) {
         // The swells running down to the trail (where off the board).
         const img = c.createImageData(r.w, r.h);
-        img.data.set(duneTaperPixels(r.t, r.w, r.h, r.x, r.y, (X, Y) => X < 0 || Y < 0 || X >= BW || Y >= BH, OFF_BOARD));
+        img.data.set(duneTaperPixels(r.t, r.w, r.h, r.x, r.y, offBoard, OFF_BOARD));
         const tc = document.createElement("canvas");
         tc.width = r.w; tc.height = r.h;
         tc.getContext("2d")!.putImageData(img, 0, 0);
