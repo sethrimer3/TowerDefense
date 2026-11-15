@@ -33,6 +33,7 @@ import { planCell } from "./forest-grass.ts";
 import { CURVE, PALETTE32, SHADOW, WIND } from "./park-grass.ts";
 import { floorArtLoaded, paintFloorTile } from "./city-layer.ts";
 import { pixelKey } from "./pixel-sprites.ts";
+import { cellPieces } from "./paint-box.ts";
 import { sceneryOutlinesOn, windAt } from "./scenery-looks.ts";
 import { caveTrailPixel, paintRoadLines, sandReachCanvases } from "./trail-art.ts";
 import { caveGravelPixel, openingLight, sunlitPixel } from "./crystal-caves-art.ts";
@@ -270,6 +271,11 @@ const DROP = 0.4;
  * about two thirds as bright, so where it falls over a dune's own shade the
  * two deepen together a little rather than one hiding the other. */
 const SHADE_INK = 0xffbea8a6;
+/** The shade's blocks (art pixels) and screen cells (screen pixels). */
+const SHADE_BLOCK = 8, SHADE_CELL = 64;
+/** The mountains' cast shade: its canvas over `box`, the `SHADE_BLOCK` squares holding any shade (wilds
+ * coordinates, four numbers each), and the screen rectangles last drawn. */
+type Shade = { canvas: HTMLCanvasElement; box: Box; blocks: Int32Array; pieces?: { key: string; boxes: { x: number; y: number; w: number; h: number }[] } };
 /** How much the dunes' height lifts the ground the mountains' shadows fall
  * on: enough to bend a shadow's edge over a swell, not so much that the
  * swells cut the shadows into pools along their troughs. */
@@ -847,7 +853,7 @@ export class Wilds {
   }
 
   /** `makeShade`'s canvases, plain and over the dunes. */
-  private shades = new Map<Float32Array | null, { canvas: HTMLCanvasElement; box: Box; hole: Box }>();
+  private shades = new Map<Float32Array | null, Shade>();
   /** The desert's art past the board that its first battle frame makes,
    * made ahead while the player builds (`DefendRenderer`'s warm-up): the
    * mountains' shadows over the dunes, then the sand trails' reaches past
@@ -880,21 +886,16 @@ export class Wilds {
     const c = canvas.getContext("2d")!, img = c.createImageData(w, h), px = new Uint32Array(img.data.buffer);
     for (let Y = y0; Y < y1; Y++) for (let X = x0; X < x1; X++) if (m[Y * GW + X]) px[(Y - y0) * w + X - x0] = SHADE_INK;
     c.putImageData(img, 0, 0);
-    // The widest clear rectangle on the board, grown out from its middle:
-    // the shade's multiply is skipped there.
-    let l = OX + (BW >> 1), r = l, t = OY + (BH >> 1), bt = t;
     const clear = (ax: number, ay: number, bx: number, by: number) => {
       for (let Y = ay; Y < by; Y++) for (let X = ax; X < bx; X++) if (m[Y * GW + X]) return false;
       return true;
     };
-    for (let grew = true; grew;) {
-      grew = false;
-      if (l > OX && clear(l - 1, t, l, bt)) { l--; grew = true; }
-      if (r < OX + BW && clear(r, t, r + 1, bt)) { r++; grew = true; }
-      if (t > OY && clear(l, t - 1, r, t)) { t--; grew = true; }
-      if (bt < OY + BH && clear(l, bt, r, bt + 1)) { bt++; grew = true; }
+    const blocks: number[] = [];
+    for (let BY = y0; BY < y1; BY += SHADE_BLOCK) for (let BX = x0; BX < x1; BX += SHADE_BLOCK) {
+      const ex = Math.min(x1, BX + SHADE_BLOCK), ey = Math.min(y1, BY + SHADE_BLOCK);
+      if (!clear(BX, BY, ex, ey)) blocks.push(BX, BY, ex, ey);
     }
-    const shade = { canvas, box: { x0, y0, x1, y1 }, hole: { x0: l, y0: t, x1: r, y1: bt } };
+    const shade: Shade = { canvas, box: { x0, y0, x1, y1 }, blocks: Int32Array.from(blocks) };
     this.shades.set(dunes, shade);
     return shade;
   }
@@ -921,15 +922,23 @@ export class Wilds {
     ctx.globalAlpha = alpha;
     ctx.globalCompositeOperation = "multiply";
     const draw = () => ctx.drawImage(shade.canvas, v.x0 - b.x0, v.y0 - b.y0, v.x1 - v.x0, v.y1 - v.y0, toX(v.x0), toY(v.y0), toX(v.x1) - toX(v.x0), toY(v.y1) - toY(v.y0));
-    // Round the board's clear middle (a pixel in from it, for sampling), a
-    // rectangle clip at a time: the same pixels, only where shade can fall.
-    const h = shade.hole, hx0 = toX(h.x0) + 1, hy0 = toY(h.y0) + 1, hx1 = toX(h.x1) - 1, hy1 = toY(h.y1) - 1;
-    if (hx1 - hx0 < 16 || hy1 - hy0 < 16) draw();
-    else for (const [x, y, w, hh] of [[0, 0, cw, hy0], [0, hy1, cw, ch - hy1], [0, hy0, hx0, hy1 - hy0], [hx1, hy0, cw - hx1, hy1 - hy0]]) {
-      if (w <= 0 || hh <= 0) continue;
+    // Only the screen cells the shade's blocks reach (two pixels out, for
+    // sampling), a whole-pixel rectangle clip at a time: multiplying by the
+    // shade's clear pixels changes nothing, so the pixels are the same.
+    const key = `${cw}x${ch}:${f.cam.x},${f.cam.y},${f.cam.s}:${f.px}`;
+    if (shade.pieces?.key !== key) {
+      const cols = Math.ceil(cw / SHADE_CELL), rows = Math.ceil(ch / SHADE_CELL), on = new Uint8Array(cols * rows), q = shade.blocks;
+      for (let i = 0; i < q.length; i += 4) {
+        const a = Math.max(0, Math.floor((toX(q[i]) - 2) / SHADE_CELL)), b = Math.min(cols - 1, Math.floor((toX(q[i + 2]) + 2) / SHADE_CELL));
+        const t = Math.max(0, Math.floor((toY(q[i + 1]) - 2) / SHADE_CELL)), u = Math.min(rows - 1, Math.floor((toY(q[i + 3]) + 2) / SHADE_CELL));
+        for (let r = t; r <= u; r++) if (a <= b) on.fill(1, r * cols + a, r * cols + b + 1);
+      }
+      shade.pieces = { key, boxes: cellPieces(on, cols, rows, SHADE_CELL, { x: 0, y: 0, w: cw, h: ch }) };
+    }
+    for (const p of shade.pieces.boxes) {
       ctx.save();
       ctx.beginPath();
-      ctx.rect(x, y, w, hh);
+      ctx.rect(p.x, p.y, p.w, p.h);
       ctx.clip();
       draw();
       ctx.restore();
