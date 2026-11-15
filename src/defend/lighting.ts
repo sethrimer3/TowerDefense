@@ -21,6 +21,7 @@ import { CELL_COUNT, CELLS_H, CELLS_W, ORTHO, boardSize, cellInBounds, cellIndex
 import { CellType, type Building, type CityMap } from "./citygen.ts";
 import { isArcherTower, isCannonTower, isMageHall, isWizardTower } from "./catalog.ts";
 import { FIELD_H, FIELD_W, LightField, RES, poolSamples, type PoolSamples } from "./light-field.ts";
+import { cellPieces } from "./paint-box.ts";
 
 export type LightKind = "lantern" | "archerTower" | "cannonTower" | "watchTower" | "wizardTower" | "mageGuild" | "door";
 export type Light = {
@@ -219,7 +220,10 @@ export class DefendLighting {
   /** What stands, painted from the buildings' own art at `MASK` pixels a
    * cell: `body` their pixels, `rim` their outlines. Null until the city
    * layer first paints them (then torches clip to open cells). */
-  private masks: { body: HTMLCanvasElement; rim: HTMLCanvasElement; covered: Uint8Array; pixels: Uint8Array } | null = null;
+  private masks: { body: HTMLCanvasElement; rim: HTMLCanvasElement; covered: Uint8Array; pixels: Uint8Array; rims: Uint8Array } | null = null;
+  /** Bumped whenever the masks change, for `rimPieces`. */
+  private masksVersion = 0;
+  private rimPieces: { key: string; board: Region[] } | null = null;
   private bodyUp: HTMLCanvasElement | null = null;
   private rimUp: HTMLCanvasElement | null = null;
   private tint: HTMLCanvasElement | null = null;
@@ -287,10 +291,11 @@ export class DefendLighting {
     this.tintKey = this.buildingGrownKey = "";
     // Read only cached source masks, never a rendered scene. Resolve light
     // occlusion at native art pixels so rounded corners are not whole cells.
-    const covered = new Uint8Array(CELL_COUNT), pixels = new Uint8Array(CELLS_W * ART * CELLS_H * ART);
-    readMasks(body, rim, { x0: 0, y0: 0, x1: CELLS_W, y1: CELLS_H }, covered, pixels);
+    const covered = new Uint8Array(CELL_COUNT), pixels = new Uint8Array(CELLS_W * ART * CELLS_H * ART), rims = new Uint8Array(CELL_COUNT);
+    readMasks(body, rim, { x0: 0, y0: 0, x1: CELLS_W, y1: CELLS_H }, covered, pixels, rims);
     const old = this.masks?.covered, oldPixels = this.masks?.pixels;
-    this.masks = { body, rim, covered, pixels };
+    this.masks = { body, rim, covered, pixels, rims };
+    this.masksVersion++;
     this.upKey = "";
     if (!old) {
       this.bakes.clear();
@@ -318,7 +323,8 @@ export class DefendLighting {
     // redrawn only inside the boxes too, next time they're asked for.
     if (this.upKey) this.upPatches.push(...boxes);
     const cells = new Set<number>();
-    for (const box of boxes) for (const i of readMasks(m.body, m.rim, box, m.covered, m.pixels)) cells.add(i);
+    for (const box of boxes) for (const i of readMasks(m.body, m.rim, box, m.covered, m.pixels, m.rims)) cells.add(i);
+    this.masksVersion++;
     this.invalidate([...cells]);
   }
 
@@ -523,11 +529,39 @@ export class DefendLighting {
     c.restore();
   }
 
+  /** The board rectangles (whole pixels, never overlapping) holding every
+   * outline pixel of the rim drawn up to `W` x `H`; null when unknown or
+   * the board is rotated or skewed. */
+  private rimRegions(W: number, H: number): Region[] | null {
+    const m = this.masks;
+    if (!m) return null;
+    const key = `${this.masksVersion}:${W}x${H}`;
+    if (this.rimPieces?.key === key) return this.rimPieces.board;
+    const cols = Math.ceil(W / RIM_CELL), rows = Math.ceil(H / RIM_CELL), on = new Uint8Array(cols * rows);
+    for (let cy = 0; cy < CELLS_H; cy++) for (let cx = 0; cx < CELLS_W; cx++) {
+      if (!m.rims[cellIndex(cx, cy)]) continue;
+      // The cell drawn up (nearest), two pixels out for rounding.
+      const a = Math.max(0, Math.floor((Math.floor((cx * W) / CELLS_W) - 2) / RIM_CELL)), b = Math.min(cols - 1, Math.floor((Math.ceil(((cx + 1) * W) / CELLS_W) + 2) / RIM_CELL));
+      const t = Math.max(0, Math.floor((Math.floor((cy * H) / CELLS_H) - 2) / RIM_CELL)), u = Math.min(rows - 1, Math.floor((Math.ceil(((cy + 1) * H) / CELLS_H) + 2) / RIM_CELL));
+      for (let r = t; r <= u; r++) on.fill(1, r * cols + a, r * cols + b + 1);
+    }
+    const board = cellPieces(on, cols, rows, RIM_CELL, { x: 0, y: 0, w: W, h: H });
+    this.rimPieces = { key, board };
+    return board;
+  }
+
   /** Keeps what is on `r` to within `by` pixels of `body` (the body grown
    * by `by` each way): the half of an outline hugging what it rings, so
    * the shine is half the outline's width. */
-  private hug(r: CanvasRenderingContext2D, { body, by }: Inner, fixed = false) {
-    const { width, height } = r.canvas;
+  private hug(r: CanvasRenderingContext2D, inner: Inner, fixed = false) {
+    const grown = this.grow(r.canvas.width, r.canvas.height, inner, fixed);
+    r.setTransform(1, 0, 0, 1, 0, 0);
+    r.globalCompositeOperation = "destination-in";
+    r.drawImage(grown, 0, 0);
+  }
+  /** The body grown by `by` each way, `width` x `height` (kept between
+   * frames for the buildings, `fixed`, and patched where they change). */
+  private grow(width: number, height: number, { body, by }: Inner, fixed = false) {
     const key = `${width}:${height}:${by}`;
     let grown: HTMLCanvasElement;
     if (fixed) grown = this.buildingGrown = sized(this.buildingGrown, width, height);
@@ -549,9 +583,7 @@ export class DefendLighting {
       }
       if (fixed) this.buildingGrownKey = key, this.grownPatches = [];
     }
-    r.setTransform(1, 0, 0, 1, 0, 0);
-    r.globalCompositeOperation = "destination-in";
-    r.drawImage(grown, 0, 0);
+    return grown;
   }
   private grown: HTMLCanvasElement | null = null;
   /** Boxes (cells) the masks were patched in since they were drawn up. */
@@ -629,11 +661,45 @@ export class DefendLighting {
     r.setTransform(1, 0, 0, 1, 0, 0);
     r.globalCompositeOperation = "source-over";
     r.clearRect(0, 0, rim.width, rim.height);
-    r.drawImage(rim, 0, 0);
-    this.hug(r, inner, true);
-    r.globalCompositeOperation = "source-in";
-    glow(r);
-    shineOnto(c, this.buildingRimLit!);
+    // Only round the cells with any outline: elsewhere the rim is clear, so
+    // what is kept and added there is nothing. Whole-pixel rectangle clips
+    // keep every pixel as it was.
+    const m = c.getTransform();
+    const pieces = m.b || m.c ? null : this.rimRegions(rim.width, rim.height);
+    if (!pieces) {
+      r.drawImage(rim, 0, 0);
+      this.hug(r, inner, true);
+      r.globalCompositeOperation = "source-in";
+      glow(r);
+      shineOnto(c, this.buildingRimLit!);
+      return;
+    }
+    if (!pieces.length) return;
+    this.grow(r.canvas.width, r.canvas.height, inner, true);
+    for (const p of pieces) {
+      r.save();
+      r.beginPath(); r.rect(p.x, p.y, p.w, p.h); r.clip();
+      r.globalCompositeOperation = "source-over";
+      r.drawImage(rim, 0, 0);
+      r.globalCompositeOperation = "destination-in";
+      r.drawImage(this.buildingGrown!, 0, 0);
+      r.globalCompositeOperation = "source-in";
+      glow(r);
+      r.restore();
+    }
+    r.globalCompositeOperation = "source-over";
+    // Onto the screen, each piece's box there (whole pixels) at a time.
+    const lit = this.buildingRimLit!;
+    for (const p of pieces) {
+      const xs = [p.x, p.x + p.w].map((x) => m.a * x + m.e), ys = [p.y, p.y + p.h].map((y) => m.d * y + m.f);
+      const x0 = Math.floor(Math.min(...xs)) - 1, y0 = Math.floor(Math.min(...ys)) - 1, x1 = Math.ceil(Math.max(...xs)) + 1, y1 = Math.ceil(Math.max(...ys)) + 1;
+      c.save();
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      c.beginPath(); c.rect(x0, y0, x1 - x0, y1 - y0); c.clip();
+      c.setTransform(m);
+      shineOnto(c, lit);
+      c.restore();
+    }
   }
 
   /** Lays this frame's darkness (from the last `drawLight`) over what is
@@ -847,6 +913,9 @@ function rgbOf(color: string) {
   return rgb;
 }
 
+/** Squares of the board (pixels) the outlines' shine is worked in. */
+const RIM_CELL = 64;
+
 /** Pixels a cell in the buildings' masks: two an art pixel, fine enough
  * for half-art-pixel outlines. */
 export const MASK = 16;
@@ -859,7 +928,7 @@ export type CellBox = { x0: number; y0: number; x1: number; y1: number; layerOnl
  * while the body fills half of it) and `pixels` (an art pixel stands while
  * either mask covers any of its samples), returning the cells whose value
  * or art pixels changed. */
-function readMasks(body: HTMLCanvasElement, rim: HTMLCanvasElement, box: CellBox, covered: Uint8Array, pixels: Uint8Array) {
+function readMasks(body: HTMLCanvasElement, rim: HTMLCanvasElement, box: CellBox, covered: Uint8Array, pixels: Uint8Array, rims: Uint8Array) {
   const changed: number[] = [];
   const w = (box.x1 - box.x0) * MASK, h = (box.y1 - box.y0) * MASK;
   if (w <= 0 || h <= 0) return changed;
@@ -874,7 +943,13 @@ function readMasks(body: HTMLCanvasElement, rim: HTMLCanvasElement, box: CellBox
         let k = (y * w + lx) * 4 + 3;
         for (let x = 0; x < MASK; x++, k += 4) if (a[k] >= 128) n++;
       }
+      let any = 0;
+      for (let y = ly; y < ly + MASK && !any; y++) {
+        let k = (y * w + lx) * 4 + 3;
+        for (let x = 0; x < MASK; x++, k += 4) if (b[k]) { any = 1; break; }
+      }
       const i = cellIndex(cx, cy), v = n >= half ? 1 : 0;
+      rims[i] = any;
       let moved = covered[i] !== v;
       covered[i] = v;
       for (let py = 0; py < ART; py++) for (let px = 0; px < ART; px++) {
