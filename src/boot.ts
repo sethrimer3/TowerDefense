@@ -43,6 +43,7 @@ async function boot() {
     // A hidden tab runs no animation frames, so a timer stands in for them.
     await within(new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))), 200, undefined);
     const game = await import("./main.ts");
+    await game.warmUp();
     await within(document.fonts.ready.then(() => undefined, () => undefined), FONT_WAIT_MS, undefined);
     await loading.complete();
     started = true;
