@@ -36,7 +36,7 @@ import { pixelKey } from "./pixel-sprites.ts";
 import { cellPieces } from "./paint-box.ts";
 import { sceneryOutlinesOn, windAt } from "./scenery-looks.ts";
 import { caveTrailPixel, paintRoadLines, sandReachCanvases } from "./trail-art.ts";
-import { caveGravelPixel, openingLight, sunlitPixel } from "./crystal-caves-art.ts";
+import { fillCaveGravel, openingLight, sunlitPixel } from "./crystal-caves-art.ts";
 import { duneHeights, duneLightKey, duneTaperPixels, duneTile, warmDuneTaper } from "./atmosphere-art.ts";
 import { segmentDistance, type TrailLine, type TrailPlan } from "./trails.ts";
 
@@ -71,9 +71,9 @@ export function rangeAt(x: number, y: number) {
   return smooth(12, 44, d) * 1.2 + (valueNoise(x / 22, y / 22, 721) - 0.5) * 0.9 + (valueNoise(x / 9, y / 9, 722) - 0.5) * 0.3 + (valueNoise(x / 3, y / 3, 728) - 0.5) * 0.16 - 0.55 - (1 - smooth(9, 14, d));
 }
 /** As `valueNoise`, but cubic between the lattice points (no creases). */
+const cub = (p0: number, p1: number, p2: number, p3: number, t: number) => p1 + 0.5 * t * (p2 - p0 + t * (2 * p0 - 5 * p1 + 4 * p2 - p3 + t * (3 * (p1 - p2) + p3 - p0)));
 function smoothNoise(x: number, y: number, salt: number) {
   const ix = Math.floor(x), iy = Math.floor(y), u = x - ix, v = y - iy;
-  const cub = (p0: number, p1: number, p2: number, p3: number, t: number) => p1 + 0.5 * t * (p2 - p0 + t * (2 * p0 - 5 * p1 + 4 * p2 - p3 + t * (3 * (p1 - p2) + p3 - p0)));
   // Neighbouring samples mostly share a lattice cell: its sixteen hashed
   // corners are kept by salt, so a sweep hashes each cell about once.
   let k = lattice.get(salt);
@@ -83,8 +83,7 @@ function smoothNoise(x: number, y: number, salt: number) {
     k.ix = ix; k.iy = iy;
     for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) h[j * 4 + i] = hash01(ix - 1 + i, iy - 1 + j, salt);
   }
-  const row = (j: number) => cub(h[j * 4], h[j * 4 + 1], h[j * 4 + 2], h[j * 4 + 3], u);
-  return Math.max(0, Math.min(1, cub(row(0), row(1), row(2), row(3), v)));
+  return Math.max(0, Math.min(1, cub(cub(h[0], h[1], h[2], h[3], u), cub(h[4], h[5], h[6], h[7], u), cub(h[8], h[9], h[10], h[11], u), cub(h[12], h[13], h[14], h[15], u), v)));
 }
 const lattice = new Map<number, { ix: number; iy: number; h: Float64Array }>();
 const smooth = (a: number, b: number, v: number) => {
@@ -388,6 +387,23 @@ function paintMesas(out: Uint32Array) {
   const layer = (n: number) => MOAB_STRATA[Math.min(MOAB_STRATA.length - 1, n)];
   const rim = sceneryOutlinesOn() ? rgbaOf(0x24100c) : rgbaOf(MOAB_RIM);
   const at = (X: number, Y: number) => (X >= 0 && Y >= 0 && X < GW && Y < GH ? L[Y * GW + X] : -1);
+  // The nearest higher stratum straight north of each pixel within
+  // `MOAB_FACE * 3` (rows `faceD` up, stratum `faceUp`), found down each
+  // column from the last row each stratum was seen in.
+  let top = 0;
+  for (let i = 0; i < L.length; i++) if (L[i] > top) top = L[i];
+  const faceD = new Uint8Array(GW * GH), faceUp = new Int16Array(GW * GH), seen = new Int32Array(top + 1);
+  for (let X = 0; X < GW; X++) {
+    seen.fill(-1e9);
+    for (let Y = 0, i = X; Y < GH; Y++, i += GW) {
+      const l = L[i];
+      if (l < 0) continue;
+      let row = -1e9, lv = -1;
+      for (let u = l + 1; u <= top; u++) if (seen[u] > row) (row = seen[u]), (lv = u);
+      if (Y - row <= MOAB_FACE * 3) (faceD[i] = Y - row), (faceUp[i] = lv);
+      seen[l] = Y;
+    }
+  }
   for (let Y = 0; Y < GH; Y++)
     for (let X = 0; X < GW; X++) {
       const i = Y * GW + X, l = L[i];
@@ -396,11 +412,7 @@ function paintMesas(out: Uint32Array) {
       const dither = BAYER4[(Y & 3) * 4 + (X & 3)];
       // A cliff face: a higher stratum stands just to the north, its face
       // dropping toward the viewer.
-      let d = 0, up = l;
-      for (let k = 1; k <= MOAB_FACE * 3; k++) {
-        const u = at(X, Y - k);
-        if (u > l) { d = k; up = u; break; }
-      }
+      const d = faceD[i], up = d ? faceUp[i] : l;
       if (d && d <= MOAB_FACE * Math.min(3, up - l)) {
         const tall = MOAB_FACE * Math.min(3, up - l);
         if (d === tall) { out[i] = tone(layer(l), 0.55); continue; }
@@ -587,11 +599,7 @@ export function paintWilds(forest: boolean, stone?: Stone, reach: readonly Trail
   // The caves' gravel floor carried on past the board, its trails too (lit
   // under the great opening by `Wilds.caveLight`).
   if (basalt) {
-    for (let Y = 0; Y < GH; Y++)
-      for (let X = 0; X < GW; X++) {
-        if (X >= OX && Y >= OY && X < OX + BW && Y < OY + BH) continue;
-        out[Y * GW + X] = caveGravelPixel(X - OX, Y - OY);
-      }
+    fillCaveGravel(out, GW, GH, OX, OY, { x0: OX, y0: OY, x1: OX + BW, y1: OY + BH });
     if (reach.length)
       paintRoadLines(out, GW, GH, OX, OY, reach, (i) => {
         const X = i % GW, Y = (i - X) / GW;
