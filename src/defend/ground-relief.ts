@@ -177,6 +177,8 @@ export class GroundRelief {
 }
 
 type Steps<T> = Generator<void, T, void>;
+/** Rows (or columns) a `bakeMaskSteps` step works through. */
+const ROWS = 64;
 /** What the masks depend on besides the open cells and the pixel scale. */
 const maskKey = (W: number, H: number, area: AreaId) => `${W}x${H}:${area}:${floorArtLoaded(area)}:${area === "moss" ? pixelKey() : ""}`;
 const outsideOf = (map: CityMap) => {
@@ -211,16 +213,13 @@ function* bakeMaskSteps(outside: Uint8Array, px: number, W: number, H: number, a
   for (let i = 0; i < W * H; i++) height[i] = (rgba[i * 4] * 0.3 + rgba[i * 4 + 1] * 0.59 + rgba[i * 4 + 2] * 0.11) / 255;
   yield;
   // Soften the art's speckle so the slopes follow the stones, not the noise.
-  const rough = boxBlur(height, W, H, Math.max(1, Math.round(px * 0.06)));
-  yield;
-  const soft = boxBlur(rough, W, H, 1);
-  yield;
-  const { gx, gy } = slopes(soft, W, H);
-  yield;
+  const rough = yield* boxBlur(height, W, H, Math.max(1, Math.round(px * 0.06)));
+  const soft = yield* boxBlur(rough, W, H, 1);
+  const { gx, gy } = yield* slopes(soft, W, H);
   const gain = 1 / Math.max(1e-4, percentile(gx, gy, 0.96));
   yield;
   const out = AXES.map(() => new ImageData(W, H));
-  for (let y = 0; y < H; y++, y % 32 || (yield)) {
+  for (let y = 0; y < H; y++, y % ROWS || (yield)) {
     const cy = Math.min(CELLS_H - 1, Math.floor(y / px));
     for (let x = 0; x < W; x++) {
       const cx = Math.min(CELLS_W - 1, Math.floor(x / px));
@@ -248,9 +247,9 @@ function* bakeMaskSteps(outside: Uint8Array, px: number, W: number, H: number, a
 }
 
 /** Sobel slopes of `h`. */
-function slopes(h: Float32Array, W: number, H: number) {
+function* slopes(h: Float32Array, W: number, H: number): Steps<{ gx: Float32Array; gy: Float32Array }> {
   const gx = new Float32Array(W * H), gy = new Float32Array(W * H);
-  for (let y = 1; y < H - 1; y++)
+  for (let y = 1; y < H - 1; y++, y % ROWS || (yield))
     for (let x = 1; x < W - 1; x++) {
       const i = y * W + x;
       const a = h[i - W - 1], b = h[i - W], c = h[i - W + 1], d = h[i - 1], f = h[i + 1], g = h[i + W - 1], k = h[i + W], m = h[i + W + 1];
@@ -272,9 +271,9 @@ function percentile(gx: Float32Array, gy: Float32Array, q: number) {
 }
 
 /** A separable box blur of radius `r`. */
-function boxBlur(src: Float32Array, W: number, H: number, r: number) {
+function* boxBlur(src: Float32Array, W: number, H: number, r: number): Steps<Float32Array> {
   const tmp = new Float32Array(W * H), out = new Float32Array(W * H), n = r * 2 + 1;
-  for (let y = 0; y < H; y++) {
+  for (let y = 0; y < H; y++, y % ROWS || (yield)) {
     let sum = 0;
     for (let x = -r; x <= r; x++) sum += src[y * W + Math.min(W - 1, Math.max(0, x))];
     for (let x = 0; x < W; x++) {
@@ -282,7 +281,7 @@ function boxBlur(src: Float32Array, W: number, H: number, r: number) {
       sum += src[y * W + Math.min(W - 1, x + r + 1)] - src[y * W + Math.max(0, x - r)];
     }
   }
-  for (let x = 0; x < W; x++) {
+  for (let x = 0; x < W; x++, x % ROWS || (yield)) {
     let sum = 0;
     for (let y = -r; y <= r; y++) sum += tmp[Math.min(H - 1, Math.max(0, y)) * W + x];
     for (let y = 0; y < H; y++) {

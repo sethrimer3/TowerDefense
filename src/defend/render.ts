@@ -206,6 +206,8 @@ export class DefendRenderer {
   private areaChangedAt = 0;
   private previousLayer: HTMLCanvasElement | null = null;
   private previousKey = "";
+  /** `refreshLayer`'s `base` when the outgoing area's layer was painted. */
+  private previousBase = "";
   private previousWeather: Weather | null = null;
   private lastWeather: Weather | null = null;
   private areaMix = 1;
@@ -1107,15 +1109,7 @@ export class DefendRenderer {
     // Every building's damage stage is painted into the layer too.
     const maskKey = `${this.area}:${pixelKey()}:${sim ? damageKey(sim) : -1}:${looks ? Object.entries(looks).join(",") : ""}`;
     const key = `${W}:${k}:${this.worldLighting}:${maskKey}`;
-    if (this.previousArea && (key !== this.previousKey || !this.layerKey)) {
-      this.previousLayer ??= document.createElement("canvas");
-      this.previousLayer.width = W * k;
-      this.previousLayer.height = H * k;
-      this.lighting.setMap(map);
-      paintCityLayer(this.previousLayer.getContext("2d")!, this.px * k, { map, sim, area: this.previousArea, lights: this.lighting.lights, stones: this.lighting.roadStones, looks, omitSunShadows: this.worldLighting });
-      this.previousKey = key;
-    }
-    if (map === this.map && key === this.layerKey) return;
+    if (map === this.map && key === this.layerKey && (!this.previousArea || key === this.previousKey)) return;
     // Only some buildings changed (a damage stage, a fall, a rebuilt
     // section): repaint just round them, not the whole city and its
     // lighting masks (a hitch of a tenth of a second or more on a big city,
@@ -1124,11 +1118,26 @@ export class DefendRenderer {
     const base = `${frame}:${looks ? Object.entries(looks).join(",") : ""}`;
     const damaging = map === this.map && sim && sim === this.stagedSim && base === this.baseKey;
     const damage = damaging ? this.damageBoxes(map, sim) : null;
-    // While an area fades in, the layers are painted whole (a box's edge
-    // samples the scaled art a shade differently), but the masks, painted
-    // at whole pixels a cell, are still patched round the damage exactly.
-    const boxes = this.previousArea ? null : damaging ? damage
-      : map !== this.map && !sim && !this.stagedSim && frame === this.frameKey ? this.mapBoxes(map, looks)
+    const P = this.px * k;
+    // Through an area's fade, the outgoing area's layer too.
+    if (this.previousArea && (key !== this.previousKey || !this.layerKey)) {
+      if (damage && this.previousBase === base && this.previousLayer) {
+        const c = this.previousLayer.getContext("2d")!, area = this.previousArea;
+        for (const box of damage)
+          repaintBox(c, P, box, (c) => paintCityLayer(c, P, { map, sim, area, lights: this.lighting.lights, stones: this.lighting.roadStones, looks, omitSunShadows: this.worldLighting, within: box }));
+      } else {
+        this.previousLayer ??= document.createElement("canvas");
+        this.previousLayer.width = W * k;
+        this.previousLayer.height = H * k;
+        this.lighting.setMap(map);
+        paintCityLayer(this.previousLayer.getContext("2d")!, P, { map, sim, area: this.previousArea, lights: this.lighting.lights, stones: this.lighting.roadStones, looks, omitSunShadows: this.worldLighting });
+      }
+      this.previousKey = key;
+      this.previousBase = base;
+    }
+    if (map === this.map && key === this.layerKey) return;
+    const boxes = damaging ? damage
+      : map !== this.map && !sim && !this.stagedSim && frame === this.frameKey && !this.previousArea ? this.mapBoxes(map, looks)
       : null;
     this.baseKey = base;
     this.frameKey = frame;
@@ -1140,7 +1149,6 @@ export class DefendRenderer {
       this.maskMap = map;
       this.layerKey = key;
       this.maskKey = maskKey;
-      const P = this.px * k;
       for (const box of boxes)
         repaintBox(this.lctx, P, box, (c) => paintCityLayer(c, P, { map, sim, area: this.area, lights: this.lighting.lights, stones: this.lighting.roadStones, looks, omitSunShadows: this.worldLighting, within: box }));
       this.patchMasks(map, sim, looks, boxes);
