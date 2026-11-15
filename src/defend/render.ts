@@ -513,12 +513,10 @@ export class DefendRenderer {
       this.ctx.beginPath();
       this.ctx.rect(strip.x, strip.y, strip.w, strip.h);
       this.ctx.clip();
-      this.ctx.fillStyle = BEYOND;
-      this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
       {
         const w = sim ? opts.weather : null, still = opts.reduceMotion || !(opts.effects ?? true);
         this.wilds.draw(this.ctx, {
-          area: this.area, px: this.px, cam: this.cam, night: opts.night, now: opts.now,
+          area: this.area, px: this.px, cam: this.cam, night: opts.night, now: opts.now, beyond: BEYOND,
           grassWind: sim && opts.weather?.rain ? "rain" : opts.weather ? "cloud" : "calm",
           treeWind: still ? 0 : w?.rain ? 2 : w && !w.clear ? 1.4 : 1,
           reduceMotion: opts.reduceMotion, effects: opts.effects ?? true,

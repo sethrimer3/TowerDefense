@@ -737,6 +737,9 @@ export type WildsFrame = {
   /** How dark the board's own night is at its edge (its ambient's opacity),
    * where the wilds' darker night starts. */
   dark?: number;
+  /** The colour past the wilds' edge, filled first: given, the still
+   * ground is kept composed at the screen's pixels and copied each frame. */
+  beyond?: string;
 };
 
 /** At night the wilds darken more than the field (which keeps its torches
@@ -942,19 +945,45 @@ export class Wilds {
       x0: Math.max(0, Math.floor(-f.cam.x / k) + OX), y0: Math.max(0, Math.floor(-f.cam.y / k) + OY),
       x1: Math.min(GW, Math.ceil((cw - f.cam.x) / k) + OX), y1: Math.min(GH, Math.ceil((ch - f.cam.y) / k) + OY),
     };
-    if (view.x0 >= OX && view.y0 >= OY && view.x1 <= OX + BW && view.y1 <= OY + BH) return;
     const toX = (X: number) => f.cam.x + (X - OX) * k, toY = (Y: number) => f.cam.y + (Y - OY) * k;
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (f.beyond && view.x0 >= OX && view.y0 >= OY && view.x1 <= OX + BW && view.y1 <= OY + BH) {
+      ctx.fillStyle = f.beyond; ctx.fillRect(0, 0, cw, ch);
+    }
+    if (view.x0 >= OX && view.y0 >= OY && view.x1 <= OX + BW && view.y1 <= OY + BH) { ctx.restore(); return; }
     ctx.imageSmoothingEnabled = false;
-    if (!forest) this.floor(ctx, f, view, toX, toY, k);
-    const blit = (src: CanvasImageSource, b: Box, sx = b.x0, sy = b.y0) => {
+    const blitTo = (c: CanvasRenderingContext2D, src: CanvasImageSource, b: Box, sx = b.x0, sy = b.y0) => {
       const x = Math.round(toX(b.x0)), y = Math.round(toY(b.y0));
-      ctx.drawImage(src, sx, sy, b.x1 - b.x0, b.y1 - b.y0, x, y, Math.round(toX(b.x1)) - x, Math.round(toY(b.y1)) - y);
+      c.drawImage(src, sx, sy, b.x1 - b.x0, b.y1 - b.y0, x, y, Math.round(toX(b.x1)) - x, Math.round(toY(b.y1)) - y);
     };
-    if (f.sand) blit(this.sand(f.sand.trails), view);
+    const blit = (src: CanvasImageSource, b: Box, sx = b.x0, sy = b.y0) => blitTo(ctx, src, b, sx, sy);
+    const sand = f.sand ? this.sand(f.sand.trails) : null;
     const g = this.ground(forest, f.area, f.forest?.plan.roads ?? f.caves?.trails ?? null);
-    blit(g.canvas, view);
+    if (f.beyond) {
+      // The still ground (the fill, the flagstones, the dunes and the
+      // mountains) only changes with the camera, the screen or the art:
+      // composed once at the screen's pixels with exactly the same calls,
+      // then copied. It is opaque, so the copy is the same.
+      const key = `${this.floorKey(f, cw, ch)}|${forest}|${sand ? this.sandKey : "-"}|${f.beyond}`;
+      let base = this.baseCache;
+      if (!base || base.key !== key || base.ground !== g) {
+        const canvas = base?.canvas ?? document.createElement("canvas");
+        if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }
+        const c = canvas.getContext("2d")!;
+        c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.globalCompositeOperation = "source-over"; c.imageSmoothingEnabled = false;
+        c.fillStyle = f.beyond; c.fillRect(0, 0, cw, ch);
+        if (!forest) this.floor(c, f, view, toX, toY, k);
+        if (sand) blitTo(c, sand, view);
+        blitTo(c, g.canvas, view);
+        base = this.baseCache = { key, ground: g, canvas };
+      }
+      ctx.drawImage(base.canvas, 0, 0);
+    } else {
+      if (!forest) this.floor(ctx, f, view, toX, toY, k);
+      if (sand) blit(sand, view);
+      blit(g.canvas, view);
+    }
     if (forest && f.effects) this.life(ctx, f, g, view, blit);
     // The caves' floor lit through the great opening, as the field's is.
     if (g.open) { ctx.globalAlpha = 0.55 * (0.3 + 0.7 * (f.caves?.day ?? 1)); blit(g.open.lit, view); ctx.globalAlpha = 1; }
@@ -1045,12 +1074,17 @@ export class Wilds {
   /** The flagstones in view, painted once at the screen's pixels for a
    * camera, canvas size, area and art (`floor` copies it each frame). */
   private floorCache: { key: string; canvas: HTMLCanvasElement } | null = null;
+  /** The still ground composed at the screen's pixels (`WildsFrame.beyond`). */
+  private baseCache: { key: string; ground: Ground; canvas: HTMLCanvasElement } | null = null;
+  private floorKey(f: WildsFrame, cw: number, ch: number) {
+    return `${f.area}:${cw}x${ch}:${f.cam.x},${f.cam.y},${f.cam.s}:${f.px}:${pixelKey()}:${floorArtLoaded(f.area)}`;
+  }
   /** The area's flagstones past the board, tile by tile, under the stone:
    * painted at the screen's pixels into `floorCache` while the camera keeps
    * still, then copied (the tiles are opaque, so the copy is the same). */
   private floor(ctx: CanvasRenderingContext2D, f: WildsFrame, view: Box, toX: (X: number) => number, toY: (Y: number) => number, k: number) {
     const T = SUB * ART, cw = ctx.canvas.width, ch = ctx.canvas.height;
-    const key = `${f.area}:${cw}x${ch}:${f.cam.x},${f.cam.y},${f.cam.s}:${f.px}:${pixelKey()}:${floorArtLoaded(f.area)}`;
+    const key = this.floorKey(f, cw, ch);
     if (this.floorCache?.key !== key) {
       const canvas = this.floorCache?.canvas ?? document.createElement("canvas");
       if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }
