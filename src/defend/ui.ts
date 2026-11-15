@@ -181,6 +181,8 @@ export class DefendPage {
   private phase: "build" | "sim" | "over" = "build";
   private map: CityMap | null = null;
   private mapLayout: Layout | null = null;
+  /** The cities a battle has been fought on (it changes them). */
+  private fought = new WeakSet<CityMap>();
   private sim: DefendSim | null = null;
   private renderer: DefendRenderer | null = null;
   private pointers = new BoardPointers({
@@ -1065,9 +1067,13 @@ export class DefendPage {
     this.performance = new BattlePerformance();
     this.performanceEnd = null;
     Object.assign(window, { defendPerformance: this.performance.history });
-    // A fresh city every run; upgrades bought mid-run apply next time.
-    this.map = null;
+    // A fresh city every run; upgrades bought mid-run apply next time. The
+    // build phase's own city, untouched by any battle, is the very city
+    // `generateCity` would make again, so it's kept, with all the art made
+    // for it (a whole regeneration and repaint otherwise).
+    if (this.map && this.fought.has(this.map)) this.map = null;
     const map = this.currentMap();
+    this.fought.add(map);
     // The keep's guards fight in Defend, mustering where the watchmen walked.
     this.menu.dismiss();
     this.sim = new DefendSim(map, { ...this.save.levels }, (defendRandom("rolls")() * 2147483648) | 0, { ...this.host.bonuses(), watch: cityWatch(this.save.keepRanks) });
