@@ -111,7 +111,10 @@ export class UnitOutline {
   private outline = canvas();
   private colors = new Map<string, ReturnType<typeof canvas>>();
   private current = this.outline;
-  private under = new Map<Ctx, Draw>([[this.outline.c, drawer(this.outline.c)]]);
+  /** Whether anything has been drawn on `outline` since it was last cleared:
+   * an empty one needs neither clearing nor copying. */
+  private inked = true;
+  private under = new Map<Ctx, Draw>([[this.outline.c, ((draw: Draw): Draw => (...a) => { this.inked = true; draw(...a); })(drawer(this.outline.c))]]);
   private currentInk: string | undefined;
   private merged = true;
   private solo: { target: Ctx; units: Ctx; rims: Ctx } | undefined;
@@ -119,6 +122,13 @@ export class UnitOutline {
 
   constructor() {
     this.discard.cv.width = this.discard.cv.height = 1;
+    {
+      const o = this.outline.c as unknown as Record<string, (...a: unknown[]) => unknown>;
+      for (const name of ["drawImage", "fill", "fillRect", "stroke", "strokeRect", "putImageData", "fillText", "strokeText"]) {
+        const own = o[name].bind(o);
+        o[name] = (...a: unknown[]) => { this.inked = true; return own(...a); };
+      }
+    }
     const c = this.layer.c, patch = c as unknown as Record<string, unknown>;
     // The outline layer follows every change of the units' transform, so
     // silhouettes land where their sprites do.
@@ -208,12 +218,13 @@ export class UnitOutline {
         cv.height = height;
       }
       l.setTransform(1, 0, 0, 1, 0, 0);
-      l.clearRect(0, 0, width, height);
+      if (l !== this.outline.c || this.inked) l.clearRect(0, 0, width, height);
       l.globalAlpha = 1;
       l.globalCompositeOperation = "source-over";
       l.setTransform(m);
       l.imageSmoothingEnabled = false;
     }
+    this.inked = false;
     return { units: this.layer.c, rims: this.outline.c };
   }
 
@@ -295,7 +306,7 @@ export class UnitOutline {
     c.setTransform(1, 0, 0, 1, 0, 0);
     c.globalAlpha = 1;
     c.globalCompositeOperation = "source-over";
-    c.drawImage(this.outline.cv, 0, 0);
+    if (this.inked) c.drawImage(this.outline.cv, 0, 0);
     for (const [ink, layer] of this.colors) {
       const t = layer.c; t.save(); t.setTransform(1, 0, 0, 1, 0, 0);
       t.globalAlpha = 1; t.globalCompositeOperation = 'source-in'; t.fillStyle = ink;
