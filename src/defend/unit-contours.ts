@@ -176,8 +176,9 @@ export class UnitContours {
     else this.bound(channel, this.penBounds, this.matrix, (width / 2 + channel.radius) * Math.max(c.lineCap === 'square' ? Math.SQRT2 : 1, c.lineJoin === 'miter' ? c.miterLimit : 1));
   }
   /** Rebuilt only with the existing combat cache. Subtract the union of every
-   * unit body, including opposing/neutral units, to suppress all overlap seams. */
-  finish(bodies: HTMLCanvasElement) {
+   * unit body, including opposing/neutral units, to suppress all overlap seams.
+   * Returns the box of what it added to `bodies` (the soft joins), if any. */
+  finish(bodies: HTMLCanvasElement): Held {
     for (const [ink, channel] of this.channels) {
       for (const row of channel.pixelRows.values()) {
         if (!row.sorted) row.spans.sort((a, b) => a[0] - b[0]);
@@ -232,15 +233,24 @@ export class UnitContours {
     // Keep actual bodies out of the rings before inserting soft joins. The
     // portal mixes those joins into its opaque fire, rather than punching
     // translucent holes through both body and rim to expose scenery.
+    let joined: Held = null;
     for (const channel of this.channels.values()) {
-      if (channel.mergePixels && channel.pixelBounds && channel.radius > 0) this.closePixelBodies(channel, bodies);
+      if (!(channel.mergePixels && channel.pixelBounds && channel.radius > 0)) continue;
+      const b = this.closePixelBodies(channel, bodies);
+      if (!b) continue;
+      if (!joined) joined = { ...b };
+      else {
+        const x1 = Math.max(joined.x + joined.w, b.x + b.w), y1 = Math.max(joined.y + joined.h, b.y + b.h);
+        joined.x = Math.min(joined.x, b.x); joined.y = Math.min(joined.y, b.y); joined.w = x1 - joined.x; joined.h = y1 - joined.y;
+      }
     }
+    return joined;
   }
   /** A soft morphological closing of pixel bodies only. Intersect the
    * feathered expanded union at its center and four corners, then insert its
    * black interior behind the real bodies. Narrow cracks become solid; wider
    * necks retain some fire until they close. No filters or scene readbacks. */
-  private closePixelBodies(channel: Channel, bodies: HTMLCanvasElement) {
+  private closePixelBodies(channel: Channel, bodies: HTMLCanvasElement): Held {
     const { pixelBounds: b, pixels } = channel, r = channel.radius;
     this.portal ??= document.createElement('canvas');
     const canvas = this.portal;
@@ -259,7 +269,7 @@ export class UnitContours {
     const w = Math.min(canvas.width, Math.ceil(b!.x1 + r * 2 + 2)) - x, h = Math.min(canvas.height, Math.ceil(b!.y1 + r * 2 + 2)) - y;
     // The bands reach `r` past the bodies at most: all inside the box.
     if (w > 0 && h > 0) this.portalHeld = { x, y, w, h };
-    if (w <= 0 || h <= 0) return;
+    if (w <= 0 || h <= 0) return null;
     this.innerHeld = { x, y, w, h };
     this.innerChannel = channel;
     c.save(); c.beginPath(); c.rect(x, y, w, h); c.clip();
@@ -272,6 +282,7 @@ export class UnitContours {
     // Bypass UnitOutline's sprite interception: this transient mask is not a
     // source sprite and must never be copied/read back or cached as one.
     CanvasRenderingContext2D.prototype.drawImage.call(body, this.inner, x, y, w, h, x, y, w, h); body.restore();
+    return { x, y, w, h };
   }
 
   /** A channel's paint's box on `canvas`, in whole pixels: its bounds and

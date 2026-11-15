@@ -8,6 +8,7 @@ import { BLIGHT_LASER } from "./blight-fortress.ts";
 import { createTronField, stepTronField, TRON, type TronField } from "./blight-fortress-particles.ts";
 import type { Brush } from "./battle-art.ts";
 import type { DefendSim, Enemy } from "./sim.ts";
+import { painted } from "./paint-box.ts";
 
 const fields = new WeakMap<Enemy, TronField>();
 const stillFields = new WeakMap<Enemy, TronField>();
@@ -34,6 +35,7 @@ function particles(c: CanvasRenderingContext2D, e: Enemy, x: number, y: number, 
       c.strokeStyle = g;
       const path = new Path2D(); path.moveTo(x + a.x * size, y + a.y * size); path.lineTo(x + b.x * size, y + b.y * size);
       CanvasRenderingContext2D.prototype.stroke.call(c, path);
+      painted(c, x + a.x * size, y + a.y * size, x + b.x * size, y + b.y * size, c.lineWidth);
     }
     const dot = size / 60;
     c.fillStyle = "#ff991c"; c.fillRect(x + p.x * size - dot / 2, y + p.y * size - dot / 2, dot, dot);

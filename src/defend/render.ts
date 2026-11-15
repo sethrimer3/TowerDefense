@@ -85,6 +85,7 @@ import { ForestGrass } from "./forest-grass.ts";
 import { hasForest } from "./forest.ts";
 import { MagicForestArt } from "./magic-forest-art.ts";
 import { hasMagicForest } from "./magic-forest.ts";
+import { PaintBox } from "./paint-box.ts";
 import { CrystalCavesArt } from "./crystal-caves-art.ts";
 import { hasCrystalCaves, shaftLight } from "./crystal-caves.ts";
 
@@ -228,6 +229,8 @@ export class DefendRenderer {
   private map: CityMap | null = null;
   private protectCombat = false;
   private actors: HTMLCanvasElement | null = null;
+  /** Where the actors' paint may lie, so a frame clears and copies only that. */
+  private actorsBox: PaintBox | null = null;
   private combatLayer: HTMLCanvasElement | null = null;
   private combatSim: DefendSim | null = null;
   private combatKey = '';
@@ -904,17 +907,23 @@ export class DefendRenderer {
     let actors = c;
     if (this.protectCombat) {
       this.actors ??= document.createElement("canvas");
+      actors = this.actors.getContext("2d")!;
+      const box = this.actorsBox ??= new PaintBox(actors);
+      actors.setTransform(1, 0, 0, 1, 0, 0);
       if (this.actors.width !== c.canvas.width || this.actors.height !== c.canvas.height) {
         this.actors.width = c.canvas.width; this.actors.height = c.canvas.height;
+      } else {
+        const b = box.held();
+        if (b) actors.clearRect(b.x, b.y, b.w, b.h);
       }
-      actors = this.actors.getContext("2d")!;
-      actors.setTransform(1, 0, 0, 1, 0, 0); actors.clearRect(0, 0, this.actors.width, this.actors.height);
+      box.reset();
       actors.setTransform(c.getTransform()); actors.imageSmoothingEnabled = false;
     }
     drawUnits({ c: actors, px: this.px }, sim, torches, opts.healthbars === true, opts.timings ? this.timings : undefined, { enemies: opts.simpleEnemies, troops: opts.simpleTroops, reduceMotion: opts.reduceMotion, merged: !!opts.mergedOutlines, effects: opts.effects !== false }, (this.outline ??= new UnitOutline()), opts.sides, { defer: true });
     this.dark.draw(actors, this.px, sim);
     if (actors !== c) {
-      c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(this.actors!, 0, 0); c.restore();
+      const b = this.actorsBox!.held();
+      if (b) { c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(this.actors!, b.x, b.y, b.w, b.h, b.x, b.y, b.w, b.h); c.restore(); }
     }
   }
 

@@ -1,4 +1,5 @@
 import { UnitContours, bodyPath } from "./unit-contours.ts";
+import { PaintBox, type Box } from "./paint-box.ts";
 /** Unit bodies share a screen layer, with independent ink channels. Legacy
  * mode retains its separate ink layer for compatibility probes. Thin visibility mode uses
  * cached outline-free body paths and primitive geometry through UnitContours
@@ -96,6 +97,11 @@ function drawer(c: Ctx): Draw {
   };
 }
 
+/** `box` of `source` onto the same place on `c`, which is untransformed. */
+function copy(c: Ctx, source: HTMLCanvasElement, box: Box | null) {
+  if (box) c.drawImage(source, box.x, box.y, box.w, box.h, box.x, box.y, box.w, box.h);
+}
+
 function canvas() {
   const cv = document.createElement("canvas");
   return { cv, c: cv.getContext("2d")! };
@@ -111,10 +117,11 @@ export class UnitOutline {
   private outline = canvas();
   private colors = new Map<string, ReturnType<typeof canvas>>();
   private current = this.outline;
-  /** Whether anything has been drawn on `outline` since it was last cleared:
-   * an empty one needs neither clearing nor copying. */
-  private inked = true;
-  private under = new Map<Ctx, Draw>([[this.outline.c, ((draw: Draw): Draw => (...a) => { this.inked = true; draw(...a); })(drawer(this.outline.c))]]);
+  /** Where the units' and the outlines' paint may lie since each was last
+   * cleared: each frame clears and copies those boxes only. */
+  private readonly layerBox: PaintBox;
+  private readonly outlineBox: PaintBox;
+  private under = new Map<Ctx, Draw>();
   private currentInk: string | undefined;
   private merged = true;
   private solo: { target: Ctx; units: Ctx; rims: Ctx } | undefined;
@@ -122,13 +129,8 @@ export class UnitOutline {
 
   constructor() {
     this.discard.cv.width = this.discard.cv.height = 1;
-    {
-      const o = this.outline.c as unknown as Record<string, (...a: unknown[]) => unknown>;
-      for (const name of ["drawImage", "fill", "fillRect", "stroke", "strokeRect", "putImageData", "fillText", "strokeText"]) {
-        const own = o[name].bind(o);
-        o[name] = (...a: unknown[]) => { this.inked = true; return own(...a); };
-      }
-    }
+    this.outlineBox = new PaintBox(this.outline.c);
+    this.under.set(this.outline.c, drawer(this.outline.c));
     const c = this.layer.c, patch = c as unknown as Record<string, unknown>;
     // The outline layer follows every change of the units' transform, so
     // silhouettes land where their sprites do.
@@ -185,6 +187,7 @@ export class UnitOutline {
       }
       draw(made?.bare ?? img, a, b, w, h, dx, dy, dw, dh, n);
     };
+    this.layerBox = new PaintBox(c);
   }
 
   /** Keep faint glows out of the silhouette; preserve genuinely translucent
@@ -213,18 +216,19 @@ export class UnitOutline {
     if (!merged) return this.individual(c);
     const { width, height } = c.canvas, m = c.getTransform();
     for (const { cv, c: l } of [this.layer, this.outline, ...this.colors.values()]) {
+      const box = l === this.layer.c ? this.layerBox : l === this.outline.c ? this.outlineBox : null;
+      l.setTransform(1, 0, 0, 1, 0, 0);
       if (cv.width !== width || cv.height !== height) {
         cv.width = width;
         cv.height = height;
-      }
-      l.setTransform(1, 0, 0, 1, 0, 0);
-      if (l !== this.outline.c || this.inked) l.clearRect(0, 0, width, height);
+      } else if (!box) l.clearRect(0, 0, width, height);
+      else { const b = box.held(); if (b) l.clearRect(b.x, b.y, b.w, b.h); }
+      box?.reset();
       l.globalAlpha = 1;
       l.globalCompositeOperation = "source-over";
       l.setTransform(m);
       l.imageSmoothingEnabled = false;
     }
-    this.inked = false;
     return { units: this.layer.c, rims: this.outline.c };
   }
 
@@ -306,7 +310,7 @@ export class UnitOutline {
     c.setTransform(1, 0, 0, 1, 0, 0);
     c.globalAlpha = 1;
     c.globalCompositeOperation = "source-over";
-    if (this.inked) c.drawImage(this.outline.cv, 0, 0);
+    copy(c, this.outline.cv, this.outlineBox.held());
     for (const [ink, layer] of this.colors) {
       const t = layer.c; t.save(); t.setTransform(1, 0, 0, 1, 0, 0);
       t.globalAlpha = 1; t.globalCompositeOperation = 'source-in'; t.fillStyle = ink;
@@ -314,10 +318,10 @@ export class UnitOutline {
       c.drawImage(layer.cv, 0, 0);
     }
     if (this.thin) {
-      this.contours.finish(this.layer.cv);
+      this.layerBox.add(this.contours.finish(this.layer.cv));
       if (!deferContours) this.contours.draw(c);
     }
-    c.drawImage(this.layer.cv, 0, 0);
+    copy(c, this.layer.cv, this.layerBox.held());
     c.restore();
   }
 }

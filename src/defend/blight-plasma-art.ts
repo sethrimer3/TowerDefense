@@ -3,6 +3,7 @@ import { BLIGHT_PLASMA, plasmaBallRadius, type PlasmaShot } from "./blight-plasm
 import { hash01 } from "./grid.ts";
 import type { Brush } from "./battle-art.ts";
 import type { DefendSim, Enemy } from "./sim.ts";
+import { painted } from "./paint-box.ts";
 
 /** A parabolic lift over straight ground travel; presentation only. */
 export function plasmaShotPose(shot: PlasmaShot) {
@@ -16,7 +17,7 @@ function orb(c: CanvasRenderingContext2D, x: number, y: number, radius: number, 
   c.save(); c.globalAlpha *= alpha;
   const halo = c.createRadialGradient(x, y, radius * .65, x, y, radius * 1.3);
   halo.addColorStop(0, "rgba(255,97,0,.2)"); halo.addColorStop(.65, "rgba(255,97,0,.13)"); halo.addColorStop(1, "rgba(255,64,0,0)");
-  const disc = (r: number) => { const p = new Path2D(); p.arc(x, y, r, 0, Math.PI * 2); CanvasRenderingContext2D.prototype.fill.call(c, p); };
+  const disc = (r: number) => { const p = new Path2D(); p.arc(x, y, r, 0, Math.PI * 2); CanvasRenderingContext2D.prototype.fill.call(c, p); painted(c, x - r, y - r, x + r, y + r); };
   c.fillStyle = halo; disc(radius * 1.3);
   const body = c.createRadialGradient(x - radius * .28, y - radius * .32, radius * .03, x, y, radius);
   body.addColorStop(0, "#ffdda0"); body.addColorStop(.22, "#ffc258"); body.addColorStop(.62, "#ff850b"); body.addColorStop(.88, "#db4500"); body.addColorStop(1, "#8a2100");
@@ -27,6 +28,7 @@ function orb(c: CanvasRenderingContext2D, x: number, y: number, radius: number, 
     c.strokeStyle = n % 2 ? "rgba(255,213,101,.55)" : "rgba(255,120,5,.8)";
     c.lineWidth = Math.max(.7, radius * .025);
     CanvasRenderingContext2D.prototype.stroke.call(c, path);
+    painted(c, x - radius, y - radius, x + radius, y + radius, c.lineWidth);
   }
   c.restore();
 }
