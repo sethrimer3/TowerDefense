@@ -50,6 +50,8 @@ export function planCell(cx: number, cy: number, keep: (x: number, y: number) =>
   return out.sort((a, b) => a.j - b.j);
 }
 
+const NONE: readonly never[] = [];
+
 /** The blades of `plan`'s open ground, by cell (null where none grow). */
 export function forestBlades(plan: ForestPlan, prior?: { plan: ForestPlan; blades: readonly (ForestBlade[] | null)[]; boxes: readonly Box[] }): (ForestBlade[] | null)[] {
   const out: (ForestBlade[] | null)[] = new Array(CELLS_W * CELLS_H).fill(null);
@@ -70,16 +72,23 @@ export function forestBlades(plan: ForestPlan, prior?: { plan: ForestPlan; blade
     }
   }
   // What no blade grows on, by the cells it may reach.
-  const near: { x: number; y: number; r: number }[][] = Array.from({ length: CELLS_W * CELLS_H }, () => []);
+  // (Listed only for the cells being planned.)
+  const near: ({ x: number; y: number; r: number }[] | undefined)[] = new Array(CELLS_W * CELLS_H);
   const add = (x: number, y: number, r: number) => {
     for (let cy = Math.max(0, Math.floor(y - r)); cy <= Math.min(CELLS_H - 1, Math.floor(y + r)); cy++)
-      for (let cx = Math.max(0, Math.floor(x - r)); cx <= Math.min(CELLS_W - 1, Math.floor(x + r)); cx++) near[cellIndex(cx, cy)].push({ x, y, r });
+      for (let cx = Math.max(0, Math.floor(x - r)); cx <= Math.min(CELLS_W - 1, Math.floor(x + r)); cx++) {
+        const k = cellIndex(cx, cy);
+        if (!redo || redo[k]) (near[k] ??= []).push({ x, y, r });
+      }
   };
-  const crowns: { x: number; y: number; r: number; id: number }[][] = Array.from({ length: CELLS_W * CELLS_H }, () => []);
+  const crowns: ({ x: number; y: number; r: number; id: number }[] | undefined)[] = new Array(CELLS_W * CELLS_H);
   for (const t of plan.trees) {
     const r = t.r * 0.85;
     for (let cy = Math.max(0, Math.floor(t.y - r)); cy <= Math.min(CELLS_H - 1, Math.floor(t.y + r)); cy++)
-      for (let cx = Math.max(0, Math.floor(t.x - r)); cx <= Math.min(CELLS_W - 1, Math.floor(t.x + r)); cx++) crowns[cellIndex(cx, cy)].push({ x: t.x, y: t.y, r, id: t.id });
+      for (let cx = Math.max(0, Math.floor(t.x - r)); cx <= Math.min(CELLS_W - 1, Math.floor(t.x + r)); cx++) {
+        const k = cellIndex(cx, cy);
+        if (!redo || redo[k]) (crowns[k] ??= []).push({ x: t.x, y: t.y, r, id: t.id });
+      }
   }
   for (const r of plan.rocks) add(r.x, r.y, r.size * 0.7);
   for (const p of plan.pads) add(p.x, p.y, p.r);
@@ -89,13 +98,14 @@ export function forestBlades(plan: ForestPlan, prior?: { plan: ForestPlan; blade
     for (let cx = 0; cx < CELLS_W; cx++) {
       const k = cellIndex(cx, cy);
       if (!plan.open[k] || (redo && !redo[k])) continue;
+      const nearK = near[k] ?? NONE, crownsK = crowns[k] ?? NONE;
       const list = planCell(cx, cy, (x, y) => {
-        if (near[k].some((d) => (x - d.x) ** 2 + (y - d.y) ** 2 < d.r * d.r)) return -2;
+        if (nearK.some((d) => (x - d.x) ** 2 + (y - d.y) ** 2 < d.r * d.r)) return -2;
         const X = Math.floor(x * ART), Y = Math.floor(y * ART);
         if (lakes.some(({ depth, box }) => X >= box.x0 && Y >= box.y0 && X < box.x1 && Y < box.y1 && depth(X, Y) > -2.5)) return -2;
         // Under the last drawn (the front) crown over it.
         let under = -1;
-        for (const c of crowns[k]) if ((x - c.x) ** 2 + (y - c.y) ** 2 < c.r * c.r) under = Math.max(under, c.id);
+        for (const c of crownsK) if ((x - c.x) ** 2 + (y - c.y) ** 2 < c.r * c.r) under = Math.max(under, c.id);
         return under;
       });
       if (list.length) out[k] = list;
@@ -124,14 +134,26 @@ function swaying(plans: readonly (Blade[] | null)[], prior?: { sway: Swaying; pl
     for (let q = 0; q < a.length; q++) if (a[q].i !== b[q].i || a[q].j !== b[q].j || a[q].phase !== b[q].phase) return false;
     return true;
   };
+  // Runs of cells copied over, copied in one go: `run` blades from `runFrom`
+  // to `runAt`.
+  let run = 0, runFrom = 0, runAt = 0;
+  const flush = () => {
+    if (!run || !prior) return;
+    const p = prior.sway;
+    for (const key of ["gx", "gy", "s1", "c1", "s2", "c2", "s3", "c3", "s4", "c4"] as const) (o[key] as Float32Array).set((p[key] as Float32Array).subarray(runFrom, runFrom + run), runAt);
+    run = 0;
+  };
   plans.forEach((list, i) => {
     const cx = i % CELLS_W, cy = (i - cx) / CELLS_W, was = prior?.plans[i] ?? null;
     if (prior && list?.length && same(was, list)) {
-      const p = prior.sway, m = list.length;
-      for (const key of ["gx", "gy", "s1", "c1", "s2", "c2", "s3", "c3", "s4", "c4"] as const) (o[key] as Float32Array).set((p[key] as Float32Array).subarray(from, from + m), k);
+      const m = list.length;
+      if (!run) (runFrom = from), (runAt = k);
+      run += m;
       k += m; from += m;
       return;
     }
+    if (!was?.length && !list?.length) return;
+    flush();
     from += was?.length ?? 0;
     for (const b of list ?? []) {
       const gx = cx * ART + b.i, gy = cy * ART + b.j, a1 = b.phase + gx * 0.06, a2 = b.phase * 2, a3 = gx * 0.021 + gy * 0.009;
@@ -140,6 +162,7 @@ function swaying(plans: readonly (Blade[] | null)[], prior?: { sway: Swaying; pl
       k++;
     }
   });
+  flush();
   return o;
 }
 

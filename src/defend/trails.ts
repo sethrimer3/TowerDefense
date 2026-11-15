@@ -88,6 +88,21 @@ function noise(x: number, y: number, scale: number, seed: number) {
   return top + (bottom - top) * uy;
 }
 
+/** Each cell's price as open ground (the same for every map), by seed,
+ * meander and scale, worked out once. */
+const wilds = new Map<string, Float32Array>();
+function wildPrices(seed: number, meander: number, scale: number) {
+  const key = `${seed}|${meander}|${scale}`;
+  let out = wilds.get(key);
+  if (!out) {
+    out = new Float32Array(CELL_COUNT);
+    for (let i = 0; i < CELL_COUNT; i++) out[i] = 1 + meander * noise(i % CELLS_W, Math.floor(i / CELLS_W), scale, seed);
+    if (wilds.size >= 16) wilds.delete(wilds.keys().next().value!);
+    wilds.set(key, out);
+  }
+  return out;
+}
+
 /** The cost of reaching the keep from each cell, the way a trail would
  * wear: open ground priced by a smooth noise of `meander` at most (so the
  * way bends), gates open, the wall dear, the city's own ground cheap, ponds
@@ -98,10 +113,10 @@ export function routeField(map: CityMap, seed: number, meander: number, scale: n
   if (!keep) return field.fill(Infinity);
   const gate = new Uint8Array(CELL_COUNT);
   for (const b of map.buildings) if (b.kind === "gate") for (const c of b.cells) gate[c] = 1;
-  const price = new Float32Array(CELL_COUNT);
+  const price = new Float32Array(CELL_COUNT), wild = wildPrices(seed, meander, scale);
   for (let i = 0; i < CELL_COUNT; i++) {
     const t = map.type[i];
-    price[i] = gate[i] ? 1 : t === CellType.OUT ? 1 + meander * noise(i % CELLS_W, Math.floor(i / CELLS_W), scale, seed) : t === CellType.WALL ? 8 : 1.5;
+    price[i] = gate[i] ? 1 : t === CellType.OUT ? wild[i] : t === CellType.WALL ? 8 : 1.5;
   }
   fillFlowField(field, keep.cells, {
     solid: new Uint8Array(CELL_COUNT),
