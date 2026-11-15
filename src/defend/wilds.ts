@@ -842,6 +842,26 @@ function* caveOpening(px: Uint32Array, floor: Uint8Array): Steps<{ lit: HTMLCanv
 const OFF_BOARD = "off";
 const offBoard = (X: number, Y: number) => X < 0 || Y < 0 || X >= BW || Y >= BH;
 
+/** Whether grounds are being painted a slice at a time behind the boot
+ * screen, and the wilds still waiting on theirs. */
+let deferring = false;
+const waiting = new Map<Wilds, { forest: boolean; area: AreaId; roads: TrailPlan | null }>();
+/** Turns slice-at-a-time painting on (while the boot screen covers the
+ * game) or off. */
+export function deferWilds(on: boolean) {
+  deferring = on;
+  if (!on) waiting.clear();
+}
+/** Paints the waiting grounds for about `ms`; whether any are left. */
+export function settleWilds(ms: number) {
+  const end = performance.now() + ms;
+  for (const [w, a] of waiting) {
+    while (w.prepare(a.forest, a.area, a.roads, Math.max(0, end - performance.now()))) if (performance.now() >= end) return true;
+    waiting.delete(w);
+  }
+  return false;
+}
+
 /** Draws the wilds, kept by the renderer. */
 export class Wilds {
   private grounds = new Map<string, Ground>();
@@ -1042,6 +1062,12 @@ export class Wilds {
       c.drawImage(src, sx, sy, b.x1 - b.x0, b.y1 - b.y0, x, y, Math.round(toX(b.x1)) - x, Math.round(toY(b.y1)) - y);
     };
     const blit = (src: CanvasImageSource, b: Box, sx = b.x0, sy = b.y0) => blitTo(ctx, src, b, sx, sy);
+    // Behind the boot screen the ground is painted a slice at a time
+    // (`settleWilds`), and nothing past the board is drawn until it's done.
+    if (deferring) {
+      const roads = f.forest?.plan.roads ?? f.caves?.trails ?? null;
+      if (this.prepare(forest, f.area, roads, 0)) { waiting.set(this, { forest, area: f.area, roads }); ctx.restore(); return; }
+    }
     const sand = f.sand ? this.sand(f.sand.trails) : null;
     const g = this.ground(forest, f.area, f.forest?.plan.roads ?? f.caves?.trails ?? null);
     if (f.beyond) {

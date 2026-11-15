@@ -1,4 +1,5 @@
 import { syncEquipment } from "./equipment.ts";
+import { deferWilds, settleWilds } from "./defend/wilds.ts";
 import { realmActive, realmPower } from "./realm.ts";
 import { DayClock, useDayClock, sunSpeed } from "./daylight.ts";
 import { ProfileEditor } from "./profile/editor.ts";
@@ -530,7 +531,17 @@ window.addEventListener("pageshow", () => dayClock.reset());
 settleTraining(save, clock(), new Set(realmActive(save,"mine") ? smithNames() : []));
 settleForge(save, clock(), new Set(realmActive(save,"mine") ? smithNames() : []));
 if (settleResearch(save, clock(), realmActive(save,"library") ? libraryPage.sim.count("researcher") : 0)) libraryPage.sim.researched();
+// The scenery past the board is painted a slice at a time while the boot
+// screen still covers the game (`warmUp`), so its wall keeps building.
+deferWilds(true);
 navigate("defend");
+/** Paints what the first page deferred, a slice at a time, then draws it
+ * whole: boot awaits it while its screen still covers the game. */
+export async function warmUp() {
+  while (settleWilds(10)) await new Promise((resolve) => setTimeout(resolve, 0));
+  deferWilds(false);
+  renderPage();
+}
 /** Called after boot uncovers the initialized game; native dialogs must open
  * here so they cannot appear above the loading screen's stone wall. */
 export function startGame() {
