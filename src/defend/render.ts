@@ -639,6 +639,7 @@ export class DefendRenderer {
    * doesn't stall as it crosses over. */
   private ahead: { map: CityMap; area: AreaId; run: (ms: number) => void } | null = null;
   private prepareNext(map: CityMap, sim: DefendSim, opts: DrawOptions) {
+    const covered = (a: AreaId) => hasForest(a) || hasMagicForest(a) || hasCrystalCaves(a);
     if (sim.unitTester) return;
     // Through the last two waves before it.
     const soon = areaForWave(sim.wave + 1).id, area = soon !== this.area ? soon : areaForWave(sim.wave + 2).id;
@@ -655,12 +656,15 @@ export class DefendRenderer {
       let more = true;
       if (phase === 0) { roads = style === "road" || style === "cave" ? trailPlan(map, style) : null; more = false; }
       else if (phase === 1) more = this.wilds.prepare(hasForest(area), area, roads, ms);
+      // The flagstones' relief masks, unless grass or cavern floor hides
+      // them on both sides of the crossing (they show through its fade).
+      else if (phase === 2) more = !(covered(area) && covered(this.area)) && this.relief.prepare(map, this.px, this.board.W, this.board.H, area, ms);
       else if (area !== "desert" || !map.trails) { phase = -1; return; }
       // The desert's dunes and sand trails, as its build phase warms them.
-      else if (phase === 2) more = warmDunes(hd, sun, step);
-      else if (phase === 3) { if (step === 0) roads = trailPlan(map, "sand"); else trailField(roads!); more = step === 0; }
-      else if (phase === 4) more = warmBoardSand(map, roads!, step);
-      else if (phase === 5) more = this.wilds.warmSand(roads, step);
+      else if (phase === 3) more = warmDunes(hd, sun, step);
+      else if (phase === 4) { if (step === 0) roads = trailPlan(map, "sand"); else trailField(roads!); more = step === 0; }
+      else if (phase === 5) more = warmBoardSand(map, roads!, step);
+      else if (phase === 6) more = this.wilds.warmSand(roads, step);
       else { phase = -1; return; }
       if (more) step++;
       else { phase++; step = 0; }
@@ -1063,7 +1067,12 @@ export class DefendRenderer {
    * fires and lanterns (baked until a building falls or rises), then the
    * moving lights: wizard fire and ice, blasts and hand torches. */
   private drawGroundRelief(map: CityMap, sim: DefendSim, opts: DrawOptions, flames: ReliefLight[]) {
-    if (!(opts.effects ?? true) || !this.relief.sync(map, this.px, this.board.W, this.board.H, this.area)) return;
+    if (!(opts.effects ?? true)) return;
+    // The forest's grass and the desert's dunes hide the flagstones (their
+    // light, drawn over the dunes, read as squares at night): there the
+    // masks aren't baked at all.
+    const bare = sim.atmosphere?.mode === "sand" ? 0 : 1 - Math.min(1, this.forestShare() + this.magicShare() + this.cavesShare());
+    if (bare <= 0 || !this.relief.sync(map, this.px, this.board.W, this.board.H, this.area)) return;
     const intact = standing(map, sim);
     const fixed = () =>
       this.lighting.lights
@@ -1077,10 +1086,7 @@ export class DefendRenderer {
       if (b > 0) moving.push({ x: u.x, y: u.y, r: 2.2, k: 0.45 * b, color: "#ffc68a" });
     }
     const out = this.lighting.lights.filter((l) => this.lighting.burn(l) <= 0).length;
-    // The forest's grass and the desert's dunes hide the flagstones (their
-    // light, drawn over the dunes, read as squares at night).
-    const bare = sim.atmosphere?.mode === "sand" ? 0 : 1 - Math.min(1, this.forestShare() + this.magicShare() + this.cavesShare());
-    if (bare > 0) this.relief.draw(this.ctx, this.px, { version: `${sim.mapVersion}:${out}`, lights: fixed }, moving, (0.6 + opts.night * 0.4) * bare);
+    this.relief.draw(this.ctx, this.px, { version: `${sim.mapVersion}:${out}`, lights: fixed }, moving, (0.6 + opts.night * 0.4) * bare);
   }
 
   private drawRain(dt: number) {
