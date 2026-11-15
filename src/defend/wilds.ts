@@ -238,7 +238,7 @@ let field: RangeField | null = null;
 /** The ranges' height field over the whole wilds (art pixels, wilds
  * coordinates), once: `f` is `rangeAt` (above 0 inside a range), `H` the
  * height, `mossy` the slow noise the moss and the mountain woods follow. */
-function rangeField(): RangeField {
+function* rangeFieldSteps(): Steps<RangeField> {
   if (field) return field;
   const H = new Float32Array(GW * GH), f = new Float32Array(GW * GH), mossy = new Float32Array(GW * GH);
   const ridge = (x: number, y: number, salt: number) => 1 - Math.abs(2 * smoothNoise(x, y, salt) - 1);
@@ -246,7 +246,7 @@ function rangeField(): RangeField {
   // finest octave's facets between samples make the rock jagged).
   const Q = 4, qw = Math.ceil(GW / Q) + 1, qh = Math.ceil(GH / Q) + 1;
   const qf = new Float32Array(qw * qh), qr = new Float32Array(qw * qh), qm = new Float32Array(qw * qh);
-  for (let gy = 0; gy < qh; gy++)
+  for (let gy = 0; gy < qh; gy++, gy % (SLICE / Q) || (yield))
     for (let gx = 0; gx < qw; gx++) {
       const X = gx * Q, Y = gy * Q, j = gy * qw + gx;
       qf[j] = rangeAt((X - OX + 0.5) / ART, (Y - OY + 0.5) / ART);
@@ -256,7 +256,7 @@ function rangeField(): RangeField {
       qr[j] = r * Math.sqrt(r);
       qm[j] = smoothNoise(X / 18, Y / 18, 727);
     }
-  for (let Y = 0; Y < GH; Y++) {
+  for (let Y = 0; Y < GH; Y++, Y % SLICE || (yield)) {
     const gy = Math.floor(Y / Q), v0 = (Y % Q) / Q;
     for (let X = 0; X < GW; X++) {
       const gx = Math.floor(X / Q), u = (X % Q) / Q, j = gy * qw + gx, i = Y * GW + X;
@@ -297,13 +297,16 @@ const duneShades = new WeakMap<Float32Array, Uint8Array>();
  * rises and falls with the swells (`DUNE_LIFT`): a shadow's edge pulls back
  * up the face of a swell turned to the sun and reaches on past its crest. */
 export function mountainShade(dunes: Float32Array | null = null): Uint8Array {
+  return (dunes ? duneShades.get(dunes) : shade) ?? drain(mountainShadeSteps(dunes));
+}
+function* mountainShadeSteps(dunes: Float32Array | null): Steps<Uint8Array> {
   const done = dunes ? duneShades.get(dunes) : shade;
   if (done) return done;
   // The desert's mesas cast theirs from their stepped strata, each cliff a
   // wall of shade over the bench below.
-  const { H } = rangeField(), L = dunes ? mesaField().L : null, Sm = dunes ? mesaField().S : null, S = new Float32Array(GW * GH), out = new Uint8Array(GW * GH);
+  const { H } = yield* rangeFieldSteps(), mesa = dunes ? yield* mesaSteps() : null, L = mesa ? mesa.L : null, Sm = mesa ? mesa.S : null, S = new Float32Array(GW * GH), out = new Uint8Array(GW * GH);
   const n = Math.round(Math.sqrt(dunes?.length ?? 0));
-  for (let Y = 0; Y < GH; Y++) {
+  for (let Y = 0; Y < GH; Y++, Y % SLICE || (yield)) {
     const row = dunes ? (((Y - OY) % n + n) % n) * n : 0;
     for (let X = 0; X < GW; X++) {
       const i = Y * GW + X, up = X > 0 && Y > 0 ? S[i - GW - 1] - DROP : 0;
@@ -318,10 +321,10 @@ export function mountainShade(dunes: Float32Array | null = null): Uint8Array {
   return out;
 }
 
-/** The mountain ranges, from `rangeField`: lit from the upper left in the
+/** The mountain ranges, from `rangeFieldSteps`: lit from the upper left in the
  * forest's crag greys, moss on the gentler slopes, outlined. */
 function* paintRanges(out: Uint32Array): Steps {
-  const { H, f, mossy } = rangeField();
+  const { H, f, mossy } = yield* rangeFieldSteps();
   const ramp = [0x24262a, 0x34373a, 0x4a4d4c, 0x63665f, 0x81847a, 0xa2a497].map((c) => rgbaOf(c));
   const moss = [0x4f6a32, 0x6f8f44].map((c) => rgbaOf(c)), edge = sceneryOutlinesOn() ? rgbaOf(0x141518) : ramp[1];
   const inR = (X: number, Y: number) => X >= 0 && Y >= 0 && X < GW && Y < GH && f[Y * GW + X] > 0;
@@ -370,7 +373,7 @@ function* blurred(a: Float32Array, w: number, h: number, r: number): Steps<Float
   return src;
 }
 
-/** The desert's ranges as Moab sandstone, from `rangeField`: the height
+/** The desert's ranges as Moab sandstone, from `rangeFieldSteps`: the height
  * smoothed and stepped into strata, each a flat bench of slickrock lit from
  * the upper left (dark red at the foot to cream caprock on top, jointed into
  * fins on the heights), every step down to the south showing a red cliff
@@ -378,10 +381,9 @@ function* blurred(a: Float32Array, w: number, h: number, r: number): Steps<Float
 let mesas: { S: Float32Array; L: Int16Array } | null = null;
 /** The desert's ranges smoothed (`S`) and stepped into strata (`L`, -1
  * off the ranges), once. */
-const mesaField = () => mesas ?? drain(mesaSteps());
 function* mesaSteps(): Steps<{ S: Float32Array; L: Int16Array }> {
   if (mesas) return mesas;
-  const { H, f } = rangeField(), S = yield* blurred(H, GW, GH, 14);
+  const { H, f } = yield* rangeFieldSteps(), S = yield* blurred(H, GW, GH, 14);
   const L = new Int16Array(GW * GH).fill(-1);
   for (let Y = 0; Y < GH; Y++, Y % SLICE || (yield))
     for (let X = 0; X < GW; X++) {
@@ -470,7 +472,7 @@ const SHROOM_STEM = 0x8a9894;
  * pixels of side a unit of height shows to the south, and the most. */
 const COLUMN = 11, SIDE_PER = 0.8, SIDE_MAX = 18;
 
-/** The Crystal Caves' ranges as basalt, from `rangeField`: a field of
+/** The Crystal Caves' ranges as basalt, from `rangeFieldSteps`: a field of
  * columns, each a jittered hexagon (nearest of a staggered grid of
  * centres, so they read as hexagons yet stay rough), standing to its own
  * height (the ranges' height there plus a little of its own), its top lit
@@ -480,7 +482,7 @@ const COLUMN = 11, SIDE_PER = 0.8, SIDE_MAX = 18;
  * tops in patches and dripping down the sides; small glowing mushrooms in
  * the moss. */
 function* paintBasalt(out: Uint32Array): Steps {
-  const { H, f } = rangeField(), dy = COLUMN * 0.866;
+  const { H, f } = yield* rangeFieldSteps(), dy = COLUMN * 0.866;
   const rows = Math.ceil(GH / dy) + 3, cols = Math.ceil(GW / COLUMN) + 3;
   const cxs = new Float32Array(rows * cols), cys = new Float32Array(rows * cols), ch = new Float32Array(rows * cols);
   for (let r = 0; r < rows; r++)
@@ -635,7 +637,7 @@ export function* paintWildsSteps(forest: boolean, stone?: Stone, reach: readonly
   // In the forest, woods and bushes up the mountains' gentler slopes, in
   // patches where the moss is (still: they are far off).
   if (forest) {
-    const { H, f, mossy } = rangeField();
+    const { H, f, mossy } = yield* rangeFieldSteps();
     for (let cy = -MARGIN; cy < CELLS_H + MARGIN; cy++)
       for (let cx = -MARGIN; cx < CELLS_W + MARGIN; cx++) {
         const X = (cx + MARGIN) * ART + 4, Y = (cy + MARGIN) * ART + 4, i = Y * GW + X;
@@ -845,7 +847,7 @@ const offBoard = (X: number, Y: number) => X < 0 || Y < 0 || X >= BW || Y >= BH;
 /** Whether grounds are being painted a slice at a time behind the boot
  * screen, and the wilds still waiting on theirs. */
 let deferring = false;
-const waiting = new Map<Wilds, { forest: boolean; area: AreaId; roads: TrailPlan | null }>();
+const waiting = new Map<object, (end: number) => boolean>();
 /** Turns slice-at-a-time painting on (while the boot screen covers the
  * game) or off. */
 export function deferWilds(on: boolean) {
@@ -855,9 +857,9 @@ export function deferWilds(on: boolean) {
 /** Paints the waiting grounds for about `ms`; whether any are left. */
 export function settleWilds(ms: number) {
   const end = performance.now() + ms;
-  for (const [w, a] of waiting) {
-    while (w.prepare(a.forest, a.area, a.roads, Math.max(0, end - performance.now()))) if (performance.now() >= end) return true;
-    waiting.delete(w);
+  for (const [key, step] of waiting) {
+    if (step(end)) return true;
+    waiting.delete(key);
   }
   return false;
 }
@@ -968,11 +970,16 @@ export class Wilds {
 
   /** The mountains' shadow mask as a canvas, for the ground `dunes` lift (`mountainShade`). */
   private makeShade(dunes: Float32Array | null) {
+    return this.shades.get(dunes) ?? drain(this.shading.get(dunes) ?? this.shadeSteps(dunes));
+  }
+  /** `makeShade`'s, half made behind the boot screen. */
+  private shading = new Map<Float32Array | null, Steps<Shade>>();
+  private *shadeSteps(dunes: Float32Array | null): Steps<Shade> {
     const made = this.shades.get(dunes);
     if (made) return made;
-    const m = mountainShade(dunes);
+    const m = yield* mountainShadeSteps(dunes);
     let x0 = GW, y0 = GH, x1 = 0, y1 = 0;
-    for (let Y = 0; Y < GH; Y++)
+    for (let Y = 0; Y < GH; Y++, Y % SLICE || (yield))
       for (let X = 0; X < GW; X++)
         if (m[Y * GW + X]) { if (X < x0) x0 = X; if (X >= x1) x1 = X + 1; if (Y < y0) y0 = Y; if (Y >= y1) y1 = Y + 1; }
     if (x1 <= x0) { x0 = y0 = 0; x1 = y1 = 1; }
@@ -992,6 +999,7 @@ export class Wilds {
     }
     const shade: Shade = { canvas, box: { x0, y0, x1, y1 }, blocks: Int32Array.from(blocks) };
     this.shades.set(dunes, shade);
+    this.shading.delete(dunes);
     return shade;
   }
 
@@ -1003,6 +1011,18 @@ export class Wilds {
     const alpha = 1 - Math.min(1, f.night * 1.4);
     if (alpha <= 0.01) return;
     const dunes = f.sand ? duneHeights() : null;
+    // Behind the boot screen it's made a slice at a time (`settleWilds`).
+    if (deferring && !this.shades.has(dunes)) {
+      if (!this.shading.has(dunes)) {
+        const g = this.shadeSteps(dunes);
+        this.shading.set(dunes, g);
+        waiting.set(g, (end) => {
+          while (!g.next().done) if (performance.now() >= end) return true;
+          return false;
+        });
+      }
+      return;
+    }
     const shade = this.makeShade(dunes);
     const k = (f.px * f.cam.s) / ART, cw = ctx.canvas.width, ch = ctx.canvas.height, b = shade.box;
     const v: Box = {
@@ -1066,7 +1086,14 @@ export class Wilds {
     // (`settleWilds`), and nothing past the board is drawn until it's done.
     if (deferring) {
       const roads = f.forest?.plan.roads ?? f.caves?.trails ?? null;
-      if (this.prepare(forest, f.area, roads, 0)) { waiting.set(this, { forest, area: f.area, roads }); ctx.restore(); return; }
+      if (this.prepare(forest, f.area, roads, 0)) {
+        waiting.set(this, (end) => {
+          while (this.prepare(forest, f.area, roads, Math.max(0, end - performance.now()))) if (performance.now() >= end) return true;
+          return false;
+        });
+        ctx.restore();
+        return;
+      }
     }
     const sand = f.sand ? this.sand(f.sand.trails) : null;
     const g = this.ground(forest, f.area, f.forest?.plan.roads ?? f.caves?.trails ?? null);

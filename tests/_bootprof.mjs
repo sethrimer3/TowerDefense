@@ -1,0 +1,11 @@
+import { chromium } from '@playwright/test';
+import fs from 'fs';
+const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+await page.goto(process.env.TEST_URL ?? 'http://127.0.0.1:5173/'); await page.waitForTimeout(6000);
+const cdp = await page.context().newCDPSession(page);
+await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 200 }); await cdp.send('Profiler.start');
+await page.reload(); await page.waitForTimeout(6000);
+const { profile } = await cdp.send('Profiler.stop');
+fs.writeFileSync(process.argv[2], JSON.stringify(profile));
+await browser.close();
