@@ -35,7 +35,7 @@ import { floorArtLoaded, paintFloorTile } from "./city-layer.ts";
 import { pixelKey } from "./pixel-sprites.ts";
 import { cellPieces } from "./paint-box.ts";
 import { sceneryOutlinesOn, windAt } from "./scenery-looks.ts";
-import { caveTrailPixel, paintRoadLines, sandReachCanvases } from "./trail-art.ts";
+import { caveTrailPixel, paintRoadLinesSteps, sandReachCanvases } from "./trail-art.ts";
 import { fillCaveGravel, openingLight, sunlitPixel } from "./crystal-caves-art.ts";
 import { duneHeights, duneLightKey, duneTaperPixels, duneTile, warmDuneTaper } from "./atmosphere-art.ts";
 import { segmentDistance, type TrailLine, type TrailPlan } from "./trails.ts";
@@ -47,6 +47,17 @@ export const MARGIN = 72;
 /** The wilds' extent in art pixels, and where the board's corner sits in it. */
 const GW = (CELLS_W + 2 * MARGIN) * ART, GH = (CELLS_H + 2 * MARGIN) * ART, OX = MARGIN * ART, OY = MARGIN * ART;
 const BW = CELLS_W * ART, BH = CELLS_H * ART;
+/** Work done a slice at a time (`Wilds.prepare`), each yield a few rows. */
+type Steps<T = void> = Generator<void, T, void>;
+const SLICE = 16;
+/** Runs `steps` to the end. */
+function drain<T>(steps: Steps<T>): T {
+  for (;;) {
+    const r = steps.next();
+    if (r.done) return r.value;
+  }
+}
+type Painted = { px: Uint32Array; turf: Uint8Array; shaded: Uint8Array; plan: WildsPlan; floor: Uint8Array | null };
 
 /** Cells from the field's edge to cell (cx, cy)'s middle (0 on the board). */
 export function beyond(cx: number, cy: number) {
@@ -309,12 +320,12 @@ export function mountainShade(dunes: Float32Array | null = null): Uint8Array {
 
 /** The mountain ranges, from `rangeField`: lit from the upper left in the
  * forest's crag greys, moss on the gentler slopes, outlined. */
-function paintRanges(out: Uint32Array) {
+function* paintRanges(out: Uint32Array): Steps {
   const { H, f, mossy } = rangeField();
   const ramp = [0x24262a, 0x34373a, 0x4a4d4c, 0x63665f, 0x81847a, 0xa2a497].map((c) => rgbaOf(c));
   const moss = [0x4f6a32, 0x6f8f44].map((c) => rgbaOf(c)), edge = sceneryOutlinesOn() ? rgbaOf(0x141518) : ramp[1];
   const inR = (X: number, Y: number) => X >= 0 && Y >= 0 && X < GW && Y < GH && f[Y * GW + X] > 0;
-  for (let Y = 0; Y < GH; Y++)
+  for (let Y = 0; Y < GH; Y++, Y % SLICE || (yield))
     for (let X = 0; X < GW; X++) {
       const i = Y * GW + X;
       if (f[i] <= 0) continue;
@@ -341,11 +352,11 @@ const MOAB_SAND = 0xe0a868;
 
 /** Box-blurs `a` (`w` by `h`) `r` pixels each way, twice: the ranges'
  * crinkles smoothed into the rounded domes and fins of slickrock. */
-function blurred(a: Float32Array, w: number, h: number, r: number) {
+function* blurred(a: Float32Array, w: number, h: number, r: number): Steps<Float32Array> {
   let src: Float32Array = a, dst: Float32Array = new Float32Array(a.length);
   for (let pass = 0; pass < 4; pass++) {
     const horiz = pass % 2 === 0, n = horiz ? w : h, m = horiz ? h : w, step = horiz ? 1 : w, line = horiz ? w : 1;
-    for (let j = 0; j < m; j++) {
+    for (let j = 0; j < m; j++, j % (SLICE * 8) || (yield)) {
       const base = j * line;
       let sum = 0;
       for (let k = -r; k <= r; k++) sum += src[base + Math.max(0, Math.min(n - 1, k)) * step];
@@ -367,11 +378,12 @@ function blurred(a: Float32Array, w: number, h: number, r: number) {
 let mesas: { S: Float32Array; L: Int16Array } | null = null;
 /** The desert's ranges smoothed (`S`) and stepped into strata (`L`, -1
  * off the ranges), once. */
-function mesaField() {
+const mesaField = () => mesas ?? drain(mesaSteps());
+function* mesaSteps(): Steps<{ S: Float32Array; L: Int16Array }> {
   if (mesas) return mesas;
-  const { H, f } = rangeField(), S = blurred(H, GW, GH, 14);
+  const { H, f } = rangeField(), S = yield* blurred(H, GW, GH, 14);
   const L = new Int16Array(GW * GH).fill(-1);
-  for (let Y = 0; Y < GH; Y++)
+  for (let Y = 0; Y < GH; Y++, Y % SLICE || (yield))
     for (let X = 0; X < GW; X++) {
       const i = Y * GW + X;
       if (f[i] <= 0) continue;
@@ -381,8 +393,8 @@ function mesaField() {
   return (mesas = { S, L });
 }
 
-function paintMesas(out: Uint32Array) {
-  const { S, L } = mesaField();
+function* paintMesas(out: Uint32Array): Steps {
+  const { S, L } = yield* mesaSteps();
   const tone = (c: number, k: number) => rgbaOf((Math.min(255, Math.round(((c >> 16) & 0xff) * k)) << 16) | (Math.min(255, Math.round(((c >> 8) & 0xff) * k)) << 8) | Math.min(255, Math.round((c & 0xff) * k)));
   const layer = (n: number) => MOAB_STRATA[Math.min(MOAB_STRATA.length - 1, n)];
   const rim = sceneryOutlinesOn() ? rgbaOf(0x24100c) : rgbaOf(MOAB_RIM);
@@ -393,7 +405,7 @@ function paintMesas(out: Uint32Array) {
   let top = 0;
   for (let i = 0; i < L.length; i++) if (L[i] > top) top = L[i];
   const faceD = new Uint8Array(GW * GH), faceUp = new Int16Array(GW * GH), seen = new Int32Array(top + 1);
-  for (let X = 0; X < GW; X++) {
+  for (let X = 0; X < GW; X++, X % (SLICE * 4) || (yield)) {
     seen.fill(-1e9);
     for (let Y = 0, i = X; Y < GH; Y++, i += GW) {
       const l = L[i];
@@ -404,7 +416,7 @@ function paintMesas(out: Uint32Array) {
       seen[l] = Y;
     }
   }
-  for (let Y = 0; Y < GH; Y++)
+  for (let Y = 0; Y < GH; Y++, Y % SLICE || (yield))
     for (let X = 0; X < GW; X++) {
       const i = Y * GW + X, l = L[i];
       if (l < 0) continue;
@@ -467,7 +479,7 @@ const COLUMN = 11, SIDE_PER = 0.8, SIDE_MAX = 18;
  * faceted and darkening to its foot; purple and blue moss creeping over the
  * tops in patches and dripping down the sides; small glowing mushrooms in
  * the moss. */
-function paintBasalt(out: Uint32Array) {
+function* paintBasalt(out: Uint32Array): Steps {
   const { H, f } = rangeField(), dy = COLUMN * 0.866;
   const rows = Math.ceil(GH / dy) + 3, cols = Math.ceil(GW / COLUMN) + 3;
   const cxs = new Float32Array(rows * cols), cys = new Float32Array(rows * cols), ch = new Float32Array(rows * cols);
@@ -481,7 +493,7 @@ function paintBasalt(out: Uint32Array) {
     }
   // Each pixel's column.
   const id = new Int32Array(GW * GH);
-  for (let Y = 0; Y < GH; Y++) {
+  for (let Y = 0; Y < GH; Y++, Y % SLICE || (yield)) {
     const r0 = Math.round(Y / dy) + 1;
     for (let X = 0; X < GW; X++) {
       let best = -1, bd = Infinity;
@@ -502,7 +514,7 @@ function paintBasalt(out: Uint32Array) {
     const m = smoothNoise(X / 44, Y / 44, 764) * 0.85 + hash01(j, 765) * 0.25 - ch[j] * 0.002 + (BAYER4[(Y & 3) * 4 + (X & 3)] - 0.5) * 0.08;
     return m > 0.6 ? (smoothNoise(X / 55, Y / 55, 766) > 0.5 ? 0 : 1) : -1;
   };
-  for (let Y = 0; Y < GH; Y++)
+  for (let Y = 0; Y < GH; Y++, Y % SLICE || (yield))
     for (let X = 0; X < GW; X++) {
       const i = Y * GW + X;
       if (X >= OX && Y >= OY && X < OX + BW && Y < OY + BH) continue;
@@ -573,7 +585,9 @@ const rgbaOf = (c: number) => ((255 << 24) | ((c & 0xff) << 16) | (c & 0xff00) |
  * the mountain ranges, rocks with their shadows, and in the forest the trees'
  * shadows. `turf` marks the lawn pixels left (where blades grow), `shaded`
  * those under a tree's shadow. */
-export function paintWilds(forest: boolean, stone?: Stone, reach: readonly TrailLine[] = [], rocks = true, look: "ranges" | "moab" | "basalt" = "ranges") {
+export const paintWilds = (...args: Parameters<typeof paintWildsSteps>) => drain(paintWildsSteps(...args));
+/** `paintWilds` a slice at a time: each `next()` paints some rows. */
+export function* paintWildsSteps(forest: boolean, stone?: Stone, reach: readonly TrailLine[] = [], rocks = true, look: "ranges" | "moab" | "basalt" = "ranges"): Steps<Painted> {
   const moab = look === "moab", basalt = look === "basalt";
   const out = new Uint32Array(GW * GH), whole = wildsPlan();
   // The trees and rocks clear of the roads carried out here.
@@ -581,7 +595,7 @@ export function paintWilds(forest: boolean, stone?: Stone, reach: readonly Trail
     ? { trees: whole.trees.filter((t) => !nearLines(reach, t.x, t.y, t.r * 0.85)), rocks: whole.rocks.filter((r) => !nearLines(reach, r.x, r.y, r.size + 0.3)) }
     : whole;
   if (forest)
-    for (let cy = -MARGIN; cy < CELLS_H + MARGIN; cy++)
+    for (let cy = -MARGIN; cy < CELLS_H + MARGIN; cy++, cy % 2 || (yield))
       for (let cx = -MARGIN; cx < CELLS_W + MARGIN; cx++) {
         if (onBoard(cx, cy)) continue;
         lawnCell(cx, cy, (X, Y, c) => {
@@ -592,22 +606,23 @@ export function paintWilds(forest: boolean, stone?: Stone, reach: readonly Trail
   const lawn = forest ? out.slice() : null;
   // The roads, on the lawn past the board (none of the field's own ground).
   if (forest && reach.length)
-    paintRoadLines(out, GW, GH, OX, OY, reach, (i) => {
+    yield* paintRoadLinesSteps(out, GW, GH, OX, OY, reach, (i) => {
       const X = i % GW, Y = (i - X) / GW;
       return !(X >= OX && Y >= OY && X < OX + BW && Y < OY + BH);
     });
   // The caves' gravel floor carried on past the board, its trails too (lit
   // under the great opening by `Wilds.caveLight`).
   if (basalt) {
-    fillCaveGravel(out, GW, GH, OX, OY, { x0: OX, y0: OY, x1: OX + BW, y1: OY + BH });
+    yield* fillCaveGravel(out, GW, GH, OX, OY, { x0: OX, y0: OY, x1: OX + BW, y1: OY + BH }, SLICE);
     if (reach.length)
-      paintRoadLines(out, GW, GH, OX, OY, reach, (i) => {
+      yield* paintRoadLinesSteps(out, GW, GH, OX, OY, reach, (i) => {
         const X = i % GW, Y = (i - X) / GW;
         return !(X >= OX && Y >= OY && X < OX + BW && Y < OY + BH);
       }, caveTrailPixel);
   }
   const bare = basalt ? out.slice() : null;
-  if (moab) paintMesas(out); else if (basalt) paintBasalt(out); else paintRanges(out);
+  yield;
+  if (moab) yield* paintMesas(out); else if (basalt) yield* paintBasalt(out); else yield* paintRanges(out);
   // Rocks, back to front, each with its shadow down and right.
   const items: { y: number; draw: () => void }[] = [];
   // (None in the desert: its dunes run on over the wilds, as rockless as the field's.)
@@ -639,13 +654,16 @@ export function paintWilds(forest: boolean, stone?: Stone, reach: readonly Trail
       }
   }
   items.sort((a, b) => a.y - b.y);
-  for (const it of items) it.draw();
+  for (let k = 0; k < items.length; k++, k % 64 || (yield)) items[k].draw();
   if (stone && look === "ranges") recolour(out, GW, stone);
+  yield;
   const turf = new Uint8Array(GW * GH), shaded = new Uint8Array(GW * GH);
   if (lawn) {
     for (let i = 0; i < out.length; i++) turf[i] = out[i] !== 0 && out[i] === lawn[i] ? 1 : 0;
+    yield;
     // The trees' shadows, as the forest casts them.
-    for (const t of plan.trees) {
+    for (let k = 0; k < plan.trees.length; k++, k % 64 || (yield)) {
+      const t = plan.trees[k];
       const s = outlinedSprite(treeSprite(t.kind, t.variant, 0, t.size)), R = t.r * ART;
       const x0 = Math.round(t.x * ART) - s.ox + Math.round(R * 0.35) + 1 + OX, y0 = Math.round(t.y * ART) - s.oy + Math.round(R * 0.5) + 1 + OY;
       for (let y = 0; y < s.h; y++)
@@ -659,7 +677,15 @@ export function paintWilds(forest: boolean, stone?: Stone, reach: readonly Trail
     }
   }
   // The floor left bare between the basalt (for the opening's light).
-  const floor = bare ? Uint8Array.from(out, (v, i) => (v !== 0 && v === bare[i] ? 1 : 0)) : null;
+  let floor: Uint8Array | null = null;
+  if (bare) {
+    floor = new Uint8Array(GW * GH);
+    for (let i = 0; i < floor.length; i++) {
+      const v = out[i];
+      if (v !== 0 && v === bare[i]) floor[i] = 1;
+      if (i % (GW * SLICE * 4) === 0) yield;
+    }
+  }
   return { px: out, turf, shaded, plan, floor };
 }
 
@@ -787,9 +813,9 @@ type Ground = { canvas: HTMLCanvasElement; turf: Uint8Array; shaded: Uint8Array;
  * (`floor`) as the full daylight lights it, faded by how much of the sky's
  * light reaches each pixel (`lit`), and that light alone in white (`moon`,
  * for the night). */
-function caveOpening(px: Uint32Array, floor: Uint8Array) {
+function* caveOpening(px: Uint32Array, floor: Uint8Array): Steps<{ lit: HTMLCanvasElement; moon: HTMLCanvasElement }> {
   const lit = new Uint32Array(GW * GH), moon = new Uint32Array(GW * GH);
-  for (let Y = 0; Y < GH; Y++)
+  for (let Y = 0; Y < GH; Y++, Y % SLICE || (yield))
     for (let X = 0; X < GW; X++) {
       const i = Y * GW + X;
       if (!floor[i]) continue;
@@ -807,7 +833,9 @@ function caveOpening(px: Uint32Array, floor: Uint8Array) {
     ctx.putImageData(img, 0, 0);
     return canvas;
   };
-  return { lit: canvasOf(lit), moon: canvasOf(moon) };
+  const litCanvas = canvasOf(lit);
+  yield;
+  return { lit: litCanvas, moon: canvasOf(moon) };
 }
 
 /** The key `duneTaperPixels` keeps the reaches' geometry by: their `open` is always off the board. */
@@ -828,26 +856,65 @@ export class Wilds {
 
   private groundsArt = "";
 
+  /** A ground being painted ahead (`prepare`), by its key in `grounds`. */
+  private pending: { key: string; art: string; steps: Steps<Ground> } | null = null;
+
+  private groundKey(forest: boolean, area: AreaId, roads: TrailPlan | null) {
+    const caves = area === "drowned", trailed = forest || caves;
+    const reach = trailed && roads ? this.reach(roads) : null;
+    return { key: trailed ? `${forest ? "forest" : "caves"}:${reach?.key ?? ""}` : area, reach };
+  }
+
   private ground(forest: boolean, area: AreaId, roads: TrailPlan | null = null) {
     // Repainted when the art changes (scenery outlines turned on or off).
     if (pixelKey() !== this.groundsArt) { this.groundsArt = pixelKey(); this.grounds.clear(); }
-    const caves = area === "drowned", trailed = forest || caves;
-    const reach = trailed && roads ? this.reach(roads) : null;
-    const key = trailed ? `${forest ? "forest" : "caves"}:${reach?.key ?? ""}` : area;
-    let g = this.grounds.get(key);
+    const { key, reach } = this.groundKey(forest, area, roads);
+    const g = this.grounds.get(key);
     if (g) return g;
+    // Finished now if it was being painted ahead.
+    const p = this.pending;
+    this.pending = null;
+    return this.keep(key, forest, area, drain(p && p.key === key && p.art === pixelKey() ? p.steps : this.groundSteps(forest, area, reach)));
+  }
+
+  /** Paints the ground `ground` would for (`forest`, `area`, `roads`) ahead
+   * of need, for about `ms` milliseconds a call. Whether any is left. */
+  prepare(forest: boolean, area: AreaId, roads: TrailPlan | null, ms: number) {
+    if (typeof document === "undefined") return false;
+    if (pixelKey() !== this.groundsArt) { this.groundsArt = pixelKey(); this.grounds.clear(); }
+    const { key, reach } = this.groundKey(forest, area, roads);
+    if (this.grounds.has(key)) return false;
+    if (!this.pending || this.pending.key !== key || this.pending.art !== pixelKey()) this.pending = { key, art: pixelKey(), steps: this.groundSteps(forest, area, reach) };
+    const p = this.pending, end = performance.now() + ms;
+    do {
+      const r = p.steps.next();
+      if (r.done) {
+        this.pending = null;
+        this.keep(key, forest, area, r.value);
+        return false;
+      }
+    } while (performance.now() < end);
+    return true;
+  }
+
+  private keep(key: string, forest: boolean, area: AreaId, g: Ground) {
     // Only the current city's roads are kept.
-    if (trailed) for (const k of [...this.grounds.keys()]) if (k.startsWith(forest ? "forest:" : "caves:")) this.grounds.delete(k);
-    const painted = paintWilds(forest, forest ? undefined : STONES[area], reach?.lines ?? [], area !== "desert" && !caves, area === "desert" ? "moab" : caves ? "basalt" : "ranges");
+    if (forest || area === "drowned") for (const k of [...this.grounds.keys()]) if (k.startsWith(forest ? "forest:" : "caves:")) this.grounds.delete(k);
+    this.grounds.set(key, g);
+    return g;
+  }
+
+  private *groundSteps(forest: boolean, area: AreaId, reach: { lines: TrailLine[] } | null): Steps<Ground> {
+    const caves = area === "drowned";
+    const painted = yield* paintWildsSteps(forest, forest ? undefined : STONES[area], reach?.lines ?? [], area !== "desert" && !caves, area === "desert" ? "moab" : caves ? "basalt" : "ranges");
     const canvas = document.createElement("canvas");
     canvas.width = GW;
     canvas.height = GH;
     const ctx = canvas.getContext("2d")!, img = ctx.createImageData(GW, GH);
     new Uint32Array(img.data.buffer).set(painted.px);
     ctx.putImageData(img, 0, 0);
-    g = { canvas, turf: painted.turf, shaded: painted.shaded, plan: painted.plan, blades: null, open: painted.floor ? caveOpening(painted.px, painted.floor) : null };
-    this.grounds.set(key, g);
-    return g;
+    yield;
+    return { canvas, turf: painted.turf, shaded: painted.shaded, plan: painted.plan, blades: null, open: painted.floor ? yield* caveOpening(painted.px, painted.floor) : null };
   }
 
   private reach(roads: TrailPlan) {

@@ -93,11 +93,11 @@ export function caveGravelPixel(x: number, y: number) {
   return rgba(c);
 }
 
-/** `caveGravelPixel` over a `w` by `h` buffer whose (`ox`, `oy`) is the
+/** `caveGravelPixel` over a `w` by `h` buffer (yielding every `slice` rows) whose (`ox`, `oy`) is the
  * board's corner, but for the box `skip` (the board itself): the same
  * pixels, with each wash's lattice hashes and each cell's pebbles worked out
  * once rather than at every pixel. */
-export function fillCaveGravel(out: Uint32Array, w: number, h: number, ox: number, oy: number, skip: { x0: number; y0: number; x1: number; y1: number }) {
+export function* fillCaveGravel(out: Uint32Array, w: number, h: number, ox: number, oy: number, skip: { x0: number; y0: number; x1: number; y1: number }, slice = Infinity): Generator<void, void, void> {
   const x0 = -ox, x1 = w - 1 - ox, y0 = -oy, y1 = h - 1 - oy;
   // The two washes: each column's lattice cell and eased offset, and the
   // lattice's hashes along the two rows a pixel row reads.
@@ -137,7 +137,7 @@ export function fillCaveGravel(out: Uint32Array, w: number, h: number, ox: numbe
         pxs[q] = cx * ART + (hash(cx, cy, k, 863) % ART); pys[q] = cy * ART + (hash(cx, cy, k, 864) % ART); bigs[q] = hash(cx, cy, k, 865) % 3 === 0 ? 1 : 0;
       }
   const OFFSETS = [0, 0, -1, 0, 0, -1, -1, -1];
-  for (let Y = 0; Y < h; Y++) {
+  for (let Y = 0; Y < h; Y++, Y % slice || (yield)) {
     const y = Y + y0;
     broad.row(y); fine.row(y);
     for (let X = 0; X < w; X++) {
