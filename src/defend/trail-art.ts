@@ -232,7 +232,16 @@ export function caveTrailPixel(v: number, X: number, Y: number): number {
 /** As `paintRoads`, for lines (cells, `half` wide) into any `ow × oh` buffer
  * whose board corner is at (ox, oy) art pixels; `keep` says which pixels
  * the road may cover. The pixels it covered. */
-export function paintRoadLines(out: Uint32Array, ow: number, oh: number, ox: number, oy: number, lines: readonly { points: readonly { x: number; y: number }[]; half: number }[], keep: (i: number) => boolean, pixel: (v: number, X: number, Y: number) => number = roadPixel): number[] {
+export function paintRoadLines(...args: Parameters<typeof paintRoadLinesSteps>): number[] {
+  const steps = paintRoadLinesSteps(...args);
+  for (;;) {
+    const r = steps.next();
+    if (r.done) return r.value;
+  }
+}
+/** `paintRoadLines` a piece at a time: each `next()` measures a piece of a
+ * line or paints some of the pixels. */
+export function* paintRoadLinesSteps(out: Uint32Array, ow: number, oh: number, ox: number, oy: number, lines: readonly { points: readonly { x: number; y: number }[]; half: number }[], keep: (i: number) => boolean, pixel: (v: number, X: number, Y: number) => number = roadPixel): Generator<void, number[], void> {
   const t = new Map<number, number>();
   for (const line of lines) {
     // Only pixels within the ragged edge's reach (`FRINGE` half widths) are painted.
@@ -245,10 +254,13 @@ export function paintRoadLines(out: Uint32Array, ow: number, oh: number, ox: num
           const i = Y * ow + X, v = segmentDistance(X + 0.5, Y + 0.5, a, b) / R;
           if (v < (t.get(i) ?? FRINGE)) t.set(i, v);
         }
+      yield;
     }
   }
   const covered: number[] = [];
+  let n = 0;
   for (const [i, v] of t) {
+    if (++n % 20000 === 0) yield;
     if (!keep(i)) continue;
     const c = pixel(v, (i % ow) - ox, Math.floor(i / ow) - oy);
     if (c) (out[i] = c), covered.push(i);

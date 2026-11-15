@@ -38,7 +38,7 @@ import type { DefendSim } from "./sim.ts";
 import { DefendLighting, MASK, type CellBox, type LightFrame } from "./lighting.ts";
 import { Fences } from "./fences.ts";
 import { Rain, Snow, ambientFor, type Weather } from "./weather.ts";
-import { areaFade, type AreaId } from "./areas.ts";
+import { areaFade, areaForWave, type AreaId } from "./areas.ts";
 import { gateArtRect } from "./wood-gate-art.ts";
 import { FACE_HANG, buildingState, damageKey, gateSpriteOf, shapeOf, hangingFaces, onCityArtLoaded, paintBuildingMask, paintCityLayer, paintFences, paintSpikePoints, paintStanding, stageOf } from "./city-layer.ts";
 import { GATE_FRAMES } from "./gate-art.ts";
@@ -87,7 +87,7 @@ import { MagicForestArt } from "./magic-forest-art.ts";
 import { hasMagicForest } from "./magic-forest.ts";
 import { PaintBox } from "./paint-box.ts";
 import { CrystalCavesArt } from "./crystal-caves-art.ts";
-import { hasCrystalCaves, shaftLight } from "./crystal-caves.ts";
+import { crystalCavesPlan, hasCrystalCaves, shaftLight } from "./crystal-caves.ts";
 
 export type DrawOptions = {
   /** How many watchmen walk the city (the keep's City watch, in Defend);
@@ -494,7 +494,7 @@ export class DefendRenderer {
     }
     this.areaMix = this.previousArea ? areaFade(opts.now - this.areaChangedAt, opts.reduceMotion) : 1;
     if (!sim) { this.areaMix = 1; this.previousArea = null; }
-    if (sim) this.warm = null;
+    if (sim) { this.warm = null; this.prepareNext(map, sim, opts); }
     else { this.warmSun = this.worldLighting ? opts.sun : undefined; this.warmDesert(map, !!opts.hdSand); }
     if (this.areaMix === 1) this.previousArea = null;
     this.lastWeather = opts.weather;
@@ -522,7 +522,7 @@ export class DefendRenderer {
           reduceMotion: opts.reduceMotion, effects: opts.effects ?? true,
           forest: hasForest(this.area) && this.forest.forestPlan ? { plan: this.forest.forestPlan, damage: this.forest.damage } : null,
           sand: sim?.atmosphere?.mode === "sand" ? { trails: sim.trails?.style === "sand" ? sim.trails : null } : null,
-          caves: hasCrystalCaves(this.area) ? { trails: this.caves.plan?.trails ?? null, day: shaftLight(this.worldLighting ? opts.sun : undefined).day } : null,
+          caves: hasCrystalCaves(this.area) ? { trails: crystalCavesPlan(map).trails, day: shaftLight(this.worldLighting ? opts.sun : undefined).day } : null,
           // The day's tint, as the board takes it (in battle, or by night).
           tint: sim || opts.night > .001 ? opts.tint : undefined,
           // The board's own darkness, which the wilds' night meets at its edge.
@@ -634,6 +634,46 @@ export class DefendRenderer {
   private warm: { map: CityMap; hd: boolean; phase: number; step: number; plan: TrailPlan | null } | null = null;
   /** The sky's sun as the board last took it. */
   private warmSun: DrawOptions['sun'];
+  /** The next area's ground past the board (and in the desert its sand),
+   * painted in idle time through the last wave before it, so the battle
+   * doesn't stall as it crosses over. */
+  private ahead: { map: CityMap; area: AreaId; run: (ms: number) => void } | null = null;
+  private prepareNext(map: CityMap, sim: DefendSim, opts: DrawOptions) {
+    if (sim.unitTester) return;
+    // Through the last two waves before it.
+    const soon = areaForWave(sim.wave + 1).id, area = soon !== this.area ? soon : areaForWave(sim.wave + 2).id;
+    if (area === this.area) return;
+    if (this.ahead?.map === map && this.ahead.area === area) {
+      // A slice every frame too, so it's ready in time when there's no idle time.
+      this.ahead.run(3);
+      return;
+    }
+    const hd = !!opts.hdSand, sun = this.worldLighting ? opts.sun : undefined, style = trailStyle(area);
+    let phase = 0, step = 0, roads: TrailPlan | null = null;
+    const a = this.ahead = { map, area, run: (ms: number) => {
+      if (this.ahead !== a || phase < 0) return;
+      let more = true;
+      if (phase === 0) { roads = style === "road" || style === "cave" ? trailPlan(map, style) : null; more = false; }
+      else if (phase === 1) more = this.wilds.prepare(hasForest(area), area, roads, ms);
+      else if (area !== "desert" || !map.trails) { phase = -1; return; }
+      // The desert's dunes and sand trails, as its build phase warms them.
+      else if (phase === 2) more = warmDunes(hd, sun, step);
+      else if (phase === 3) { if (step === 0) roads = trailPlan(map, "sand"); else trailField(roads!); more = step === 0; }
+      else if (phase === 4) more = warmBoardSand(map, roads!, step);
+      else if (phase === 5) more = this.wilds.warmSand(roads, step);
+      else { phase = -1; return; }
+      if (more) step++;
+      else { phase++; step = 0; }
+    } };
+    if (typeof requestIdleCallback !== "function") return;
+    const idle = (deadline: IdleDeadline) => {
+      if (this.ahead !== a || phase < 0) return;
+      a.run(Math.max(2, Math.min(8, deadline.timeRemaining())));
+      requestIdleCallback(idle, { timeout: 300 });
+    };
+    requestIdleCallback(idle, { timeout: 300 });
+  }
+
   private warmDesert(map: CityMap, hd: boolean) {
     if (typeof requestIdleCallback !== "function" || this.area !== "desert" || !map.trails || trailStyle(this.area) !== "sand") return;
     if (this.warm && this.warm.map === map && this.warm.hd === hd) return;
