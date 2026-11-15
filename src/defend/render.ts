@@ -1122,8 +1122,13 @@ export class DefendRenderer {
     // many times a second while a worm tears through it and masons rebuild).
     const frame = `${W}:${k}:${this.worldLighting}:${this.area}:${pixelKey()}`;
     const base = `${frame}:${looks ? Object.entries(looks).join(",") : ""}`;
-    const boxes = map === this.map && sim && sim === this.stagedSim && base === this.baseKey && !this.previousArea ? this.damageBoxes(map, sim)
-      : map !== this.map && !sim && !this.stagedSim && frame === this.frameKey && !this.previousArea ? this.mapBoxes(map, looks)
+    const damaging = map === this.map && sim && sim === this.stagedSim && base === this.baseKey;
+    const damage = damaging ? this.damageBoxes(map, sim) : null;
+    // While an area fades in, the layers are painted whole (a box's edge
+    // samples the scaled art a shade differently), but the masks, painted
+    // at whole pixels a cell, are still patched round the damage exactly.
+    const boxes = this.previousArea ? null : damaging ? damage
+      : map !== this.map && !sim && !this.stagedSim && frame === this.frameKey ? this.mapBoxes(map, looks)
       : null;
     this.baseKey = base;
     this.frameKey = frame;
@@ -1136,16 +1141,9 @@ export class DefendRenderer {
       this.layerKey = key;
       this.maskKey = maskKey;
       const P = this.px * k;
-      const masked: CellBox[] = [];
-      for (const box of boxes) {
+      for (const box of boxes)
         repaintBox(this.lctx, P, box, (c) => paintCityLayer(c, P, { map, sim, area: this.area, lights: this.lighting.lights, stones: this.lighting.roadStones, looks, omitSunShadows: this.worldLighting, within: box }));
-        // A fallen building being rebuilt isn't in the masks: only its timber shows.
-        if (box.layerOnly) continue;
-        masked.push(box);
-        for (const [cv, mode] of [[this.bodyMask, "body"], [this.rimMask, "rim"]] as const)
-          repaintBox(cv.getContext("2d", { willReadFrequently: true })!, MASK, box, (c) => paintBuildingMask(c, MASK, { map, sim, area: this.area, looks, lights: this.lighting.lights, stones: this.lighting.roadStones, within: box }, mode));
-      }
-      if (masked.length) this.lighting.patchMasks(masked);
+      this.patchMasks(map, sim, looks, boxes);
       this.findFaces(map, sim);
       return;
     }
@@ -1158,10 +1156,25 @@ export class DefendRenderer {
     // Native-resolution occlusion masks do not depend on camera zoom, board
     // pixel size or whether sunlight is composited outside the city layer.
     if (map !== this.maskMap || maskKey !== this.maskKey) {
+      const patch = damage && map === this.maskMap;
       this.maskMap = map; this.maskKey = maskKey;
-      this.paintMasks(map, sim, looks);
+      if (patch) this.patchMasks(map, sim, looks, damage);
+      else this.paintMasks(map, sim, looks);
     }
     this.findFaces(map, sim);
+  }
+
+  /** Repaints the lighting's body/rim masks inside `boxes` alone. */
+  private patchMasks(map: CityMap, sim: DefendSim | null, looks: Readonly<Record<number, string>> | undefined, boxes: readonly CellBox[]) {
+    const masked: CellBox[] = [];
+    for (const box of boxes) {
+      // A fallen building being rebuilt isn't in the masks: only its timber shows.
+      if (box.layerOnly) continue;
+      masked.push(box);
+      for (const [cv, mode] of [[this.bodyMask, "body"], [this.rimMask, "rim"]] as const)
+        repaintBox(cv.getContext("2d", { willReadFrequently: true })!, MASK, box, (c) => paintBuildingMask(c, MASK, { map, sim, area: this.area, looks, lights: this.lighting.lights, stones: this.lighting.roadStones, within: box }, mode));
+    }
+    if (masked.length) this.lighting.patchMasks(masked);
   }
 
   /** The wall's brick faces hanging over open ground, as they stand. */
