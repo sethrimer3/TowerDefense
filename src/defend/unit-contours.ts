@@ -3,6 +3,7 @@
  * per-unit canvases, image filters, or pairwise overlap tests. */
 import { UNIT_CONTOUR_ART_PIXELS, PORTAL_CONTOUR_WIDTH, PORTAL_UNIT_INK } from "./art-scale.ts";
 import { paintPortal } from "./portal-noise.ts";
+import { cellPieces } from "./paint-box.ts";
 
 type Ctx = CanvasRenderingContext2D;
 type Stroke = { path: Path2D; width: number; cap: CanvasLineCap; join: CanvasLineJoin; miter: number; radius?: number; filled?: boolean };
@@ -108,27 +109,7 @@ export class UnitContours {
   private pieces(channel: Channel, box: Box): Box[] {
     const cells = channel.cells;
     if (channel.unbounded || !cells || cells.cols !== Math.ceil(this.screenWidth / CELL) || cells.rows !== Math.ceil(this.screenHeight / CELL)) return [box];
-    const out: Box[] = [], open = new Map<string, Box>();
-    const r0 = Math.floor(box.y / CELL), r1 = Math.min(cells.rows - 1, Math.floor((box.y + box.h - 1) / CELL));
-    const c0 = Math.floor(box.x / CELL), c1 = Math.min(cells.cols - 1, Math.floor((box.x + box.w - 1) / CELL));
-    for (let r = r0; r <= r1 + 1; r++) {
-      const runs = new Map<string, Box>();
-      if (r <= r1) {
-        const y = Math.max(box.y, r * CELL), y1 = Math.min(box.y + box.h, (r + 1) * CELL);
-        for (let c = c0; c <= c1; c++) {
-          if (!cells.on[r * cells.cols + c]) continue;
-          let e = c; while (e < c1 && cells.on[r * cells.cols + e + 1]) e++;
-          const x = Math.max(box.x, c * CELL), x1 = Math.min(box.x + box.w, (e + 1) * CELL), key = `${x}:${x1}`;
-          const prior = open.get(key);
-          if (prior) { prior.h = y1 - prior.y; runs.set(key, prior); }
-          else runs.set(key, { x, y, w: x1 - x, h: y1 - y });
-          c = e;
-        }
-      }
-      for (const [key, b] of open) if (runs.get(key) !== b) out.push(b);
-      open.clear(); for (const [key, b] of runs) open.set(key, b);
-    }
-    return out;
+    return cellPieces(cells.on, cells.cols, cells.rows, CELL, box);
   }
   rect(x: number, y: number, w: number, h: number) {
     if (!w || !h) return;
@@ -222,8 +203,8 @@ export class UnitContours {
   }
   /** Rebuilt only with the existing combat cache. Subtract the union of every
    * unit body, including opposing/neutral units, to suppress all overlap seams.
-   * Returns the box of what it added to `bodies` (the soft joins), if any. */
-  finish(bodies: HTMLCanvasElement): Held {
+   * Returns the rectangles of what it added to `bodies` (the soft joins). */
+  finish(bodies: HTMLCanvasElement): Box[] {
     for (const [ink, channel] of this.channels) {
       for (const row of channel.pixelRows.values()) {
         if (!row.sorted) row.spans.sort((a, b) => a[0] - b[0]);
@@ -278,16 +259,9 @@ export class UnitContours {
     // Keep actual bodies out of the rings before inserting soft joins. The
     // portal mixes those joins into its opaque fire, rather than punching
     // translucent holes through both body and rim to expose scenery.
-    let joined: Held = null;
+    const joined: Box[] = [];
     for (const channel of this.channels.values()) {
-      if (!(channel.mergePixels && channel.pixelBounds && channel.radius > 0)) continue;
-      const b = this.closePixelBodies(channel, bodies);
-      if (!b) continue;
-      if (!joined) joined = { ...b };
-      else {
-        const x1 = Math.max(joined.x + joined.w, b.x + b.w), y1 = Math.max(joined.y + joined.h, b.y + b.h);
-        joined.x = Math.min(joined.x, b.x); joined.y = Math.min(joined.y, b.y); joined.w = x1 - joined.x; joined.h = y1 - joined.y;
-      }
+      if (channel.mergePixels && channel.pixelBounds && channel.radius > 0) joined.push(...this.closePixelBodies(channel, bodies));
     }
     return joined;
   }
@@ -295,7 +269,7 @@ export class UnitContours {
    * feathered expanded union at its center and four corners, then insert its
    * black interior behind the real bodies. Narrow cracks become solid; wider
    * necks retain some fire until they close. No filters or scene readbacks. */
-  private closePixelBodies(channel: Channel, bodies: HTMLCanvasElement): Held {
+  private closePixelBodies(channel: Channel, bodies: HTMLCanvasElement): Box[] {
     const { pixelBounds: b, pixels } = channel, r = channel.radius;
     this.portal ??= document.createElement('canvas');
     const canvas = this.portal;
@@ -314,7 +288,7 @@ export class UnitContours {
     const w = Math.min(canvas.width, Math.ceil(b!.x1 + r * 2 + 2)) - x, h = Math.min(canvas.height, Math.ceil(b!.y1 + r * 2 + 2)) - y;
     // The bands reach `r` past the bodies at most: all inside the box.
     if (w > 0 && h > 0) this.portalHeld = { x, y, w, h };
-    if (w <= 0 || h <= 0) return null;
+    if (w <= 0 || h <= 0) return [];
     this.innerHeld = { x, y, w, h };
     this.innerChannel = channel;
     // The bands lie in the channel's marked cells: close only those.
@@ -333,7 +307,7 @@ export class UnitContours {
     // source sprite and must never be copied/read back or cached as one.
     for (const p of pieces) CanvasRenderingContext2D.prototype.drawImage.call(body, this.inner, p.x, p.y, p.w, p.h, p.x, p.y, p.w, p.h);
     body.restore();
-    return { x, y, w, h };
+    return pieces;
   }
 
   /** A channel's paint's box on `canvas`, in whole pixels: its bounds and

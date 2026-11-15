@@ -98,8 +98,8 @@ function drawer(c: Ctx): Draw {
 }
 
 /** `box` of `source` onto the same place on `c`, which is untransformed. */
-function copy(c: Ctx, source: HTMLCanvasElement, box: Box | null) {
-  if (box) c.drawImage(source, box.x, box.y, box.w, box.h, box.x, box.y, box.w, box.h);
+function copy(c: Ctx, source: HTMLCanvasElement, pieces: Box[]) {
+  for (const b of pieces) c.drawImage(source, b.x, b.y, b.w, b.h, b.x, b.y, b.w, b.h);
 }
 
 function canvas() {
@@ -222,7 +222,7 @@ export class UnitOutline {
         cv.width = width;
         cv.height = height;
       } else if (!box) l.clearRect(0, 0, width, height);
-      else { const b = box.held(); if (b) l.clearRect(b.x, b.y, b.w, b.h); }
+      else for (const b of box.pieces()) l.clearRect(b.x, b.y, b.w, b.h);
       box?.reset();
       l.globalAlpha = 1;
       l.globalCompositeOperation = "source-over";
@@ -310,7 +310,7 @@ export class UnitOutline {
     c.setTransform(1, 0, 0, 1, 0, 0);
     c.globalAlpha = 1;
     c.globalCompositeOperation = "source-over";
-    copy(c, this.outline.cv, this.outlineBox.held());
+    copy(c, this.outline.cv, this.outlineBox.pieces());
     for (const [ink, layer] of this.colors) {
       const t = layer.c; t.save(); t.setTransform(1, 0, 0, 1, 0, 0);
       t.globalAlpha = 1; t.globalCompositeOperation = 'source-in'; t.fillStyle = ink;
@@ -318,10 +318,10 @@ export class UnitOutline {
       c.drawImage(layer.cv, 0, 0);
     }
     if (this.thin) {
-      this.layerBox.add(this.contours.finish(this.layer.cv));
+      for (const b of this.contours.finish(this.layer.cv)) this.layerBox.add(b);
       if (!deferContours) this.contours.draw(c);
     }
-    copy(c, this.layer.cv, this.layerBox.held());
+    copy(c, this.layer.cv, this.layerBox.pieces());
     c.restore();
   }
 }

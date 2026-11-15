@@ -911,8 +911,7 @@ export class DefendRenderer {
       if (this.actors.width !== c.canvas.width || this.actors.height !== c.canvas.height) {
         this.actors.width = c.canvas.width; this.actors.height = c.canvas.height;
       } else {
-        const b = box.held();
-        if (b) actors.clearRect(b.x, b.y, b.w, b.h);
+        for (const b of box.pieces()) actors.clearRect(b.x, b.y, b.w, b.h);
       }
       box.reset();
       actors.setTransform(c.getTransform()); actors.imageSmoothingEnabled = false;
@@ -920,8 +919,12 @@ export class DefendRenderer {
     drawUnits({ c: actors, px: this.px }, sim, torches, opts.healthbars === true, opts.timings ? this.timings : undefined, { enemies: opts.simpleEnemies, troops: opts.simpleTroops, reduceMotion: opts.reduceMotion, merged: !!opts.mergedOutlines, effects: opts.effects !== false }, (this.outline ??= new UnitOutline()), opts.sides, { defer: true });
     this.dark.draw(actors, this.px, sim);
     if (actors !== c) {
-      const b = this.actorsBox!.held();
-      if (b) { c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(this.actors!, b.x, b.y, b.w, b.h, b.x, b.y, b.w, b.h); c.restore(); }
+      const pieces = this.actorsBox!.pieces();
+      if (pieces.length) {
+        c.save(); c.setTransform(1, 0, 0, 1, 0, 0);
+        for (const b of pieces) c.drawImage(this.actors!, b.x, b.y, b.w, b.h, b.x, b.y, b.w, b.h);
+        c.restore();
+      }
     }
   }
 

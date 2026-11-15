@@ -19,7 +19,39 @@ export function painted(c: Ctx, x0: number, y0: number, x1: number, y1: number, 
   watched.get(c)?.user(Math.min(x0, x1), Math.min(y0, y1), Math.max(x0, x1), Math.max(y0, y1), pad);
 }
 
+/** `box` (or everything) split into the rectangles of the marked cells of a
+ * `cols` x `rows` grid of `cell`-pixel squares: runs along each row, merged
+ * down while they repeat. The rectangles never overlap. */
+export function cellPieces(on: Uint8Array, cols: number, rows: number, cell: number, box: Box): Box[] {
+  const out: Box[] = [];
+  let open = new Map<string, Box>(), runs = new Map<string, Box>();
+  const r0 = Math.max(0, Math.floor(box.y / cell)), r1 = Math.min(rows - 1, Math.floor((box.y + box.h - 1) / cell));
+  const c0 = Math.max(0, Math.floor(box.x / cell)), c1 = Math.min(cols - 1, Math.floor((box.x + box.w - 1) / cell));
+  for (let r = r0; r <= r1 + 1; r++) {
+    runs.clear();
+    if (r <= r1) {
+      const y = Math.max(box.y, r * cell), y1 = Math.min(box.y + box.h, (r + 1) * cell);
+      for (let c = c0; c <= c1; c++) {
+        if (!on[r * cols + c]) continue;
+        let e = c; while (e < c1 && on[r * cols + e + 1]) e++;
+        const x = Math.max(box.x, c * cell), x1 = Math.min(box.x + box.w, (e + 1) * cell), key = `${x}:${x1}`;
+        const prior = open.get(key);
+        if (prior) { prior.h = y1 - prior.y; runs.set(key, prior); }
+        else runs.set(key, { x, y, w: x1 - x, h: y1 - y });
+        c = e;
+      }
+    }
+    for (const [key, b] of open) if (runs.get(key) !== b) out.push(b);
+    const t = open; open = runs; runs = t;
+  }
+  return out;
+}
+
+/** Cells of a `PaintBox`'s grid, in screen pixels. */
+const CELL = 32;
+
 export class PaintBox {
+  private cells = new Uint8Array(0); private cols = 0; private rows = 0; private any = false;
   private x0 = Infinity; private y0 = Infinity; private x1 = -Infinity; private y1 = -Infinity;
   private px0 = Infinity; private py0 = Infinity; private px1 = -Infinity; private py1 = -Infinity;
   private all = false;
@@ -111,6 +143,12 @@ export class PaintBox {
     if (!(x0 <= x1 && y0 <= y1)) { if (Number.isNaN(x0 + y0 + x1 + y1)) this.all = true; return; }
     if (x0 < this.x0) this.x0 = x0; if (y0 < this.y0) this.y0 = y0;
     if (x1 > this.x1) this.x1 = x1; if (y1 > this.y1) this.y1 = y1;
+    const { width, height } = this.c.canvas, cols = Math.ceil(width / CELL), rows = Math.ceil(height / CELL);
+    if (cols !== this.cols || rows !== this.rows) { this.cols = cols; this.rows = rows; this.cells = new Uint8Array(cols * rows); this.any = false; }
+    const a = Math.max(0, Math.floor((Math.floor(x0) - 2) / CELL)), b = Math.min(cols - 1, Math.floor((Math.ceil(x1) + 2) / CELL));
+    const t = Math.max(0, Math.floor((Math.floor(y0) - 2) / CELL)), u = Math.min(rows - 1, Math.floor((Math.ceil(y1) + 2) / CELL));
+    for (let r = t; r <= u; r++) this.cells.fill(1, r * cols + a, r * cols + b + 1);
+    if (a <= b && t <= u) this.any = true;
   }
   add(box: Box | null) { if (box) this.screen(box.x, box.y, box.x + box.w, box.y + box.h); }
   /** Marks the whole canvas, such as after a resize. */
@@ -126,10 +164,19 @@ export class PaintBox {
     const w = Math.min(width, Math.ceil(this.x1) + 2) - x, h = Math.min(height, Math.ceil(this.y1) + 2) - y;
     return w > 0 && h > 0 ? { x, y, w, h } : null;
   }
+  /** `held` split into the rectangles of the cells painted, which never
+   * overlap: what to clear or copy when the paint is scattered. */
+  pieces(): Box[] {
+    const b = this.held();
+    if (!b) return [];
+    const { width, height } = this.c.canvas;
+    if (this.all || this.cols !== Math.ceil(width / CELL) || this.rows !== Math.ceil(height / CELL)) return [b];
+    return cellPieces(this.cells, this.cols, this.rows, CELL, b);
+  }
   /** Clears what was painted (the context's transform is kept) and starts over. */
   clear() {
-    const b = this.held();
-    if (b) { const c = this.c; c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(b.x, b.y, b.w, b.h); c.restore(); }
+    const pieces = this.pieces();
+    if (pieces.length) { const c = this.c; c.save(); c.setTransform(1, 0, 0, 1, 0, 0); for (const b of pieces) c.clearRect(b.x, b.y, b.w, b.h); c.restore(); }
     this.reset();
   }
   /** Starts over. The open path's points stay: they are already on screen,
@@ -137,5 +184,6 @@ export class PaintBox {
   reset() {
     this.x0 = this.y0 = Infinity; this.x1 = this.y1 = -Infinity;
     this.all = false; this.m = null;
+    if (this.any) { this.cells.fill(0); this.any = false; }
   }
 }
