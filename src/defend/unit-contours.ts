@@ -11,7 +11,10 @@ type PixelRow = { y: number; h: number; radius: number; spans: [number, number][
 type Box = { x: number; y: number; w: number; h: number };
 /** The part of a scratch canvas that may hold paint: null when clear. */
 type Held = Box | null;
-type Channel = { held: Held; pixels: Path2D[]; pixelRows: Map<string, PixelRow>; pixelBounds: Bounds | null; radius: number; unbounded: boolean; mergePixels: boolean; bounds: Bounds | null; faded: boolean; rectangles: Path2D; expanded: Path2D; path: Path2D; strokes: Map<string, Stroke>; canvas: HTMLCanvasElement; c: Ctx };
+/** Which `CELL`-pixel squares of the screen a channel's paint may reach. */
+type Cells = { on: Uint8Array; cols: number; rows: number; any: boolean };
+const CELL = 64;
+type Channel = { held: Held; cells?: Cells; pixels: Path2D[]; pixelRows: Map<string, PixelRow>; pixelBounds: Bounds | null; radius: number; unbounded: boolean; mergePixels: boolean; bounds: Bounds | null; faded: boolean; rectangles: Path2D; expanded: Path2D; path: Path2D; strokes: Map<string, Stroke>; canvas: HTMLCanvasElement; c: Ctx };
 export class UnitContours {
   private channels = new Map<string, Channel>();
   private ink: string | undefined;
@@ -47,6 +50,7 @@ export class UnitContours {
     this.innerChannel = null; this.pixelMode = false; this.radius = width * this.scale; this.ink = undefined; this.pen = new Path2D(); this.penBounds = null; this.penUnbounded = false; this.penRects.length = 0; this.rectOnly = true;
     for (const [ink, channel] of this.channels) {
       channel.pixels = [new Path2D(), new Path2D(), new Path2D()]; channel.pixelRows.clear(); channel.pixelBounds = null; channel.radius = this.radiusOf(ink); channel.unbounded = false; channel.path = new Path2D(); channel.rectangles = new Path2D(); channel.expanded = new Path2D(); channel.strokes.clear(); channel.faded = false; channel.mergePixels = false; channel.bounds = null;
+      if (channel.cells?.any) { channel.cells.on.fill(0); channel.cells.any = false; }
       if (channel.canvas.width !== c.canvas.width || channel.canvas.height !== c.canvas.height) {
         channel.canvas.width = c.canvas.width; channel.canvas.height = c.canvas.height; channel.held = null;
       }
@@ -82,9 +86,49 @@ export class UnitContours {
     const x = matrix.a * cx + matrix.c * cy + matrix.e, y = matrix.b * cx + matrix.d * cy + matrix.f;
     const rx = Math.abs(matrix.a) * hw + Math.abs(matrix.c) * hh + pad, ry = Math.abs(matrix.b) * hw + Math.abs(matrix.d) * hh + pad;
     const x0 = x - rx, y0 = y - ry, x1 = x + rx, y1 = y + ry;
+    this.mark(channel, x0, y0, x1, y1);
     const old = channel.bounds;
     if (old) { old.x0 = Math.min(old.x0, x0); old.y0 = Math.min(old.y0, y0); old.x1 = Math.max(old.x1, x1); old.y1 = Math.max(old.y1, y1); }
     else channel.bounds = { x0, y0, x1, y1 };
+  }
+  /** Marks the cells a box of paint reaches, padded like `box`. */
+  private mark(channel: Channel, x0: number, y0: number, x1: number, y1: number) {
+    const cols = Math.ceil(this.screenWidth / CELL), rows = Math.ceil(this.screenHeight / CELL);
+    let cells = channel.cells;
+    if (!cells || cells.cols !== cols || cells.rows !== rows) cells = channel.cells = { on: new Uint8Array(cols * rows), cols, rows, any: false };
+    const pad = channel.radius * 2 + 2;
+    if (!(x0 - pad <= x1 + pad && y0 - pad <= y1 + pad)) { cells.on.fill(1); cells.any = true; return; }
+    const c0 = Math.max(0, Math.floor((x0 - pad) / CELL)), c1 = Math.min(cols - 1, Math.floor((x1 + pad) / CELL));
+    const r0 = Math.max(0, Math.floor((y0 - pad) / CELL)), r1 = Math.min(rows - 1, Math.floor((y1 + pad) / CELL));
+    for (let r = r0; r <= r1; r++) cells.on.fill(1, r * cols + c0, r * cols + c1 + 1);
+    if (c0 <= c1 && r0 <= r1) cells.any = true;
+  }
+  /** `box` split into the rectangles of marked cells, runs merged across
+   * rows; the whole box if the channel is unbounded or has no cells. */
+  private pieces(channel: Channel, box: Box): Box[] {
+    const cells = channel.cells;
+    if (channel.unbounded || !cells || cells.cols !== Math.ceil(this.screenWidth / CELL) || cells.rows !== Math.ceil(this.screenHeight / CELL)) return [box];
+    const out: Box[] = [], open = new Map<string, Box>();
+    const r0 = Math.floor(box.y / CELL), r1 = Math.min(cells.rows - 1, Math.floor((box.y + box.h - 1) / CELL));
+    const c0 = Math.floor(box.x / CELL), c1 = Math.min(cells.cols - 1, Math.floor((box.x + box.w - 1) / CELL));
+    for (let r = r0; r <= r1 + 1; r++) {
+      const runs = new Map<string, Box>();
+      if (r <= r1) {
+        const y = Math.max(box.y, r * CELL), y1 = Math.min(box.y + box.h, (r + 1) * CELL);
+        for (let c = c0; c <= c1; c++) {
+          if (!cells.on[r * cells.cols + c]) continue;
+          let e = c; while (e < c1 && cells.on[r * cells.cols + e + 1]) e++;
+          const x = Math.max(box.x, c * CELL), x1 = Math.min(box.x + box.w, (e + 1) * CELL), key = `${x}:${x1}`;
+          const prior = open.get(key);
+          if (prior) { prior.h = y1 - prior.y; runs.set(key, prior); }
+          else runs.set(key, { x, y, w: x1 - x, h: y1 - y });
+          c = e;
+        }
+      }
+      for (const [key, b] of open) if (runs.get(key) !== b) out.push(b);
+      open.clear(); for (const [key, b] of runs) open.set(key, b);
+    }
+    return out;
   }
   rect(x: number, y: number, w: number, h: number) {
     if (!w || !h) return;
@@ -111,6 +155,7 @@ export class UnitContours {
         if (b) { b.x0 = Math.min(b.x0, left); b.y0 = Math.min(b.y0, top); b.x1 = Math.max(b.x1, left + width); b.y1 = Math.max(b.y1, top + height); }
         else channel.pixelBounds = { x0: left, y0: top, x1: left + width, y1: top + height };
       } else channel.expanded.rect(left - r, top - r, width + 2 * r, height + 2 * r);
+      this.mark(channel, left, top, left + width, top + height);
       const box = channel.bounds;
       if (box) { box.x0 = Math.min(box.x0, left); box.y0 = Math.min(box.y0, top); box.x1 = Math.max(box.x1, left + width); box.y1 = Math.max(box.y1, top + height); }
       else channel.bounds = { x0: left, y0: top, x1: left + width, y1: top + height };
@@ -272,16 +317,22 @@ export class UnitContours {
     if (w <= 0 || h <= 0) return null;
     this.innerHeld = { x, y, w, h };
     this.innerChannel = channel;
-    c.save(); c.beginPath(); c.rect(x, y, w, h); c.clip();
-    c.globalCompositeOperation = "source-over"; c.drawImage(canvas, 0, 0);
-    c.globalCompositeOperation = "destination-in";
-    c.drawImage(canvas, -r, -r); c.drawImage(canvas, r, -r); c.drawImage(canvas, -r, r); c.drawImage(canvas, r, r);
-    c.restore(); c.globalCompositeOperation = "source-over";
+    // The bands lie in the channel's marked cells: close only those.
+    const pieces = this.pieces(channel, { x, y, w, h });
+    for (const p of pieces) {
+      c.save(); c.beginPath(); c.rect(p.x, p.y, p.w, p.h); c.clip();
+      c.globalCompositeOperation = "source-over"; c.drawImage(canvas, 0, 0);
+      c.globalCompositeOperation = "destination-in";
+      c.drawImage(canvas, -r, -r); c.drawImage(canvas, r, -r); c.drawImage(canvas, -r, r); c.drawImage(canvas, r, r);
+      c.restore();
+    }
+    c.globalCompositeOperation = "source-over";
     const body = bodies.getContext("2d")!;
     body.save(); body.setTransform(1, 0, 0, 1, 0, 0); body.globalAlpha = 1; body.globalCompositeOperation = "destination-over";
     // Bypass UnitOutline's sprite interception: this transient mask is not a
     // source sprite and must never be copied/read back or cached as one.
-    CanvasRenderingContext2D.prototype.drawImage.call(body, this.inner, x, y, w, h, x, y, w, h); body.restore();
+    for (const p of pieces) CanvasRenderingContext2D.prototype.drawImage.call(body, this.inner, p.x, p.y, p.w, p.h, p.x, p.y, p.w, p.h);
+    body.restore();
     return { x, y, w, h };
   }
 
@@ -329,21 +380,29 @@ export class UnitContours {
     const s = scratch.getContext('2d')!;
     s.setTransform(1, 0, 0, 1, 0, 0);
     const join = this.innerChannel === channel ? this.inner : null;
-    if (plain) {
-      s.clearRect(0, 0, box.w, box.h);
-      s.drawImage(canvas, box.x, box.y, box.w, box.h, 0, 0, box.w, box.h);
-      // Torch shine belongs to the outer fire, never the black necks.
-      if (join) { s.globalCompositeOperation = 'destination-out'; s.drawImage(join, box.x, box.y, box.w, box.h, 0, 0, box.w, box.h); }
-    } else {
-      s.translate(-box.x, -box.y);
-      paintPortal(s, box, this.seconds, globalThis.devicePixelRatio || 1);
-      s.setTransform(1, 0, 0, 1, 0, 0);
-      if (join) { s.globalCompositeOperation = 'source-atop'; s.drawImage(join, box.x, box.y, box.w, box.h, 0, 0, box.w, box.h); }
-      s.globalCompositeOperation = 'destination-in';
-      s.drawImage(canvas, box.x, box.y, box.w, box.h, 0, 0, box.w, box.h);
+    // Only the cells the contour can reach: scattered Dark Ones need not
+    // pay for the burning dimension over the empty screen between them.
+    for (const p of this.pieces(channel, box)) {
+      const x = p.x - box.x, y = p.y - box.y;
+      if (plain) {
+        s.clearRect(x, y, p.w, p.h);
+        s.drawImage(canvas, p.x, p.y, p.w, p.h, x, y, p.w, p.h);
+        // Torch shine belongs to the outer fire, never the black necks.
+        if (join) { s.globalCompositeOperation = 'destination-out'; s.drawImage(join, p.x, p.y, p.w, p.h, x, y, p.w, p.h); }
+      } else {
+        s.translate(-box.x, -box.y);
+        paintPortal(s, p, this.seconds, globalThis.devicePixelRatio || 1);
+        s.setTransform(1, 0, 0, 1, 0, 0);
+        if (join) { s.globalCompositeOperation = 'source-atop'; s.drawImage(join, p.x, p.y, p.w, p.h, x, y, p.w, p.h); }
+        // destination-in reaches the whole surface: keep it to this piece.
+        s.save(); s.beginPath(); s.rect(x, y, p.w, p.h); s.clip();
+        s.globalCompositeOperation = 'destination-in';
+        s.drawImage(canvas, p.x, p.y, p.w, p.h, x, y, p.w, p.h);
+        s.restore();
+      }
+      s.globalCompositeOperation = 'source-over';
+      c.drawImage(scratch, x, y, p.w, p.h, p.x, p.y, p.w, p.h);
     }
-    s.globalCompositeOperation = 'source-over';
-    c.drawImage(scratch, 0, 0, box.w, box.h, box.x, box.y, box.w, box.h);
   }
   /** The same dimension and cut, painted at one pixel per half art pixel
    * (the contour's own width, `radius`) on the board's lattice and scaled
