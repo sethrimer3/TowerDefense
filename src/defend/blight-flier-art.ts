@@ -8,6 +8,7 @@ import { basicName, basicUnitSprite } from "./basic-unit-art.ts";
 import { drawSprite, sprite } from "./damage-art.ts";
 import { BLIGHT_FLIER_FACINGS, blightFlierBox, blightFlierTurned, triangleOutlineCells } from "./blight-flier-shapes.ts";
 import type { Enemy } from "./sim.ts";
+import { painted } from "./paint-box.ts";
 
 type Brush = { c: CanvasRenderingContext2D; px: number };
 // Rates are powers of one half; every layer returns together after 48 s.
@@ -46,8 +47,13 @@ function body(c: CanvasRenderingContext2D, e: Enemy, x: number, y: number, angle
 function inlay(c: CanvasRenderingContext2D, at: { left: number; top: number; cell: number }, cx: number, cy: number, radius: number, angle: number) {
   const half = at.cell / 2, path = new Path2D();
   const ox = at.left + Math.round((cx - at.left) / half) * half, oy = at.top + Math.round((cy - at.top) / half) * half;
-  for (const [x, y] of triangleOutlineCells(radius / half, angle)) path.rect(ox + x * half, oy + y * half, half, half);
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const [x, y] of triangleOutlineCells(radius / half, angle)) {
+    path.rect(ox + x * half, oy + y * half, half, half);
+    x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x + 1); y1 = Math.max(y1, y + 1);
+  }
   CanvasRenderingContext2D.prototype.fill.call(c, path);
+  if (x1 > x0) painted(c, ox + x0 * half, oy + y0 * half, ox + x1 * half, oy + y1 * half);
 }
 
 export function drawBlightFlier({ c, px }: Brush, e: Enemy, seconds: number, reduceMotion = false, under?: Brush, simple = false) {

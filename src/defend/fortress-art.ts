@@ -9,6 +9,7 @@ import type { Brush } from "./battle-art.ts";
 import { hash01 } from "./grid.ts";
 import { pixels as rawPixels, shade, sprite, type Pix } from "./damage-art.ts";
 import type { DefendSim, Enemy } from "./sim.ts";
+import { painted } from "./paint-box.ts";
 
 /** Damage lines and joints may mark filled material, never grow a body. */
 function pixels(out:Uint32Array,w:number,h:number):Pix {
@@ -218,7 +219,9 @@ export function drawFortress({ c, px }: Brush, e: Enemy, _sim?: DefendSim, reduc
   const bodyY = fortressBodyY(e, px, reduceMotion), x0 = e.x * px - w * s / 2, y0 = bodyY - h * s / 2;
   c.save(); c.fillStyle = "rgba(0,0,0,.28)";
   // Shadow is translucent and stays beneath the articulated legs.
-  CanvasRenderingContext2D.prototype.fillRect.call(c, x0 + scale * .1, e.y * px - h * s / 2 + scale * .15, w * s, h * s);
+  const sx = x0 + scale * .1, sy = e.y * px - h * s / 2 + scale * .15;
+  CanvasRenderingContext2D.prototype.fillRect.call(c, sx, sy, w * s, h * s);
+  painted(c, sx, sy, sx + w * s, sy + h * s);
   drawFortressLegs({ c, px }, e, reduceMotion);
   const hurt = e.hp / e.maxHp < .5, seed = e.id % 4;
   draw(c, sprite(`fb:${fort.tier}:${w}:${h}:1:${hurt ? 1 : 0}:0:${seed}`, w, h,

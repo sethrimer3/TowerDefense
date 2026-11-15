@@ -103,6 +103,8 @@ export class DarkDrain {
   private canvas: HTMLCanvasElement | null = null;
   private glowCanvas: HTMLCanvasElement | null = null;
   private mask: HTMLCanvasElement | null = null;
+  /** The mask's painted part, in its pixels: only that is cleared next time. */
+  private maskHeld: Bounds | null = null;
   private pixels: ImageData | null = null;
   private sim: DefendSim | null = null;
   private sampled = -Infinity;
@@ -140,15 +142,23 @@ export class DarkDrain {
   private protectedMask(c: CanvasRenderingContext2D, px: number, source: HTMLCanvasElement, bounds: Bounds, actors?: HTMLCanvasElement | null) {
     if (!actors) return source;
     this.mask ??= document.createElement("canvas");
+    const off = this.mask.getContext("2d")!;
+    off.setTransform(1, 0, 0, 1, 0, 0);
     if (this.mask.width !== c.canvas.width || this.mask.height !== c.canvas.height) {
       this.mask.width = c.canvas.width; this.mask.height = c.canvas.height;
+    } else if (this.maskHeld) off.clearRect(this.maskHeld.x, this.maskHeld.y, this.maskHeld.w, this.maskHeld.h);
+    // Everything below is clipped to `bounds`: its screen box, padded.
+    const m = c.getTransform(), xs: number[] = [], ys: number[] = [];
+    for (const [u, v] of [[bounds.x, bounds.y], [bounds.x + bounds.w, bounds.y], [bounds.x, bounds.y + bounds.h], [bounds.x + bounds.w, bounds.y + bounds.h]]) {
+      xs.push(m.a * u * px + m.c * v * px + m.e); ys.push(m.b * u * px + m.d * v * px + m.f);
     }
-    const off = this.mask.getContext("2d")!;
-    off.setTransform(1, 0, 0, 1, 0, 0); off.clearRect(0, 0, this.mask.width, this.mask.height);
+    const hx = Math.max(0, Math.floor(Math.min(...xs)) - 2), hy = Math.max(0, Math.floor(Math.min(...ys)) - 2);
+    this.maskHeld = { x: hx, y: hy, w: Math.min(this.mask.width, Math.ceil(Math.max(...xs)) + 2) - hx, h: Math.min(this.mask.height, Math.ceil(Math.max(...ys)) + 2) - hy };
+    if (!(this.maskHeld.w > 0 && this.maskHeld.h > 0)) this.maskHeld = { x: 0, y: 0, w: this.mask.width, h: this.mask.height };
     off.globalCompositeOperation = "source-over"; off.imageSmoothingEnabled = true;
     off.save(); off.setTransform(c.getTransform()); this.clip(off, px, bounds); off.drawImage(source, 0, 0, CELLS_W * px, CELLS_H * px);
     off.setTransform(1, 0, 0, 1, 0, 0); off.globalCompositeOperation = "destination-out";
-    off.drawImage(actors, 0, 0); off.restore(); off.globalCompositeOperation = "source-over";
+    const h = this.maskHeld; off.drawImage(actors, h.x, h.y, h.w, h.h, h.x, h.y, h.w, h.h); off.restore(); off.globalCompositeOperation = "source-over";
     return this.mask;
   }
 
@@ -162,7 +172,7 @@ export class DarkDrain {
       c.save(); this.clip(c, px, bounds);
       if (actors) c.setTransform(1, 0, 0, 1, 0, 0);
       c.imageSmoothingEnabled = true; c.globalCompositeOperation = operation; c.globalAlpha *= alpha;
-      if (actors) c.drawImage(source, 0, 0);
+      if (actors) { const h = this.maskHeld!; c.drawImage(source, h.x, h.y, h.w, h.h, h.x, h.y, h.w, h.h); }
       else c.drawImage(source, 0, 0, CELLS_W * px, CELLS_H * px);
       c.restore();
     };
