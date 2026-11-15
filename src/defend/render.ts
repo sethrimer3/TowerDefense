@@ -659,12 +659,14 @@ export class DefendRenderer {
       // The flagstones' relief masks, unless grass or cavern floor hides
       // them on both sides of the crossing (they show through its fade).
       else if (phase === 2) more = !(covered(area) && covered(this.area)) && this.relief.prepare(map, this.px, this.board.W, this.board.H, area, ms);
+      // The Crystal Caves' floor.
+      else if (phase === 3) more = hasCrystalCaves(area) && this.caves.prepare(map, ms);
       else if (area !== "desert" || !map.trails) { phase = -1; return; }
       // The desert's dunes and sand trails, as its build phase warms them.
-      else if (phase === 3) more = warmDunes(hd, sun, step);
-      else if (phase === 4) { if (step === 0) roads = trailPlan(map, "sand"); else trailField(roads!); more = step === 0; }
-      else if (phase === 5) more = warmBoardSand(map, roads!, step);
-      else if (phase === 6) more = this.wilds.warmSand(roads, step);
+      else if (phase === 4) more = warmDunes(hd, sun, step);
+      else if (phase === 5) { if (step === 0) roads = trailPlan(map, "sand"); else trailField(roads!); more = step === 0; }
+      else if (phase === 6) more = warmBoardSand(map, roads!, step);
+      else if (phase === 7) more = this.wilds.warmSand(roads, step);
       else { phase = -1; return; }
       if (more) step++;
       else { phase++; step = 0; }

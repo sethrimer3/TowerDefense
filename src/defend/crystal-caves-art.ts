@@ -93,40 +93,42 @@ export function caveGravelPixel(x: number, y: number) {
   return rgba(c);
 }
 
+/** `wash(x, y, scale, salt)` along a row of `w` pixels from `x0`: each
+ * column's lattice cell and eased offset, and the lattice's hashes along
+ * the two rows a pixel row reads, worked out once a row (`row`, then `at`). */
+function washer(w: number, x0: number, scale: number, salt: number) {
+  const ixs = new Int32Array(w), sxs = new Float64Array(w);
+  for (let X = 0; X < w; X++) {
+    const fx = (X + x0) / scale, ix = Math.floor(fx), tx = fx - ix;
+    ixs[X] = ix; sxs[X] = tx * tx * (3 - 2 * tx);
+  }
+  const lo = ixs[0], n = ixs[w - 1] - lo + 2;
+  const top = new Float64Array(n), bottom = new Float64Array(n);
+  let rowAt = NaN, sy = 0;
+  return {
+    row(y: number) {
+      const fy = y / scale, iy = Math.floor(fy), ty = fy - iy;
+      sy = ty * ty * (3 - 2 * ty);
+      if (iy !== rowAt) {
+        rowAt = iy;
+        for (let k = 0; k < n; k++) (top[k] = hash01(lo + k, iy, salt)), (bottom[k] = hash01(lo + k, iy + 1, salt));
+      }
+    },
+    at(X: number) {
+      const k = ixs[X] - lo, sx = sxs[X];
+      const a = top[k], b = top[k + 1], c = bottom[k], d = bottom[k + 1];
+      return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
+    },
+  };
+}
+
 /** `caveGravelPixel` over a `w` by `h` buffer (yielding every `slice` rows) whose (`ox`, `oy`) is the
  * board's corner, but for the box `skip` (the board itself): the same
  * pixels, with each wash's lattice hashes and each cell's pebbles worked out
  * once rather than at every pixel. */
 export function* fillCaveGravel(out: Uint32Array, w: number, h: number, ox: number, oy: number, skip: { x0: number; y0: number; x1: number; y1: number }, slice = Infinity): Generator<void, void, void> {
   const x0 = -ox, x1 = w - 1 - ox, y0 = -oy, y1 = h - 1 - oy;
-  // The two washes: each column's lattice cell and eased offset, and the
-  // lattice's hashes along the two rows a pixel row reads.
-  const washer = (scale: number, salt: number) => {
-    const ixs = new Int32Array(w), sxs = new Float64Array(w);
-    for (let X = 0; X < w; X++) {
-      const fx = (X + x0) / scale, ix = Math.floor(fx), tx = fx - ix;
-      ixs[X] = ix; sxs[X] = tx * tx * (3 - 2 * tx);
-    }
-    const lo = ixs[0], n = ixs[w - 1] - lo + 2;
-    const top = new Float64Array(n), bottom = new Float64Array(n);
-    let rowAt = NaN, sy = 0;
-    return {
-      row(y: number) {
-        const fy = y / scale, iy = Math.floor(fy), ty = fy - iy;
-        sy = ty * ty * (3 - 2 * ty);
-        if (iy !== rowAt) {
-          rowAt = iy;
-          for (let k = 0; k < n; k++) (top[k] = hash01(lo + k, iy, salt)), (bottom[k] = hash01(lo + k, iy + 1, salt));
-        }
-      },
-      at(X: number) {
-        const k = ixs[X] - lo, sx = sxs[X];
-        const a = top[k], b = top[k + 1], c = bottom[k], d = bottom[k + 1];
-        return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
-      },
-    };
-  };
-  const broad = washer(40, 860), fine = washer(9, 861);
+  const broad = washer(w, x0, 40, 860), fine = washer(w, x0, 9, 861);
   // Each cell's three pebbles: where (art pixels) and whether big.
   const cx0 = Math.floor((x0 - 1) / ART), cy0 = Math.floor((y0 - 1) / ART), cw = Math.floor(x1 / ART) - cx0 + 1, chh = Math.floor(y1 / ART) - cy0 + 1;
   const pxs = new Int32Array(cw * chh * 3), pys = new Int32Array(cw * chh * 3), bigs = new Uint8Array(cw * chh * 3);
@@ -164,17 +166,30 @@ export function* fillCaveGravel(out: Uint32Array, w: number, h: number, ox: numb
 export const sunlitPixel = (v: number) => sunlit(v, 1);
 
 /** The cavern floor over every open cell, as RGBA. */
-export function cavePixels(plan: CrystalCavesPlan): Uint32Array {
+export const cavePixels = (plan: CrystalCavesPlan): Uint32Array => drain(cavePixelSteps(plan));
+/** Rows a `cavePixelSteps` step paints. */
+const SLICE = 16;
+function drain<T>(steps: Generator<void, T, void>): T {
+  for (;;) {
+    const r = steps.next();
+    if (r.done) return r.value;
+  }
+}
+/** `cavePixels` a slice of rows (or a stage) a step. */
+export function* cavePixelSteps(plan: CrystalCavesPlan): Generator<void, Uint32Array, void> {
   const img: Img = { px: new Uint32Array(W * H), w: W, h: H };
   const out = img.px;
   const openAt = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && plan.open[Math.floor(y / ART) * CELLS_W + Math.floor(x / ART)] === 1;
   // Gravel, in clumps of tone, with pebbles lit from the upper left.
-  for (let y = 0; y < H; y++)
+  const broad = washer(W, 0, 40, 860), fine = washer(W, 0, 9, 861);
+  for (let y = 0; y < H; y++, y % SLICE || (yield)) {
+    broad.row(y); fine.row(y);
     for (let x = 0; x < W; x++)
       if (openAt(x, y)) {
-        const v = wash(x, y, 40, 860) * 0.65 + wash(x, y, 9, 861) * 0.35 + (hash01(x, y, 862) - 0.5) * 0.45;
+        const v = broad.at(x) * 0.65 + fine.at(x) * 0.35 + (hash01(x, y, 862) - 0.5) * 0.45;
         out[y * W + x] = rgba(GRAVEL[Math.max(0, Math.min(GRAVEL.length - 1, Math.floor(v * GRAVEL.length)))]);
       }
+  }
   for (let cy = 0; cy < CELLS_H; cy++)
     for (let cx = 0; cx < CELLS_W; cx++) {
       if (!plan.open[cy * CELLS_W + cx]) continue;
@@ -191,7 +206,8 @@ export function cavePixels(plan: CrystalCavesPlan): Uint32Array {
   // The worn trails: packed dust through the gravel, pebbles kicked to their sides.
   if (plan.trails) {
     const { t } = trailField(plan.trails);
-    for (let y = 0; y < H; y++)
+    yield;
+    for (let y = 0; y < H; y++, y % SLICE || (yield))
       for (let x = 0; x < W; x++) {
         const i = y * W + x;
         if (t[i] > 1.3 || !openAt(x, y)) continue;
@@ -202,8 +218,9 @@ export function cavePixels(plan: CrystalCavesPlan): Uint32Array {
   // The rocks: shaded by their slope toward the upper left, glossy where it
   // faces the light, outlined at their foot, casting a shadow down and right.
   const h = rockHeights(plan);
+  yield;
   const hAt = (x: number, y: number) => (x >= 0 && y >= 0 && x < W && y < H ? h[y * W + x] : 0);
-  for (let y = 0; y < H; y++)
+  for (let y = 0; y < H; y++, y % SLICE || (yield))
     for (let x = 0; x < W; x++) {
       const i = y * W + x;
       if (!openAt(x, y)) continue;
@@ -220,6 +237,7 @@ export function cavePixels(plan: CrystalCavesPlan): Uint32Array {
       // Slick: a glossy streak where the rock turns to the light.
       if (lit > 0.95 && h[i] > 0.45) out[i] = rgba(GLOSS[lit > 1.45 ? 2 : lit > 1.2 ? 1 : 0]);
     }
+  yield;
   for (const p of plan.ponds) paintPond(img, p.x * ART, p.y * ART, p.r, p.seed, false);
   for (const c of plan.crystals) paintCrystals(img, c, false);
   for (const m of plan.mushrooms) paintMushrooms(img, m, false);
@@ -349,10 +367,10 @@ const OPEN_PAD = 64;
 
 /** The opening's light as a white mask (alpha the light), `OPEN_PAD` wider
  * each side and taller above than the board, down to its deepest edge. */
-function openingPixels() {
+function* openingPixels(): Generator<void, { pixels: Uint32Array; w: number; h: number }, void> {
   const w = W + 2 * OPEN_PAD, h = OPEN_PAD + Math.ceil((CELLS_H * CAVE_OPENING.depth + CAVE_OPENING.wobble + 1) * ART);
   const out = new Uint32Array(w * h);
-  for (let y = 0; y < h; y++)
+  for (let y = 0; y < h; y++, y % SLICE || (yield))
     for (let x = 0; x < w; x++) {
       const k = openingLight(x - OPEN_PAD, y - OPEN_PAD);
       if (k > 0) out[y * w + x] = rgba(0xfff4dc, Math.round(255 * k));
@@ -455,8 +473,44 @@ export class CrystalCavesArt {
   }
 
   private mask() {
-    if (!this.openMask) { const m = openingPixels(); this.openMask = canvasOf(m.pixels, m.w, m.h); }
+    if (!this.openMask) { const m = drain(this.masking ??= openingPixels()); this.openMask = canvasOf(m.pixels, m.w, m.h); }
     return this.openMask;
+  }
+  /** The floor and the opening's mask, half made ahead (`prepare`). */
+  private painting: { plan: CrystalCavesPlan; steps: Generator<void, Uint32Array, void> } | null = null;
+  private masking: Generator<void, { pixels: Uint32Array; w: number; h: number }, void> | null = null;
+
+  /** Plans `map`'s caves and makes, for about `ms`, what their first frame
+   * would (the floor, its daylit copy, the opening's mask and the daylight
+   * patches), ahead of a battle crossing into them; whether any is left. */
+  prepare(map: CityMap, ms: number) {
+    if (typeof document === "undefined") return false;
+    this.sync(map);
+    const end = performance.now() + ms, plan = this.plan!;
+    if (!this.floor) {
+      if (this.painting?.plan !== plan) this.painting = { plan, steps: cavePixelSteps(plan) };
+      for (;;) {
+        const r = this.painting.steps.next();
+        if (r.done) { this.setFloor(r.value); break; }
+        if (performance.now() >= end) return true;
+      }
+    }
+    if (!this.openMask) {
+      this.masking ??= openingPixels();
+      for (;;) {
+        const r = this.masking.next();
+        if (r.done) { this.openMask = canvasOf(r.value.pixels, r.value.w, r.value.h); break; }
+        if (performance.now() >= end) return true;
+      }
+    }
+    this.patchSprites();
+    return false;
+  }
+
+  private setFloor(floor: Uint32Array) {
+    this.floor = canvasOf(floor, W, H);
+    this.lit = canvasOf(sunlitFloor(floor), W, H);
+    this.painting = null;
   }
 
   private patchSprites() {
@@ -470,15 +524,11 @@ export class CrystalCavesArt {
    * the sun crosses the sky; only floor shows them). */
   drawFloor(c: CanvasRenderingContext2D, px: number, alpha: number, light: ShaftLight = shaftLight()) {
     if (!this.plan || alpha <= 0 || typeof document === "undefined") return;
-    if (!this.floor) {
-      const floor = cavePixels(this.plan);
-      this.floor = canvasOf(floor, W, H);
-      this.lit = canvasOf(sunlitFloor(floor), W, H);
-    }
+    if (!this.floor) this.setFloor(drain(this.painting?.plan === this.plan ? this.painting.steps : cavePixelSteps(this.plan)));
     c.save();
     c.imageSmoothingEnabled = false;
     c.globalAlpha *= alpha;
-    c.drawImage(this.floor, 0, 0, CELLS_W * px, CELLS_H * px);
+    c.drawImage(this.floor!, 0, 0, CELLS_W * px, CELLS_H * px);
     const ox = Math.round(light.shift.x * ART), oy = Math.round(light.shift.y * ART), key = `${ox}:${oy}`;
     c.globalAlpha *= 0.3 + 0.7 * light.day;
     // The sky through the great opening, its edge's shadow sliding with the
