@@ -91,6 +91,42 @@ export const BOULDERS = { chance: 0.006, clear: 2, apart: 3, top: SUB, mountains
 /** A heap this many cells or more is drawn as a small mountain. */
 export const MOUNTAIN = 9;
 
+/** What the plans read of each cell's own hashes and noise, the same for
+ * every map, worked out once: the thickets at each cell's middle, the cells
+ * in the order each set of spots is tried, and the cells whose hashes start
+ * a boulder, a big tree of each size, or a rock or pad. */
+let thicks: Float64Array | null = null;
+const thickAt = () => (thicks ??= Float64Array.from({ length: CELLS_W * CELLS_H }, (_, k) => thicket((k % CELLS_W) + 0.5, Math.floor(k / CELLS_W) + 0.5)));
+let boulderOrder: [number, number, number][] | null = null;
+function boulderSpots() {
+  if (boulderOrder) return boulderOrder;
+  const spots: [number, number, number][] = [];
+  for (let cy = BOULDERS.top; cy < CELLS_H; cy++) for (let cx = 0; cx < CELLS_W; cx++) spots.push([cx, cy, hash01(cx, cy, 507)]);
+  return (boulderOrder = spots.sort((a, b) => a[2] - b[2]));
+}
+const seeded = new Map<string, Int32Array>();
+/** The cells, row by row (from row `top`), whose own numbers pass `pass`. */
+function cellsWhere(key: string, pass: (cx: number, cy: number, k: number) => boolean, top = 0) {
+  let out = seeded.get(key);
+  if (out) return out;
+  const list: number[] = [];
+  for (let cy = top; cy < CELLS_H; cy++) for (let cx = 0; cx < CELLS_W; cx++) if (pass(cx, cy, cellIndex(cx, cy))) list.push(cellIndex(cx, cy));
+  seeded.set(key, (out = Int32Array.from(list)));
+  return out;
+}
+const loneSpots = () => cellsWhere("boulder", (cx, cy) => hash01(cx, cy, 501) < BOULDERS.chance, BOULDERS.top);
+const order = new Map<number, Int32Array>();
+/** Every cell in the order a forest's spots `key` are tried, glades first. */
+function spotOrder(key: number) {
+  let out = order.get(key);
+  if (out) return out;
+  const t = thickAt(), all: [number, number, number][] = [];
+  for (let cy = 0; cy < CELLS_H; cy++) for (let cx = 0; cx < CELLS_W; cx++) all.push([cx, cy, hash01(cx, cy, key) * (0.4 + t[cellIndex(cx, cy)])]);
+  all.sort((a, b) => a[2] - b[2] || a[1] - b[1] || a[0] - b[0]);
+  order.set(key, (out = Int32Array.from(all, ([cx, cy]) => cellIndex(cx, cy))));
+  return out;
+}
+
 /** Planned once per outskirts (`outskirts.ts`), not per map. */
 const boulderPlans = new WeakMap<object, Boulder[]>();
 
@@ -120,7 +156,10 @@ export function boulderPlan(map: CityMap): Boulder[] {
   // filled, so nothing is walled in.
   const grow = (cx: number, cy: number, want: number) => {
     const cells: [number, number][] = [[cx, cy]];
-    const has = (x: number, y: number) => cells.some(([a, b]) => a === x && b === y);
+    // The heap's cells (all on the board) marked, so asking is a lookup.
+    const marked = new Uint8Array(CELLS_W * CELLS_H);
+    marked[cellIndex(cx, cy)] = 1;
+    const has = (x: number, y: number) => cellInBounds(x, y) && marked[cellIndex(x, y)] === 1;
     // Of a few cells beside it, the one most hemmed in by the heap.
     const hemmed = (x: number, y: number) => [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]].filter(([dx, dy]) => has(x + dx, y + dy)).length;
     for (let k = 0; cells.length < want && k < want * 8; k++) {
@@ -133,7 +172,7 @@ export function boulderPlan(map: CityMap): Boulder[] {
         const v = hemmed(nx, ny);
         if (v > score) score = v, best = [nx, ny];
       }
-      if (best) cells.push(best);
+      if (best) cells.push(best), (marked[cellIndex(best[0], best[1])] = 1);
     }
     let x0 = cx, y0 = cy, x1 = cx, y1 = cy;
     for (const [x, y] of cells) x0 = Math.min(x0, x), y0 = Math.min(y0, y), x1 = Math.max(x1, x), y1 = Math.max(y1, y);
@@ -154,11 +193,8 @@ export function boulderPlan(map: CityMap): Boulder[] {
     plan.push({ cells: cells.map(([x, y]) => cellIndex(x, y)), seed: hash(cx, cy, 506) });
   };
   // A few small mountains first, at spots tried in a hashed order.
-  const spots: [number, number, number][] = [];
-  for (let cy = BOULDERS.top; cy < CELLS_H; cy++) for (let cx = 0; cx < CELLS_W; cx++) spots.push([cx, cy, hash01(cx, cy, 507)]);
-  spots.sort((a, b) => a[2] - b[2]);
   let mountains = 0;
-  for (const [cx, cy] of spots) {
+  for (const [cx, cy] of boulderSpots()) {
     if (mountains >= BOULDERS.mountains) break;
     // Room for its heart: a 3 × 3 of open ground.
     let room = true;
@@ -169,19 +205,19 @@ export function boulderPlan(map: CityMap): Boulder[] {
     mountains++;
   }
   // Then lone boulders, 2 × 2 blocks, clusters and rocky heaps.
-  for (let cy = BOULDERS.top; cy < CELLS_H; cy++)
-    for (let cx = 0; cx < CELLS_W; cx++) {
-      if (hash01(cx, cy, 501) >= BOULDERS.chance || !open(cx, cy)) continue;
-      const roll = hash01(cx, cy, 502);
-      if (roll < 0.3) {
-        taken[cellIndex(cx, cy)] = 1;
-        plan.push({ cells: [cellIndex(cx, cy)], seed: hash(cx, cy, 506) });
-      } else if (roll < 0.5) {
-        const cells = [[cx, cy], ...([[1, 0], [0, 1], [1, 1]] as const).map(([dx, dy]) => [cx + dx, cy + dy]).filter(([x, y]) => open(x, y))];
-        for (const [x, y] of cells) taken[cellIndex(x, y)] = 1;
-        plan.push({ cells: cells.map(([x, y]) => cellIndex(x, y)), seed: hash(cx, cy, 506) });
-      } else grow(cx, cy, roll < 0.8 ? 3 + (hash(cx, cy, 503) % 4) : 7 + (hash(cx, cy, 503) % 6));
-    }
+  for (const k of loneSpots()) {
+    const cx = k % CELLS_W, cy = (k - cx) / CELLS_W;
+    if (!open(cx, cy)) continue;
+    const roll = hash01(cx, cy, 502);
+    if (roll < 0.3) {
+      taken[cellIndex(cx, cy)] = 1;
+      plan.push({ cells: [cellIndex(cx, cy)], seed: hash(cx, cy, 506) });
+    } else if (roll < 0.5) {
+      const cells = [[cx, cy], ...([[1, 0], [0, 1], [1, 1]] as const).map(([dx, dy]) => [cx + dx, cy + dy]).filter(([x, y]) => open(x, y))];
+      for (const [x, y] of cells) taken[cellIndex(x, y)] = 1;
+      plan.push({ cells: cells.map(([x, y]) => cellIndex(x, y)), seed: hash(cx, cy, 506) });
+    } else grow(cx, cy, roll < 0.8 ? 3 + (hash(cx, cy, 503) % 4) : 7 + (hash(cx, cy, 503) % 6));
+  }
   boulderPlans.set(outskirts(map), plan);
   return plan;
 }
@@ -247,16 +283,14 @@ function plan_(map: CityMap): ForestPlan {
   const keep = new Discs();
   const stones = new Discs();
   for (const b of boulders) for (const c of b.cells) stones.push({ x: (c % CELLS_W) + 0.5, y: Math.floor(c / CELLS_W) + 0.5, r: 0.8 });
-  const each = (visit: (cx: number, cy: number) => void) => {
-    for (let cy = 0; cy < CELLS_H; cy++) for (let cx = 0; cx < CELLS_W; cx++) if (map.type[cellIndex(cx, cy)] === CellType.OUT) visit(cx, cy);
-  };
+  const thick = thickAt();
+  // The open cells among `cells`, in their order.
+  function* each(cells: Int32Array): Generator<[number, number]> {
+    for (const k of cells) if (map.type[k] === CellType.OUT) yield [k % CELLS_W, Math.floor(k / CELLS_W)];
+  }
   // Spots tried in an order of their own hashes, glades first, so a few
   // picked aren't all in the board's top rows.
-  const spots = (key: number) => {
-    const out: [number, number, number][] = [];
-    each((cx, cy) => out.push([cx, cy, hash01(cx, cy, key) * (0.4 + thicket(cx + 0.5, cy + 0.5))]));
-    return out.sort((a, b) => a[2] - b[2] || a[1] - b[1] || a[0] - b[0]);
-  };
+  const spots = (key: number) => each(spotOrder(key));
   // A few lakes, each a cluster of discs, in the glades.
   for (const [cx, cy] of spots(420)) {
     if (lakes.length >= FOREST.lakes) break;
@@ -272,15 +306,14 @@ function plan_(map: CityMap): ForestPlan {
   }
   // Trees, huge to large, each keeping the ground under it.
   for (const size of [3, 2, 1] as const)
-    each((cx, cy) => {
-      if (hash01(cx, cy, 440 + size) >= FOREST.big[size] * (0.4 + thicket(cx + 0.5, cy + 0.5) * 1.6)) return;
+    for (const [cx, cy] of each(cellsWhere(`tree${size}`, (cx, cy, k) => hash01(cx, cy, 440 + size) < FOREST.big[size] * (0.4 + thick[k] * 1.6)))) {
       const kind: TreeKind = hash01(cx, cy, 444) < 0.55 ? "oak" : "pine";
       const variant = hash(cx, cy, 445) % VARIANTS, r = canopyRadius(kind, variant, size);
       const x = cx + 0.25 + hash01(cx, cy, 446) * 0.5, y = cy + 0.25 + hash01(cx, cy, 447) * 0.5;
-      if (!clearOf(map, x, y, r) || onRoad(x, y, r * 0.85) || inDiscs(keep, x, y, r * 0.6) || inDiscs(stones, x, y, r * 0.6)) return;
+      if (!clearOf(map, x, y, r) || onRoad(x, y, r * 0.85) || inDiscs(keep, x, y, r * 0.6) || inDiscs(stones, x, y, r * 0.6)) continue;
       trees.push({ id: 0, x, y, r, kind, size, variant, phase: hash01(cx, cy, 448) * Math.PI * 2 });
       keep.push({ x, y, r: r * 0.7 });
-    });
+    }
   // A few small berry bushes in the open between them, glades first.
   let bushes = 0;
   for (const [cx, cy] of spots(450)) {
@@ -293,10 +326,11 @@ function plan_(map: CityMap): ForestPlan {
     bushes++;
   }
   // Rocks and bare pads in the ground the trees leave.
-  each((cx, cy) => {
+  // (Only cells whose hashes seed one; the rest have nothing to place.)
+  for (const [cx, cy] of each(cellsWhere("ground", (cx, cy, k) => hash01(cx, cy, 408) < FOREST.rock || hash01(cx, cy, 414) < FOREST.pad * (1.6 - thick[k])))) {
     const x0 = cx + 0.5, y0 = cy + 0.5;
-    if (inDiscs(keep, x0, y0) || inDiscs(stones, x0, y0) || onRoad(x0, y0, 0.8)) return;
-    const dense = thicket(x0, y0);
+    if (inDiscs(keep, x0, y0) || inDiscs(stones, x0, y0) || onRoad(x0, y0, 0.8)) continue;
+    const dense = thick[cellIndex(cx, cy)];
     if (hash01(cx, cy, 408) < FOREST.rock) {
       const size = 0.18 + hash01(cx, cy, 409) * 0.3, x = cx + 0.3 + hash01(cx, cy, 410) * 0.4, y = cy + 0.3 + hash01(cx, cy, 412) * 0.4;
       if (clearOf(map, x, y, size)) rocks.push({ x, y, size, seed: hash(cx, cy, 413) });
@@ -306,7 +340,7 @@ function plan_(map: CityMap): ForestPlan {
       const r = 0.7 + hash01(cx, cy, 415) * 1.3, x = cx + 0.5, y = cy + 0.5;
       if (clearOf(map, x, y, r * 0.6) && !inDiscs(keep, x, y, r * 0.5)) pads.push({ x, y, r, seed: hash(cx, cy, 416) });
     }
-  });
+  }
   // The rocks the roads bend round.
   for (const r of roads?.rocks ?? []) rocks.push({ x: r.x, y: r.y, size: Math.round(r.r * 16) / 8, seed: hash(Math.round(r.x * 8), Math.round(r.y * 8), 413) % 64 });
   // Drawn back to front, so a canopy lower on the board stands over the one behind.
