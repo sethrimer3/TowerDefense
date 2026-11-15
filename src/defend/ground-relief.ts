@@ -56,12 +56,19 @@ export class GroundRelief {
     if (typeof document === "undefined") return false;
     const key = `${W}x${H}:${area}:${floorArtLoaded(area)}:${area === "moss" ? pixelKey() : ""}`;
     if (map === this.map && key === this.key) return this.masks.length === 4;
+    // The masks read only which cells are open ground: a new city with the
+    // same (each battle's) keeps them and the light sprites made from them.
+    let same = key === this.key && this.masks.length === 4;
+    for (let i = 0; i < this.outside.length; i++) {
+      const v = map.type[i] === CellType.OUT ? 1 : 0;
+      if (this.outside[i] !== v) (same = false), (this.outside[i] = v);
+    }
     this.map = map;
-    this.key = key;
     this.fixedKey = "";
+    if (same) return true;
+    this.key = key;
     this.sprites.clear(); this.spritePixels = 0;
     this.size = { W, H };
-    for (let i = 0; i < this.outside.length; i++) this.outside[i] = map.type[i] === CellType.OUT ? 1 : 0;
     this.masks = bakeMasks(this.outside, px, W, H, area);
     if (!this.weights.length) this.weights = AXES.map(([ax, ay]) => weightSprite(ax, ay));
     return this.masks.length === 4;
@@ -171,9 +178,10 @@ function bakeMasks(outside: Uint8Array, px: number, W: number, H: number, area: 
       if (!outside[cellIndex(cx, cy)]) continue;
       const i = y * W + x;
       // Height rising to the east means the surface faces west, and so on.
-      const face = [-gx[i], gx[i], -gy[i], gy[i]];
+      const sx = gx[i], sy = gy[i];
       for (let a = 0; a < 4; a++) {
-        const v = Math.min(1, Math.max(0, face[a] * gain));
+        const face = a === 0 ? -sx : a === 1 ? sx : a === 2 ? -sy : sy;
+        const v = Math.min(1, Math.max(0, face * gain));
         if (v <= 0.02) continue;
         const d = out[a].data;
         d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = 255;

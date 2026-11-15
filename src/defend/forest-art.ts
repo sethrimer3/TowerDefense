@@ -1005,6 +1005,9 @@ export class ForestArt {
       this.sim = undefined;
     }
     if (sim !== this.sim) {
+      // A floor painted with nothing damaged (the build phase's, as a battle
+      // starts) is already the fresh run's floor.
+      const clean = this.sim !== undefined && !!this.floor && this.untouched() && !this.witherStages.some((s) => s > 0);
       this.sim = sim;
       this.damage = new ForestDamage(this.plan!);
       this.debris = [];
@@ -1017,7 +1020,7 @@ export class ForestArt {
       this.blightVersion = this.shadowBlightVersion = -1;
       this.witherStages = new Uint8Array(this.plan!.trees.length);
       this.dirty = true;
-      this.floorStale = [WHOLE];
+      if (!clean) this.floorStale = [WHOLE];
     }
   }
 
