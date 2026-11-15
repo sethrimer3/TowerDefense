@@ -50,11 +50,30 @@ export class GroundRelief {
   /** The board's size in canvas pixels, as of the last `sync`. */
   private size = { W: 0, H: 0 };
 
+  /** The masks for the next area, baked ahead (`prepare`). */
+  private ahead: { key: string; outside: Uint8Array; steps: Steps<HTMLCanvasElement[]> | null; masks: HTMLCanvasElement[] | null } | null = null;
+
+  /** Bakes ahead, for about `ms`, the masks `sync` would bake for `map` in
+   * `area`, so crossing into it doesn't stall; whether any work is left. */
+  prepare(map: CityMap, px: number, W: number, H: number, area: AreaId, ms: number) {
+    if (typeof document === "undefined") return false;
+    const key = `${px}:${maskKey(W, H, area)}`, outside = outsideOf(map);
+    if (!this.ahead || this.ahead.key !== key || !sameCells(this.ahead.outside, outside))
+      this.ahead = { key, outside, steps: bakeMaskSteps(outside, px, W, H, area), masks: null };
+    const a = this.ahead, end = performance.now() + ms;
+    while (a.steps) {
+      const r = a.steps.next();
+      if (r.done) (a.masks = r.value), (a.steps = null);
+      else if (performance.now() >= end) return true;
+    }
+    return false;
+  }
+
   /** Bakes the masks for `map` at `px` canvas pixels a cell, if anything
    * they depend on changed. False until there is a DOM and the floor art. */
   sync(map: CityMap, px: number, W: number, H: number, area: AreaId = "moss") {
     if (typeof document === "undefined") return false;
-    const key = `${W}x${H}:${area}:${floorArtLoaded(area)}:${area === "moss" ? pixelKey() : ""}`;
+    const key = maskKey(W, H, area);
     if (map === this.map && key === this.key) return this.masks.length === 4;
     // The masks read only which cells are open ground: a new city with the
     // same (each battle's) keeps them and the light sprites made from them.
@@ -69,7 +88,9 @@ export class GroundRelief {
     this.key = key;
     this.sprites.clear(); this.spritePixels = 0;
     this.size = { W, H };
-    this.masks = bakeMasks(this.outside, px, W, H, area);
+    const a = this.ahead;
+    if (a?.masks && a.key === `${px}:${key}` && sameCells(a.outside, this.outside)) (this.masks = a.masks), (this.ahead = null);
+    else this.masks = bakeMasks(this.outside, px, W, H, area);
     if (!this.weights.length) this.weights = AXES.map(([ax, ay]) => weightSprite(ax, ay));
     return this.masks.length === 4;
   }
@@ -155,8 +176,29 @@ export class GroundRelief {
   }
 }
 
+type Steps<T> = Generator<void, T, void>;
+/** What the masks depend on besides the open cells and the pixel scale. */
+const maskKey = (W: number, H: number, area: AreaId) => `${W}x${H}:${area}:${floorArtLoaded(area)}:${area === "moss" ? pixelKey() : ""}`;
+const outsideOf = (map: CityMap) => {
+  const out = new Uint8Array(CELLS_W * CELLS_H);
+  for (let i = 0; i < out.length; i++) out[i] = map.type[i] === CellType.OUT ? 1 : 0;
+  return out;
+};
+const sameCells = (a: Uint8Array, b: Uint8Array) => {
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+};
+
 /** The four facing masks, from the flagstones' brightness as height. */
 function bakeMasks(outside: Uint8Array, px: number, W: number, H: number, area: AreaId): HTMLCanvasElement[] {
+  const steps = bakeMaskSteps(outside, px, W, H, area);
+  for (;;) {
+    const r = steps.next();
+    if (r.done) return r.value;
+  }
+}
+/** `bakeMasks` a stage (or a band of rows) a step. */
+function* bakeMaskSteps(outside: Uint8Array, px: number, W: number, H: number, area: AreaId): Steps<HTMLCanvasElement[]> {
   const floor = document.createElement("canvas");
   floor.width = W;
   floor.height = H;
@@ -164,14 +206,21 @@ function bakeMasks(outside: Uint8Array, px: number, W: number, H: number, area: 
   if (!fc) return [];
   paintFloor(fc, px, area);
   const rgba = fc.getImageData(0, 0, W, H).data;
+  yield;
   const height = new Float32Array(W * H);
   for (let i = 0; i < W * H; i++) height[i] = (rgba[i * 4] * 0.3 + rgba[i * 4 + 1] * 0.59 + rgba[i * 4 + 2] * 0.11) / 255;
+  yield;
   // Soften the art's speckle so the slopes follow the stones, not the noise.
-  const soft = boxBlur(boxBlur(height, W, H, Math.max(1, Math.round(px * 0.06))), W, H, 1);
+  const rough = boxBlur(height, W, H, Math.max(1, Math.round(px * 0.06)));
+  yield;
+  const soft = boxBlur(rough, W, H, 1);
+  yield;
   const { gx, gy } = slopes(soft, W, H);
+  yield;
   const gain = 1 / Math.max(1e-4, percentile(gx, gy, 0.96));
+  yield;
   const out = AXES.map(() => new ImageData(W, H));
-  for (let y = 0; y < H; y++) {
+  for (let y = 0; y < H; y++, y % 32 || (yield)) {
     const cy = Math.min(CELLS_H - 1, Math.floor(y / px));
     for (let x = 0; x < W; x++) {
       const cx = Math.min(CELLS_W - 1, Math.floor(x / px));
