@@ -93,6 +93,72 @@ export function caveGravelPixel(x: number, y: number) {
   return rgba(c);
 }
 
+/** `caveGravelPixel` over a `w` by `h` buffer whose (`ox`, `oy`) is the
+ * board's corner, but for the box `skip` (the board itself): the same
+ * pixels, with each wash's lattice hashes and each cell's pebbles worked out
+ * once rather than at every pixel. */
+export function fillCaveGravel(out: Uint32Array, w: number, h: number, ox: number, oy: number, skip: { x0: number; y0: number; x1: number; y1: number }) {
+  const x0 = -ox, x1 = w - 1 - ox, y0 = -oy, y1 = h - 1 - oy;
+  // The two washes: each column's lattice cell and eased offset, and the
+  // lattice's hashes along the two rows a pixel row reads.
+  const washer = (scale: number, salt: number) => {
+    const ixs = new Int32Array(w), sxs = new Float64Array(w);
+    for (let X = 0; X < w; X++) {
+      const fx = (X + x0) / scale, ix = Math.floor(fx), tx = fx - ix;
+      ixs[X] = ix; sxs[X] = tx * tx * (3 - 2 * tx);
+    }
+    const lo = ixs[0], n = ixs[w - 1] - lo + 2;
+    const top = new Float64Array(n), bottom = new Float64Array(n);
+    let rowAt = NaN, sy = 0;
+    return {
+      row(y: number) {
+        const fy = y / scale, iy = Math.floor(fy), ty = fy - iy;
+        sy = ty * ty * (3 - 2 * ty);
+        if (iy !== rowAt) {
+          rowAt = iy;
+          for (let k = 0; k < n; k++) (top[k] = hash01(lo + k, iy, salt)), (bottom[k] = hash01(lo + k, iy + 1, salt));
+        }
+      },
+      at(X: number) {
+        const k = ixs[X] - lo, sx = sxs[X];
+        const a = top[k], b = top[k + 1], c = bottom[k], d = bottom[k + 1];
+        return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
+      },
+    };
+  };
+  const broad = washer(40, 860), fine = washer(9, 861);
+  // Each cell's three pebbles: where (art pixels) and whether big.
+  const cx0 = Math.floor((x0 - 1) / ART), cy0 = Math.floor((y0 - 1) / ART), cw = Math.floor(x1 / ART) - cx0 + 1, chh = Math.floor(y1 / ART) - cy0 + 1;
+  const pxs = new Int32Array(cw * chh * 3), pys = new Int32Array(cw * chh * 3), bigs = new Uint8Array(cw * chh * 3);
+  for (let j = 0; j < chh; j++)
+    for (let i = 0; i < cw; i++)
+      for (let k = 0; k < 3; k++) {
+        const cx = cx0 + i, cy = cy0 + j, q = (j * cw + i) * 3 + k;
+        pxs[q] = cx * ART + (hash(cx, cy, k, 863) % ART); pys[q] = cy * ART + (hash(cx, cy, k, 864) % ART); bigs[q] = hash(cx, cy, k, 865) % 3 === 0 ? 1 : 0;
+      }
+  const OFFSETS = [0, 0, -1, 0, 0, -1, -1, -1];
+  for (let Y = 0; Y < h; Y++) {
+    const y = Y + y0;
+    broad.row(y); fine.row(y);
+    for (let X = 0; X < w; X++) {
+      if (X >= skip.x0 && Y >= skip.y0 && X < skip.x1 && Y < skip.y1) continue;
+      const x = X + x0;
+      const v = broad.at(X) * 0.65 + fine.at(X) * 0.35 + (hash01(x, y, 862) - 0.5) * 0.45;
+      let c = GRAVEL[Math.max(0, Math.min(GRAVEL.length - 1, Math.floor(v * GRAVEL.length)))];
+      for (let o = 0; o < 8; o += 2) {
+        const cx = Math.floor((x + OFFSETS[o]) / ART), cy = Math.floor((y + OFFSETS[o + 1]) / ART), base = ((cy - cy0) * cw + cx - cx0) * 3;
+        for (let k = 0; k < 3; k++) {
+          const px = pxs[base + k], py = pys[base + k], big = bigs[base + k] === 1;
+          if (px === x && py === y) c = big ? PEBBLE.lit : PEBBLE.mid;
+          else if (big && ((px + 1 === x && py === y) || (px === x && py + 1 === y))) c = PEBBLE.mid;
+          else if (px + 1 === x && py + 1 === y) c = PEBBLE.dark;
+        }
+      }
+      out[Y * w + X] = rgba(c);
+    }
+  }
+}
+
 /** RGBA pixel `v` lit warm by the full daylight through the great opening
  * (as `drawFloor` lights the floor under it), for the wilds. */
 export const sunlitPixel = (v: number) => sunlit(v, 1);
