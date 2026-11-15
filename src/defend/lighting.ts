@@ -220,10 +220,11 @@ export class DefendLighting {
   /** What stands, painted from the buildings' own art at `MASK` pixels a
    * cell: `body` their pixels, `rim` their outlines. Null until the city
    * layer first paints them (then torches clip to open cells). */
-  private masks: { body: HTMLCanvasElement; rim: HTMLCanvasElement; covered: Uint8Array; pixels: Uint8Array; rims: Uint8Array } | null = null;
+  private masks: { body: HTMLCanvasElement; rim: HTMLCanvasElement; covered: Uint8Array; pixels: Uint8Array; rims: Uint8Array; bodies: Uint8Array } | null = null;
   /** Bumped whenever the masks change, for `rimPieces`. */
   private masksVersion = 0;
   private rimPieces: { key: string; board: Region[] } | null = null;
+  private bodyPieces: { key: string; board: Region[] } | null = null;
   private bodyUp: HTMLCanvasElement | null = null;
   private rimUp: HTMLCanvasElement | null = null;
   private tint: HTMLCanvasElement | null = null;
@@ -291,10 +292,10 @@ export class DefendLighting {
     this.tintKey = this.buildingGrownKey = "";
     // Read only cached source masks, never a rendered scene. Resolve light
     // occlusion at native art pixels so rounded corners are not whole cells.
-    const covered = new Uint8Array(CELL_COUNT), pixels = new Uint8Array(CELLS_W * ART * CELLS_H * ART), rims = new Uint8Array(CELL_COUNT);
-    readMasks(body, rim, { x0: 0, y0: 0, x1: CELLS_W, y1: CELLS_H }, covered, pixels, rims);
+    const covered = new Uint8Array(CELL_COUNT), pixels = new Uint8Array(CELLS_W * ART * CELLS_H * ART), rims = new Uint8Array(CELL_COUNT), bodies = new Uint8Array(CELL_COUNT);
+    readMasks(body, rim, { x0: 0, y0: 0, x1: CELLS_W, y1: CELLS_H }, covered, pixels, rims, bodies);
     const old = this.masks?.covered, oldPixels = this.masks?.pixels;
-    this.masks = { body, rim, covered, pixels, rims };
+    this.masks = { body, rim, covered, pixels, rims, bodies };
     this.masksVersion++;
     this.upKey = "";
     if (!old) {
@@ -323,7 +324,7 @@ export class DefendLighting {
     // redrawn only inside the boxes too, next time they're asked for.
     if (this.upKey) this.upPatches.push(...boxes);
     const cells = new Set<number>();
-    for (const box of boxes) for (const i of readMasks(m.body, m.rim, box, m.covered, m.pixels, m.rims)) cells.add(i);
+    for (const box of boxes) for (const i of readMasks(m.body, m.rim, box, m.covered, m.pixels, m.rims, m.bodies)) cells.add(i);
     this.masksVersion++;
     this.invalidate([...cells]);
   }
@@ -532,21 +533,21 @@ export class DefendLighting {
   /** The board rectangles (whole pixels, never overlapping) holding every
    * outline pixel of the rim drawn up to `W` x `H`; null when unknown or
    * the board is rotated or skewed. */
-  private rimRegions(W: number, H: number): Region[] | null {
+  private rimRegions(W: number, H: number, of: "rims" | "bodies" = "rims"): Region[] | null {
     const m = this.masks;
     if (!m) return null;
-    const key = `${this.masksVersion}:${W}x${H}`;
-    if (this.rimPieces?.key === key) return this.rimPieces.board;
-    const cols = Math.ceil(W / RIM_CELL), rows = Math.ceil(H / RIM_CELL), on = new Uint8Array(cols * rows);
+    const key = `${this.masksVersion}:${W}x${H}`, held = of === "rims" ? "rimPieces" : "bodyPieces";
+    if (this[held]?.key === key) return this[held]!.board;
+    const cols = Math.ceil(W / RIM_CELL), rows = Math.ceil(H / RIM_CELL), on = new Uint8Array(cols * rows), flags = m[of];
     for (let cy = 0; cy < CELLS_H; cy++) for (let cx = 0; cx < CELLS_W; cx++) {
-      if (!m.rims[cellIndex(cx, cy)]) continue;
+      if (!flags[cellIndex(cx, cy)]) continue;
       // The cell drawn up (nearest), two pixels out for rounding.
       const a = Math.max(0, Math.floor((Math.floor((cx * W) / CELLS_W) - 2) / RIM_CELL)), b = Math.min(cols - 1, Math.floor((Math.ceil(((cx + 1) * W) / CELLS_W) + 2) / RIM_CELL));
       const t = Math.max(0, Math.floor((Math.floor((cy * H) / CELLS_H) - 2) / RIM_CELL)), u = Math.min(rows - 1, Math.floor((Math.ceil(((cy + 1) * H) / CELLS_H) + 2) / RIM_CELL));
       for (let r = t; r <= u; r++) on.fill(1, r * cols + a, r * cols + b + 1);
     }
     const board = cellPieces(on, cols, rows, RIM_CELL, { x: 0, y: 0, w: W, h: H });
-    this.rimPieces = { key, board };
+    this[held] = { key, board };
     return board;
   }
 
@@ -623,8 +624,14 @@ export class DefendLighting {
   private unlightBodies(body: HTMLCanvasElement, ambient: Ambient) {
     const dk = this.dark!.getContext("2d")!,
       gl = this.glow!.getContext("2d")!;
+    // Only round the cells with any body: elsewhere the body (and so its
+    // tint) is clear, and taking or laying clear pixels changes nothing.
+    const pieces = this.rimRegions(body.width, body.height, "bodies") ?? [{ x: 0, y: 0, w: body.width, h: body.height }];
+    const each = (c: CanvasRenderingContext2D, paint: () => void) => {
+      for (const p of pieces) { c.save(); c.beginPath(); c.rect(p.x, p.y, p.w, p.h); c.clip(); paint(); c.restore(); }
+    };
     gl.globalCompositeOperation = "destination-out";
-    gl.drawImage(body, 0, 0);
+    each(gl, () => gl.drawImage(body, 0, 0));
     gl.globalCompositeOperation = "source-over";
     const key = `${body.width}:${body.height}:${ambient.color}`;
     const whole = key !== this.tintKey || !this.tint;
@@ -645,10 +652,10 @@ export class DefendLighting {
     }
     this.tintPatches = [];
     dk.globalCompositeOperation = "destination-out";
-    dk.drawImage(body, 0, 0);
+    each(dk, () => dk.drawImage(body, 0, 0));
     dk.globalCompositeOperation = "source-over";
     dk.globalAlpha = ambient.alpha;
-    dk.drawImage(this.tint!, 0, 0);
+    each(dk, () => dk.drawImage(this.tint!, 0, 0));
     dk.globalAlpha = 1;
   }
 
@@ -725,11 +732,13 @@ export class DefendLighting {
    * lights. */
   private drawCarried(field: LightField, { px, now, reduceMotion }: LightFrame, glow: number, carried: Carried) {
     if (!carried.torches.length) return;
+    const reached: number[] = [];
     for (const t of carried.torches) {
       const f = getTorchFlicker({ x: t.id * 11, y: t.id * 5 }, now, reduceMotion);
       // Explosion flashes pass their own reach and brightness.
-      const alpha = Math.min(1, (t.k ?? 0.8) * f);
-      field.addTorch(t.x, t.y, (t.r || CARRIED_RADIUS) * (0.95 + (f - 1) * 0.6), alpha);
+      const alpha = Math.min(1, (t.k ?? 0.8) * f), reach = (t.r || CARRIED_RADIUS) * (0.95 + (f - 1) * 0.6);
+      field.addTorch(t.x, t.y, reach, alpha);
+      if (reach > 0 && alpha > 0) reached.push(t.x, t.y, reach);
     }
     const small = this.small!;
     field.paintTorches(small.torchImg.data);
@@ -739,6 +748,31 @@ export class DefendLighting {
     const W = dk.canvas.width,
       H = dk.canvas.height;
     this.dyn = upscale(this.dyn, small.torch, px, W, H);
+    if (this.masks) {
+      // With the buildings' masks the pools need no clipping to the ground,
+      // and each is carved and added only in the board squares it reaches (a
+      // cell past its reach, for the smoothing), where the rest is clear. The
+      // drawing up stays whole: a clip there could move its sampling.
+      const cols = Math.ceil(W / RIM_CELL), rows = Math.ceil(H / RIM_CELL), on = new Uint8Array(cols * rows);
+      for (let i = 0; i < reached.length; i += 3) {
+        const x = reached[i], y = reached[i + 1], r = reached[i + 2] + 1;
+        const a = Math.max(0, Math.floor(((x - r) * px - 2) / RIM_CELL)), b = Math.min(cols - 1, Math.floor(((x + r) * px + 2) / RIM_CELL));
+        const t = Math.max(0, Math.floor(((y - r) * px - 2) / RIM_CELL)), u = Math.min(rows - 1, Math.floor(((y + r) * px + 2) / RIM_CELL));
+        for (let row = t; row <= u; row++) if (a <= b) on.fill(1, row * cols + a, row * cols + b + 1);
+      }
+      const pieces = cellPieces(on, cols, rows, RIM_CELL, { x: 0, y: 0, w: W, h: H }), dyn = this.dyn;
+      dk.globalCompositeOperation = "destination-out";
+      dk.globalAlpha = 0.85;
+      for (const p of pieces) dk.drawImage(dyn, p.x, p.y, p.w, p.h, p.x, p.y, p.w, p.h);
+      dk.globalCompositeOperation = "source-over";
+      dk.globalAlpha = 1;
+      gl.globalCompositeOperation = "lighter";
+      gl.globalAlpha = Math.min(1, glow * 0.8);
+      for (const p of pieces) gl.drawImage(dyn, p.x, p.y, p.w, p.h, p.x, p.y, p.w, p.h);
+      gl.globalCompositeOperation = "source-over";
+      gl.globalAlpha = 1;
+      return;
+    }
     const d = this.dyn.getContext("2d")!;
     // With the buildings' masks, `unlightBodies` takes it off them after.
     if (!this.masks) {
@@ -928,7 +962,7 @@ export type CellBox = { x0: number; y0: number; x1: number; y1: number; layerOnl
  * while the body fills half of it) and `pixels` (an art pixel stands while
  * either mask covers any of its samples), returning the cells whose value
  * or art pixels changed. */
-function readMasks(body: HTMLCanvasElement, rim: HTMLCanvasElement, box: CellBox, covered: Uint8Array, pixels: Uint8Array, rims: Uint8Array) {
+function readMasks(body: HTMLCanvasElement, rim: HTMLCanvasElement, box: CellBox, covered: Uint8Array, pixels: Uint8Array, rims: Uint8Array, bodies: Uint8Array) {
   const changed: number[] = [];
   const w = (box.x1 - box.x0) * MASK, h = (box.y1 - box.y0) * MASK;
   if (w <= 0 || h <= 0) return changed;
@@ -943,11 +977,16 @@ function readMasks(body: HTMLCanvasElement, rim: HTMLCanvasElement, box: CellBox
         let k = (y * w + lx) * 4 + 3;
         for (let x = 0; x < MASK; x++, k += 4) if (a[k] >= 128) n++;
       }
-      let any = 0;
+      let any = 0, solid = 0;
       for (let y = ly; y < ly + MASK && !any; y++) {
         let k = (y * w + lx) * 4 + 3;
         for (let x = 0; x < MASK; x++, k += 4) if (b[k]) { any = 1; break; }
       }
+      for (let y = ly; y < ly + MASK && !solid; y++) {
+        let k = (y * w + lx) * 4 + 3;
+        for (let x = 0; x < MASK; x++, k += 4) if (a[k]) { solid = 1; break; }
+      }
+      bodies[cellIndex(cx, cy)] = solid;
       const i = cellIndex(cx, cy), v = n >= half ? 1 : 0;
       rims[i] = any;
       let moved = covered[i] !== v;
