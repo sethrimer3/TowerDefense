@@ -63,6 +63,8 @@ export const SETTINGS_TEXT = [
  ["setting.devStewardship","Stewardship","Administración","Intendance","Verwaltung","Administração","Amministrazione","統治","관리","治理"],
  ["setting.devMine","Mine","Mina","Mine","Mine","Mina","Miniera","鉱山","광산","矿山"],
  ["setting.devLibrary","Library","Biblioteca","Bibliothèque","Bibliothek","Biblioteca","Biblioteca","図書館","도서관","图书馆"],
+ ["setting.devFrameTimes","Show frame timings","Mostrar tiempos de fotograma","Afficher les temps d'image","Bildzeiten anzeigen","Mostrar tempos de quadro","Mostra tempi dei fotogrammi","フレーム時間を表示","프레임 시간 표시","显示帧耗时"],
+ ["setting.devNoLighting","Battle lighting off","Iluminación de batalla desactivada","Éclairage de bataille désactivé","Schlachtbeleuchtung aus","Iluminação de batalha desligada","Illuminazione di battaglia disattivata","戦闘の照明オフ","전투 조명 끄기","关闭战斗光照"],
  ["settings.allOn","ALL ON","ACTIVAR TODO","TOUT ACTIVER","ALLES AN","ATIVAR TUDO","ATTIVA TUTTO","すべて有効","모두 켜기","全部开启"],
  ["settings.allResearch","All research unlocked","Toda la investigación desbloqueada","Toutes les recherches débloquées","Alle Forschungen freigeschaltet","Todas as pesquisas desbloqueadas","Tutte le ricerche sbloccate","すべての研究を解放","모든 연구 잠금 해제","解锁全部研究"],
  ["settings.idleHour","Add 1 hour of idle time","Añadir 1 hora de tiempo inactivo","Ajouter 1 heure d'absence","1 Stunde Abwesenheit hinzufügen","Adicionar 1 hora de tempo ausente","Aggiungi 1 ora di assenza","不在時間を1時間追加","방치 시간 1시간 추가","增加1小时离线时间"],

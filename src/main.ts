@@ -179,6 +179,8 @@ const defendPage = new DefendPage(el("defend"), {
   ultraGraphics: () => save.settings.ultraGraphics,
   setHealthbars: (value) => { save.settings.showHealthbars = value; store(); },
   crispZoom: () => save.settings.crispZoom,
+  frameTimes: () => save.settings.developerMode && save.settings.devFrameTimes,
+  lighting: () => !(save.settings.developerMode && save.settings.devNoLighting),
   setCrispZoom: (value) => { save.settings.crispZoom = value; store(); },
   showEmpty: () => save.settings.showEmpty,
   dragRally: () => save.settings.dragRally,
