@@ -37,6 +37,8 @@ import { cellPieces } from "./paint-box.ts";
 import { sceneryOutlinesOn, windAt } from "./scenery-looks.ts";
 import { caveTrailPixel, paintRoadLinesSteps, sandReachCanvases } from "./trail-art.ts";
 import { fillCaveGravel, openingLight, sunlitPixel } from "./crystal-caves-art.ts";
+import { fillCinder, LAVA, paintFissure, paintPool, rgba as forgeRgba, rockPiece, scrapPiece, shardPiece, stand, ventPiece, type Img } from "./ember-forge-art.ts";
+import { fissure, forgeRock, hasEmberForge, type Fissure, type ScrapKind } from "./ember-forge.ts";
 import { duneHeights, duneLightKey, duneTaperPixels, duneTile, warmDuneTaper } from "./atmosphere-art.ts";
 import { segmentDistance, type TrailLine, type TrailPlan } from "./trails.ts";
 
@@ -57,7 +59,7 @@ function drain<T>(steps: Steps<T>): T {
     if (r.done) return r.value;
   }
 }
-type Painted = { px: Uint32Array; turf: Uint8Array; shaded: Uint8Array; plan: WildsPlan; floor: Uint8Array | null };
+type Painted = { px: Uint32Array; turf: Uint8Array; shaded: Uint8Array; plan: WildsPlan; floor: Uint8Array | null; glow: Uint32Array | null };
 
 /** Cells from the field's edge to cell (cx, cy)'s middle (0 on the board). */
 export function beyond(cx: number, cy: number) {
@@ -580,6 +582,114 @@ function* paintBasalt(out: Uint32Array): Steps {
   }
 }
 const BAYER4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
+
+/** The Ember Forge's mountains: dark basalt (foot to top), the pale ash
+ * settled on their gentler heights, and the lava crust at their foot. */
+const VOLCANO = [0x0d0908, 0x150f0d, 0x1e1613, 0x2a1f1a, 0x382a23, 0x4a382e];
+const VOLCANO_ASH = [0x3e3733, 0x504743];
+const VOLCANO_CRUST = [0x1c0f0b, 0x2c1812];
+/** The Ember Forge's ranges, from `rangeFieldSteps`: dark basalt lit from
+ * the upper left, ash on the gentler heights, streams of lava winding down
+ * their flanks and pooling in lakes under black crust round their foot,
+ * outlined. The lava's light goes into `glow` too, for the night. */
+function* paintVolcano(out: Uint32Array, glow: Uint32Array): Steps {
+  const { H, f, mossy } = yield* rangeFieldSteps();
+  const ramp = VOLCANO.map((c) => rgbaOf(c)), ash = VOLCANO_ASH.map((c) => rgbaOf(c));
+  const lava = LAVA.map((c) => forgeRgba(c)), crust = VOLCANO_CRUST.map((c) => rgbaOf(c));
+  const edge = sceneryOutlinesOn() ? rgbaOf(0x0a0605) : ramp[1];
+  // The streams' winding lines and the lakes' noise, sampled every `Q`
+  // pixels and blended between, as the ranges' own fields are.
+  const Q = 4, qw = Math.ceil(GW / Q) + 1, qh = Math.ceil(GH / Q) + 1, qs = new Float32Array(qw * qh), ql = new Float32Array(qw * qh);
+  for (let gy = 0; gy < qh; gy++, gy % (SLICE / Q) || (yield))
+    for (let gx = 0; gx < qw; gx++) {
+      const X = gx * Q, Y = gy * Q;
+      qs[gy * qw + gx] = smoothNoise(X / 70 + smoothNoise(X / 33, Y / 33, 791) * 1.4, Y / 70, 790);
+      ql[gy * qw + gx] = smoothNoise(X / 46, Y / 46, 792);
+    }
+  const inR = (X: number, Y: number) => X >= 0 && Y >= 0 && X < GW && Y < GH && f[Y * GW + X] > 0;
+  for (let Y = 0; Y < GH; Y++, Y % SLICE || (yield)) {
+    const gy = Math.floor(Y / Q), v0 = (Y % Q) / Q;
+    for (let X = 0; X < GW; X++) {
+      const i = Y * GW + X, fi = f[i];
+      if (fi <= -0.22) continue;
+      if (X >= OX && Y >= OY && X < OX + BW && Y < OY + BH) continue;
+      const gx = Math.floor(X / Q), u = (X % Q) / Q, j = gy * qw + gx;
+      const lerp = (a: Float32Array) => (a[j] * (1 - u) + a[j + 1] * u) * (1 - v0) + (a[j + qw] * (1 - u) + a[j + qw + 1] * u) * v0;
+      const dither = BAYER4[(Y & 3) * 4 + (X & 3)] - 0.5;
+      if (fi <= 0) {
+        // A lake of lava round the mountain's foot, crusted at its shore.
+        const l = lerp(ql) + fi * 1.4 + dither * 0.03;
+        if (l < 0.6) continue;
+        const hot = l - 0.6;
+        if (hot < 0.02) { out[i] = crust[(X + Y) & 1]; continue; }
+        // Plates of crust drifting on it, thicker near the shore.
+        const plate = smoothNoise(X / 9, Y / 9, 796) * 0.7 + smoothNoise(X / 3.5, Y / 3.5, 797) * 0.3 + Math.max(0, 0.08 - hot) * 3;
+        if (plate > 0.64) { out[i] = crust[plate > 0.7 ? 0 : 1]; continue; }
+        const n = plate > 0.6 ? 1 : plate > 0.45 ? 2 : plate > 0.3 ? 3 : 4;
+        out[i] = lava[n];
+        glow[i] = lava[Math.min(5, n + 1)];
+        continue;
+      }
+      if (!inR(X - 1, Y) || !inR(X + 1, Y) || !inR(X, Y - 1) || !inR(X, Y + 1)) { out[i] = edge; continue; }
+      const gxH = H[i + 1] - H[i - 1], gyH = H[i + GW] - H[i - GW], steep = Math.abs(gxH) + Math.abs(gyH);
+      const k = (0.6 * gxH + 0.8 * gyH) * 0.3 + (H[i] - 50) * 0.004 + dither * 0.3;
+      let c = k > 0.75 ? ramp[5] : k > 0.35 ? ramp[4] : k > 0.02 ? ramp[3] : k > -0.35 ? ramp[2] : k > -0.8 ? ramp[1] : ramp[0];
+      const m = mossy[i] - steep * 0.12 + dither * 0.12;
+      if (m > 0.74 || (m > 0.7 && (X + Y) & 1)) c = ash[k > 0.3 ? 1 : 0];
+      // Lava filling the gullies between the ridges, hottest down their
+      // middles, a dark crust at their banks.
+      const lift = smooth(0, 0.35, fi);
+      if (lift > 0.6) {
+        const ridge = (H[i] - 30 * smooth(0, 0.6, fi)) / (150 * lift) + (lerp(qs) - 0.5) * 0.05 + dither * 0.01;
+        if (ridge < 0.11) {
+          const n = ridge < 0.04 ? 4 : ridge < 0.075 ? 3 : 1;
+          c = lava[n];
+          glow[i] = lava[Math.min(5, n + 1)];
+        } else if (ridge < 0.13) c = crust[(X + Y) & 1];
+      }
+      out[i] = c;
+    }
+  }
+}
+
+/** The forge's fissures, pools, vents, obsidian and scrap out in the open
+ * wilds, thinning out as the field's own ground does, never on the
+ * mountains, the field or each other. */
+type WildForge = { cracks: Fissure[]; pools: { x: number; y: number; r: number; seed: number }[]; vents: { x: number; y: number; r: number; seed: number }[]; shards: { x: number; y: number; r: number; seed: number; shards: number }[]; scrap: { x: number; y: number; r: number; seed: number; kind: ScrapKind }[] };
+let forgeWilds: WildForge | null = null;
+function wildForge(): WildForge {
+  if (forgeWilds) return forgeWilds;
+  const out: WildForge = { cracks: [], pools: [], vents: [], shards: [], scrap: [] };
+  const taken: { x: number; y: number; r: number }[] = wildsPlan().rocks.map((r) => ({ x: r.x, y: r.y, r: r.size * 0.6 }));
+  const room = (x: number, y: number, r: number) => {
+    if (x + r + 0.5 > 0 && y + r + 0.5 > 0 && x - r - 0.5 < CELLS_W && y - r - 0.5 < CELLS_H) return false;
+    for (const [dx, dy] of [[0, 0], [r, 0], [-r, 0], [0, r], [0, -r]]) if (rangeAt(x + dx, y + dy) > -0.15) return false;
+    return taken.every((t) => (t.x - x) ** 2 + (t.y - y) ** 2 >= (t.r + r + 0.8) ** 2);
+  };
+  const KINDS: readonly ScrapKind[] = ["anvil", "ingots", "cog", "slag", "slag"];
+  for (let cy = -MARGIN; cy < CELLS_H + MARGIN; cy++)
+    for (let cx = -MARGIN; cx < CELLS_W + MARGIN; cx++) {
+      if (onBoard(cx, cy)) continue;
+      const thin = 1 - 0.75 * smooth(6, 28, beyond(cx, cy)), u = hash01(cx, cy, 781) / thin, x = cx + 0.5, y = cy + 0.5, seed = hash(cx, cy, 782);
+      if (u < 0.0005) {
+        const r = 1.6 + hash01(cx, cy, 783) * 1.1;
+        if (room(x, y, r + 2)) { out.pools.push({ x, y, r, seed }); taken.push({ x, y, r: r + 0.6 }); }
+      } else if (u < 0.0021) {
+        const f = fissure(x, y, seed, (px, py) => room(px, py, 0.5));
+        if (f) { out.cracks.push(f); for (const p of f.points) taken.push({ x: p.x, y: p.y, r: 0.35 }); }
+      } else if (u < 0.0033) {
+        const r = 1 + hash01(cx, cy, 788) * 0.6;
+        if (room(x, y, r + 1)) { out.vents.push({ x, y, r, seed }); taken.push({ x, y, r }); }
+      } else if (u < 0.0047) {
+        const r = 0.6 + hash01(cx, cy, 789) * 0.7;
+        if (room(x, y, r + 0.5)) { out.shards.push({ x, y, r, seed, shards: 2 + (seed % 4) }); taken.push({ x, y, r }); }
+      } else if (u < 0.0056) {
+        const kind = KINDS[seed % KINDS.length], r = kind === "slag" ? 0.8 + hash01(cx, cy, 794) * 0.6 : 0.9;
+        if (room(x, y, r + 0.8)) { out.scrap.push({ x, y, r, seed, kind }); taken.push({ x, y, r }); }
+      }
+    }
+  return (forgeWilds = out);
+}
 const rgbaOf = (c: number) => ((255 << 24) | ((c & 0xff) << 16) | (c & 0xff00) | ((c >> 16) & 0xff)) >>> 0;
 
 /** The wilds' still ground in art pixels over the whole extent: in the
@@ -589,8 +699,8 @@ const rgbaOf = (c: number) => ((255 << 24) | ((c & 0xff) << 16) | (c & 0xff00) |
  * those under a tree's shadow. */
 export const paintWilds = (...args: Parameters<typeof paintWildsSteps>) => drain(paintWildsSteps(...args));
 /** `paintWilds` a slice at a time: each `next()` paints some rows. */
-export function* paintWildsSteps(forest: boolean, stone?: Stone, reach: readonly TrailLine[] = [], rocks = true, look: "ranges" | "moab" | "basalt" = "ranges"): Steps<Painted> {
-  const moab = look === "moab", basalt = look === "basalt";
+export function* paintWildsSteps(forest: boolean, stone?: Stone, reach: readonly TrailLine[] = [], rocks = true, look: "ranges" | "moab" | "basalt" | "volcano" = "ranges"): Steps<Painted> {
+  const moab = look === "moab", basalt = look === "basalt", volcano = look === "volcano";
   const out = new Uint32Array(GW * GH), whole = wildsPlan();
   // The trees and rocks clear of the roads carried out here.
   const plan: WildsPlan = reach.length
@@ -623,12 +733,33 @@ export function* paintWildsSteps(forest: boolean, stone?: Stone, reach: readonly
       }, caveTrailPixel);
   }
   const bare = basalt ? out.slice() : null;
+  // The Ember Forge's cinders carried on past the board, its fissures and
+  // pools in them, and what glows of it kept apart for the night.
+  const glow: Img | null = volcano ? { px: new Uint32Array(GW * GH), w: GW, h: GH } : null;
+  const img: Img = { px: out, w: GW, h: GH };
+  const offField = (X: number, Y: number) => !(X >= OX && Y >= OY && X < OX + BW && Y < OY + BH);
+  const forge = volcano ? wildForge() : null;
+  if (forge) {
+    yield* fillCinder(out, GW, GH, OX, OY, offField, SLICE);
+    for (const f of forge.cracks) paintFissure(img, glow, f, OX, OY, offField);
+    for (const p of forge.pools) paintPool(img, glow, p.x * ART + OX, p.y * ART + OY, p.r, p.seed, offField);
+  }
   yield;
-  if (moab) yield* paintMesas(out); else if (basalt) yield* paintBasalt(out); else yield* paintRanges(out);
+  if (moab) yield* paintMesas(out); else if (basalt) yield* paintBasalt(out); else if (volcano) yield* paintVolcano(out, glow!.px); else yield* paintRanges(out);
   // Rocks, back to front, each with its shadow down and right.
   const items: { y: number; draw: () => void }[] = [];
+  // The forge's own basalt boulders and pieces, standing as on the field.
+  if (forge) {
+    for (const r of plan.rocks) {
+      const rock = forgeRock(r.x, r.y, Math.max(0.5, r.size * 0.6), r.seed * 7919 + 13);
+      items.push({ y: r.y, draw: () => stand(img, glow, rockPiece(rock), r.x * ART + OX, r.y * ART + OY, offField, rock.r > 1.2 ? 2 : 1) });
+    }
+    for (const v of forge.vents) items.push({ y: v.y, draw: () => stand(img, glow, ventPiece(v), v.x * ART + OX, v.y * ART + OY, offField, 1) });
+    for (const c of forge.shards) items.push({ y: c.y, draw: () => stand(img, glow, shardPiece(c), c.x * ART + OX, c.y * ART + OY, offField, 1) });
+    for (const c of forge.scrap) items.push({ y: c.y, draw: () => stand(img, glow, scrapPiece(c), c.x * ART + OX, c.y * ART + OY, offField, 1) });
+  }
   // (None in the desert: its dunes run on over the wilds, as rockless as the field's.)
-  if (rocks) for (const r of plan.rocks)
+  else if (rocks) for (const r of plan.rocks)
     items.push({ y: r.y, draw: () => {
       const s = rockSprite(r.size, r.seed), x0 = Math.round(r.x * ART) - s.ox + OX, y0 = Math.round(r.y * ART) - s.oy + OY;
       stampInto(out, GW, GH, s, x0 + (r.size > 1 ? 2 : 1), y0 + (r.size > 1 ? 2 : 1), true);
@@ -688,7 +819,7 @@ export function* paintWildsSteps(forest: boolean, stone?: Stone, reach: readonly
       if (i % (GW * SLICE * 4) === 0) yield;
     }
   }
-  return { px: out, turf, shaded, plan, floor };
+  return { px: out, turf, shaded, plan, floor, glow: glow?.px ?? null };
 }
 
 /** The waving blades of the wilds' lawn, as flat arrays: each blade's root
@@ -809,7 +940,7 @@ function nightShade() {
 
 /** The wilds' still ground painted for one area (and, in the forest, one
  * city's roads), the trees and rocks it was painted with, and its blades. */
-type Ground = { canvas: HTMLCanvasElement; turf: Uint8Array; shaded: Uint8Array; plan: WildsPlan; blades: Blades | null; open: { lit: HTMLCanvasElement; moon: HTMLCanvasElement } | null };
+type Ground = { canvas: HTMLCanvasElement; turf: Uint8Array; shaded: Uint8Array; plan: WildsPlan; blades: Blades | null; open: { lit: HTMLCanvasElement; moon: HTMLCanvasElement } | null; glow: HTMLCanvasElement | null };
 
 /** The Crystal Caves' wilds under the great opening: the bare floor `px`
  * (`floor`) as the full daylight lights it, faded by how much of the sky's
@@ -928,7 +1059,7 @@ export class Wilds {
 
   private *groundSteps(forest: boolean, area: AreaId, reach: { lines: TrailLine[] } | null): Steps<Ground> {
     const caves = area === "drowned";
-    const painted = yield* paintWildsSteps(forest, forest ? undefined : STONES[area], reach?.lines ?? [], area !== "desert" && !caves, area === "desert" ? "moab" : caves ? "basalt" : "ranges");
+    const painted = yield* paintWildsSteps(forest, forest ? undefined : STONES[area], reach?.lines ?? [], area !== "desert" && !caves, area === "desert" ? "moab" : caves ? "basalt" : hasEmberForge(area) ? "volcano" : "ranges");
     const canvas = document.createElement("canvas");
     canvas.width = GW;
     canvas.height = GH;
@@ -936,7 +1067,16 @@ export class Wilds {
     new Uint32Array(img.data.buffer).set(painted.px);
     ctx.putImageData(img, 0, 0);
     yield;
-    return { canvas, turf: painted.turf, shaded: painted.shaded, plan: painted.plan, blades: null, open: painted.floor ? yield* caveOpening(painted.px, painted.floor) : null };
+    let glow: HTMLCanvasElement | null = null;
+    if (painted.glow) {
+      glow = document.createElement("canvas");
+      glow.width = GW; glow.height = GH;
+      const gc = glow.getContext("2d")!, gi = gc.createImageData(GW, GH);
+      new Uint32Array(gi.data.buffer).set(painted.glow);
+      gc.putImageData(gi, 0, 0);
+      yield;
+    }
+    return { canvas, turf: painted.turf, shaded: painted.shaded, plan: painted.plan, blades: null, open: painted.floor ? yield* caveOpening(painted.px, painted.floor) : null, glow };
   }
 
   private reach(roads: TrailPlan) {
@@ -1144,6 +1284,14 @@ export class Wilds {
       ctx.drawImage(nightShade(), x, y, toX(GW) - x, toY(GH) - y);
       ctx.globalAlpha = 1;
       ctx.imageSmoothingEnabled = false;
+    }
+    // The Ember Forge's lava glowing through the night, as on the field.
+    if (g.glow && f.night > 0.02) {
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = 0.55 * Math.min(1, f.night);
+      blit(g.glow, view);
+      ctx.globalCompositeOperation = "source-over";
+      ctx.globalAlpha = 1;
     }
     // And by night the opening's pale moonlight over it, as over the field.
     if (g.open) {
