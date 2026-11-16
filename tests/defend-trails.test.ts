@@ -134,6 +134,31 @@ test("at a fork each enemy takes a near-equal branch by its own coin, always the
   for (let id = 1; id <= 10; id++) assert.equal(forkPick(field, wear, here, left, choices, id), left, "a far dearer branch is never taken");
 });
 
+test("a walker holds the branch it picked, so neighbouring cells' coins never shuffle it on one spot", () => {
+  // Seed 5's wave 42: one cell sent a Lesser Dark Blade sideways and the next
+  // sent it diagonally back over the line it had just crossed, forever.
+  const save = defaultDefendSave();
+  const sim = new DefendSim(city(5), save.levels, 9);
+  sim.startAt(42);
+  const last = new Map<number, { x: number; y: number; dx: number; dy: number }>();
+  let moves = 0, reversals = 0;
+  for (let t = 0; t < 60 * 30; t++) {
+    sim.update(1 / 30);
+    for (const e of sim.enemies) {
+      if (e.kind !== "lesserDarkBlade") continue;
+      const p = last.get(e.id);
+      if (!p) { last.set(e.id, { x: e.x, y: e.y, dx: 0, dy: 0 }); continue; }
+      const dx = e.x - p.x, dy = e.y - p.y, d = Math.hypot(dx, dy);
+      if (d < 1e-4) continue;
+      moves++;
+      if (dx * p.dx + dy * p.dy < -0.5 * d * Math.hypot(p.dx, p.dy)) reversals++;
+      last.set(e.id, { x: e.x, y: e.y, dx, dy });
+    }
+  }
+  assert.ok(moves > 1000, `the knights walked (${moves})`);
+  assert.equal(reversals, 0, "never turned straight back");
+});
+
 /** Runs a battle at `wave` on `map`, sampling where ground walkers go. */
 function march(map: CityMap, wave: number, seconds = 40) {
   const save = defaultDefendSave();
