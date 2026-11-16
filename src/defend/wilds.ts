@@ -49,6 +49,20 @@ export const MARGIN = 72;
 /** The wilds' extent in art pixels, and where the board's corner sits in it. */
 const GW = (CELLS_W + 2 * MARGIN) * ART, GH = (CELLS_H + 2 * MARGIN) * ART, OX = MARGIN * ART, OY = MARGIN * ART;
 const BW = CELLS_W * ART, BH = CELLS_H * ART;
+
+/** Wilds coordinate `v` (art pixels) to a whole device pixel through `to`,
+ * rounded, except at the board's edges (`o`, `o + size`), which go outward
+ * (the near edge up, the far edge down), so the wilds always reach under the
+ * board's partly covered rim pixels. */
+export function snapEdge(v: number, o: number, size: number, to: (v: number) => number) {
+  return v === o ? Math.ceil(to(v)) : v === o + size ? Math.floor(to(v)) : Math.round(to(v));
+}
+
+/** [`a`, `b`) cut at `p` and `q` where they fall inside it. */
+export function edgeSpans(a: number, b: number, p: number, q: number): [number, number][] {
+  const cuts = [a, ...[p, q].filter((c) => c > a && c < b), b];
+  return cuts.slice(1).map((c, i) => [cuts[i], c]);
+}
 /** Work done a slice at a time (`Wilds.prepare`), each yield a few rows. */
 type Steps<T = void> = Generator<void, T, void>;
 const SLICE = 16;
@@ -1210,6 +1224,7 @@ export class Wilds {
       x1: Math.min(GW, Math.ceil((cw - f.cam.x) / k) + OX), y1: Math.min(GH, Math.ceil((ch - f.cam.y) / k) + OY),
     };
     const toX = (X: number) => f.cam.x + (X - OX) * k, toY = (Y: number) => f.cam.y + (Y - OY) * k;
+    const devX = (X: number) => snapEdge(X, OX, BW, toX), devY = (Y: number) => snapEdge(Y, OY, BH, toY);
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     if (f.beyond && view.x0 >= OX && view.y0 >= OY && view.x1 <= OX + BW && view.y1 <= OY + BH) {
@@ -1217,9 +1232,17 @@ export class Wilds {
     }
     if (view.x0 >= OX && view.y0 >= OY && view.x1 <= OX + BW && view.y1 <= OY + BH) { ctx.restore(); return; }
     ctx.imageSmoothingEnabled = false;
+    // Cut at the board's edges, so the wilds' first art pixel past each edge
+    // starts on the device pixel the board's rim only partly covers: a single
+    // stretched copy can land it a pixel late, leaving the dark beyond showing
+    // through as a thin line along the edge at some zooms.
     const blitTo = (c: CanvasRenderingContext2D, src: CanvasImageSource, b: Box, sx = b.x0, sy = b.y0) => {
-      const x = Math.round(toX(b.x0)), y = Math.round(toY(b.y0));
-      c.drawImage(src, sx, sy, b.x1 - b.x0, b.y1 - b.y0, x, y, Math.round(toX(b.x1)) - x, Math.round(toY(b.y1)) - y);
+      for (const [ax, bx] of edgeSpans(b.x0, b.x1, OX, OX + BW))
+        for (const [ay, by] of edgeSpans(b.y0, b.y1, OY, OY + BH)) {
+          if (ax >= OX && bx <= OX + BW && ay >= OY && by <= OY + BH) continue;
+          const x = devX(ax), y = devY(ay), w = devX(bx) - x, h = devY(by) - y;
+          if (w > 0 && h > 0) c.drawImage(src, sx + ax - b.x0, sy + ay - b.y0, bx - ax, by - ay, x, y, w, h);
+        }
     };
     const blit = (src: CanvasImageSource, b: Box, sx = b.x0, sy = b.y0) => blitTo(ctx, src, b, sx, sy);
     // Behind the boot screen the ground is painted a slice at a time
@@ -1380,7 +1403,8 @@ export class Wilds {
       for (let ty = Math.floor((view.y0 - OY) / T); ty * T < view.y1 - OY; ty++)
         for (let tx = Math.floor((view.x0 - OX) / T); tx * T < view.x1 - OX; tx++) {
           if (tx >= 0 && ty >= 0 && tx < TILES_W && ty < TILES_H) continue;
-          const x = Math.round(toX(tx * T + OX)), y = Math.round(toY(ty * T + OY)), w = Math.round(toX((tx + 1) * T + OX)) - x, h = Math.round(toY((ty + 1) * T + OY)) - y;
+          const devX = (X: number) => snapEdge(X, OX, BW, toX), devY = (Y: number) => snapEdge(Y, OY, BH, toY);
+          const x = devX(tx * T + OX), y = devY(ty * T + OY), w = devX((tx + 1) * T + OX) - x, h = devY((ty + 1) * T + OY) - y;
           c.fillStyle = "#17181b";
           c.fillRect(x, y, w, h);
           paintFloorTile(c, f.area, tx, ty, x, y, w, h);
