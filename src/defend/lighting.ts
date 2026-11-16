@@ -510,7 +510,7 @@ export class DefendLighting {
    * a screen-sized canvas, drawn unmoved; `c`'s transform places the
    * board; only their inner half beside `inner.body` shines (see `hug`).
    * For the units' contours. */
-  shineOutlines(c: CanvasRenderingContext2D, outline: (r: CanvasRenderingContext2D) => void, inner: Inner) {
+  shineOutlines(c: CanvasRenderingContext2D, outline: (r: CanvasRenderingContext2D) => void, inner: Inner, near?: readonly Region[] | null) {
     const glow = this.glow;
     if (!glow) return;
     const m = c.getTransform();
@@ -518,6 +518,10 @@ export class DefendLighting {
     const r = (this.rimLit = sized(this.rimLit, width, height)).getContext("2d")!;
     r.setTransform(1, 0, 0, 1, 0, 0);
     r.globalCompositeOperation = "source-over";
+    if (near) {
+      this.shinePieces(c, r, outline, inner, pieceRegions(near, Math.ceil(inner.by) + 2, width, height), m);
+      return;
+    }
     r.clearRect(0, 0, width, height);
     outline(r);
     this.hug(r, inner);
@@ -527,6 +531,51 @@ export class DefendLighting {
     c.save();
     c.setTransform(1, 0, 0, 1, 0, 0);
     shineOnto(c, this.rimLit!);
+    c.restore();
+  }
+
+  /** `shineOutlines` within `pieces` alone (whole pixels, never
+   * overlapping, holding every pixel of the body grown by `inner.by`):
+   * past the body grown, `hug` leaves nothing to shine. */
+  private shinePieces(c: CanvasRenderingContext2D, r: CanvasRenderingContext2D, outline: (r: CanvasRenderingContext2D) => void, inner: Inner, pieces: Region[], m: DOMMatrix) {
+    if (!pieces.length) return;
+    const { width, height } = r.canvas;
+    for (const p of pieces) r.clearRect(p.x, p.y, p.w, p.h);
+    // Past the pieces the canvas keeps whatever it held: it's never used.
+    outline(r);
+    const grown = (this.grown = sized(this.grown, width, height)).getContext("2d")!;
+    for (const p of pieces) {
+      grown.save();
+      grown.beginPath(); grown.rect(p.x, p.y, p.w, p.h); grown.clip();
+      grown.globalCompositeOperation = "source-over";
+      grown.clearRect(p.x, p.y, p.w, p.h);
+      for (const dy of [-inner.by, 0, inner.by]) for (const dx of [-inner.by, 0, inner.by]) grown.drawImage(inner.body, dx, dy);
+      grown.restore();
+    }
+    for (const p of pieces) {
+      r.save();
+      r.setTransform(1, 0, 0, 1, 0, 0);
+      r.beginPath(); r.rect(p.x, p.y, p.w, p.h); r.clip();
+      r.globalCompositeOperation = "destination-in";
+      r.drawImage(this.grown!, 0, 0);
+      r.restore();
+    }
+    // The glow is drawn scaled: clipped, it would sample a shade
+    // differently at some zooms, so it goes over the whole canvas.
+    r.save();
+    r.globalCompositeOperation = "source-in";
+    r.setTransform(m);
+    r.drawImage(this.glow!, 0, 0);
+    r.restore();
+    r.globalCompositeOperation = "source-over";
+    c.save();
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    for (const p of pieces) {
+      c.save();
+      c.beginPath(); c.rect(p.x, p.y, p.w, p.h); c.clip();
+      shineOnto(c, this.rimLit!);
+      c.restore();
+    }
     c.restore();
   }
 
@@ -1026,6 +1075,19 @@ function nearest(cv: HTMLCanvasElement | null, src: HTMLCanvasElement, w: number
 
 /** A box of canvas pixels. */
 type Region = { x: number; y: number; w: number; h: number };
+
+/** Square `PIECE_CELL`-pixel cells of a `width` x `height` canvas touched by
+ * `regions` grown by `pad`, as non-overlapping rectangles. */
+const PIECE_CELL = 64;
+function pieceRegions(regions: readonly Region[], pad: number, width: number, height: number): Region[] {
+  const cols = Math.ceil(width / PIECE_CELL), rows = Math.ceil(height / PIECE_CELL), on = new Uint8Array(cols * rows);
+  for (const g of regions) {
+    const a = Math.max(0, Math.floor((g.x - pad) / PIECE_CELL)), b = Math.min(cols - 1, Math.floor((g.x + g.w + pad) / PIECE_CELL));
+    const t = Math.max(0, Math.floor((g.y - pad) / PIECE_CELL)), u = Math.min(rows - 1, Math.floor((g.y + g.h + pad) / PIECE_CELL));
+    for (let y = t; y <= u; y++) if (a <= b) on.fill(1, y * cols + a, y * cols + b + 1);
+  }
+  return cellPieces(on, cols, rows, PIECE_CELL, { x: 0, y: 0, w: width, h: height });
+}
 /** Cell box `b` on a `w` × `h` board, out to whole pixels. */
 function region(b: CellBox, w: number, h: number): Region {
   const x = Math.floor((b.x0 * w) / CELLS_W), y = Math.floor((b.y0 * h) / CELLS_H);
