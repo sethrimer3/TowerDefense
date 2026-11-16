@@ -299,8 +299,9 @@ export class UnitOutline {
     if (this.thin) this.contours.draw(c);
   }
   /** The contours again, lit by the torchlight's glow where it reaches. */
-  shineContours(c: Ctx, lighting: { shineOutlines(c: CanvasRenderingContext2D, outline: (r: CanvasRenderingContext2D) => void, inner: { body: CanvasImageSource; by: number }): void }) {
-    if (this.thin) lighting.shineOutlines(c, (r) => this.contours.draw(r, true), { body: this.layer.cv, by: this.contours.width / 2 });
+  shineContours(c: Ctx, lighting: { shineOutlines(c: CanvasRenderingContext2D, outline: (r: CanvasRenderingContext2D) => void, inner: { body: CanvasImageSource; by: number }, near?: readonly Box[] | null): void }) {
+    // Only round what the layer holds: the shine hugs the bodies.
+    if (this.thin) lighting.shineOutlines(c, (r) => this.contours.draw(r, true), { body: this.layer.cv, by: this.contours.width / 2 }, this.layerBox.pieces());
   }
 
   /** The outlines, then the units over them, onto `c`. */
