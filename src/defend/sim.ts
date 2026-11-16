@@ -127,6 +127,9 @@ export type Enemy = {
   /** Personal offset inside each cell so a crowd spreads across the street. */
   jx: number;
   jy: number;
+  /** The trail cell a walker chose at a fork (`forkStep`), held until it
+   * steps into it; absent off the trails. */
+  forkTo?: number;
   distract: number;
   distractT: number;
   rollT: number;

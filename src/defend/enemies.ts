@@ -162,11 +162,24 @@ function march(t: Turn) {
   let best = downhill(field, sim.foeSolid, cx, cy);
   if (best < 0) return;
   // At a fork in a worn trail, either near-equal branch, by the enemy's own coin.
-  if (sim.trails && !sim.foeSolid[best]) best = forkPick(field, sim.trails.wear, cellIndex(cx, cy), best, openSteps(sim.foeSolid, cx, cy), e.id);
+  if (sim.trails && !sim.foeSolid[best]) best = forkStep(sim, e, field, cx, cy, best);
   const c = cellCenter(best);
   if (sim.foeSolid[best]) return smashThrough(t, best);
   if (field === sim.field) rollForDistraction(t, cx, cy);
   sim.moveToward(e, { x: c.x + e.jx, y: c.y + e.jy }, { speed: enemySpeed(sim, e) * chilled(e), dt });
+}
+
+/** The cell a walker on a worn trail heads for next. Each cell's fork coin
+ * is its own, so two neighbouring cells can send the walker at each other:
+ * one cell picks a step sideways, the next a diagonal step back across the
+ * line it just crossed, and it shuffles on that line forever. So a walker
+ * holds the cell it picked until it stands in it, while that cell is still
+ * an open step downhill of where it is; every held step is downhill, so it
+ * always gets somewhere. */
+function forkStep(sim: DefendSim, e: Enemy, field: Float64Array, cx: number, cy: number, best: number) {
+  const here = cellIndex(cx, cy), steps = openSteps(sim.foeSolid, cx, cy), held = e.forkTo;
+  if (held !== undefined && held !== here && field[held] < field[here] && steps.includes(held)) return held;
+  return (e.forkTo = forkPick(field, sim.trails!.wear, here, best, steps, e.id));
 }
 
 /** The cheapest way on goes through a building: walk up and smash it. */
