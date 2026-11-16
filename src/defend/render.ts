@@ -166,7 +166,9 @@ export class DefendRenderer {
   private shimmerOpened = 0;
   private shimmerClosed = -Infinity;
   private readonly collapse = new CollapseView();
-  readonly timings = { entityMs: 0, effectsMs: 0, terrainMs: 0 };
+  readonly timings = { entityMs: 0, effectsMs: 0, terrainMs: 0, lightingMs: 0 };
+  /** False leaves the battle's lighting out (Developer: Battle lighting off). */
+  lightingOn = true;
   readonly lighting = new DefendLighting();
   readonly fences = new Fences();
   readonly grass = new ParkGrass();
@@ -485,7 +487,7 @@ export class DefendRenderer {
     this.lit = false;
     if (sim && opts.collapsed) sim = this.collapse.view(sim,map,opts.collapsed);
     const start = opts.timings ? performance.now() : 0;
-    this.timings.entityMs = this.timings.effectsMs = this.timings.terrainMs = 0;
+    this.timings.entityMs = this.timings.effectsMs = this.timings.terrainMs = this.timings.lightingMs = 0;
     const area = opts.area ?? "moss";
     if (area !== this.area) {
       this.previousArea = sim && map === this.map ? this.area : null;
@@ -893,7 +895,10 @@ export class DefendRenderer {
     const strength = overcast(weather);
     const old = this.previousArea && this.previousWeather ? overcast(this.previousWeather) : strength;
     Rain.overcast(this.ctx, old + (strength - old) * this.areaMix, W, H);
+    if (!this.lightingOn) return;
+    const start = opts.timings ? performance.now() : 0;
     this.drawLighting(map, sim, weather, opts);
+    if (opts.timings) this.timings.lightingMs += performance.now() - start;
     this.lit = true;
   }
 

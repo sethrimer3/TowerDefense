@@ -115,11 +115,15 @@ export const SETTINGS = {
   devStewardship: { kind: "toggle", default: false, page: { id: "dev-stewardship", label: "Stewardship" } },
   devMine: { kind: "toggle", default: false, page: { id: "dev-mine", label: "Mine" } },
   devLibrary: { kind: "toggle", default: false, page: { id: "dev-library", label: "Library" } },
+  /** Dev: the battle's frame timings overlay (FPS, and each pass's time). */
+  devFrameTimes: { kind: "toggle", default: false, page: { id: "dev-frame-times", label: "Show frame timings" } },
+  /** Dev: the battle's night lighting (darkness, torchlight, outline shine) left out, to measure what it costs. */
+  devNoLighting: { kind: "toggle", default: false, page: { id: "dev-no-lighting", label: "Battle lighting off" } },
   language: { kind: "choice", default: "en", choices: LANGUAGE_CHOICES, page: { id: "language", label: "Language" } },
 } as const satisfies Record<string, Setting>;
 
 export type SettingKey = keyof typeof SETTINGS;
-export const DEV_OPTIONS = ["devMode", "devTowers", "devJournal", "instantResearch", "devSmithy", "devCommand", "devStewardship", "devMine", "devLibrary"] as const satisfies readonly SettingKey[];
+export const DEV_OPTIONS = ["devMode", "devTowers", "devJournal", "instantResearch", "devSmithy", "devCommand", "devStewardship", "devMine", "devLibrary", "devFrameTimes", "devNoLighting"] as const satisfies readonly SettingKey[];
 type ValueOf<S> = S extends { kind: "toggle" } ? boolean
   : S extends { choices: readonly (readonly [infer V, string])[] } ? V
   : number;

@@ -19,14 +19,14 @@ export class Timings {
   }
 }
 
-export type FrameTimes = { frameMs: number; updateMs: number; entityMs: number; effectsMs: number; terrainMs: number; uiMs: number };
+export type FrameTimes = { frameMs: number; updateMs: number; entityMs: number; effectsMs: number; terrainMs: number; uiMs: number; lightingMs: number };
 
 /** Optional developer overlay. Bounded counters; DOM changes at most twice a second. */
 export class FrameTimeOverlay {
   private element: HTMLOutputElement | null = null;
   private elapsed = 0;
   private samples = 0;
-  private totals: FrameTimes = { frameMs: 0, updateMs: 0, entityMs: 0, effectsMs: 0, terrainMs: 0, uiMs: 0 };
+  private totals: FrameTimes = { frameMs: 0, updateMs: 0, entityMs: 0, effectsMs: 0, terrainMs: 0, uiMs: 0, lightingMs: 0 };
   private frames = new Timings();
   enabled = false;
 
@@ -50,7 +50,7 @@ export class FrameTimeOverlay {
       document.body.append(this.element);
     }
     const mean = (key: keyof FrameTimes) => (this.totals[key] / this.samples).toFixed(1);
-    this.element.textContent = `${(1000 * this.samples / this.totals.frameMs).toFixed(0)} FPS · frame ${mean('frameMs')} ms · p95 ${this.frames.p95()} ms\nUpdate ${mean('updateMs')} · Entities ${mean('entityMs')} · Effects ${mean('effectsMs')}\nTerrain ${mean('terrainMs')} · UI ${mean('uiMs')} ms`;
+    this.element.textContent = `${(1000 * this.samples / this.totals.frameMs).toFixed(0)} FPS · frame ${mean('frameMs')} ms · p95 ${this.frames.p95()} ms\nUpdate ${mean('updateMs')} · Entities ${mean('entityMs')} · Effects ${mean('effectsMs')}\nTerrain ${mean('terrainMs')} · Lighting ${mean('lightingMs')} · UI ${mean('uiMs')} ms`;
     this.elapsed = this.samples = 0; this.frames = new Timings();
     for (const key of Object.keys(this.totals) as (keyof FrameTimes)[]) this.totals[key] = 0;
   }

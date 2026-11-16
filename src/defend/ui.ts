@@ -129,6 +129,10 @@ export type DefendHost = {
   /** The board zooms in whole device pixels an art pixel (the Settings
    * page's Crisp pixel zoom, also the board's own checkbox). */
   crispZoom?(): boolean;
+  /** Developer: the frame timings overlay shows. */
+  frameTimes?(): boolean;
+  /** False when the developer turned the battle's lighting off. */
+  lighting?(): boolean;
   setCrispZoom?(value: boolean): void;
   /** Whether the palette lists items the player has none of. */
   showEmpty?(): boolean;
@@ -222,6 +226,8 @@ export class DefendPage {
   private economyTreeState = "";
   private performance = new BattlePerformance();
   private frameTimes = new FrameTimeOverlay();
+  /** The Show frame timings setting as last seen. */
+  private timedSetting = false;
   private performanceEnd: string | null = null;
   private message = "";
   private messageT = 0;
@@ -1194,6 +1200,9 @@ export class DefendPage {
     if (!this.renderer) return;
     const crisp = !!this.host.crispZoom?.();
     this.renderer.crisp = crisp;
+    this.renderer.lightingOn = this.host.lighting?.() ?? true;
+    const timed = !!this.host.frameTimes?.();
+    if (timed !== this.timedSetting) { this.timedSetting = timed; this.frameTimes.toggle(timed); }
     this.renderer.maxDpr = this.host.resolution?.() ?? 0;
     const box = this.root.querySelector<HTMLInputElement>("#defend-crisp");
     if (box && box.checked !== crisp) box.checked = crisp;
