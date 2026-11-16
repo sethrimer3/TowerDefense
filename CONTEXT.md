@@ -52,8 +52,14 @@ An entry point on the bottom edge where an owned infantry squad enters a Siege a
 The unit the player builds with: the board is 12 × 12 of them. Only the middle 10 × 10, the **buildable field**, takes building; the outer ring stays open, and enemies enter along the top.
 
 **Wilds**:
-The impassable, visible scenery beyond the board's edges, carrying on the area's own ground: in the forest its grass and trees, then whole mountain ranges (in the desert, sandstone cliffs over flagstones). Nothing happens there; it fills the view so no dark space shows at any window shape.
+The impassable, visible scenery beyond the board's edges, carrying on the area's own ground: in the forest its grass and trees, then whole mountain ranges (in the desert, sandstone cliffs over flagstones; in the Ember Forge, volcanic crags with lava in their gullies over cinders). Nothing happens there; it fills the view so no dark space shows at any window shape.
 _Avoid_: border, margin
+
+**Fissure**:
+A jagged crack in the Ember Forge's cinder ground, glowing with lava from below.
+
+**Vent**:
+A small cinder cone in the Ember Forge with a glowing mouth, spitting sparks and smoke.
 
 **Outskirts**:
 What a Defend city's scenery is planned from beyond its buildings: which ground is open, walled, fenced, water, gate or keep. A building placed inside the walls leaves the outskirts as they were, so the forest and the worn trails stay exactly as they stood.

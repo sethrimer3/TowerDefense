@@ -88,6 +88,8 @@ import { hasMagicForest } from "./magic-forest.ts";
 import { PaintBox } from "./paint-box.ts";
 import { CrystalCavesArt } from "./crystal-caves-art.ts";
 import { crystalCavesPlan, hasCrystalCaves, shaftLight } from "./crystal-caves.ts";
+import { EmberForgeArt } from "./ember-forge-art.ts";
+import { hasEmberForge } from "./ember-forge.ts";
 
 export type DrawOptions = {
   /** How many watchmen walk the city (the keep's City watch, in Defend);
@@ -199,6 +201,7 @@ export class DefendRenderer {
   readonly forestGrass = new ForestGrass();
   readonly magic = new MagicForestArt();
   readonly caves = new CrystalCavesArt();
+  readonly forge = new EmberForgeArt();
   /** The battle time the wizard art last advanced to. */
   private wizardTime = 0;
   private rain = new Rain();
@@ -579,6 +582,7 @@ export class DefendRenderer {
     this.drawForest(sim, opts, dt);
     this.drawMagicForest(sim, opts);
     this.drawCaveGlow(opts);
+    this.drawForgeGlow(opts);
     // The mountains' long shadows past the board, over the field too.
     this.wilds.drawShade(this.ctx, { px: this.px, cam: this.cam, night: opts.night, sand: sim?.atmosphere?.mode === "sand" });
     this.ghosts.watch(sim, opts.now / 1000);
@@ -643,7 +647,7 @@ export class DefendRenderer {
    * doesn't stall as it crosses over. */
   private ahead: { map: CityMap; area: AreaId; run: (ms: number) => void } | null = null;
   private prepareNext(map: CityMap, sim: DefendSim, opts: DrawOptions) {
-    const covered = (a: AreaId) => hasForest(a) || hasMagicForest(a) || hasCrystalCaves(a);
+    const covered = (a: AreaId) => hasForest(a) || hasMagicForest(a) || hasCrystalCaves(a) || hasEmberForge(a);
     if (sim.unitTester) return;
     // Through the last two waves before it.
     const soon = areaForWave(sim.wave + 1).id, area = soon !== this.area ? soon : areaForWave(sim.wave + 2).id;
@@ -664,7 +668,7 @@ export class DefendRenderer {
       // them on both sides of the crossing (they show through its fade).
       else if (phase === 2) more = !(covered(area) && covered(this.area)) && this.relief.prepare(map, this.px, this.board.W, this.board.H, area, ms);
       // The Crystal Caves' floor.
-      else if (phase === 3) more = hasCrystalCaves(area) && this.caves.prepare(map, ms);
+      else if (phase === 3) more = (hasCrystalCaves(area) && this.caves.prepare(map, ms)) || (hasEmberForge(area) && this.forge.prepare(map, ms));
       else if (area !== "desert" || !map.trails) { phase = -1; return; }
       // The desert's dunes and sand trails, as its build phase warms them.
       else if (phase === 4) more = warmDunes(hd, sun, step);
@@ -765,6 +769,12 @@ export class DefendRenderer {
       this.caves.sync(map);
       this.caves.drawFloor(ctx, this.px, caves, shaftLight(this.worldLighting ? opts.sun : undefined));
     }
+    // The Ember Forge's cinders, fissures, lava pools and what stands on them.
+    const forge = this.forgeShare();
+    if (forge > 0) {
+      this.forge.sync(map);
+      this.forge.drawFloor(ctx, this.px, forge);
+    }
     this.river.sync(map);
     this.river.draw({
       c: ctx, px: this.px, now: opts.now, dt, rain: !!(sim && opts.weather?.rain), cold: sim?.cold ?? !!opts.weather?.snow, thawed: sim?.thawedPonds,
@@ -774,7 +784,7 @@ export class DefendRenderer {
     // tint, so night darkens them and the day's light turns over them.
     const desert = sim?.atmosphere?.mode === "sand";
     if (sim && desert) this.atmosphere.drawGround(ctx, this.px, sim, opts.reduceMotion, opts.effects ?? true, this.worldLighting ? opts.sun : undefined, !!opts.hdSand);
-    if (this.forestShare() > 0 || magic > 0 || caves > 0 || desert) {
+    if (this.forestShare() > 0 || magic > 0 || caves > 0 || forge > 0 || desert) {
       this.drawFaces();
       paintSpikePoints(ctx, this.px, map, sim);
     }
@@ -1013,6 +1023,19 @@ export class DefendRenderer {
     return now + (this.previousArea && hasCrystalCaves(this.previousArea) ? 1 - this.areaMix : 0);
   }
 
+  /** How much of the Ember Forge shows, fading like the forest's. */
+  private forgeShare() {
+    const now = hasEmberForge(this.area) ? this.areaMix : 0;
+    return now + (this.previousArea && hasEmberForge(this.previousArea) ? 1 - this.areaMix : 0);
+  }
+
+  /** The Ember Forge's lava, sparks and smoke, over the battle's darkness. */
+  private drawForgeGlow(opts: DrawOptions) {
+    const alpha = this.forgeShare();
+    if (alpha <= 0) return;
+    this.forge.drawGlow(this.ctx, this.px, { now: opts.now, alpha, still: opts.reduceMotion, night: opts.night, effects: opts.effects ?? true });
+  }
+
   /** What glows in the Crystal Caves, over the battle's darkness. */
   private drawCaveGlow(opts: DrawOptions) {
     const alpha = this.cavesShare();
@@ -1080,7 +1103,7 @@ export class DefendRenderer {
     // The forest's grass and the desert's dunes hide the flagstones (their
     // light, drawn over the dunes, read as squares at night): there the
     // masks aren't baked at all.
-    const bare = sim.atmosphere?.mode === "sand" ? 0 : 1 - Math.min(1, this.forestShare() + this.magicShare() + this.cavesShare());
+    const bare = sim.atmosphere?.mode === "sand" ? 0 : 1 - Math.min(1, this.forestShare() + this.magicShare() + this.cavesShare() + this.forgeShare());
     if (bare <= 0 || !this.relief.sync(map, this.px, this.board.W, this.board.H, this.area)) return;
     const intact = standing(map, sim);
     const fixed = () =>
