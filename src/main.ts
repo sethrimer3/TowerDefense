@@ -149,7 +149,7 @@ function openChamber(where: "smithy" | "study", topic?: string) {
 }
 const defendPage = new DefendPage(el("defend"), {
   save: () => save.defend,
-  bonuses: () => bonuses(save),
+  bonuses: (game) => bonuses(game ?? save),
   game: () => save,
   spentKnowledge: () => { store(); refreshCurrencies(); },
   clock,

@@ -631,24 +631,81 @@ let rubbleSprite: HTMLCanvasElement | null = null;
 // An artist's keep arriving (or the Pixel Art setting flipping) redraws it.
 onPixelArt(() => {
   keepSprites.length = 0;
+  smallKeepSprites.length = 0;
+  smallFlashSprite = null;
   keepFlashSprite = rubbleSprite = null;
 });
 
+/** Whether a keep drawn in `box` is the Ember Forge outpost's small keep
+ * (a single quarter tile, `outpost.ts`). */
+const smallKeep = ({ w, px }: ArtBox) => px > 0 && w / px < 3;
+const smallKeepSprites: HTMLCanvasElement[] = [];
+let smallFlashSprite: HTMLCanvasElement | null = null;
+
 /** Pale damage overlay with exactly the keep sprite's silhouette. */
-export function paintKeepFlash(c: CanvasRenderingContext2D, { x, y, w, h }: ArtBox, alpha: number) {
-  keepFlashSprite ??= spriteCanvas(keepPixels().map(v => v ? rgba(0xfff4dc) : 0), KEEP, KEEP, undefined, false);
+export function paintKeepFlash(c: CanvasRenderingContext2D, box: ArtBox, alpha: number) {
+  const { x, y, w, h } = box, small = smallKeep(box);
+  const sprite = small
+    ? (smallFlashSprite ??= spriteCanvas(outpostKeepPixels().map(v => v ? rgba(0xfff4dc) : 0), SMALL_KEEP, SMALL_KEEP, undefined, false))
+    : (keepFlashSprite ??= spriteCanvas(keepPixels().map(v => v ? rgba(0xfff4dc) : 0), KEEP, KEEP, undefined, false));
   c.save();
   c.imageSmoothingEnabled = false;
   c.globalAlpha = alpha;
-  c.drawImage(keepFlashSprite, x, y, w, h);
+  c.drawImage(sprite, x, y, w, h);
   c.restore();
 }
 
 /** The keep's pixels at damage `stage` drawn up to fill its box,
  * smoothing off. */
-function paintKeep(c: CanvasRenderingContext2D, { x, y, w, h }: ArtBox, stage: number) {
+function paintKeep(c: CanvasRenderingContext2D, box: ArtBox, stage: number) {
   if (typeof document === "undefined") return;
-  drawSprite(c, (keepSprites[stage] ??= spriteCanvas(keepPixels(stage), KEEP, KEEP)), x, y, w, h);
+  const { x, y, w, h } = box;
+  if (smallKeep(box)) drawSprite(c, (smallKeepSprites[stage] ??= spriteCanvas(outpostKeepPixels(stage), SMALL_KEEP, SMALL_KEEP)), x, y, w, h);
+  else drawSprite(c, (keepSprites[stage] ??= spriteCanvas(keepPixels(stage), KEEP, KEEP)), x, y, w, h);
+}
+
+/** The Ember Forge outpost's keep (`outpost.ts`) art's size: two cells. */
+export const SMALL_KEEP = 2 * ART;
+
+/** The outpost's small keep, from above, as `SMALL_KEEP × SMALL_KEEP` RGBA
+ * pixels: a squat square tower, its crenellated wall walk round a four-sided
+ * slate roof, with a door to the south. At damage `stage` 1 to 4 soot,
+ * holes and embers spread over it; like the keep's, damage only repaints. */
+export function outpostKeepPixels(stage = 0): Uint32Array {
+  const n = SMALL_KEEP, out = new Uint32Array(n * n);
+  const set = (x: number, y: number, c: number) => (out[y * n + x] = rgba(c));
+  const lo = 3, hi = n - 4, mid = n / 2 - 0.5;
+  for (let y = 0; y < n; y++)
+    for (let x = 0; x < n; x++) {
+      const ring = Math.min(x, y, n - 1 - x, n - 1 - y);
+      if (ring === 0) set(x, y, K.outline);
+      else if (ring === 1) set(x, y, (x + y) % 3 === 0 ? K.crenel : K.merlon);
+      else if (ring === 2) set(x, y, x === 2 || y === 2 ? K.walkLit : x === n - 3 || y === n - 3 ? K.walkShade : K.walk);
+      else if (x === lo || y === lo || x === hi || y === hi) set(x, y, K.outline);
+      else {
+        const dx = x - mid, dy = y - mid;
+        if (Math.abs(dx) === Math.abs(dy)) set(x, y, dx < 0 && dy < 0 ? K.ridgeLit : K.ridge);
+        else {
+          const ns = Math.abs(dy) > Math.abs(dx), face = ns ? (dy < 0 ? K.roof.n : K.roof.s) : dx < 0 ? K.roof.w : K.roof.e;
+          set(x, y, (ns ? y % 2 === 0 : x % 2 === 0) ? shade(face, 0.88) : face);
+        }
+      }
+    }
+  // The door, through the south wall walk.
+  for (let x = n / 2 - 1; x < n / 2 + 1; x++) {
+    set(x, n - 3, x === n / 2 - 1 ? K.doorDark : K.door);
+    set(x, n - 2, K.door);
+  }
+  // Damage: soot first, then holes, then embers in them.
+  for (let y = 1; y < n - 1; y++)
+    for (let x = 1; x < n - 1; x++) {
+      const u = hash01(x, y, 4711);
+      if (stage >= 4 && u < 0.08) set(x, y, hash01(x, y, 4712) < 0.4 ? K.emberHot : K.ember);
+      else if (stage >= 3 && u < 0.2) set(x, y, K.hole);
+      else if (stage >= 2 && u < 0.32) set(x, y, hash01(x, y, 4713) < 0.5 ? K.rafter : K.rafterDark);
+      else if (stage >= 1 && u < 0.46) set(x, y, K.soot);
+    }
+  return out;
 }
 
 /** The fallen keep's rubble over its cells (`box`, canvas pixels). */

@@ -21,6 +21,7 @@ import {
   placeGate,
   placeSpikes,
   cityTileSet,
+  cityTileOk,
   fitLayout,
   moveCityTile,
   moveKeep,
@@ -304,6 +305,7 @@ export function refusal(drag: Drag, layout: Layout, key: string): string {
   }
   const [tx, ty] = key.split(",").map(Number);
   if (!buildableTile(tx, ty)) return "Nothing can be built on the outer ring of the field — only the middle 10 × 10 tiles take building.";
+  if ((kind === "cityTile" || kind === "keep") && !cityTileOk(layout, tx, ty)) return "The outpost's city can't stand on the edge of the field.";
   const inCity = cityTileSet(layout).has(key);
   if (kind === "cityTile")
     return inCity ? "That tile is already part of the city." : drag.from === "cityTile" ? "What stands on this tile doesn't fit there." : "There isn't room for a city tile there.";

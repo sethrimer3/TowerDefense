@@ -35,7 +35,7 @@ import { floorArtLoaded, paintFloorTile } from "./city-layer.ts";
 import { pixelKey } from "./pixel-sprites.ts";
 import { cellPieces } from "./paint-box.ts";
 import { sceneryOutlinesOn, windAt } from "./scenery-looks.ts";
-import { caveTrailPixel, paintRoadLinesSteps, sandReachCanvases } from "./trail-art.ts";
+import { caveTrailPixel, emberTrailPixel, paintRoadLinesSteps, sandReachCanvases } from "./trail-art.ts";
 import { fillCaveGravel, openingLight, sunlitPixel } from "./crystal-caves-art.ts";
 import { fillCinder, LAVA, paintFissure, paintPool, rgba as forgeRgba, rockPiece, scrapPiece, shardPiece, stand, ventPiece, type Img } from "./ember-forge-art.ts";
 import { fissure, forgeRock, hasEmberForge, type Fissure, type ScrapKind } from "./ember-forge.ts";
@@ -185,14 +185,17 @@ export function roadReach(roads: TrailPlan): TrailLine[] {
   const out: TrailLine[] = [];
   for (const line of roads.lines) {
     const first = line.points[0];
-    if (first.y >= 0 && first.y <= CELLS_H) continue;
-    const up = first.y < 0, from = line.points[1], dir = up ? -1 : 1;
+    // The Ember Forge's also cross the left and right edges.
+    const side = first.x < 0 || first.x > CELLS_W;
+    if (!side && first.y >= 0 && first.y <= CELLS_H) continue;
+    const from = line.points[1], dir = (side ? first.x < 0 : first.y < 0) ? -1 : 1;
     const points = [{ x: from.x, y: from.y }];
-    let x = from.x, drift = 0;
+    let across = side ? from.y : from.x, drift = 0;
     for (let k = 1; k < MARGIN; k++) {
-      const y = from.y + dir * k;
-      drift = drift * 0.85 + (valueNoise(k / 7, Math.round(from.x), 741) - 0.5) * 0.5;
-      x += drift;
+      const along = (side ? from.x : from.y) + dir * k;
+      drift = drift * 0.85 + (valueNoise(k / 7, Math.round(across) + (side ? 7919 : 0), 741) - 0.5) * 0.5;
+      across += drift;
+      const x = side ? along : across, y = side ? across : along;
       points.push({ x, y });
       // On until well under the mountains, which are painted over it.
       if (rangeAt(x, y) > 0.35) break;
@@ -752,9 +755,18 @@ export function* paintWildsSteps(forest: boolean, stone?: Stone, reach: readonly
   const glow: Img | null = volcano ? { px: new Uint32Array(GW * GH), w: GW, h: GH } : null;
   const img: Img = { px: out, w: GW, h: GH };
   const offField = (X: number, Y: number) => !(X >= OX && Y >= OY && X < OX + BW && Y < OY + BH);
-  const forge = volcano ? wildForge() : null;
+  const allForge = volcano ? wildForge() : null;
+  // Its pieces clear of the trails carried out here.
+  const forge = allForge && reach.length ? {
+    cracks: allForge.cracks.filter((f) => !f.points.some((p) => nearLines(reach, p.x, p.y, 0.8))),
+    pools: allForge.pools.filter((p) => !nearLines(reach, p.x, p.y, p.r + 0.8)),
+    vents: allForge.vents.filter((v) => !nearLines(reach, v.x, v.y, v.r + 0.5)),
+    shards: allForge.shards.filter((c) => !nearLines(reach, c.x, c.y, c.r + 0.5)),
+    scrap: allForge.scrap.filter((c) => !nearLines(reach, c.x, c.y, c.r + 0.5)),
+  } : allForge;
   if (forge) {
     yield* fillCinder(out, GW, GH, OX, OY, offField, SLICE);
+    if (reach.length) yield* paintRoadLinesSteps(out, GW, GH, OX, OY, reach, (i) => offField(i % GW, Math.floor(i / GW)), emberTrailPixel);
     for (const f of forge.cracks) paintFissure(img, glow, f, OX, OY, offField);
     for (const p of forge.pools) paintPool(img, glow, p.x * ART + OX, p.y * ART + OY, p.r, p.seed, offField);
   }
@@ -919,6 +931,8 @@ export type WildsFrame = {
   /** The Crystal Caves' trails, carried on out here through the gravel, and
    * how strong the day is through the great opening (0..1, `ShaftLight.day`). */
   caves?: { trails: TrailPlan | null; day: number } | null;
+  /** The Ember Forge's trails, carried on out here through the cinders. */
+  forge?: { trails: TrailPlan | null } | null;
   /** The day's colour washed over the board (soft light), so the wilds take it too. */
   tint?: { color: string; strength: number };
   /** How dark the board's own night is at its edge (its ambient's opacity),
@@ -1027,9 +1041,9 @@ export class Wilds {
   private pending: { key: string; art: string; steps: Steps<Ground> } | null = null;
 
   private groundKey(forest: boolean, area: AreaId, roads: TrailPlan | null) {
-    const caves = area === "drowned", trailed = forest || caves;
+    const caves = area === "drowned", forge = hasEmberForge(area), trailed = forest || caves || forge;
     const reach = trailed && roads ? this.reach(roads) : null;
-    return { key: trailed ? `${forest ? "forest" : "caves"}:${reach?.key ?? ""}` : area, reach };
+    return { key: trailed ? `${forest ? "forest" : caves ? "caves" : "forge"}:${reach?.key ?? ""}` : area, reach };
   }
 
   private ground(forest: boolean, area: AreaId, roads: TrailPlan | null = null) {
@@ -1066,7 +1080,8 @@ export class Wilds {
 
   private keep(key: string, forest: boolean, area: AreaId, g: Ground) {
     // Only the current city's roads are kept.
-    if (forest || area === "drowned") for (const k of [...this.grounds.keys()]) if (k.startsWith(forest ? "forest:" : "caves:")) this.grounds.delete(k);
+    const prefix = forest ? "forest:" : area === "drowned" ? "caves:" : hasEmberForge(area) ? "forge:" : null;
+    if (prefix) for (const k of [...this.grounds.keys()]) if (k.startsWith(prefix)) this.grounds.delete(k);
     this.grounds.set(key, g);
     return g;
   }
@@ -1248,7 +1263,7 @@ export class Wilds {
     // Behind the boot screen the ground is painted a slice at a time
     // (`settleWilds`), and nothing past the board is drawn until it's done.
     if (deferring) {
-      const roads = f.forest?.plan.roads ?? f.caves?.trails ?? null;
+      const roads = f.forest?.plan.roads ?? f.caves?.trails ?? f.forge?.trails ?? null;
       if (this.prepare(forest, f.area, roads, 0)) {
         waiting.set(this, (end) => {
           while (this.prepare(forest, f.area, roads, Math.max(0, end - performance.now()))) if (performance.now() >= end) return true;
@@ -1259,7 +1274,7 @@ export class Wilds {
       }
     }
     const sand = f.sand ? this.sand(f.sand.trails) : null;
-    const g = this.ground(forest, f.area, f.forest?.plan.roads ?? f.caves?.trails ?? null);
+    const g = this.ground(forest, f.area, f.forest?.plan.roads ?? f.caves?.trails ?? f.forge?.trails ?? null);
     if (f.beyond) {
       // The still ground (the fill, the flagstones, the dunes and the
       // mountains) only changes with the camera, the screen or the art:

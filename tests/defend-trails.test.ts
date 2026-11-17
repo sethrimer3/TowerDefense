@@ -26,11 +26,13 @@ const city = (seed = 7, trails = true, layout = defaultLayout()): CityMap => {
 };
 const cellOf = (x: number, y: number) => cellIndex(Math.max(0, Math.min(CELLS_W - 1, Math.floor(x))), Math.max(0, Math.min(CELLS_H - 1, Math.floor(y))));
 
-test("only the first three areas wear trails, and only on Defend's own cities", () => {
+test("only the first four areas wear trails, and only on Defend's own cities", () => {
   assert.equal(trailStyle("moss"), "road");
   assert.equal(trailStyle("desert"), "sand");
   assert.equal(trailStyle("drowned"), "cave");
-  assert.equal(trailStyle("ember"), null);
+  assert.equal(trailStyle("ember"), "ember");
+  assert.equal(trailStyle("fungal"), null);
+  assert.equal(trailPlan(city(7, false), "ember"), null);
   assert.equal(trailPlan(city(7, false), "cave"), null);
   assert.equal(trailPlan(city(7, false), "road"), null);
   assert.equal(trailPlan(city(7, false), "sand"), null);

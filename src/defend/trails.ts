@@ -1,7 +1,8 @@
-/** Worn monster trails across the open ground of Defend's first three areas:
+/** Worn monster trails across the open ground of Defend's first four areas:
  * the Mossbound Ruins' forest trails (`"road"`), the Amber Desert's sand
- * trails (`"sand"`) and the Crystal Caves' trodden ways through the gravel
- * (`"cave"`), natural game trails or pioneer paths.
+ * trails (`"sand"`), the Crystal Caves' trodden ways through the gravel
+ * (`"cave"`) and the Ember Forge's crushed ash (`"ember"`, in from all four
+ * sides: `entries`), natural game trails or pioneer paths.
  *
  * They are the ways the Dark One's walkers have always come. Each is planned
  * from the map alone (`trailPlan`, memoised per map and style), so a placed
@@ -33,10 +34,10 @@ import { boulderPlan } from "./forest.ts";
 import type { AreaId } from "./areas.ts";
 import { outskirts } from "./outskirts.ts";
 
-export type TrailStyle = "road" | "sand" | "cave";
+export type TrailStyle = "road" | "sand" | "cave" | "ember";
 
 /** Which trails an area's open ground has, if any. */
-export const trailStyle = (area: AreaId): TrailStyle | null => (area === "moss" ? "road" : area === "desert" ? "sand" : area === "drowned" ? "cave" : null);
+export const trailStyle = (area: AreaId): TrailStyle | null => (area === "moss" ? "road" : area === "desert" ? "sand" : area === "drowned" ? "cave" : area === "ember" ? "ember" : null);
 
 /** Tuning. `cost` is how much cheaper a fully worn cell is to walk than open
  * ground (1.25 a cell); `slack` how much dearer a branch at a fork may be and
@@ -54,14 +55,21 @@ export const TRAIL = {
   road: { half: 2.2, heads: 3, tails: 1, meander: 1.6, scale: 9, rockEvery: 12, rock: [0.8, 1.3] },
   sand: { half: 2, heads: 4, tails: 2, meander: 1.8, scale: 10, rockEvery: 13, rock: [1, 1.6] },
   cave: { half: 1.9, heads: 3, tails: 2, meander: 1.7, scale: 9, rockEvery: 12, rock: [1, 1.5] },
+  /** The Ember Forge's: `heads` in from each of the four sides (`sides`),
+   * since its walkers come from every side. */
+  ember: { half: 1.9, heads: 2, tails: 0, meander: 1.7, scale: 9, rockEvery: 12, rock: [1, 1.5], sides: true },
 };
 
 /** A trail's middle line (cells), how far either side of it is worn, and
  * how deeply (0..1). */
 export type TrailLine = { points: Point[]; half: number; level: number };
+/** Where a trail comes onto the board: the point on its edge and the way
+ * in (a unit step along x or y). */
+export type TrailEntry = { x: number; y: number; dx: number; dy: number };
 /** A map's trails: each cell's wear (0..1, only on open ground), the
- * trailheads' x along the top edge, and the lines to draw. */
-export type TrailPlan = { style: TrailStyle; wear: Float32Array; heads: number[]; lines: TrailLine[]; rocks: TrailRock[] };
+ * trailheads' x along the top edge, every trail's way in (`entries`, the
+ * top's and, in the Ember Forge, the other sides' too), and the lines to draw. */
+export type TrailPlan = { style: TrailStyle; wear: Float32Array; heads: number[]; entries: TrailEntry[]; lines: TrailLine[]; rocks: TrailRock[] };
 
 /** Planned once per outskirts (`outskirts.ts`), not per map. */
 const plans = new WeakMap<object, Map<TrailStyle, TrailPlan>>();
@@ -202,16 +210,24 @@ export type TrailRock = { x: number; y: number; r: number };
  * side, and the ways traced again round them, so each trail swerves sharply
  * past its rocks as a game trail does. */
 function planTrails(map: CityMap, seed: number, style: TrailStyle): TrailPlan {
-  const S = TRAIL[style], blocked = new Uint8Array(CELL_COUNT);
+  const S: { half: number; heads: number; tails: number; meander: number; scale: number; rockEvery: number; rock: number[]; sides?: boolean } = TRAIL[style], blocked = new Uint8Array(CELL_COUNT);
   if (style === "road") for (const b of boulderPlan(map)) for (const c of b.cells) blocked[c] = 1;
   const keep = map.buildings.find((b) => b.kind === "keep");
   // Where each trail starts: along the top edge, and the forest's road out.
-  const starts: { x: number; y: number; edge: number }[] = [];
+  // `edge` -1 is the top, 1 the bottom; `side` 2 the left, 3 the right.
+  const starts: { x: number; y: number; edge: number; side?: number }[] = [];
   const band = CELLS_W / S.heads;
   for (let k = 0; k < S.heads; k++) {
     const x = Math.max(6, Math.min(CELLS_W - 7, Math.floor((k + 0.5) * band + (hash01(seed, k, 902, style.length) - 0.5) * band * 0.6)));
     starts.push({ x, y: 0, edge: -1 });
   }
+  // The Ember Forge's come in from the bottom, the left and the right too.
+  if (S.sides)
+    for (const side of [1, 2, 3])
+      for (let k = 0; k < S.heads; k++) {
+        const along = Math.max(6, Math.min(CELLS_W - 7, Math.floor((k + 0.5) * band + (hash01(seed, k, 904 + side, style.length) - 0.5) * band * 0.6)));
+        starts.push(side === 1 ? { x: along, y: CELLS_H - 1, edge: 1, side } : { x: side === 2 ? 0 : CELLS_W - 1, y: along, edge: 0, side });
+      }
   // And out the bottom, past the city (wherever the player sets it), so the
   // trails run the whole field: about the keep, spread apart.
   if (keep)
@@ -245,14 +261,16 @@ function planTrails(map: CityMap, seed: number, style: TrailStyle): TrailPlan {
     }
   });
   field = routeField(map, seed, S.meander, S.scale, blocked);
-  const lines: TrailLine[] = [], heads: number[] = [];
+  const lines: TrailLine[] = [], heads: number[] = [], entries: TrailEntry[] = [];
   traceAll(field).forEach((way, k) => {
     if (way.length < 4) return;
     const s = starts[k];
     // From just past the board's edge, so the trail comes in from beyond it.
-    way.unshift({ x: s.x + 0.5, y: s.edge < 0 ? -1.5 : CELLS_H + 1.5 });
+    if (s.side === 2 || s.side === 3) way.unshift({ x: s.side === 2 ? -1.5 : CELLS_W + 1.5, y: s.y + 0.5 });
+    else way.unshift({ x: s.x + 0.5, y: s.edge < 0 ? -1.5 : CELLS_H + 1.5 });
     lines.push({ points: smooth(way, 2, 1), half: S.half, level: 1 });
     if (s.edge < 0) heads.push(s.x + 0.5);
+    if (s.edge < 0 || s.side) entries.push(s.side === 2 ? { x: 0, y: s.y + 0.5, dx: 1, dy: 0 } : s.side === 3 ? { x: CELLS_W, y: s.y + 0.5, dx: -1, dy: 0 } : s.edge < 0 ? { x: s.x + 0.5, y: 0, dx: 0, dy: 1 } : { x: s.x + 0.5, y: CELLS_H, dx: 0, dy: -1 });
   });
   // A rock may have been passed by no trail after all: keep those beside one.
   const near = rocks.filter((r) => lines.some((l) => l.points.some((p) => Math.hypot(p.x - r.x, p.y - r.y) < r.r + S.half + 1.5)));
@@ -262,7 +280,7 @@ function planTrails(map: CityMap, seed: number, style: TrailStyle): TrailPlan {
     for (let cy = Math.floor(r.y - r.r); cy <= Math.floor(r.y + r.r); cy++)
       for (let cx = Math.floor(r.x - r.r); cx <= Math.floor(r.x + r.r); cx++)
         if (cx >= 0 && cy >= 0 && cx < CELLS_W && cy < CELLS_H && Math.hypot(cx + 0.5 - r.x, cy + 0.5 - r.y) < r.r + 0.3) wear[cellIndex(cx, cy)] = 0;
-  return { style, wear, heads, lines, rocks: near };
+  return { style, wear, heads, entries, lines, rocks: near };
 }
 
 /** Whether every cell within `r` of point `p` on the board is open ground. */

@@ -89,7 +89,7 @@ import { PaintBox } from "./paint-box.ts";
 import { CrystalCavesArt } from "./crystal-caves-art.ts";
 import { crystalCavesPlan, hasCrystalCaves, shaftLight } from "./crystal-caves.ts";
 import { EmberForgeArt } from "./ember-forge-art.ts";
-import { hasEmberForge } from "./ember-forge.ts";
+import { emberForgePlan, hasEmberForge } from "./ember-forge.ts";
 
 export type DrawOptions = {
   /** How many watchmen walk the city (the keep's City watch, in Defend);
@@ -530,6 +530,7 @@ export class DefendRenderer {
           forest: hasForest(this.area) && this.forest.forestPlan ? { plan: this.forest.forestPlan, damage: this.forest.damage } : null,
           sand: sim?.atmosphere?.mode === "sand" ? { trails: sim.trails?.style === "sand" ? sim.trails : null } : null,
           caves: hasCrystalCaves(this.area) ? { trails: crystalCavesPlan(map).trails, day: shaftLight(this.worldLighting ? opts.sun : undefined).day } : null,
+          forge: hasEmberForge(this.area) ? { trails: emberForgePlan(map).trails } : null,
           // The day's tint, as the board takes it (in battle, or by night).
           tint: sim || opts.night > .001 ? opts.tint : undefined,
           // The board's own darkness, which the wilds' night meets at its edge.
@@ -662,7 +663,7 @@ export class DefendRenderer {
     const a = this.ahead = { map, area, run: (ms: number) => {
       if (this.ahead !== a || phase < 0) return;
       let more = true;
-      if (phase === 0) { roads = style === "road" || style === "cave" ? trailPlan(map, style) : null; more = false; }
+      if (phase === 0) { roads = style === "road" || style === "cave" || style === "ember" ? trailPlan(map, style) : null; more = false; }
       else if (phase === 1) more = this.wilds.prepare(hasForest(area), area, roads, ms);
       // The flagstones' relief masks, unless grass or cavern floor hides
       // them on both sides of the crossing (they show through its fade).

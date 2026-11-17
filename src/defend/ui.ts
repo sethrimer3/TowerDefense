@@ -30,6 +30,7 @@ import { allEnemyKinds, journalHTML, paintJournal } from "./journal.ts";
 import { paintPortraits } from "./journal-portrait.ts";
 import { wavePickerHTML } from "./wave-picker.ts";
 import { areaForWave, areaStyle, type AreaId } from "./areas.ts";
+import { outpostGame, outpostView, outpostWave } from "./outpost.ts";
 import { installWallTiles } from "../ui/wall-tiles.ts";
 import { uiSprite } from "../ui/dom.ts";
 import { KeepBricks } from "./keep-bricks.ts";
@@ -86,8 +87,9 @@ import { inspectable, type Armed } from "./inspect.ts";
 
 export type DefendHost = {
   save(): DefendSave;
-  /** The Smithy's and the skill trees' multipliers for the next defense. */
-  bonuses(): Bonuses;
+  /** The Smithy's and the skill trees' multipliers for the next defense,
+   * from `game` (the Ember Forge outpost's view of the save) when given. */
+  bonuses(game?: Save): Bonuses;
   /** The whole save: the Knowledge a building's upgrade spends. */
   game?(): Save;
   /** Knowledge was spent on an upgrade: store it and show the new count. */
@@ -206,7 +208,7 @@ export class DefendPage {
     board:()=>this.root.querySelector<HTMLElement>("#defend-board")!,
     renderer:()=>this.renderer!, map:()=>this.sim?.map??this.currentMap(),
     sizing:()=>this.host.menuSizing?.()??"fixed",
-    source:()=>this.sim??{levels:this.save.levels,bonuses:this.host.bonuses()},
+    source:()=>this.sim??{levels:this.save.levels,bonuses:this.bonuses()},
     orders:b=>decodeOrders(layoutOrders(this.save.layout,b)),
     change:(b,o)=>this.changeOrders(b,o),
     spec:b=>({name:this.pickedSpike?"Wall spikes":STRUCTURES[b.kind as keyof typeof STRUCTURES]?.name??b.kind,tree:true,
@@ -283,7 +285,7 @@ export class DefendPage {
     }
     if (!this.built) this.build();
     if(!this.sim) {
-      const map=this.currentMap(),source={levels:this.save.levels,bonuses:this.host.bonuses()};
+      const map=this.currentMap(),source={levels:this.save.levels,bonuses:this.bonuses()};
       let changed=false;
       for(const b of map.buildings){const o=layoutOrders(this.save.layout,b);if(!o)continue;const before=JSON.stringify(decodeOrders(o));clampOrders(b,source,o);changed ||= before!==JSON.stringify(decodeOrders(o));}
       if(changed)this.host.persist();
@@ -306,7 +308,8 @@ export class DefendPage {
     const updated = performance.now();
     if (this.sim && this.phase === 'sim') {
       this.handleEvents();
-      if (dt > 0) this.sounds.hear(this.sim);
+      // (A run that reached the Ember Forge's border has ended.)
+      if (dt > 0 && this.sim) this.sounds.hear(this.sim);
     }
     this.fadeNight(dt);
     this.teach();
@@ -318,7 +321,7 @@ export class DefendPage {
     this.fitView();
     this.placeSpecialty();
     if (this.specialty && !("side" in this.specialty.target)) {
-      const kind = targetKind(this.save, this.specialty.target), game = this.host.game?.();
+      const kind = targetKind(this.save, this.specialty.target), game = this.game();
       if (isEconomyBuilding(kind) && game) {
         const state = `${kind}:${economySkills(kind).map(id=>game.skills[id]).join(',')}:${game.researchJob?.id??''}:${Math.floor((this.host.clock?.()??Date.now())/1000)}`;
         if (state !== this.economyTreeState) { this.economyTreeState = state; this.renderSpecialty(); }
@@ -400,8 +403,29 @@ export class DefendPage {
     this.frameTimes.toggle(this.frameTimes.enabled);
   }
 
-  private get save() {
-    return this.host.save();
+  /** The save the page works on: at the Ember Forge outpost (`outpost.ts`)
+   * its view of it, with the outpost's city and palette. */
+  private get save(): DefendSave {
+    const home = this.host.save();
+    return this.atOutpost ? outpostView(home) : home;
+  }
+
+  /** Whether the page is at the Ember Forge outpost: the battle's own city
+   * while one runs, else whether the starting wave is the forge's. */
+  get atOutpost(): boolean {
+    if (this.sim) return !!this.sim.map.outpost;
+    return !this.testerSelected && outpostWave(startingWave(this.host.save()));
+  }
+
+  /** The whole save, as the outpost sees it while there. */
+  private game(): Save | undefined {
+    const game = this.host.game?.();
+    return game && this.atOutpost ? outpostGame(game) : game;
+  }
+
+  private bonuses(): Bonuses {
+    const game = this.atOutpost ? this.game() : undefined;
+    return game ? this.host.bonuses(game) : this.host.bonuses();
   }
 
   // ── DOM ───────────────────────────────────────────────────────────────
@@ -658,7 +682,7 @@ export class DefendPage {
     // rank its upgraded copies waiting here keep.
     const all: { id: string; name: string; count: number; icon: IconItem; look?: string; badge?: string }[] =
       this.phase === "build"
-        ? PALETTE_ITEMS.filter((item) => inCategory(item, this.category)).flatMap((item) => [
+        ? PALETTE_ITEMS.filter((item) => inCategory(item, this.category) && !(this.atOutpost && (item === "mine" || item === "library"))).flatMap((item) => [
             { id: item, name: ITEM_NAMES[item], count: plainAvailable(s, item), icon: item as IconItem },
             ...keptGroups(s, item).map((g) => ({ id: `${item}~${g.path}~${g.rank}`, name: `${ITEM_NAMES[item]} · ${specialtyLabel(g)}`, count: g.count, icon: item as IconItem, look: pathLook(item, g.path), badge: pathBadge(g) })),
           ])
@@ -923,6 +947,7 @@ export class DefendPage {
       if (!fit.ok) throw new Error(fit.reason);
       this.map = generateCity(fit, this.save.seed);
       this.map.trails = { seed: this.save.seed };
+      if (layout.outpost) this.map.outpost = true;
       this.mapLayout = layout;
     }
     return this.map;
@@ -933,18 +958,29 @@ export class DefendPage {
     const dialog = this.root.querySelector<HTMLDialogElement>(".defend-wave-dialog")!;
     dialog.innerHTML = wavePickerHTML(this.save, this.host.devMode(), this.testerSelected);
     dialog.querySelector<HTMLButtonElement>("[data-unit-tester]")?.addEventListener("click", () => {
+      const was = this.atOutpost;
       this.testerSelected = true;
       dialog.close();
-      this.renderControls();
+      if (this.atOutpost !== was) {
+        this.picked = null;
+        this.closeSpecialty();
+        this.renderChrome();
+      } else this.renderControls();
     });
     dialog.querySelector<HTMLButtonElement>("[data-wave-close]")!.onclick = () => dialog.close();
     dialog.querySelectorAll<HTMLButtonElement>("[data-wave]").forEach((b) => {
       b.onclick = () => {
+        const was = this.atOutpost;
         this.save.startWave = Number(b.dataset.wave);
         this.testerSelected = false;
         this.host.persist();
         dialog.close();
-        this.renderControls();
+        // Into or out of the Ember Forge: the other city and its palette.
+        if (this.atOutpost !== was) {
+          this.picked = null;
+          this.closeSpecialty();
+          this.renderChrome();
+        } else this.renderControls();
       };
     });
     dialog.showModal();
@@ -1082,7 +1118,7 @@ export class DefendPage {
     this.fought.add(map);
     // The keep's guards fight in Defend, mustering where the watchmen walked.
     this.menu.dismiss();
-    this.sim = new DefendSim(map, { ...this.save.levels }, (defendRandom("rolls")() * 2147483648) | 0, { ...this.host.bonuses(), watch: cityWatch(this.save.keepRanks) });
+    this.sim = new DefendSim(map, { ...this.save.levels }, (defendRandom("rolls")() * 2147483648) | 0, { ...this.bonuses(), watch: cityWatch(this.save.keepRanks) });
     restoreOrders(this.sim);
     musterWatch(this.sim, this.renderer?.cityLife.watchmenAt() ?? []);
     this.sim.speed = Math.min(this.save.battleSpeed, this.save.speed3 ? 3 : 2);
@@ -1102,6 +1138,30 @@ export class DefendPage {
     }
     const w = this.weather, sky = w.blizzard ? "A blizzard howls in. " : w.snow ? "Snow drifts in. " : w.sand ? "A sandstorm blows in. " : w.mist ? "Mist creeps over the ground. " : w.rain ? "Rain rolls in. " : "";
     this.setMessage(`${sky}Here they come! ${this.sideOpen.sim ? "Drag" : "Open Skills and drag"} a bomb onto the field, plant the war banner to rally your troops, raise the fallen with Necromancy, call down a meteor, freeze them with a Frost nova, or drop in reinforcements.`, 4);
+  }
+
+  /** Leaves the battle at the Ember Forge's border for the build phase of
+   * the city that fights `wave` (the outpost or home), which becomes the
+   * next starting wave. */
+  private travel(wave: number) {
+    this.essenceAt = -Infinity;
+    this.payEssence();
+    this.stopSummoning();
+    this.performance.finish("cleared");
+    this.performanceEnd = null;
+    const home = this.host.save();
+    home.startWave = wave;
+    this.phase = "build";
+    this.sim = null;
+    this.map = null;
+    this.weather = null;
+    this.night = 0;
+    this.picked = null;
+    this.host.persist();
+    this.hideBanner();
+    this.renderChrome();
+    this.relayout();
+    this.setMessage(outpostWave(wave) ? `${areaForWave(wave).name} outpost` : areaForWave(wave).name, 4);
   }
 
   private endRun() {
@@ -1176,6 +1236,13 @@ export class DefendPage {
         // Reaching a new zone for the first time holds the battle on its story.
         if (!sim.unitTester) {
           const story = this.unreadStory(ev.wave + 1);
+          // The Ember Forge is fought from its outpost: the run stops at its
+          // border, and the next wave starts from the other city.
+          if (outpostWave(ev.wave + 1) !== !!sim.map.outpost) {
+            this.travel(ev.wave + 1);
+            if (story) this.tellStory(story, () => {});
+            return;
+          }
           if (story) this.tellStory(story, () => {});
         }
       } else if (ev.type === "waveStart") {
@@ -1232,7 +1299,7 @@ export class DefendPage {
       looks: this.looks(),
       gate: this.save.gateRanks,
       over: this.phase === "over",
-      orders: {levels:this.save.levels,bonuses:this.host.bonuses()},
+      orders: {levels:this.save.levels,bonuses:this.bonuses()},
       shimmer: this.phase === "build" && !this.sim && this.sideOpen.build,
       highlight: this.host.highlight?.() ?? null,
       ...(lifting ? { lifting } : {}),
@@ -1530,7 +1597,7 @@ export class DefendPage {
   private pick(id: number | null, menu=true) {
     if(id===null)this.pickedSpike=undefined;
     if (id !== this.picked?.id) this.aimPreview = null;
-    this.picked = id === null ? null : { id, armed: { levels: { ...this.save.levels }, bonuses: this.host.bonuses() } };
+    this.picked = id === null ? null : { id, armed: { levels: { ...this.save.levels }, bonuses: this.bonuses() } };
     if(menu){const b=id===null?undefined:(this.sim?.map??this.currentMap()).buildings[id];if(b)this.menu.show(b);else this.menu.dismiss(false);}
 
   }
@@ -1540,12 +1607,12 @@ export class DefendPage {
     for(const key of ["targetMode","rangePercent","rally","crosshair"] as const)delete placed[key];
     Object.assign(placed,decodeOrders(o));
     if(this.sim)applyOrders(this.sim,b,decodeOrders(placed));
-    else clampOrders(b,{levels:this.save.levels,bonuses:this.host.bonuses()},placed);
+    else clampOrders(b,{levels:this.save.levels,bonuses:this.bonuses()},placed);
     if(this.sim) {
       const live=this.sim.orders.get(b.id)!;
       for(const key of ["rally","crosshair"] as const) {if(live[key])placed[key]=live[key];else delete placed[key];}
     }
-    if(this.picked)this.picked.armed={levels:this.save.levels,bonuses:this.host.bonuses()};
+    if(this.picked)this.picked.armed={levels:this.save.levels,bonuses:this.bonuses()};
     this.host.persist();
   }
   private treeTarget(b:Building):TreeTarget|null {
@@ -1628,7 +1695,7 @@ export class DefendPage {
 
   /** The player bought tree node `id` for the panel's building. */
   private upgrade(id: string) {
-    const sp = this.specialty, game = this.host.game?.();
+    const sp = this.specialty, game = this.game();
     if (!sp || !game || this.phase !== "build") return;
     const economyKind = !("side" in sp.target) ? targetKind(this.save, sp.target) : undefined;
     if (isEconomyBuilding(economyKind)) {
@@ -1689,7 +1756,7 @@ export class DefendPage {
 
   /** Respec, free: every Knowledge point back, the building back to its root. */
   private respec() {
-    const sp = this.specialty, game = this.host.game?.();
+    const sp = this.specialty, game = this.game();
     if (!sp || !game || this.phase !== "build") return;
     const tree = "side" in sp.target ? SIDE_UI[sp.target.side] : targetKind(this.save, sp.target) === "repairShop" ? sharedBranches("repairShop") : undefined;
     const r = tree ? tree.respec(game) : respecBuilding(game, sp.target as SpecialtyTarget);
@@ -1698,7 +1765,7 @@ export class DefendPage {
 
   /** Undoes tree node `id` and every upgrade after it, free, their Knowledge back. */
   private undo(id: string) {
-    const sp = this.specialty, game = this.host.game?.();
+    const sp = this.specialty, game = this.game();
     if (!sp || !game || this.phase !== "build") return;
     if ("side" in sp.target) {
       const tree = SIDE_UI[sp.target.side], back = tree.undo(game, id);
@@ -1728,7 +1795,7 @@ export class DefendPage {
    * when it is owned, sell everything after it (undo the one grown from
    * it; on a side tree's root, every rank), staying on it. */
   private again(id: string) {
-    const sp = this.specialty, game = this.host.game?.();
+    const sp = this.specialty, game = this.game();
     if (!sp || !game || this.phase !== "build") return;
     if(!("side" in sp.target)&&isEconomyBuilding(targetKind(this.save,sp.target)))return this.upgrade(id);
     if ("side" in sp.target) {
@@ -1781,7 +1848,7 @@ export class DefendPage {
   private afterChange(cue: "chime" | "unlock" | "coin") {
     const sp = this.specialty!;
     this.host.spentKnowledge?.();
-    const source={levels:this.save.levels,bonuses:this.host.bonuses()};
+    const source={levels:this.save.levels,bonuses:this.bonuses()};
     for(const b of this.currentMap().buildings){const o=layoutOrders(this.save.layout,b);if(o)clampOrders(b,source,o);}
     this.host.persist();
     play(cue);
@@ -1793,7 +1860,7 @@ export class DefendPage {
   private renderSpecialty(focus = false) {
     const el = this.root.querySelector<HTMLElement>("#defend-specialty");
     if (!el) return;
-    const sp = this.specialty, game = this.host.game?.();
+    const sp = this.specialty, game = this.game();
     const kind = !sp ? undefined : "side" in sp.target ? sp.target.side : targetKind(this.save, sp.target);
     if (!sp || !kind || !game || this.phase === "over") {
       if (sp) this.specialty = null;
@@ -1877,7 +1944,7 @@ export class DefendPage {
    * building of it has reached (every one in Developer mode), what this one
    * has in gold. */
   private renderMap(el: HTMLElement, kind: PaletteKind, wear: ReturnType<typeof specialtyOf>) {
-    const sp = this.specialty!, game = this.host.game!()!;
+    const sp = this.specialty!, game = this.game()!;
     const found = foundNodes(this.save), all = this.host.devMode();
     const here = new Set(buildingTree(kind, wear).filter((n) => n.state === "owned").map((n) => n.id));
     const line = kind === "wallSpikes" ? "Wall spikes" : ITEM_NAMES[rootOf(kind)];

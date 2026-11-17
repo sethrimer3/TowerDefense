@@ -19,6 +19,7 @@ import {
 } from "./ember-forge.ts";
 import { artPen } from "./pixel-fx.ts";
 import { sceneryOutlinesOn } from "./scenery-looks.ts";
+import { emberTrailPixel, trailField } from "./trail-art.ts";
 
 const W = CELLS_W * ART, H = CELLS_H * ART;
 
@@ -410,6 +411,18 @@ export function* emberFloorSteps(plan: EmberForgePlan): Generator<void, { floor:
   const img: Img = { px: new Uint32Array(W * H), w: W, h: H }, glow: Img = { px: new Uint32Array(W * H), w: W, h: H };
   const ok = (x: number, y: number) => plan.open[Math.floor(y / ART) * CELLS_W + Math.floor(x / ART)] === 1;
   yield* fillCinder(img.px, W, H, 0, 0, ok, 16);
+  // The trails: crushed ash through the cinders, clinker kicked to their sides.
+  if (plan.trails) {
+    const { t } = trailField(plan.trails);
+    yield;
+    for (let y = 0; y < H; y++, y % 16 || (yield))
+      for (let x = 0; x < W; x++) {
+        const i = y * W + x;
+        if (t[i] > 1.3 || !ok(x, y)) continue;
+        const c = emberTrailPixel(t[i], x, y);
+        if (c) img.px[i] = c;
+      }
+  }
   for (const f of plan.cracks) paintFissure(img, glow, f, 0, 0, ok);
   yield;
   for (const p of plan.pools) paintPool(img, glow, p.x * ART, p.y * ART, p.r, p.seed, ok);

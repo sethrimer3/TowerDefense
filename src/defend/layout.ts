@@ -98,6 +98,10 @@ export type Layout = {
   /** Whether wall sections may stand inside the city (from the walls'
    * Town walls upgrade, not saved on its own). */
   innerWalls?: true;
+  /** The Ember Forge outpost's own city (`outpost.ts`): a smaller keep (a
+   * single quarter), and city tiles only on the middle 8 × 8 tiles
+   * (`cityTileOk`). Absent on the home city. */
+  outpost?: true;
 };
 
 export type FittedStructure = {
@@ -149,7 +153,21 @@ export function cloneLayout(l: Layout): Layout {
     ballistas: l.ballistas.map((v) => ({ ...v })),
     ...(l.walls ? { walls: l.walls.map((w) => ({ ...w })) } : {}),
     ...(l.innerWalls ? { innerWalls: true as const } : {}),
+    ...(l.outpost ? { outpost: true as const } : {}),
   };
+}
+
+/** How many tiles in from the board's edge the Ember Forge outpost's city
+ * must keep: the buildable field's own ring stays open too, so the forge's
+ * trails cross the whole field on every side. */
+export const OUTPOST_MARGIN = 2;
+/** Whether the city (a city tile or the keep's tile) may stand on tile
+ * (tx, ty) of `l`: anywhere on the buildable field, but the outpost's only
+ * on its middle 8 × 8. */
+export function cityTileOk(l: Pick<Layout, "outpost">, tx: number, ty: number) {
+  if (!buildableTile(tx, ty)) return false;
+  if (!l.outpost) return true;
+  return tx >= OUTPOST_MARGIN && ty >= OUTPOST_MARGIN && tx < TILES_W - OUTPOST_MARGIN && ty < TILES_H - OUTPOST_MARGIN;
 }
 
 export function cityTileSet(l: Layout): Set<string> {
@@ -235,9 +253,12 @@ export function quarterSize(kind: StructureKind, compact: boolean): { qw: number
   return { qw: f.w / QC, qh: f.h / QC, span: f.span };
 }
 
+/** The keep's footprint in quarter tiles: the outpost's is a single quarter. */
+export const keepSize = (outpost = false) => (outpost ? { qw: 1, qh: 1, span: 1 as TileSpan } : quarterSize("keep", false));
+
 /** The keep's top left quarter: its footprint in the middle of its tile. */
-export function keepQuarter(keep: TilePos): QuarterPos {
-  const { qw, qh } = quarterSize("keep", false);
+export function keepQuarter(keep: TilePos, outpost = false): QuarterPos {
+  const { qw, qh } = keepSize(outpost);
   return { qx: keep.tx * QUARTER + ((QUARTER - qw) >> 1), qy: keep.ty * QUARTER + ((QUARTER - qh) >> 1) };
 }
 
@@ -385,8 +406,8 @@ function ringJoined(r: Rect, city: Uint8Array, foot: Int32Array): boolean {
 /** The keep, then every structure oldest first, as fitted. */
 function placements(l: Layout): Placement[] {
   const compact = new Set(l.compact);
-  const keep = keepQuarter(l.keep);
-  const out: Placement[] = [{ uid: KEEP_UID, kind: "keep", tx: l.keep.tx, ty: l.keep.ty, ...keep, ...quarterSize("keep", false) }];
+  const keep = keepQuarter(l.keep, !!l.outpost);
+  const out: Placement[] = [{ uid: KEEP_UID, kind: "keep", tx: l.keep.tx, ty: l.keep.ty, ...keep, ...keepSize(!!l.outpost) }];
   for (const s of [...l.structures].sort((a, b) => a.uid - b.uid))
     out.push({ uid: s.uid, kind: s.kind, tx: s.tx, ty: s.ty, qx: s.qx, qy: s.qy, ...quarterSize(s.kind, compact.has(s.kind)) });
   return out;
@@ -710,7 +731,7 @@ export function moveBallista(l: Layout, from: CornerSpot, to: CornerSpot): Layou
 // Every edit returns the new layout, or null when it would be illegal.
 
 export function placeCityTile(l: Layout, tx: number, ty: number): Layout | null {
-  if (!buildableTile(tx, ty)) return null;
+  if (!cityTileOk(l, tx, ty)) return null;
   const tiles = cityTileSet(l);
   if (tiles.has(tileKey(tx, ty))) return null;
   const next = cloneLayout(l);
@@ -758,7 +779,7 @@ export function moveCityTile(l: Layout, from: TilePos, to: TilePos): Layout | nu
 /** Carries tile `from` (a city tile, or the keep's) to open ground at `to`
  * with everything on it. */
 function carryTile(l: Layout, from: TilePos, to: TilePos): Layout | null {
-  if (!buildableTile(to.tx, to.ty)) return null;
+  if (!cityTileOk(l, to.tx, to.ty)) return null;
   const toKey = tileKey(to.tx, to.ty);
   if (cityTileSet(l).has(toKey)) return null;
   const next = cloneLayout(l);
