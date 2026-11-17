@@ -808,12 +808,18 @@ export class DefendRenderer {
       this.drawFaces();
       paintSpikePoints(ctx, this.px, map, sim);
     }
-    // The Highlands' ice, pillars, rune stones and relics, standing out
+    // The Highlands' ice, pillars, rune stones, relics and huts, standing out
     // of the snow (in front of the wall's hanging faces).
     const vault = this.vaultShare();
     if (vault > 0) {
       this.vault.sync(map);
       this.vault.drawFloor(ctx, this.px, vault);
+      // Its huts, which fall when a blast hits them or someone walks
+      // through them.
+      this.vault.drawHuts(ctx, this.px, vault, {
+        battle: sim, wave: sim?.wave ?? 0, time: sim?.time ?? 0, walkers: feet, blasts: sim?.effects ?? [],
+        now: opts.now, still: opts.reduceMotion, effects: opts.effects ?? true,
+      });
     }
     if ((opts.effects ?? true) && this.forestShare() > 0) {
       this.forestGrass.sync(this.forest.forestPlan!);
