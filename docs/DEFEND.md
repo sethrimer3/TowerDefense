@@ -812,7 +812,7 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   come from every side. A run stops at the forge's border and carries on from the other city. Selected starting
   waves preview their own area. Ground and connected wall cap/face textures
   crossfade over three seconds, with matching wave button and list colors.
-  `area-enemies.ts` supplies themed pools; Nadir permits every normal wave species. Offspring remain parent-only. Unspendable area-budget remainders are discarded. Nadir uses crypt masonry with a dark violet floor wash. Frozen Vault (101-120) includes all ship tiers, Ice Golems (240 HP, cost 80, double fire/explosion damage) and Sliding Ice Cubes (45 HP, cost 10, cardinal slides at 3.6 cells/second, meltable ice trails, immune to blast deflection). Both enemies have journal entries; kills award no currency.
+  `area-enemies.ts` supplies themed pools; Nadir permits every normal wave species. Offspring remain parent-only. Unspendable area-budget remainders are discarded. Nadir floats in a black and dark red void with its own ground, rifts, pyramids, stairs, trapdoors, watching eyes and hovering stones (`nadir.ts`). Frozen Vault (101-120) includes all ship tiers, Ice Golems (240 HP, cost 80, double fire/explosion damage) and Sliding Ice Cubes (45 HP, cost 10, cardinal slides at 3.6 cells/second, meltable ice trails, immune to blast deflection). Both enemies have journal entries; kills award no currency.
 - Every themed roster has at least 15 species; Frozen Vault has 20. The native
   additions below are affordable during their first visit and also eligible in
   Nadir. Costs are fixed difficulty:
