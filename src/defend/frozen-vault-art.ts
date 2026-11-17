@@ -18,7 +18,7 @@ import { CELLS_H, CELLS_W, hash, hash01 } from "./grid.ts";
 import type { CityMap } from "./citygen.ts";
 import {
   FROZEN_VAULT, frozenVaultPlan, glintAt,
-  type FrozenVaultPlan, type IceSpire, type Relic, type RuneStone, type VaultPillar,
+  HutRuins, type FrozenVaultPlan, type Hut, type HutBlast, type HutWalker, type IceSpire, type Relic, type RuneStone, type VaultPillar,
 } from "./frozen-vault.ts";
 import { haloSprite, piece, rgba, wash, type Img, type Piece } from "./ember-forge-art.ts";
 import { artPen } from "./pixel-fx.ts";
@@ -42,6 +42,10 @@ const RUNE_GLOW = [0x3a9ee8, 0x9ee6ff];
 /** Gold and steel seen through the ice. */
 const GOLD = [0x6e6440, 0x9c8e58, 0xc8b878, 0xece0a8];
 const STEEL = [0x5a6a86, 0x8c9cb8, 0xc0cee4];
+/** The huts' weathered planks and their thatch, shade to lit; the stones
+ * of a cabin's chimney. */
+const PLANK = [0x24160f, 0x3e2a1c, 0x5e422a, 0x82603c, 0xa8845a];
+const THATCH = [0x332816, 0x54432a, 0x7a663c, 0xa48e58, 0xc8b47c];
 /** The outline round a piece while scenery outlines are on; its shadow on the snow. */
 const INK = 0x101828;
 const SHADOW = rgba(0x1a2c5c, 84);
@@ -203,6 +207,127 @@ function drumPiece(v: VaultPillar): Piece {
   return p;
 }
 
+/** A little hut seen from above, standing (`down` false) or fallen. */
+export function hutPiece(h: Hut, down = false): Piece {
+  return down ? hutRubble(h) : h.round ? roundHut(h) : cabin(h);
+}
+
+/** Where a standing hut's smoke comes out, in art pixels from its middle
+ * along and across its roof (a round hut's from its peak). */
+function chimneyAt(h: Hut): [number, number] {
+  if (h.round) return [0, 0];
+  const L = Math.round(h.r * ART * 1.05), S = Math.max(3, Math.round(h.r * ART * 0.75));
+  return [(hash01(h.seed, 1271) < 0.5 ? -1 : 1) * Math.max(1, Math.round(L * 0.5)), -Math.max(1, Math.round(S * 0.5))];
+}
+
+/** A cabin under a gabled roof deep in snow, its ridge running across (or
+ * up and down when `turned`): the face toward the light bright, the other
+ * in blue shade, a white crest of snow along the ridge, the planks of the
+ * eaves showing round the edge (lit on the sunny side) and in a few places
+ * where the snow has slid, a stone chimney with a dark mouth, and a stack
+ * of split logs against one gable end. */
+function cabin(h: Hut): Piece {
+  const L = Math.round(h.r * ART * 1.05), S = Math.max(3, Math.round(h.r * ART * 0.75)), R = L + 4, p = square(R), c = R;
+  const put = (x: number, y: number, col: number) => {
+    const [X, Y] = h.turned ? [c + y, c + x] : [c + x, c + y];
+    if (X >= 0 && Y >= 0 && X < p.w && Y < p.h) p.px[Y * p.w + X] = rgba(col);
+  };
+  // Lit toward the top (or the left, turned): both face the light.
+  for (let y = -S; y <= S; y++)
+    for (let x = -L; x <= L; x++) {
+      const edge = Math.abs(y) === S || Math.abs(x) === L, lit = y < 0, k = Math.abs(y) / S;
+      if (edge) { put(x, y, lit || y === 0 ? PLANK[3] : Math.abs(x) === L && y < S ? PLANK[2] : PLANK[1]); continue; }
+      if (y === 0) { put(x, y, SNOW[3]); continue; }
+      const [X, Y] = h.turned ? [y, x] : [x, y];
+      // Where the snow has slid, near the lower eave, planks show.
+      if (!lit && k > 0.6 && hash01(X + 50, Y + 50, h.seed) < 0.22) { put(x, y, (x & 1) ? PLANK[2] : PLANK[1]); continue; }
+      put(x, y, lit ? pick(SNOW, 2.3 - k * 0.5 + (dither(X + 64, Y + 64) - 0.5) * 0.6) : pick(SNOW, 1.6 - k * 0.9 + (dither(X + 64, Y + 64) - 0.5) * 0.6));
+    }
+  // The chimney on the sunny face, toward one end.
+  const [e, cy] = chimneyAt(h);
+  put(e, cy, STONE[4]); put(e + 1, cy, STONE[3]); put(e, cy + 1, STONE[2]); put(e + 1, cy + 1, STONE[1]);
+  put(e, cy, SLATE[0]);
+  put(e - 1, cy, STONE[3]); put(e, cy - 1, STONE[4]);
+  // The woodpile against the other gable end: log ends, lit and in shade.
+  const w = -Math.sign(e) * (L + 2), top = -1;
+  for (let j = 0; j < 3; j++) {
+    put(w, top + j, j === 0 ? PLANK[4] : PLANK[3]);
+    put(w - Math.sign(w), top + j, j === 0 ? PLANK[3] : PLANK[2]);
+  }
+  put(w, top - 1, SNOW[3]); put(w - Math.sign(w), top - 1, SNOW[2]);
+  return p;
+}
+
+/** A round hut under a conical roof of thatch: snow lying deep on the
+ * sunny upper left, the thatch showing in streaks on the shaded lower
+ * right and in a ring at the eaves, and the tips of its poles crossing
+ * out of the smoke hole at its peak. */
+function roundHut(h: Hut): Piece {
+  const r = Math.max(4, h.r * ART * 0.95), R = Math.ceil(r) + 2, p = square(R), c = R + 0.5;
+  for (let y = 0; y < p.h; y++)
+    for (let x = 0; x < p.w; x++) {
+      const dx = x + 0.5 - c, dy = y + 0.5 - c, d = Math.hypot(dx, dy);
+      if (d > r) continue;
+      const q = y * p.w + x, f = facing(dx, dy) * Math.min(1, d / (r * 0.6)), a = Math.atan2(dy, dx);
+      const streak = Math.round((a / (Math.PI * 2)) * 20 + 20) & 1 ? 0.45 : -0.35;
+      if (d > r - 1) { p.px[q] = rgba(pick(THATCH, 2 + f * 1.5 + streak * 0.5)); continue; }
+      // Snow on the side toward the light, its edge ragged.
+      const snow = f + (hash01(x, y, h.seed) - 0.5) * 0.35 > -0.3;
+      p.px[q] = rgba(snow ? pick(SNOW, 2.1 + f * 1.1 + (dither(x, y) - 0.5) * 0.5) : pick(THATCH, 1.6 + f * 1.2 + streak));
+    }
+  // The smoke hole and the poles' tips crossing out of it.
+  const k = Math.floor(c), put = (x: number, y: number, col: number) => { p.px[y * p.w + x] = rgba(col); };
+  put(k, k, SLATE[0]);
+  put(k - 1, k - 1, PLANK[4]); put(k - 2, k - 2, PLANK[3]);
+  put(k + 1, k - 1, PLANK[3]); put(k + 2, k - 2, PLANK[2]);
+  put(k - 1, k + 1, PLANK[2]);
+  return p;
+}
+
+/** What is left of a hut: its roof's planks (or a round hut's poles and
+ * bundles of thatch) fallen in a heap, mostly lying the way the roof ran
+ * with a few across, each lit along its top, over the dark boards of its
+ * floor, with snow thrown over them. */
+function hutRubble(h: Hut): Piece {
+  const r = Math.max(4, h.r * ART), R = Math.ceil(r * 1.2) + 2, p = square(R), c = R + 0.5;
+  const ramp = h.round ? THATCH : PLANK, put = (x: number, y: number, col: number) => {
+    if (x >= 0 && y >= 0 && x < p.w && y < p.h) p.px[y * p.w + x] = rgba(col);
+  };
+  // The floor and the heap's dark hollows.
+  for (let y = 0; y < p.h; y++)
+    for (let x = 0; x < p.w; x++) {
+      const dx = (x + 0.5 - c) / (h.turned ? 0.8 : 1), dy = (y + 0.5 - c) / (h.turned ? 1 : 0.8);
+      if (Math.hypot(dx, dy) < r * 0.85 + (hash01(x, y, h.seed) - 0.5) * 1.5) put(x, y, (x + y) & 1 ? PLANK[0] : PLANK[1]);
+    }
+  // Planks or poles: most along the roof, a few across.
+  const run = h.turned ? Math.PI / 2 : 0, n = 9 + (h.seed % 3);
+  for (let k = 0; k < n; k++) {
+    const a = run + (k % 4 === 3 ? Math.PI / 2 : 0) + (hash01(h.seed, k, 1281) - 0.5) * 0.9;
+    const b = hash01(h.seed, k, 1282) * Math.PI * 2, d = Math.sqrt(hash01(h.seed, k, 1283)) * r * 0.75;
+    const len = 3 + (hash(h.seed, k, 1284) % 4), ox = c + Math.cos(b) * d, oy = c + Math.sin(b) * d * 0.85;
+    for (let t = 0; t <= len; t++) {
+      const x = Math.floor(ox + Math.cos(a) * (t - len / 2)), y = Math.floor(oy + Math.sin(a) * (t - len / 2));
+      put(x, y + 1, ramp[1]);
+      put(x, y, ramp[t === len ? 4 : 3 - ((k + (t >> 1)) & 1)]);
+    }
+  }
+  // Snow thrown over the heap, in small drifts.
+  for (let k = 0; k < 6; k++) {
+    const b = hash01(h.seed, k, 1285) * Math.PI * 2, d = hash01(h.seed, k, 1286) * r * 0.9;
+    const x = Math.floor(c + Math.cos(b) * d), y = Math.floor(c + Math.sin(b) * d);
+    put(x, y, SNOW[3]); put(x + 1, y, SNOW[2]); put(x, y + 1, SNOW[1]);
+  }
+  // A cabin's chimney stones.
+  if (!h.round) {
+    const x = Math.floor(c + (hash01(h.seed, 1287) - 0.5) * r), y = Math.floor(c + (hash01(h.seed, 1288) - 0.5) * r);
+    put(x, y, STONE[4]); put(x + 1, y, STONE[3]); put(x, y + 1, STONE[2]); put(x + 1, y + 1, STONE[1]);
+  }
+  return p;
+}
+
+/** How long a fallen hut's puff of snow and splinters lasts, seconds. */
+const PUFF = 0.7;
+
 /** Rune patterns, three by four: bit k is pixel (k % 3, k / 3 | 0). */
 const GLYPHS = [0b010_111_010_010, 0b101_010_101_000, 0b111_100_111_001, 0b010_101_010_101, 0b110_011_110_000, 0b001_011_101_111, 0b100_110_100_111, 0b010_010_111_101];
 
@@ -347,6 +472,13 @@ function canvasOf(pixels: Uint32Array, w: number, h: number) {
   return cv;
 }
 
+/** One frame of the battle as the huts see it: `battle` is null while none
+ * is fought (every hut stands). */
+export type HutFrame = {
+  battle: object | null; wave: number; time: number; walkers: readonly HutWalker[]; blasts: readonly HutBlast[];
+  now: number; still: boolean; effects: boolean;
+};
+
 export type VaultGlowOptions = { now: number; alpha: number; still: boolean; night: number; effects: boolean };
 
 export class FrozenVaultArt {
@@ -356,6 +488,9 @@ export class FrozenVaultArt {
   private glow: HTMLCanvasElement | null = null;
   private halo: HTMLCanvasElement | null = null;
   private ink = true;
+  /** Which huts have fallen; their pictures, standing and fallen. */
+  readonly ruins = new HutRuins();
+  private hutArt = new Map<string, { cv: HTMLCanvasElement; ax: number; ay: number }>();
   private painting: { plan: FrozenVaultPlan; steps: Generator<void, { floor: Uint32Array; glow: Uint32Array }, void> } | null = null;
 
   /** Plans `map`'s vault (and repaints it) when the map changes, or when
@@ -368,6 +503,7 @@ export class FrozenVaultArt {
     this.plan = frozenVaultPlan(map);
     this.floor = this.glow = null;
     this.painting = null;
+    this.hutArt.clear();
   }
 
   /** Plans `map`'s vault and paints, for about `ms`, its layer ahead of a
@@ -406,6 +542,58 @@ export class FrozenVaultArt {
     c.imageSmoothingEnabled = false;
     c.globalAlpha *= alpha;
     c.drawImage(this.floor!, 0, 0, CELLS_W * px, CELLS_H * px);
+    c.restore();
+  }
+
+  /** The huts over the snow, standing or fallen, and the puff of snow and
+   * splinters as one falls. */
+  drawHuts(c: CanvasRenderingContext2D, px: number, alpha: number, f: HutFrame) {
+    const plan = this.plan;
+    if (!plan || alpha <= 0 || typeof document === "undefined") return;
+    this.ruins.update(plan.huts, f.battle, f.wave, f.time, f.walkers, f.blasts);
+    if (!plan.huts.length) return;
+    const u = px / ART;
+    c.save();
+    c.imageSmoothingEnabled = false;
+    c.globalAlpha *= alpha;
+    const base = c.globalAlpha;
+    plan.huts.forEach((h, k) => {
+      const down = this.ruins.down(k), key = `${k}:${down ? 1 : 0}`;
+      let art = this.hutArt.get(key);
+      if (!art) {
+        const p = hutPiece(h, down), drop = down ? 1 : 2, img: Img = { px: new Uint32Array((p.w + drop) * (p.h + drop)), w: p.w + drop, h: p.h + drop };
+        standOn(img, null, p, p.ax, p.ay, () => true, drop);
+        art = { cv: canvasOf(img.px, img.w, img.h), ax: p.ax, ay: p.ay };
+        this.hutArt.set(key, art);
+      }
+      c.drawImage(art.cv, (Math.round(h.x * ART) - art.ax) * u, (Math.round(h.y * ART) - art.ay) * u, art.cv.width * u, art.cv.height * u);
+      if (!down) {
+        // A thread of smoke from the chimney, drifting off downwind.
+        if (f.still || !f.effects) return;
+        const [a, b] = chimneyAt(h), [ox, oy] = h.turned ? [b, a] : [a, b], dot = artPen(c, px);
+        const x0 = Math.round(h.x * ART) + ox, y0 = Math.round(h.y * ART) + oy;
+        c.fillStyle = "#dfe6f0";
+        for (let i = 0; i < 4; i++) {
+          const ph = (f.now / 2600 + i / 4 + hash01(h.seed, 1295)) % 1;
+          c.globalAlpha = base * 0.45 * (1 - ph);
+          dot(Math.floor(x0 + ph * 4 + Math.sin(ph * 5 + i) * 0.8), Math.floor(y0 - ph * 9), ph > 0.5 ? 2 : 1, ph > 0.5 ? 2 : 1);
+        }
+        c.globalAlpha = base;
+        return;
+      }
+      const age = f.time - this.ruins.fell[k];
+      if (f.still || !f.effects || !(age < PUFF)) return;
+      // The puff: snow and splinters flung out, falling back, fading.
+      const dot = artPen(c, px), k0 = age / PUFF;
+      for (let i = 0; i < 12; i++) {
+        const a = hash01(h.seed, i, 1291) * Math.PI * 2, v = (0.6 + hash01(h.seed, i, 1292)) * h.r * ART * 1.4;
+        const d = v * (1 - (1 - k0) ** 2), lift = Math.sin(k0 * Math.PI) * (2 + hash01(h.seed, i, 1293) * 3);
+        c.globalAlpha = base * (1 - k0);
+        c.fillStyle = i % 3 === 0 ? (h.round ? "#a48e58" : "#82603c") : i % 3 === 1 ? "#eaf2fc" : "#ffffff";
+        dot(Math.floor(h.x * ART + Math.cos(a) * d), Math.floor(h.y * ART + Math.sin(a) * d * 0.8 - lift));
+      }
+      c.globalAlpha = base;
+    });
     c.restore();
   }
 

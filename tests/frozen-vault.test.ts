@@ -10,8 +10,8 @@ import { CELLS_W, cellIndex } from "../src/defend/grid.ts";
 import { trailStyle } from "../src/defend/trails.ts";
 import { dunePixels, setDuneLight, setDuneLook, setDuneStyle, duneLightKey, SAND_TONES } from "../src/defend/atmosphere-art.ts";
 import { HD_SNOW_TONES, SNOW_TONES, driftLook, driftLookFor } from "../src/defend/drift-look.ts";
-import { frozenVaultPlan, glintAt, hasFrozenVault } from "../src/defend/frozen-vault.ts";
-import { pillarPiece, relicPiece, runePiece, spirePiece } from "../src/defend/frozen-vault-art.ts";
+import { FROZEN_VAULT, HutRuins, frozenVaultPlan, glintAt, hasFrozenVault } from "../src/defend/frozen-vault.ts";
+import { hutPiece, pillarPiece, relicPiece, runePiece, spirePiece } from "../src/defend/frozen-vault-art.ts";
 import { zoneStory } from "../src/defend/zone-stories.ts";
 
 function city() {
@@ -97,4 +97,50 @@ test("each piece is drawn bare, the runes and ice glowing, and the glints flash 
   let lit = 0;
   for (let t = 0; t < 30; t += 0.05) for (let k = 0; k < 10; k++) if ((glintAt(plan, k, t)?.show ?? 0) > 0) lit++;
   assert.ok(lit > 0 && lit < 30 / 0.05 * 10 * 0.2, "glints come and go");
+});
+
+test("little huts stand in the snow, some beside the trails, clear of the vault's pieces", () => {
+  const map = city(), plan = frozenVaultPlan(map);
+  assert.ok(plan.huts.length >= 3 && plan.huts.length <= FROZEN_VAULT.huts, "huts show");
+  assert.ok(plan.huts.some((h) => h.round) || plan.huts.some((h) => !h.round));
+  const others = [...plan.spires, ...plan.pillars, ...plan.runes, ...plan.relics, ...plan.sheets];
+  for (const h of plan.huts) {
+    assert.equal(map.type[cellIndex(Math.floor(h.x), Math.floor(h.y))], CellType.OUT);
+    for (const o of others) assert.ok(Math.hypot(h.x - o.x, h.y - o.y) >= h.r + o.r, "huts keep clear of the ruins");
+  }
+  if (plan.trails) {
+    const trails = plan.trails;
+    const beside = plan.huts.filter((h) => {
+      const cx = Math.floor(h.x), cy = Math.floor(h.y);
+      for (let y = cy - 2; y <= cy + 2; y++) for (let x = cx - 2; x <= cx + 2; x++) if (x >= 0 && y >= 0 && x < CELLS_W && y < 12 && trails.wear[cellIndex(x, y)] > 0.1) return true;
+      return false;
+    });
+    assert.ok(beside.length >= 1, "some stand where the Blight walks");
+  }
+  for (const h of plan.huts.slice(0, 3)) for (const down of [false, true]) {
+    const solid = [...hutPiece(h, down).px].filter((v) => v);
+    assert.ok(solid.length > 10, "it shows");
+    for (const v of solid) assert.ok((v & 0xff) + ((v >> 8) & 0xff) + ((v >> 16) & 0xff) > 40, "no baked outline");
+  }
+});
+
+test("a hut falls when someone walks through it or a blast hits it, and stands again next wave", () => {
+  const huts = [{ x: 3, y: 3, r: 0.6, seed: 1, round: false, turned: false }, { x: 8, y: 8, r: 0.6, seed: 2, round: true, turned: false }];
+  const ruins = new HutRuins(), battle = {};
+  ruins.update(huts, null, 0, 0, [{ x: 3, y: 3, size: 0.4 }], []);
+  assert.ok(!ruins.down(0), "nothing falls outside a battle");
+  ruins.update(huts, battle, 81, 1, [{ x: 5, y: 5, size: 0.4 }], []);
+  assert.ok(!ruins.down(0) && !ruins.down(1), "passing by leaves it standing");
+  ruins.update(huts, battle, 81, 2, [{ x: 3.2, y: 3.1, size: 0.4 }], []);
+  assert.ok(ruins.down(0) && !ruins.down(1), "walked through, it falls");
+  assert.equal(ruins.fell[0], 2);
+  const boom = { kind: "boom", x: 9, y: 9, r: 1 };
+  ruins.update(huts, battle, 81, 3, [], [boom]);
+  assert.ok(ruins.down(1), "a blast knocks it down");
+  ruins.update(huts, battle, 81, 4, [], [{ kind: "firework", x: 3, y: 3, r: 2 }]);
+  assert.equal(ruins.fell[0], 2, "a fallen hut stays fallen");
+  ruins.update(huts, battle, 82, 5, [], [boom]);
+  assert.ok(!ruins.down(0) && !ruins.down(1), "rebuilt by the next wave; an old blast is not counted again");
+  ruins.update(huts, {}, 82, 0, [], []);
+  assert.ok(!ruins.down(0), "a new battle starts with every hut standing");
 });

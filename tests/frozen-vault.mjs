@@ -1,6 +1,7 @@
 // The Highlands (zone 5, waves 81–100): the desert's dunes in snow, the
 // trails trodden through them, the snowballs, the vault's ice spires,
-// pillars, rune stones, relics and frozen sheets, in battle, at sunset and
+// pillars, rune stones, relics, frozen sheets and huts (standing, and
+// fallen once the Blight walks through them), in battle, at sunset and
 // at night, desktop and phone, and its wilds past the board. Isolated
 // saves. Needs `npm run dev`.
 import { chromium } from '@playwright/test';
@@ -52,12 +53,12 @@ try {
     await page.waitForTimeout(4000);
     const plan = await page.evaluate(() => {
       const r = window.__dp.renderer, p = r.vault?.plan, sim = window.__dp.sim;
-      return { area: r.area, mode: sim?.atmosphere?.mode, spires: p?.spires.length ?? -1, pillars: p?.pillars.length ?? -1, runes: p?.runes.length ?? -1, relics: p?.relics.length ?? -1, sheets: p?.sheets.length ?? -1, trails: sim?.trails?.style };
+      return { area: r.area, mode: sim?.atmosphere?.mode, spires: p?.spires.length ?? -1, pillars: p?.pillars.length ?? -1, runes: p?.runes.length ?? -1, relics: p?.relics.length ?? -1, sheets: p?.sheets.length ?? -1, huts: p?.huts.length ?? -1, trails: sim?.trails?.style };
     });
     console.log(width, JSON.stringify(plan));
     assert.equal(plan.area, 'frozen');
     assert.equal(plan.mode, 'snow');
-    assert.ok(plan.spires >= 3 && plan.pillars >= 2 && plan.runes >= 1, JSON.stringify(plan));
+    assert.ok(plan.spires >= 3 && plan.pillars >= 2 && plan.runes >= 1 && plan.huts >= 3, JSON.stringify(plan));
     await page.screenshot({ path: `${out}/frozen-vault-${width}-battle.png` });
     if (!process.env.BASELINE)
       for (const what of ['spires', 'pillars', 'runes', 'relics', 'sheets']) {
@@ -67,6 +68,25 @@ try {
         }, what);
         await page.waitForTimeout(300);
         await page.screenshot({ path: `${out}/frozen-vault-${width}-${what}.png` });
+      }
+    // A standing hut and, once the wave has tramped through, a fallen one.
+    if (!process.env.BASELINE)
+      for (const down of [false, true]) {
+        if (down) await page.waitForFunction(() => window.__dp.renderer.vault.ruins.fell.some((t) => !Number.isNaN(t)), null, { timeout: 60000 }).catch(() => {});
+        const shown = await page.evaluate((down) => {
+          const r = window.__dp.renderer, huts = r.vault.plan.huts, k = huts.findIndex((_, k) => r.vault.ruins.down(k) === down);
+          if (k < 0) return null;
+          const t = huts[k];
+          r.cam.s = 3; r.cam.x = r.canvas.width / 2 - t.x * r.px * 3; r.cam.y = r.canvas.height / 2 - t.y * r.px * 3;
+          return { k, fallen: huts.filter((_, j) => r.vault.ruins.down(j)).length, of: huts.length };
+        }, down);
+        console.log(width, down ? 'fallen hut' : 'standing hut', JSON.stringify(shown));
+        await page.waitForTimeout(down ? 100 : 300);
+        if (!shown) continue;
+        const at = await page.evaluate((k) => { const r = window.__dp.renderer, t = r.vault.plan.huts[k]; return r.toClient(t.x, t.y); }, shown.k);
+        const side = phone ? 240 : 320, vw = width, vh = phone ? 780 : 900;
+        const clip = { x: Math.max(0, Math.min(vw - side, at.x - side / 2)), y: Math.max(0, Math.min(vh - side, at.y - side / 2)), width: side, height: side };
+        await page.screenshot({ path: `${out}/frozen-vault-${width}-hut-${down ? 'fallen' : 'standing'}.png`, clip });
       }
     // Zoomed out, the snow and the mountains round the board.
     await page.evaluate(() => {
