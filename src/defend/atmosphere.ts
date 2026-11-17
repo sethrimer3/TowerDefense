@@ -5,7 +5,7 @@ import { ENEMIES } from "./catalog.ts";
 import { areaForWave, type AreaId } from "./areas.ts";
 import type { DefendSim } from "./sim.ts";
 
-/** The desert's sand, the Frozen Vault's snow (the same drifts, in its own
+/** The desert's sand, the Highlands' snow (the same drifts, in its own
  * colours: `drift-look.ts`), or the Mistwood's mist. */
 export type GroundWeather = "sand" | "snow" | "mist" | null;
 /** Whether the ground weather drifts: sand or snow, which lie in dunes,

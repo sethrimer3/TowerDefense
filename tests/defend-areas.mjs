@@ -50,7 +50,7 @@ try {
     return {color:s.color,background:s.backgroundColor,area:row.title};
   }));
   assert.equal(new Set(rows.map(r=>r.background)).size,3);
-  assert.deepEqual(rows.map(r=>r.area),['Mossbound Ruins','Amber Desert','Frozen Vault']);
+  assert.deepEqual(rows.map(r=>r.area),['Mossbound Ruins','Amber Desert','The Highlands']);
   await page.screenshot({path:'test-results/defend-areas-mobile-picker.png'});
   await page.locator('[data-wave="21"]').click();
   const button=await page.locator('#defend-wave').evaluate(el=>({color:getComputedStyle(el).getPropertyValue('--area-color').trim(),width:el.getBoundingClientRect().width,scroll:document.documentElement.scrollWidth,view:innerWidth,overflow:[...document.querySelectorAll('body *')].filter(e=>e.getBoundingClientRect().right>innerWidth).map(e=>({tag:e.tagName,id:e.id,right:e.getBoundingClientRect().right})).slice(0,10)}));

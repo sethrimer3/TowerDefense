@@ -68,7 +68,7 @@ export const ZONE_STORIES: Partial<Record<AreaId, ZoneStory>> = {
     title: "A Warning from the North",
     greeting: "Your Majesty,",
     paragraphs: [
-      "The forge has gone quiet, but the Blight did not die with the dwarves' alliance. It has turned north, over the glaciers, to the Frozen Vault, where the first kings sealed away the relics too dangerous to keep and too precious to destroy.",
+      "The forge has gone quiet, but the Blight did not die with the dwarves' alliance. It has turned north, up into the Highlands, where under the glaciers lies the Frozen Vault, in which the first kings sealed away the relics too dangerous to keep and too precious to destroy.",
       "It does not come for our people this time. It comes for the Vault.",
       "The snow here drifts against anything that stands still, and the ice remembers every footstep. Whatever the first kings locked away, the Dark One wants it. Do not let the doors be opened.",
     ],

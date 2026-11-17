@@ -19,7 +19,7 @@ function city() {
   return generateCity(fitLayout(placeCityTile(layout, layout.keep.tx + 1, layout.keep.ty)!), 3);
 }
 
-test("the Frozen Vault comes before the Mistwood: waves 81-100, then 101-120", () => {
+test("the Highlands comes before the Mistwood: waves 81-100, then 101-120", () => {
   const ids = AREAS.map((a) => a.id);
   assert.equal(ids.indexOf("frozen"), 4);
   assert.equal(ids.indexOf("fungal"), 5);
