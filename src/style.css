@@ -2775,6 +2775,7 @@ nav button[data-mode] > .tab-label { min-height: 2.4em; }
 :root.landscape .defend-head > *,
 :root.landscape .native-campaign .campaign-head > * { pointer-events: auto; }
 :root.landscape .defend-head .defend-center { pointer-events: none; }
+:root.landscape .defend-head .defend-center > button { pointer-events: auto; }
 :root.landscape .defend-hud,
 :root.landscape .native-campaign .campaign-status,
 :root.landscape .native-campaign .campaign-head label,
@@ -2834,6 +2835,10 @@ nav button[data-mode] > .tab-label { min-height: 2.4em; }
 :root.landscape #defend:has(.defend-head.defend-building) .defend-side { left: calc(var(--ls-left) + 112px); }
 :root.landscape .defend-crisp { top: calc(var(--ls-in) + 52px); bottom: auto; right: calc(var(--ls-in) - 5px); }
 
+/* An open upgrade tree fills the board: everything floating over the board
+ * steps aside until it closes. */
+:root.landscape .shell:has(> .page.active .defend-specialty.upgrade-tree:not([hidden], .carrying)) > :is(nav, .currency-hold),
+:root.landscape .shell:has(> .page.active .defend-specialty.upgrade-tree:not([hidden], .carrying)) :is(.defend-head, .campaign-head, .defend-side, .ambush-side, .defend-crisp, .strike-bar, .ambush-mini, .defend-stage .scroll-arrow) { visibility: hidden; }
 /* Ambush and Siege: the same, the plaque and buildings floating along the bottom. */
 :root.landscape .native-campaign.active { gap: 0; }
 :root.landscape .native-campaign .campaign-stage,

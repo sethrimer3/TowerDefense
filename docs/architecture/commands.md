@@ -69,6 +69,7 @@ node tests/defend-meteor.mjs # Meteor strike palette, aim, fall, landing, cooldo
 node tests/defend-frost-nova.mjs # Frost nova palette, aim, burst, rime, blizzard and Study setup (needs dev server)
 node tests/defend-reinforcements.mjs # Reinforcements palette, aim, drop, landing, champion and Study setup (needs dev server)
 node tests/library-navigation.mjs # Whole-room Lab/Nave framing, Mine building picker and research/back transitions (needs dev server)
+node tests/landscape-hits.mjs     # Landscape Defend: every floating control takes its own clicks; an open upgrade tree hides the tabs, controls and palette (needs dev server)
 node --experimental-transform-types --import ./tests/pin-random.ts tools/measure-upgrade-production.ts # Bounded 1x Mine/Library scenarios, no player saves
 node --experimental-transform-types --import ./tests/pin-random.ts tools/estimate-upgrades.ts # Catalog costs, rank CSV and docs/UPGRADE_TIMING.md (uses measured JSON)
 ```
