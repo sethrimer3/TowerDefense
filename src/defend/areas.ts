@@ -9,7 +9,9 @@ export const AREAS = [
   // name it); it is the Crystal Caves now (crystal-caves.ts).
   { id: "drowned", name: "Crystal Caves", climate: "underground", rainChance: 0, color: "#9fd4f5", dark: "#1c2533" },
   { id: "ember", name: "Ember Forge", climate: "dry", rainChance: 0, color: "#ffac64", dark: "#632d20" },
-  { id: "fungal", name: "Fungal Hollow", climate: "underground", rainChance: 0, color: "#e6a8c1", dark: "#593649" },
+  // Its id is kept from when it was the Fungal Hollow (saves and journals
+  // name it); it is the Mistwood now (mistwood.ts).
+  { id: "fungal", name: "Mistwood", climate: "temperate", rainChance: 0, color: "#a9d8c6", dark: "#1f3a34" },
   { id: "frozen", name: "Frozen Vault", climate: "cold", rainChance: 0, color: "#c2e9ff", dark: "#304f69" },
   { id: "crystal", name: "Violet Geode", climate: "underground", rainChance: 0, color: "#d4a2f5", dark: "#49305e" },
   { id: "obsidian", name: "Obsidian Crypt", climate: "dry", rainChance: 0, color: "#ba9c9c", dark: "#382d33" },

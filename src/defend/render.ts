@@ -52,7 +52,7 @@ import { drawGrid, drawLifting, drawOverlay, type Overlay } from "./edit-overlay
 import { drawBuildingOrders, drawInspect, type Armed } from "./inspect.ts";
 import { drawShimmer, drawShimmerFlash, drawHighlights, flashAlpha, closeFade, type Highlight } from "./placed-shimmer.ts";
 import { ART } from "./park-art.ts";
-import { Wilds } from "./wilds.ts";
+import { MARGIN, Wilds } from "./wilds.ts";
 import { stirWind } from "./scenery-looks.ts";
 import { drawFlag, drawWarBanner } from "./structure-art.ts";
 import { RallyFlagArt } from "./rally-flag-art.ts";
@@ -87,6 +87,8 @@ import { MagicForestArt } from "./magic-forest-art.ts";
 import { hasMagicForest } from "./magic-forest.ts";
 import { PaintBox } from "./paint-box.ts";
 import { CrystalCavesArt } from "./crystal-caves-art.ts";
+import { MistwoodArt } from "./mistwood-art.ts";
+import { hasMistwood } from "./mistwood.ts";
 import { crystalCavesPlan, hasCrystalCaves, shaftLight } from "./crystal-caves.ts";
 import { EmberForgeArt } from "./ember-forge-art.ts";
 import { emberForgePlan, hasEmberForge } from "./ember-forge.ts";
@@ -201,6 +203,7 @@ export class DefendRenderer {
   readonly forestGrass = new ForestGrass();
   readonly magic = new MagicForestArt();
   readonly caves = new CrystalCavesArt();
+  readonly mistwood = new MistwoodArt();
   readonly forge = new EmberForgeArt();
   /** The battle time the wizard art last advanced to. */
   private wizardTime = 0;
@@ -561,7 +564,7 @@ export class DefendRenderer {
     }
     if (sim) this.advanceWizard(sim);
     if (sim) this.drawBattle(map, sim, opts);
-    if (sim) this.atmosphere.draw(this.ctx, this.px, sim, opts.reduceMotion, opts.effects ?? true);
+    if (sim) this.atmosphere.draw(this.ctx, this.px, sim, opts.reduceMotion, opts.effects ?? true, opts.night, MARGIN);
     // Snow sits above terrain but below enemies, defenders, projectiles and
     // health bars: blizzards are dense without erasing combat silhouettes.
     if (sim && !opts.reduceMotion && (opts.effects ?? true)) {
@@ -584,8 +587,10 @@ export class DefendRenderer {
     this.drawMagicForest(sim, opts);
     this.drawCaveGlow(opts);
     this.drawForgeGlow(opts);
-    // The mountains' long shadows past the board, over the field too.
-    this.wilds.drawShade(this.ctx, { px: this.px, cam: this.cam, night: opts.night, sand: sim?.atmosphere?.mode === "sand" });
+    this.drawMistwood(sim, opts);
+    // The mountains' long shadows past the board, over the field too (the
+    // Mistwood has none: its wilds are forest).
+    if (!hasMistwood(this.area)) this.wilds.drawShade(this.ctx, { px: this.px, cam: this.cam, night: opts.night, sand: sim?.atmosphere?.mode === "sand" });
     this.ghosts.watch(sim, opts.now / 1000);
     this.ghosts.draw(this.ctx, this.px, opts.now / 1000, opts.reduceMotion);
     if (opts.effects ?? true) this.drawSmoke(map, sim, opts);
@@ -648,7 +653,7 @@ export class DefendRenderer {
    * doesn't stall as it crosses over. */
   private ahead: { map: CityMap; area: AreaId; run: (ms: number) => void } | null = null;
   private prepareNext(map: CityMap, sim: DefendSim, opts: DrawOptions) {
-    const covered = (a: AreaId) => hasForest(a) || hasMagicForest(a) || hasCrystalCaves(a) || hasEmberForge(a);
+    const covered = (a: AreaId) => hasForest(a) || hasMagicForest(a) || hasCrystalCaves(a) || hasEmberForge(a) || hasMistwood(a);
     if (sim.unitTester) return;
     // Through the last two waves before it.
     const soon = areaForWave(sim.wave + 1).id, area = soon !== this.area ? soon : areaForWave(sim.wave + 2).id;
@@ -669,7 +674,7 @@ export class DefendRenderer {
       // them on both sides of the crossing (they show through its fade).
       else if (phase === 2) more = !(covered(area) && covered(this.area)) && this.relief.prepare(map, this.px, this.board.W, this.board.H, area, ms);
       // The Crystal Caves' floor.
-      else if (phase === 3) more = (hasCrystalCaves(area) && this.caves.prepare(map, ms)) || (hasEmberForge(area) && this.forge.prepare(map, ms));
+      else if (phase === 3) more = (hasCrystalCaves(area) && this.caves.prepare(map, ms)) || (hasEmberForge(area) && this.forge.prepare(map, ms)) || (hasMistwood(area) && this.mistwood.prepare(map, ms));
       else if (area !== "desert" || !map.trails) { phase = -1; return; }
       // The desert's dunes and sand trails, as its build phase warms them.
       else if (phase === 4) more = warmDunes(hd, sun, step);
@@ -776,6 +781,12 @@ export class DefendRenderer {
       this.forge.sync(map);
       this.forge.drawFloor(ctx, this.px, forge);
     }
+    // The Mistwood's moss, roots, wells and what stands on them.
+    const wood = this.mistShare();
+    if (wood > 0) {
+      this.mistwood.sync(map);
+      this.mistwood.drawFloor(ctx, this.px, wood);
+    }
     this.river.sync(map);
     this.river.draw({
       c: ctx, px: this.px, now: opts.now, dt, rain: !!(sim && opts.weather?.rain), cold: sim?.cold ?? !!opts.weather?.snow, thawed: sim?.thawedPonds,
@@ -785,7 +796,7 @@ export class DefendRenderer {
     // tint, so night darkens them and the day's light turns over them.
     const desert = sim?.atmosphere?.mode === "sand";
     if (sim && desert) this.atmosphere.drawGround(ctx, this.px, sim, opts.reduceMotion, opts.effects ?? true, this.worldLighting ? opts.sun : undefined, !!opts.hdSand);
-    if (this.forestShare() > 0 || magic > 0 || caves > 0 || forge > 0 || desert) {
+    if (this.forestShare() > 0 || magic > 0 || caves > 0 || forge > 0 || wood > 0 || desert) {
       this.drawFaces();
       paintSpikePoints(ctx, this.px, map, sim);
     }
@@ -1030,6 +1041,27 @@ export class DefendRenderer {
     return now + (this.previousArea && hasEmberForge(this.previousArea) ? 1 - this.areaMix : 0);
   }
 
+  /** How much of the Mistwood shows, fading like the forest's. */
+  private mistShare() {
+    const now = hasMistwood(this.area) ? this.areaMix : 0;
+    return now + (this.previousArea && hasMistwood(this.previousArea) ? 1 - this.areaMix : 0);
+  }
+
+  /** The Mistwood's ancient crowns over everyone, darkened like the forest's,
+   * then what glows in it: runes, mushrooms, wells and the wisps. */
+  private drawMistwood(sim: DefendSim | null, opts: DrawOptions) {
+    const alpha = this.mistShare();
+    if (alpha <= 0) return;
+    const shade = this.lit && opts.weather ? (o: CanvasRenderingContext2D) => {
+      o.fillStyle = `rgba(118,118,118,${opts.weather!.rain ? 0.2 : 0.12})`;
+      o.fillRect(0, 0, this.board.W, this.board.H);
+      this.lighting.darken(o);
+    } : undefined;
+    const under = [...(sim ? beneath(sim) : []), ...this.cityLife.visible];
+    this.mistwood.drawCrowns(this.ctx, this.px, { now: opts.now, alpha, still: opts.reduceMotion || !(opts.effects ?? true), under, shade });
+    this.mistwood.drawGlow(this.ctx, this.px, { now: opts.now, alpha, still: opts.reduceMotion, night: opts.night, effects: opts.effects ?? true });
+  }
+
   /** The Ember Forge's lava, sparks and smoke, over the battle's darkness. */
   private drawForgeGlow(opts: DrawOptions) {
     const alpha = this.forgeShare();
@@ -1104,7 +1136,7 @@ export class DefendRenderer {
     // The forest's grass and the desert's dunes hide the flagstones (their
     // light, drawn over the dunes, read as squares at night): there the
     // masks aren't baked at all.
-    const bare = sim.atmosphere?.mode === "sand" ? 0 : 1 - Math.min(1, this.forestShare() + this.magicShare() + this.cavesShare() + this.forgeShare());
+    const bare = sim.atmosphere?.mode === "sand" ? 0 : 1 - Math.min(1, this.forestShare() + this.magicShare() + this.cavesShare() + this.forgeShare() + this.mistShare());
     if (bare <= 0 || !this.relief.sync(map, this.px, this.board.W, this.board.H, this.area)) return;
     const intact = standing(map, sim);
     const fixed = () =>

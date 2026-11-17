@@ -162,19 +162,23 @@ const DROWNED: Look = {
   accent: [0x3f8fd0, 0x7cc8f5, 0xb274f0],
 };
 
-const SHROOM = { o: 0x1c0a14, d: 0x96305e, m: 0xe0628f, l: 0xffaccb, s: 0xeadcc6 };
+/** The Mistwood's pale, faintly glowing caps (outline, shade, mid, lit, stem). */
+const SHROOM = { o: 0x0a1210, d: 0x5e6290, m: 0x8a94bc, l: 0xc8d2ea, s: 0xc8c2b0 };
 const SHROOMS = [
   ["..ooo..", ".ollmo.", "omlmmmo", "odddddo", ".oosoo.", "..oso..", "...o..."],
   [".ooo.", "olmmo", "ddddd", ".oso.", "..o.."],
 ] as const;
 
-/** Mauve stone, mycelium in the joints, pink mushrooms and spores. */
+/** The Mistwood (id `fungal`): old grey-green stone furred with moss, pale
+ * mushrooms in its joints and the odd rune glinting teal. */
 const FUNGAL: Look = {
-  mortar: 0x25131d,
-  joint: (gx, gy) => (hash01(gx, gy, 431) < 0.04 ? 0xb89aa0 : undefined),
-  stone: [0x3a1f30, 0x553148, 0x6e445e, 0x8b5a77, 0xae7d97],
+  mortar: 0x141c1a,
+  joint: (gx, gy) => (hash01(gx, gy, 431) < 0.06 ? 0x3f6440 : undefined),
+  stone: [0x232b29, 0x313b38, 0x414c48, 0x55615c, 0x6e7a74],
   dress(p, b, seed) {
-    const n = hash01(seed, 40) < 0.4 ? 1 + (hash(seed, 41) % 2) : 0;
+    // Moss over the stone's upper edge.
+    for (let x = b.x0; x <= b.x1; x++) if (hash01(seed, x, 39) < 0.45) p.set(x, b.y0 + (hash(seed, x, 38) % 2), hash01(seed, x, 37) < 0.5 ? 0x2c4a32 : 0x3f6440);
+    const n = hash01(seed, 40) < 0.3 ? 1 : 0;
     for (let k = 0; k < n; k++) {
       const big = k === 0 && b.x1 - b.x0 > 8 && b.y1 - b.y0 > 8, art = SHROOMS[big ? 0 : 1];
       const [x, y] = spotIn(b, seed, 43 + k, 0);
@@ -183,18 +187,19 @@ const FUNGAL: Look = {
     for (let k = 0; k < 2; k++)
       if (hash01(seed, k, 46) < 0.35) {
         const [x, y] = spotIn(b, seed, 47 + k, 1);
-        p.set(x, y, 0xa8f0dc);
+        p.set(x, y, 0x7ff0e0);
       }
   },
   face(p, cx, seed) {
-    // A bracket fungus on the face.
-    if (hash01(seed, cx, 48) < 0.5) {
-      const x = 2 + (hash(seed, cx, 49) % (WALL_ART - 7));
-      stamp(p, x, 2, ["ollllo", ".mmmm.", "..dd.."], { o: 0x1c0a14, l: 0xf0a0bf, m: 0xc8507e, d: 0x7a2448 });
-    }
+    // Moss hanging down the face.
+    for (let x = 1; x < WALL_ART - 1; x++)
+      if (hash01(seed, cx, x, 48) < 0.3) {
+        const len = 1 + (hash(seed, cx, x, 49) % 3);
+        for (let y = 0; y < len; y++) p.set(x, y, y === len - 1 ? 0x5d7a6b : 0x2c4a32);
+      }
   },
-  rubble: [0x553148, 0x6e445e, 0x8b5a77],
-  accent: [0x96305e, 0xe0628f, 0xffaccb],
+  rubble: [0x313b38, 0x414c48, 0x55615c],
+  accent: [0x1f5a56, 0x4fd0c4, 0xaefff2],
 };
 
 /** Blue-grey stone under a cap of snow, and icicles on the face. */

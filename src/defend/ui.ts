@@ -377,7 +377,7 @@ export class DefendPage {
     if (!this.built) return QUIET;
     const area = areaForWave(Math.max(this.sim?.wave ?? 1, startingWave(this.save)));
     const w = this.weather, night = this.night, under = area.climate === "underground", cold = area.climate === "cold";
-    const green = area.id === "moss" || area.id === "magic";
+    const green = area.id === "moss" || area.id === "magic" || area.id === "fungal";
     const blazes = this.phase === "sim" ? Math.min(1, (this.sim?.blazes.length ?? 0) / 10) : 0;
     return {
       rain: w?.rain ? (night > 0.5 ? 1 : 0.55) : 0,

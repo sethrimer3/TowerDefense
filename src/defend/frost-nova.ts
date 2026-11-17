@@ -123,6 +123,8 @@ export function stepFrostNova(sim: DefendSim, dt: number) {
       b.t += dt;
       if (b.hit) continue;
       b.hit = true;
+      // A burst of frost clears the Mistwood's mist where it lands.
+      sim.atmosphere?.clearMist(b.x, b.y, b.r);
       for (const e of fortressAreaTargets(b.nova ? sim.enemiesInSquare(b.x,b.y,b.r) : sim.enemiesNear(b.x,b.y,b.r))) {
         if (e.hp <= 0 || (!b.nova && dist(e.x - b.x, e.y - b.y) > b.r)) continue;
         if (b.nova) {

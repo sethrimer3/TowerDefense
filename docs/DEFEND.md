@@ -804,7 +804,7 @@ from its seed; `tests/defend-replay.test.ts` pins it.
 ## Weather and light (`weather.ts`, `lighting.ts`)
 
 - Areas (`areas.ts`) change every twenty waves: Mossbound Ruins, Amber
-  Desert, Crystal Caves, Ember Forge, Fungal Hollow, Frozen Vault, Violet
+  Desert, Crystal Caves, Ember Forge, Mistwood, Frozen Vault, Violet
   Geode, Obsidian Crypt, Astral Sanctuary, Nadir and the Magic Forest testing
   zone (waves 201–220: clovers, wispy trees, lightning bugs), repeating after wave 220. The Ember Forge is
   fought from its own outpost city (smaller keep, ten fewer city tiles but at least ten, none on the edge of
@@ -822,14 +822,14 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   | Mossbound Ruins | Briarling 2, Moss Boar 6, Root Treant 18 | Fast sprouts, sturdy tusked raiders, slow trees releasing three briarlings |
   | Amber Desert | Dune Scorpion 6, Sun Scarab 12, Sand Vulture 5 | Short-range venom, a finite swarm shield, flying wall bypass |
   | Crystal Caves | Brine Crab 60, Lantern Jelly 40, Coral Guardian 240 | Tough crawlers, floating stinging jellies, finite shield support |
-  | Fungal Hollow | Sporeling 30, Fungal Brute 180, Spore Moth 80 | Small poison clouds, brutes releasing three sporelings, airborne spores |
+  | Mistwood | Sporeling 30, Fungal Brute 180, Spore Moth 80 | Small poison clouds, brutes releasing three sporelings, airborne spores |
   | Violet Geode | Shardling 40, Crystal Sentinel 600, Prism Ray 200 | Fast crystals, shield support, flying shield support |
   | Astral Sanctuary | Star Wisp 150, Comet Hound 500, Astral Warden 5,000 | Fast fliers, fast ground hunters, heavy shield support |
   | Mossbound Ruins | Fern Mantis 3, Moss Troll 18, Lantern Hornet 9 | Fast melee hunter, regeneration, flying venom |
   | Amber Desert | Glass Jackal 10, Dune Tortoise 40, Dust Djinn 45 | Fast hunter, armored shell vulnerable to explosions, flying shield support |
   | Ember Forge | Cinder Imp 8, Slag Golem 60, Ember Moth 12 | Fire resistance, fire immunity with explosion weakness, flying fire resistance |
   | Crystal Caves | Kelp Stalker 80 | Regenerating kelp hunter |
-  | Fungal Hollow | Cap Crawler 50, Mycelium Hulk 400, Rot Mite 10 | Spore clouds, regenerating heavy fungus, fast venomous mites |
+  | Mistwood | Cap Crawler 50, Mycelium Hulk 400, Rot Mite 10 | Spore clouds, regenerating heavy fungus, fast venomous mites |
   | Violet Geode | Geode Crab 300, Prism Moth 100, Shard Brood 450 | Armored shell vulnerable to explosions, fast flier, brood releasing three shardlings |
   | Obsidian Crypt | Crypt Hound 350, Grave Wisp 500 | Fast ground hunter, regenerating flying spirit |
   | Astral Sanctuary | Nova Moth 800 | Flying brood releasing two star wisps |
@@ -852,7 +852,7 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   under the units, so enemies stay clear), Amber Desert a sandstorm, Fungal
   Hollow mist, and the other dry or underground areas no rain.
 - Ground weather (`atmosphere.ts`, drawn by `atmosphere-art.ts`): in the
-  desert and the Fungal Hollow a per-cell field steps ten times a second.
+  desert and the Mistwood a per-cell field steps ten times a second.
   The wind (`windAt`, `WIND`) always blows down the board and to the left.
   Mist is fed outside the walls, drifts with the wind, swirls round blasts
   and moving projectiles (blasts also blow holes in it), and seeps through
