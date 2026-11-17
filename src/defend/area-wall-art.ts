@@ -344,29 +344,29 @@ const ASTRAL: Look = {
   accent: [0x6e5020, 0xc89a40, 0xffe8a0],
 };
 
-/** The void's stone, faint violet runes and seams. */
+/** The void's stone: black, its seams and runes a dark red. */
 const NADIR: Look = {
-  mortar: 0x06040a,
-  joint: (gx, gy) => (hash01(gx >> 1, gy >> 1, 481) < 0.2 ? 0x3e2670 : undefined),
-  stone: [0x0c0a14, 0x1a1528, 0x261e3a, 0x342a52, 0x564884],
+  mortar: 0x050203,
+  joint: (gx, gy) => (hash01(gx >> 1, gy >> 1, 481) < 0.2 ? 0x5a0c12 : undefined),
+  stone: [0x0a0506, 0x150a0b, 0x201011, 0x2c1718, 0x48262a],
   dress(p, b, seed) {
     if (hash01(seed, 90) < 0.35) {
       const [x, y] = spotIn(b, seed, 91, 3);
       const runes = [["l.l", ".l.", "l.l"], ["lll", "l..", "lll"], [".l.", "lll", ".l."], ["l..", "ll.", "l.l"]] as const;
-      for (const [dx, dy] of [[-1, -1], [3, -1], [-1, 3], [3, 3]]) p.set(x + dx, y + dy, 0x2e2050);
-      stamp(p, x, y, runes[hash(seed, 92) % runes.length], { l: 0xa47ae8 });
+      for (const [dx, dy] of [[-1, -1], [3, -1], [-1, 3], [3, 3]]) p.set(x + dx, y + dy, 0x3a0a0e);
+      stamp(p, x, y, runes[hash(seed, 92) % runes.length], { l: 0xc8262e });
     }
   },
   face(p, cx, seed) {
     if (hash01(seed, cx, 93) < 0.4) {
       const x = 3 + (hash(seed, cx, 94) % (WALL_ART - 6));
-      p.set(x, 2, 0xa47ae8);
-      p.set(x + 1, 3, 0x6a48b0);
-      p.set(x - 1, 4, 0x6a48b0);
+      p.set(x, 2, 0xc8262e);
+      p.set(x + 1, 3, 0x7a121a);
+      p.set(x - 1, 4, 0x7a121a);
     }
   },
-  rubble: [0x14101e, 0x1e172d, 0x2a2140],
-  accent: [0x2e2050, 0x6a48b0, 0xa47ae8],
+  rubble: [0x100809, 0x1a0c0d, 0x261213],
+  accent: [0x3a0a0e, 0x7a121a, 0xc8262e],
 };
 
 const LOOKS: Partial<Record<AreaId, Look>> = {

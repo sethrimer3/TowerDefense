@@ -91,6 +91,8 @@ import { PaintBox } from "./paint-box.ts";
 import { CrystalCavesArt } from "./crystal-caves-art.ts";
 import { MistwoodArt } from "./mistwood-art.ts";
 import { hasMistwood } from "./mistwood.ts";
+import { NadirArt } from "./nadir-art.ts";
+import { hasNadir } from "./nadir.ts";
 import { crystalCavesPlan, hasCrystalCaves, shaftLight } from "./crystal-caves.ts";
 import { EmberForgeArt } from "./ember-forge-art.ts";
 import { emberForgePlan, hasEmberForge } from "./ember-forge.ts";
@@ -209,6 +211,7 @@ export class DefendRenderer {
   readonly caves = new CrystalCavesArt();
   readonly mistwood = new MistwoodArt();
   readonly forge = new EmberForgeArt();
+  readonly nadir = new NadirArt();
   readonly vault = new FrozenVaultArt();
   /** The battle time the wizard art last advanced to. */
   private wizardTime = 0;
@@ -594,10 +597,11 @@ export class DefendRenderer {
     this.drawCaveGlow(opts);
     this.drawForgeGlow(opts);
     this.drawVaultGlow(opts);
+    this.drawNadirGlow(opts);
     this.drawMistwood(sim, opts);
     // The mountains' long shadows past the board, over the field too (the
-    // Mistwood has none: its wilds are forest).
-    if (!hasMistwood(this.area)) this.wilds.drawShade(this.ctx, { px: this.px, cam: this.cam, night: opts.night, sand: drifting(sim?.atmosphere?.mode ?? null) });
+    // Mistwood has none: its wilds are forest; nor the Nadir, over the void).
+    if (!hasMistwood(this.area) && !hasNadir(this.area)) this.wilds.drawShade(this.ctx, { px: this.px, cam: this.cam, night: opts.night, sand: drifting(sim?.atmosphere?.mode ?? null) });
     this.ghosts.watch(sim, opts.now / 1000);
     this.ghosts.draw(this.ctx, this.px, opts.now / 1000, opts.reduceMotion);
     if (opts.effects ?? true) this.drawSmoke(map, sim, opts);
@@ -660,7 +664,7 @@ export class DefendRenderer {
    * doesn't stall as it crosses over. */
   private ahead: { map: CityMap; area: AreaId; run: (ms: number) => void } | null = null;
   private prepareNext(map: CityMap, sim: DefendSim, opts: DrawOptions) {
-    const covered = (a: AreaId) => hasForest(a) || hasMagicForest(a) || hasCrystalCaves(a) || hasEmberForge(a) || hasMistwood(a);
+    const covered = (a: AreaId) => hasForest(a) || hasMagicForest(a) || hasCrystalCaves(a) || hasEmberForge(a) || hasMistwood(a) || hasNadir(a);
     if (sim.unitTester) return;
     // Through the last two waves before it.
     const soon = areaForWave(sim.wave + 1).id, area = soon !== this.area ? soon : areaForWave(sim.wave + 2).id;
@@ -681,7 +685,7 @@ export class DefendRenderer {
       // them on both sides of the crossing (they show through its fade).
       else if (phase === 2) more = !(covered(area) && covered(this.area)) && this.relief.prepare(map, this.px, this.board.W, this.board.H, area, ms);
       // The Crystal Caves' floor.
-      else if (phase === 3) more = (hasCrystalCaves(area) && this.caves.prepare(map, ms)) || (hasEmberForge(area) && this.forge.prepare(map, ms)) || (hasMistwood(area) && this.mistwood.prepare(map, ms)) || (hasFrozenVault(area) && this.vault.prepare(map, ms));
+      else if (phase === 3) more = (hasCrystalCaves(area) && this.caves.prepare(map, ms)) || (hasEmberForge(area) && this.forge.prepare(map, ms)) || (hasMistwood(area) && this.mistwood.prepare(map, ms)) || (hasFrozenVault(area) && this.vault.prepare(map, ms)) || (hasNadir(area) && this.nadir.prepare(map, ms));
       else if (style !== "sand" || !map.trails) { phase = -1; return; }
       // The desert's dunes (or the Vault's snow) and its trails, as its
       // build phase warms them.
@@ -795,6 +799,14 @@ export class DefendRenderer {
       this.mistwood.sync(map);
       this.mistwood.drawFloor(ctx, this.px, wood);
     }
+    // The Nadir's black ground and what stands on it, its eyes watching and
+    // its stones hovering.
+    const nadir = this.nadirShare();
+    if (nadir > 0) {
+      this.nadir.sync(map);
+      this.nadir.drawFloor(ctx, this.px, nadir);
+      this.nadir.drawLive(ctx, this.px, { now: opts.now, alpha: nadir, still: opts.reduceMotion, walkers: feet });
+    }
     this.river.sync(map);
     this.river.draw({
       c: ctx, px: this.px, now: opts.now, dt, rain: !!(sim && opts.weather?.rain), cold: sim?.cold ?? !!opts.weather?.snow, thawed: sim?.thawedPonds,
@@ -804,7 +816,7 @@ export class DefendRenderer {
     // tint, so night darkens them and the day's light turns over them.
     const desert = drifting(sim?.atmosphere?.mode ?? null);
     if (sim && desert) this.atmosphere.drawGround(ctx, this.px, sim, opts.reduceMotion, opts.effects ?? true, this.worldLighting ? opts.sun : undefined, !!opts.hdSand);
-    if (this.forestShare() > 0 || magic > 0 || caves > 0 || forge > 0 || wood > 0 || desert) {
+    if (this.forestShare() > 0 || magic > 0 || caves > 0 || forge > 0 || wood > 0 || nadir > 0 || desert) {
       this.drawFaces();
       paintSpikePoints(ctx, this.px, map, sim);
     }
@@ -1074,6 +1086,19 @@ export class DefendRenderer {
     return now + (this.previousArea && hasEmberForge(this.previousArea) ? 1 - this.areaMix : 0);
   }
 
+  /** How much of the Nadir shows, fading like the forest's. */
+  private nadirShare() {
+    const now = hasNadir(this.area) ? this.areaMix : 0;
+    return now + (this.previousArea && hasNadir(this.previousArea) ? 1 - this.areaMix : 0);
+  }
+
+  /** The Nadir's veins, rifts, motes and eyes, over the battle's darkness. */
+  private drawNadirGlow(opts: DrawOptions) {
+    const alpha = this.nadirShare();
+    if (alpha <= 0) return;
+    this.nadir.drawGlow(this.ctx, this.px, { now: opts.now, alpha, still: opts.reduceMotion, night: opts.night, effects: opts.effects ?? true });
+  }
+
   /** How much of the Mistwood shows, fading like the forest's. */
   private mistShare() {
     const now = hasMistwood(this.area) ? this.areaMix : 0;
@@ -1169,7 +1194,7 @@ export class DefendRenderer {
     // The forest's grass and the desert's dunes hide the flagstones (their
     // light, drawn over the dunes, read as squares at night): there the
     // masks aren't baked at all.
-    const bare = drifting(sim.atmosphere?.mode ?? null) ? 0 : 1 - Math.min(1, this.forestShare() + this.magicShare() + this.cavesShare() + this.forgeShare() + this.mistShare());
+    const bare = drifting(sim.atmosphere?.mode ?? null) ? 0 : 1 - Math.min(1, this.forestShare() + this.magicShare() + this.cavesShare() + this.forgeShare() + this.mistShare() + this.nadirShare());
     if (bare <= 0 || !this.relief.sync(map, this.px, this.board.W, this.board.H, this.area)) return;
     const intact = standing(map, sim);
     const fixed = () =>

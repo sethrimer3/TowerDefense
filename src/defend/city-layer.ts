@@ -248,7 +248,7 @@ export function paintFloor(c: CanvasRenderingContext2D, px: number, area: AreaId
       paintFloorTile(c, area, tx, ty, x, y, Math.round((tx + 1) * T) - x, Math.round((ty + 1) * T) - y);
     }
   if (area === "nadir") {
-    c.fillStyle = "rgba(17,8,32,0.48)";
+    c.fillStyle = "rgba(26,2,6,0.55)";
     c.fillRect(0, 0, width, height);
   }
 }

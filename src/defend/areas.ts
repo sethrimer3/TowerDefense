@@ -16,14 +16,15 @@ export const AREAS = [
   { id: "crystal", name: "Violet Geode", climate: "underground", rainChance: 0, color: "#d4a2f5", dark: "#49305e" },
   { id: "obsidian", name: "Obsidian Crypt", climate: "dry", rainChance: 0, color: "#ba9c9c", dark: "#382d33" },
   { id: "astral", name: "Astral Sanctuary", climate: "dry", rainChance: 0, color: "#e4d299", dark: "#273d63" },
-  { id: "nadir", name: "Nadir", climate: "underground", rainChance: 0, color: "#ab9acb", dark: "#171322" },
+  { id: "nadir", name: "Nadir", climate: "underground", rainChance: 0, color: "#c86a6a", dark: "#1a0709" },
   // A testing zone, after the ten: clovers, wispy trees and lightning bugs
   // (magic-forest.ts). Ambush leaves it out.
   { id: "magic", name: "Magic Forest", climate: "temperate", rainChance: 0, color: "#b6f0a8", dark: "#1f3a2c", test: true },
 ] as const;
 export type Area = typeof AREAS[number];
 export type AreaId = Area["id"];
-/** Nadir reuses the crypt masonry beneath its own dark floor wash. */
+/** Nadir lays the crypt's flagstones inside its walls under a dark red
+ * wash; outside them it is its own black ground (`nadir.ts`). */
 export const areaArtId = (area: AreaId) => area === "nadir" ? "obsidian" : area === "magic" ? "moss" : area;
 /** Whether the area is a testing zone (no Ambush levels of its own). */
 export const isTestArea = (area: Area) => "test" in area && area.test === true;

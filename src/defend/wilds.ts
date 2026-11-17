@@ -43,6 +43,8 @@ import { hasFrozenVault, type FrozenVaultPlan } from "./frozen-vault.ts";
 import { paintIceSheet, standOn, vaultItems } from "./frozen-vault-art.ts";
 import { boulderPiece, crownPiece, fillMoss, paintWell, pieceItems, deepCanopy } from "./mistwood-art.ts";
 import { hasMistwood, type AncientTree, type MistwoodPlan, type Moonwell } from "./mistwood.ts";
+import { hasNadir } from "./nadir.ts";
+import { voidWildsSteps } from "./nadir-art.ts";
 import { driftLook } from "./drift-look.ts";
 import { duneHeights, duneLightKey, duneTaperPixels, duneTile, warmDuneTaper } from "./atmosphere-art.ts";
 import { segmentDistance, type TrailLine, type TrailPlan } from "./trails.ts";
@@ -230,7 +232,6 @@ const STONES: Partial<Record<AreaId, Stone>> = {
   crystal: { ramp: [0x241a33, 0x33264a, 0x45345f, 0x5a4478, 0x725894, 0x9076b4], top: [0x8f62c2, 0xbf96e8] },
   obsidian: { ramp: [0x0e0b0e, 0x181418, 0x231d22, 0x30282e, 0x40363d, 0x54484f], top: [0x3d2f3a, 0x55434f] },
   astral: { ramp: [0x3e3a30, 0x544e40, 0x6d6652, 0x878067, 0xa49c80, 0xc4bc9c], top: [0x5d6c96, 0x8697c4] },
-  nadir: { ramp: [0x120f19, 0x1b1625, 0x251e33, 0x312842, 0x3f3455, 0x51446c], top: [0x3a2c55, 0x52407a] },
   magic: { ramp: [0x2e3a3a, 0x3e4e4e, 0x506565, 0x667e7c, 0x80999a, 0x9db8b4], top: [0x3f8a5c, 0x63b27e] },
 };
 
@@ -866,8 +867,8 @@ const rgbaOf = (c: number) => ((255 << 24) | ((c & 0xff) << 16) | (c & 0xff00) |
  * those under a tree's shadow. */
 export const paintWilds = (...args: Parameters<typeof paintWildsSteps>) => drain(paintWildsSteps(...args));
 /** `paintWilds` a slice at a time: each `next()` paints some rows. */
-export function* paintWildsSteps(forest: boolean, stone?: Stone, reach: readonly TrailLine[] = [], rocks = true, look: "ranges" | "moab" | "basalt" | "volcano" | "mistwood" | "vault" = "ranges"): Steps<Painted> {
-  const moab = look === "moab", basalt = look === "basalt", volcano = look === "volcano", wood = look === "mistwood", vault = look === "vault";
+export function* paintWildsSteps(forest: boolean, stone?: Stone, reach: readonly TrailLine[] = [], rocks = true, look: "ranges" | "moab" | "basalt" | "volcano" | "mistwood" | "vault" | "void" = "ranges"): Steps<Painted> {
+  const moab = look === "moab", basalt = look === "basalt", volcano = look === "volcano", wood = look === "mistwood", vault = look === "vault", voids = look === "void";
   const out = new Uint32Array(GW * GH), whole = wildsPlan();
   // The trees and rocks clear of the roads carried out here.
   const plan: WildsPlan = reach.length
@@ -902,7 +903,7 @@ export function* paintWildsSteps(forest: boolean, stone?: Stone, reach: readonly
   const bare = basalt ? out.slice() : null;
   // The Ember Forge's cinders carried on past the board, its fissures and
   // pools in them, and what glows of it kept apart for the night.
-  const glow: Img | null = volcano || wood || vault ? { px: new Uint32Array(GW * GH), w: GW, h: GH } : null;
+  const glow: Img | null = volcano || wood || vault || voids ? { px: new Uint32Array(GW * GH), w: GW, h: GH } : null;
   const img: Img = { px: out, w: GW, h: GH };
   const offField = (X: number, Y: number) => !(X >= OX && Y >= OY && X < OX + BW && Y < OY + BH);
   const allForge = volcano ? wildForge() : null;
@@ -929,7 +930,10 @@ export function* paintWildsSteps(forest: boolean, stone?: Stone, reach: readonly
     for (const w of woods.wells) paintWell(img, glow, w.x * ART + OX, w.y * ART + OY, w.r, w.seed, offField);
     yield* deepCanopy(out, GW, GH, OX, OY, (X, Y) => offField(X, Y) && beyond(Math.floor((X - OX) / ART), Math.floor((Y - OY) / ART)) > WOOD_DEEP + smoothNoise((X - OX) / 60, (Y - OY) / 60, 1411) * 8, SLICE);
   }
-  if (moab) yield* paintMesas(out); else if (basalt) yield* paintBasalt(out); else if (volcano) yield* paintVolcano(out, glow!.px); else if (vault) yield* paintAlps(out); else if (!wood) yield* paintRanges(out);
+  // Nadir: the field's ground breaking off over the void, pieces of it
+  // floating out there (no mountains, no rocks).
+  if (voids) yield* voidWildsSteps(out, glow!.px, GW, GH, OX, OY, BW, BH, MARGIN, SLICE);
+  if (moab) yield* paintMesas(out); else if (basalt) yield* paintBasalt(out); else if (volcano) yield* paintVolcano(out, glow!.px); else if (vault) yield* paintAlps(out); else if (!wood && !voids) yield* paintRanges(out);
 
   // Rocks, back to front, each with its shadow down and right.
   const items: { y: number; draw: () => void }[] = [];
@@ -1267,7 +1271,7 @@ export class Wilds {
 
   private *groundSteps(forest: boolean, area: AreaId, reach: { lines: TrailLine[] } | null): Steps<Ground> {
     const caves = area === "drowned";
-    const painted = yield* paintWildsSteps(forest, forest ? undefined : STONES[area], reach?.lines ?? [], area !== "desert" && area !== "frozen" && !caves, area === "desert" ? "moab" : caves ? "basalt" : hasEmberForge(area) ? "volcano" : hasMistwood(area) ? "mistwood" : hasFrozenVault(area) ? "vault" : "ranges");
+    const painted = yield* paintWildsSteps(forest, forest ? undefined : STONES[area], reach?.lines ?? [], area !== "desert" && area !== "frozen" && !caves && !hasNadir(area), area === "desert" ? "moab" : caves ? "basalt" : hasEmberForge(area) ? "volcano" : hasMistwood(area) ? "mistwood" : hasFrozenVault(area) ? "vault" : hasNadir(area) ? "void" : "ranges");
     const canvas = document.createElement("canvas");
     canvas.width = GW;
     canvas.height = GH;
@@ -1467,14 +1471,14 @@ export class Wilds {
         const c = canvas.getContext("2d")!;
         c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.globalCompositeOperation = "source-over"; c.imageSmoothingEnabled = false;
         c.fillStyle = f.beyond; c.fillRect(0, 0, cw, ch);
-        if (!forest) this.floor(c, f, view, toX, toY, k);
+        if (!forest && !hasNadir(f.area)) this.floor(c, f, view, toX, toY, k);
         if (sand) blitTo(c, sand, view);
         blitTo(c, g.canvas, view);
         base = this.baseCache = { key, ground: g, canvas };
       }
       ctx.drawImage(base.canvas, 0, 0);
     } else {
-      if (!forest) this.floor(ctx, f, view, toX, toY, k);
+      if (!forest && !hasNadir(f.area)) this.floor(ctx, f, view, toX, toY, k);
       if (sand) blit(sand, view);
       blit(g.canvas, view);
     }
@@ -1502,7 +1506,8 @@ export class Wilds {
       ctx.globalAlpha = 1;
       ctx.imageSmoothingEnabled = false;
     }
-    // The Ember Forge's lava glowing through the night, as on the field.
+    // The Ember Forge's lava (and the Nadir's veins) glowing through the
+    // night, as on the field.
     if (g.glow && f.night > 0.02) {
       ctx.globalCompositeOperation = "lighter";
       ctx.globalAlpha = 0.55 * Math.min(1, f.night);
@@ -1606,10 +1611,6 @@ export class Wilds {
       this.floorCache = { key, canvas };
     }
     ctx.drawImage(this.floorCache.canvas, 0, 0);
-    if (f.area === "nadir") {
-      ctx.fillStyle = "rgba(17,8,32,0.48)";
-      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-    }
     void k;
   }
 
