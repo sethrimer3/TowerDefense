@@ -48,23 +48,23 @@
   ]
  },
  "frozenFleet": {
-  "wave": 101,
+  "wave": 81,
   "lost": false,
   "time": "60.00",
   "digests": [
-   "5s:dd9767a71f9c",
-   "10s:8127bfbdfdb6",
-   "15s:4dc5021e0b4b",
-   "20s:e14699dd6fc7",
-   "25s:11dfb77d22d2",
-   "30s:ff403ff8b594",
-   "35s:b54c18eeafa5",
-   "40s:ec91788be3e4",
-   "45s:691cb88aafba",
-   "50s:2e2a1ef1af92",
-   "55s:8e82a1400f5b",
-   "60s:b99acf439924",
-   "end:b99acf439924"
+   "5s:0bee06e7a2f6",
+   "10s:f8f7e0e29bee",
+   "15s:815e0b117a1d",
+   "20s:6c071860a460",
+   "25s:08ff01769092",
+   "30s:26056c115b77",
+   "35s:7efd1a12adca",
+   "40s:c834d7b3c71a",
+   "45s:801e8f840a67",
+   "50s:1364603cb01a",
+   "55s:7b70c8fa4f51",
+   "60s:63a9bcb77309",
+   "end:63a9bcb77309"
   ]
  },
  "newEnemies": {

@@ -1,6 +1,7 @@
-/** Worn monster trails across the open ground of Defend's first four areas:
+/** Worn monster trails across the open ground of Defend's first five areas:
  * the Mossbound Ruins' forest trails (`"road"`), the Amber Desert's sand
- * trails (`"sand"`), the Crystal Caves' trodden ways through the gravel
+ * trails (`"sand"`, trodden the same way through the Frozen Vault's snow),
+ * the Crystal Caves' trodden ways through the gravel
  * (`"cave"`) and the Ember Forge's crushed ash (`"ember"`, in from all four
  * sides: `entries`), natural game trails or pioneer paths.
  *
@@ -37,7 +38,7 @@ import { outskirts } from "./outskirts.ts";
 export type TrailStyle = "road" | "sand" | "cave" | "ember";
 
 /** Which trails an area's open ground has, if any. */
-export const trailStyle = (area: AreaId): TrailStyle | null => (area === "moss" ? "road" : area === "desert" ? "sand" : area === "drowned" ? "cave" : area === "ember" ? "ember" : null);
+export const trailStyle = (area: AreaId): TrailStyle | null => (area === "moss" ? "road" : area === "desert" || area === "frozen" ? "sand" : area === "drowned" ? "cave" : area === "ember" ? "ember" : null);
 
 /** Tuning. `cost` is how much cheaper a fully worn cell is to walk than open
  * ground (1.25 a cell); `slack` how much dearer a branch at a fork may be and

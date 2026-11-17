@@ -29,7 +29,9 @@ import { CELLS_W, CELLS_H, CELL_COUNT, cellIndex, hash } from "./grid.ts";
 import { openKey, sandTrailCanvases, trailField, trailId } from "./trail-art.ts";
 import type { TrailPlan } from "./trails.ts";
 import { CellType, type CityMap } from "./citygen.ts";
-import { DUNE_CREST, DUNE_PERIOD, WEED_SIZES, duneAt, periodicNoise, weatherNoise, type Atmosphere } from "./atmosphere.ts";
+import { DUNE_CREST, DUNE_PERIOD, WEED_SIZES, drifting, duneAt, periodicNoise, weatherNoise, type Atmosphere } from "./atmosphere.ts";
+import { HD_SNOW_TONES, SNOW_TONES, driftLook, setDriftLook, type DriftLook } from "./drift-look.ts";
+import { sceneryOutlinesOn } from "./scenery-looks.ts";
 import { ENEMIES } from "./catalog.ts";
 import { ART } from "./park-art.ts";
 import { OUTLINE, artPen, bake, blit } from "./pixel-fx.ts";
@@ -56,6 +58,9 @@ const SEAM = .45;
 /** The high-definition dunes' tones (HD Sand), deep shadow to sunlit, warm
  * in the shade as real sand is. */
 export const HD_TONES = [[112, 66, 40], [136, 84, 48], [160, 104, 58], [182, 124, 70], [202, 146, 84], [218, 166, 100], [232, 186, 120], [244, 208, 146], [252, 228, 176]];
+/** The tones of the current look (`drift-look.ts`): the desert's sand, or
+ * the Frozen Vault's snow, in the same steps. */
+let tones: readonly (readonly number[])[] = SAND_TONES, hdTones: readonly (readonly number[])[] = HD_TONES;
 /** Art pixels the swells stand over their troughs, at their tallest. */
 export const DUNE_RELIEF = 9;
 /** The HD dunes' height: a slip face about the angle of repose. */
@@ -118,7 +123,7 @@ function lightFor(sun?: Sun): Light {
   const r = Math.round((rise - RISE.lo) / (RISE.hi - RISE.lo) * RISES);
   const a = step / HEADINGS * Math.PI * 2, snapped = RISE.lo + r / RISES * (RISE.hi - RISE.lo), across = 1 / Math.sqrt(1 + snapped * snapped);
   return { x: Math.cos(a), y: Math.sin(a), rise: snapped, contrast: level / CONTRASTS, across, up: snapped * across,
-    key: `${style}:${(step + HEADINGS) % HEADINGS}:${r}:${level}` };
+    key: `${style}:${driftLook()}:${(step + HEADINGS) % HEADINGS}:${r}:${level}` };
 }
 /** The light the dunes are drawn in now. */
 const light: Light = lightFor();
@@ -167,6 +172,15 @@ export function setDuneStyle(hd: boolean) {
   return true;
 }
 export function duneStyle() { return style; }
+/** Draw the dunes as sand or as snow (`drift-look.ts`), relit at once.
+ * Returns whether it changed. */
+export function setDuneLook(next: DriftLook) {
+  if (!setDriftLook(next)) return false;
+  tones = next === "snow" ? SNOW_TONES : SAND_TONES;
+  hdTones = next === "snow" ? HD_SNOW_TONES : HD_TONES;
+  light.key = ""; setDuneLight(lastSun);
+  return true;
+}
 /** The current light's key, which changes whenever the dunes relight. */
 export function duneLightKey() { return light.key; }
 /** How tall the current dunes stand, in art pixels. */
@@ -186,7 +200,7 @@ export function duneShade(gx: number, gy: number, shadowed = false) {
  * place between the darkest and lightest tones, before dithering. */
 export function hdLight(gx: number, gy: number) {
   const l = (-(gx * light.x + gy * light.y) * HD_ACROSS + HD_UP) / Math.sqrt(gx * gx + gy * gy + 1);
-  return (l - HD_LO) / (HD_HI - HD_LO) * (HD_TONES.length - 1);
+  return (l - HD_LO) / (HD_HI - HD_LO) * (hdTones.length - 1);
 }
 /** The simple sand's tone at brightness `b` for tile pixel (tx, ty): one of
  * `SAND_TONES`, ordered-dithered only near a band's edge, then moved by the
@@ -194,16 +208,16 @@ export function hdLight(gx: number, gy: number) {
 function sandTone(b: number, tx: number, ty: number, detail = 0) {
   const f = SAND_BASE + (b - 1) / TONE_STEP;
   let t = Math.round(f + (BAYER[(ty & 3) * 4 + (tx & 3)] - .5) * SEAM) + detail;
-  return t < 0 ? 0 : t >= SAND_TONES.length ? SAND_TONES.length - 1 : t;
+  return t < 0 ? 0 : t >= tones.length ? tones.length - 1 : t;
 }
-function sandAt(b: number, tx: number, ty: number, detail = 0) { return SAND_TONES[sandTone(b, tx, ty, detail)]; }
+function sandAt(b: number, tx: number, ty: number, detail = 0) { return tones[sandTone(b, tx, ty, detail)]; }
 /** The HD tone at light `f` for tile pixel (tx, ty): dithered, with a rare
  * grain a shade off. */
 function hdTone(f: number, tx: number, ty: number) {
   let t = Math.round(f + BAYER[(ty & 3) * 4 + (tx & 3)] - .5);
   const speck = hash(tx, ty, 79) % 37;
   if (speck === 0) t++; else if (speck === 1) t--;
-  return HD_TONES[t < 0 ? 0 : t >= HD_TONES.length ? HD_TONES.length - 1 : t];
+  return hdTones[t < 0 ? 0 : t >= hdTones.length ? hdTones.length - 1 : t];
 }
 
 /** Slope bins a side in the shading table: every slope on the tile falls in
@@ -450,9 +464,9 @@ export function dunePixels() {
     return { size: n, data: out };
   }
   // Each tone packed once, then a few sums a pixel.
-  const cast = castShadows(), detail = sandDetail(), words = new Uint32Array(out.buffer), colors = new Uint32Array(SAND_TONES.length);
+  const cast = castShadows(), detail = sandDetail(), words = new Uint32Array(out.buffer), colors = new Uint32Array(tones.length);
   const pack = new Uint8Array(colors.buffer);
-  SAND_TONES.forEach((col, k) => { pack[k * 4] = col[0]; pack[k * 4 + 1] = col[1]; pack[k * 4 + 2] = col[2]; pack[k * 4 + 3] = 255; });
+  tones.forEach((col, k) => { pack[k * 4] = col[0]; pack[k * 4 + 1] = col[1]; pack[k * 4 + 2] = col[2]; pack[k * 4 + 3] = 255; });
   for (let y = 0, i = 0; y < n; y++) for (let x = 0; x < n; x++, i++) words[i] = colors[sandTone(t[bins[i] + (cast[i] ? BINS * BINS : 0)], x, y, detail[i])];
   return { size: n, data: out };
 }
@@ -550,8 +564,9 @@ function taperGeometry(t: Float32Array, w: number, h: number, bx: number, by: nu
  * (`hd`) and the light of the sky's `sun`, worked out ahead while the player builds
  * (`DefendRenderer`'s warm-up): the same tables, only sooner. One step a
  * call, `step` from 0; whether any are left. */
-export function warmDunes(hd: boolean, sun: Sun | undefined, step: number) {
+export function warmDunes(hd: boolean, sun: Sun | undefined, step: number, look: DriftLook = "sand") {
   setDuneStyle(hd);
+  setDuneLook(look);
   // The battle's dunes turn toward the sky's sun as it starts: turned now.
   if (step === 0) setDuneLight(sun);
   const steps = [duneHeights, slopes, castShadows, shadeTable, sandDetail, grainDetail, rippleDetail, () => { if (typeof document !== "undefined") dunes(); }];
@@ -907,6 +922,57 @@ function weeds() {
   return weedSprites;
 }
 
+/** One snowball frame, `size` art pixels across, rolled by `angle`: a ball
+ * of packed snow lit from the upper left, blue in its shade, with a few
+ * clumps that turn as it rolls; outlined (`ink`) only while scenery
+ * outlines are on. Drawn bare otherwise. */
+export function snowballPixels(angle: number, size = 11, ink = true) {
+  const r = (size - 2) / 2, c = (size - 1) / 2, px: (string | null)[] = new Array(size * size).fill(null);
+  const shades = ["#5c78ac", "#8ca6d2", "#bccfea", "#e2ecf8", "#ffffff"];
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    const dx = x - c, dy = y - c, d = Math.sqrt(dx * dx + dy * dy);
+    if (d > r + .3) continue;
+    // A sphere's light from the upper left, banded into the shades.
+    const z = Math.sqrt(Math.max(0, 1 - (d / (r + .3)) ** 2));
+    let lit = (-dx * .55 - dy * .65) / (r + .3) * .8 + z * .7;
+    // Clumps on its surface, carried round as it turns.
+    const a = Math.atan2(dy, dx) + angle, clump = Math.sin(a * 3) * Math.sin(d * 1.7 + angle * 2);
+    if (d > r * .35 && clump > .55) lit -= .35;
+    px[y * size + x] = shades[Math.max(0, Math.min(4, Math.round(lit * 3.2 + .6)))];
+  }
+  if (!ink) return { size, px };
+  const out = px.slice();
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    if (px[y * size + x]) continue;
+    const near = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([ox, oy]) => {
+      const nx = x + ox, ny = y + oy;
+      return nx >= 0 && ny >= 0 && nx < size && ny < size && px[ny * size + nx];
+    });
+    if (near) out[y * size + x] = "#1b2640";
+  }
+  return { size, px: out };
+}
+let ballSprites: { ink: boolean; frames: HTMLCanvasElement[][] } | null = null;
+/** The snowballs the wind rolls over the Frozen Vault's drifts, where the
+ * desert's tumbleweeds would be: the same sizes and frames. */
+function snowballs() {
+  const ink = sceneryOutlinesOn();
+  if (ballSprites?.ink === ink) return ballSprites.frames;
+  const frames: HTMLCanvasElement[][] = [];
+  for (let s = 0; s < WEED_SIZES; s++) {
+    const row: HTMLCanvasElement[] = [];
+    for (let f = 0; f < WEED_FRAMES; f++) {
+      const size = WEED_PX[s] - 2, { px } = snowballPixels(f * Math.PI * 2 / (WEED_FRAMES * 5) * 5 + s * .7, size, ink);
+      const { cv, c } = bake(WEED_PX[s], WEED_PX[s]);
+      for (let i = 0; i < px.length; i++) if (px[i]) { c.fillStyle = px[i]!; c.fillRect(i % size + 1, Math.floor(i / size) + 2, 1, 1); }
+      row.push(cv);
+    }
+    frames.push(row);
+  }
+  ballSprites = { ink, frames };
+  return frames;
+}
+
 /** One pixel of mist `air` thick at mist pixel (x, y), its texture shifted
  * by (ox, oy), into `out` at byte `k`: dithered into hard levels, the
  * thickest a paler swirl, its colour dimmed by `dim`. */
@@ -953,8 +1019,9 @@ export class AtmosphereArt {
    * without one. */
   drawGround(c: CanvasRenderingContext2D, px: number, sim: DefendSim, reduceMotion: boolean, effects: boolean, sun?: Sun, hd = false) {
     const env = sim.atmosphere;
-    if (!env || env.mode !== "sand") return;
+    if (!env || !drifting(env.mode)) return;
     setDuneStyle(hd);
+    setDuneLook(env.mode === "snow" ? "snow" : "sand");
     easeDuneLight(sun);
     c.save();
     c.imageSmoothingEnabled = false;
@@ -1210,7 +1277,7 @@ export class AtmosphereArt {
 
   /** The tumbleweeds bouncing past, each with its shadow. */
   private drawBlowing(c: CanvasRenderingContext2D, px: number, env: Atmosphere, reduceMotion: boolean) {
-    const dot = artPen(c, px), sprites = weeds();
+    const snow = env.mode === "snow", dot = artPen(c, px), sprites = snow ? snowballs() : weeds();
     for (const p of env.weeds) {
       const frames = sprites[Math.max(0, Math.min(WEED_SIZES - 1, p.size))], size = WEED_PX[p.size] ?? WEED_PX[0];
       const turn = reduceMotion ? 0 : p.turn;
@@ -1218,7 +1285,7 @@ export class AtmosphereArt {
       const frame = frames[((Math.floor(turn * 2 * WEED_PX[2] / size) % WEED_FRAMES) + WEED_FRAMES) % WEED_FRAMES];
       const hop = reduceMotion ? 0 : Math.abs(Math.sin(turn * 1.3 * WEED_PX[2] / size)) * size * .2;
       const ax = Math.round(p.x * ART) - (size >> 1), ay = Math.round(p.y * ART) - size + 3;
-      c.fillStyle = "rgba(40,24,10,.28)";
+      c.fillStyle = snow ? "rgba(30,46,90,.26)" : "rgba(40,24,10,.28)";
       dot(ax + 2, ay + size - 2, size - 4, 2);
       blit(c, px, frame, ax, ay - Math.round(hop));
     }

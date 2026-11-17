@@ -43,7 +43,7 @@ try {
         }
       }
     }
-    sim.solid.fill(0);sim.field.fill(1000);sim.wave=101;
+    sim.solid.fill(0);sim.field.fill(1000);sim.wave=81;
     for(let x=4;x<=16;x++)sim.field[cellIndex(x,12)]=30-x;
     for(let y=13;y<=16;y++)sim.field[cellIndex(16,y)]=26-y;
     const cube=sim.spawnAuxiliary('iceCube',4.5,12.5);

@@ -39,14 +39,14 @@ function corridor(sim: DefendSim) {
 
 test('area precipitation selects snow/blizzards, sandstorms and mist without rain', () => {
   for (const wave of [21, 81, 101]) assert.equal(rollWeather(() => 0, areaForWave(wave)).rain, false);
-  assert.equal(skyLabel(rollWeather(() => .5, areaForWave(101)), 0), 'Snow');
-  assert.equal(skyLabel(rollWeather(() => .5, areaForWave(101)), 1), 'Blizzard');
+  assert.equal(skyLabel(rollWeather(() => .5, areaForWave(81)), 0), 'Snow');
+  assert.equal(skyLabel(rollWeather(() => .5, areaForWave(81)), 1), 'Blizzard');
   // A stormy roll in the cold is a blizzard by day too.
-  assert.equal(rollWeather(() => 0, areaForWave(101)).blizzard, true);
-  assert.equal(rollWeather(() => STORM_CHANCE, areaForWave(101)).blizzard, undefined);
-  assert.equal(skyLabel(rollWeather(() => 0, areaForWave(101)), 0), 'Blizzard');
+  assert.equal(rollWeather(() => 0, areaForWave(81)).blizzard, true);
+  assert.equal(rollWeather(() => STORM_CHANCE, areaForWave(81)).blizzard, undefined);
+  assert.equal(skyLabel(rollWeather(() => 0, areaForWave(81)), 0), 'Blizzard');
   assert.equal(skyLabel(rollWeather(() => 0, areaForWave(21)), 0), 'Sandstorm');
-  assert.equal(skyLabel(rollWeather(() => 0, areaForWave(81)), 0), 'Mist');
+  assert.equal(skyLabel(rollWeather(() => 0, areaForWave(101)), 0), 'Mist');
   const snow = new Snow() as any;
   snow.update(0, 720, 840, 0); const normal = snow.flakes.length;
   snow.update(.1, 720, 840, 1);
@@ -54,7 +54,7 @@ test('area precipitation selects snow/blizzards, sandstorms and mist without rai
 });
 
 test('intact walls exclude mist, cracks leak, and repaired masonry seals again', () => {
-  const sim = scene(81), env = sim.atmosphere!, b = wall(sim); assert.ok(b);
+  const sim = scene(101), env = sim.atmosphere!, b = wall(sim); assert.ok(b);
   run(sim, 10); assert.equal(inside(sim, env.air), 0);
   for (const w of corridor(sim)) sim.damageBuilding(w.id, sim.maxHp[w.id] * .55);
   run(sim, 15); assert.ok(inside(sim, env.air) > .01, 'mist seeps through damage without a complete breach');

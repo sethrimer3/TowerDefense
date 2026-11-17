@@ -37,7 +37,7 @@ test('Blight movement, wakes, ramming, sinking and winter ice match the original
   for (const kind of kinds) for (const location of ['open', 'house', 'wall', 'keep', 'winter'] as const) {
     const results = [BLIGHT_SHIPS[kind], kind].map(k => {
       const { sim, enemy } = scene(k);
-      if (location === 'winter') sim.wave = 101;
+      if (location === 'winter') sim.wave = 81;
       if (location === 'house' || location === 'wall' || location === 'keep') {
         const building = location === 'keep' ? sim.keep : sim.map.buildings.find(b => b.kind === location)!;
         enemy.x = building.rect.x + building.rect.w / 2;

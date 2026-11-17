@@ -78,6 +78,8 @@ import { FloodArt } from "./flood-art.ts";
 import { ChimneySmoke } from "./chimney-smoke.ts";
 import { Ghosts } from "./ghosts.ts";
 import { AtmosphereArt, warmBoardSand, warmDunes } from "./atmosphere-art.ts";
+import { drifting } from "./atmosphere.ts";
+import { driftLookFor } from "./drift-look.ts";
 import { trailPlan, trailStyle, type TrailPlan } from "./trails.ts";
 import { trailField } from "./trail-art.ts";
 import { ForestArt } from "./forest-art.ts";
@@ -92,6 +94,8 @@ import { hasMistwood } from "./mistwood.ts";
 import { crystalCavesPlan, hasCrystalCaves, shaftLight } from "./crystal-caves.ts";
 import { EmberForgeArt } from "./ember-forge-art.ts";
 import { emberForgePlan, hasEmberForge } from "./ember-forge.ts";
+import { FrozenVaultArt } from "./frozen-vault-art.ts";
+import { frozenVaultPlan, hasFrozenVault } from "./frozen-vault.ts";
 
 export type DrawOptions = {
   /** How many watchmen walk the city (the keep's City watch, in Defend);
@@ -205,6 +209,7 @@ export class DefendRenderer {
   readonly caves = new CrystalCavesArt();
   readonly mistwood = new MistwoodArt();
   readonly forge = new EmberForgeArt();
+  readonly vault = new FrozenVaultArt();
   /** The battle time the wizard art last advanced to. */
   private wizardTime = 0;
   private rain = new Rain();
@@ -531,9 +536,10 @@ export class DefendRenderer {
           treeWind: still ? 0 : w?.rain ? 2 : w && !w.clear ? 1.4 : 1,
           reduceMotion: opts.reduceMotion, effects: opts.effects ?? true,
           forest: hasForest(this.area) && this.forest.forestPlan ? { plan: this.forest.forestPlan, damage: this.forest.damage } : null,
-          sand: sim?.atmosphere?.mode === "sand" ? { trails: sim.trails?.style === "sand" ? sim.trails : null } : null,
+          sand: sim && drifting(sim.atmosphere?.mode ?? null) ? { trails: sim.trails?.style === "sand" ? sim.trails : null } : null,
           caves: hasCrystalCaves(this.area) ? { trails: crystalCavesPlan(map).trails, day: shaftLight(this.worldLighting ? opts.sun : undefined).day } : null,
           forge: hasEmberForge(this.area) ? { trails: emberForgePlan(map).trails } : null,
+          vault: hasFrozenVault(this.area) ? { trails: frozenVaultPlan(map).trails } : null,
           // The day's tint, as the board takes it (in battle, or by night).
           tint: sim || opts.night > .001 ? opts.tint : undefined,
           // The board's own darkness, which the wilds' night meets at its edge.
@@ -587,10 +593,11 @@ export class DefendRenderer {
     this.drawMagicForest(sim, opts);
     this.drawCaveGlow(opts);
     this.drawForgeGlow(opts);
+    this.drawVaultGlow(opts);
     this.drawMistwood(sim, opts);
     // The mountains' long shadows past the board, over the field too (the
     // Mistwood has none: its wilds are forest).
-    if (!hasMistwood(this.area)) this.wilds.drawShade(this.ctx, { px: this.px, cam: this.cam, night: opts.night, sand: sim?.atmosphere?.mode === "sand" });
+    if (!hasMistwood(this.area)) this.wilds.drawShade(this.ctx, { px: this.px, cam: this.cam, night: opts.night, sand: drifting(sim?.atmosphere?.mode ?? null) });
     this.ghosts.watch(sim, opts.now / 1000);
     this.ghosts.draw(this.ctx, this.px, opts.now / 1000, opts.reduceMotion);
     if (opts.effects ?? true) this.drawSmoke(map, sim, opts);
@@ -668,16 +675,17 @@ export class DefendRenderer {
     const a = this.ahead = { map, area, run: (ms: number) => {
       if (this.ahead !== a || phase < 0) return;
       let more = true;
-      if (phase === 0) { roads = style === "road" || style === "cave" || style === "ember" ? trailPlan(map, style) : null; more = false; }
+      if (phase === 0) { roads = style === "road" || style === "cave" || style === "ember" || (style === "sand" && hasFrozenVault(area)) ? trailPlan(map, style) : null; more = false; }
       else if (phase === 1) more = this.wilds.prepare(hasForest(area), area, roads, ms);
       // The flagstones' relief masks, unless grass or cavern floor hides
       // them on both sides of the crossing (they show through its fade).
       else if (phase === 2) more = !(covered(area) && covered(this.area)) && this.relief.prepare(map, this.px, this.board.W, this.board.H, area, ms);
       // The Crystal Caves' floor.
-      else if (phase === 3) more = (hasCrystalCaves(area) && this.caves.prepare(map, ms)) || (hasEmberForge(area) && this.forge.prepare(map, ms)) || (hasMistwood(area) && this.mistwood.prepare(map, ms));
-      else if (area !== "desert" || !map.trails) { phase = -1; return; }
-      // The desert's dunes and sand trails, as its build phase warms them.
-      else if (phase === 4) more = warmDunes(hd, sun, step);
+      else if (phase === 3) more = (hasCrystalCaves(area) && this.caves.prepare(map, ms)) || (hasEmberForge(area) && this.forge.prepare(map, ms)) || (hasMistwood(area) && this.mistwood.prepare(map, ms)) || (hasFrozenVault(area) && this.vault.prepare(map, ms));
+      else if (style !== "sand" || !map.trails) { phase = -1; return; }
+      // The desert's dunes (or the Vault's snow) and its trails, as its
+      // build phase warms them.
+      else if (phase === 4) more = warmDunes(hd, sun, step, driftLookFor(area));
       else if (phase === 5) { if (step === 0) roads = trailPlan(map, "sand"); else trailField(roads!); more = step === 0; }
       else if (phase === 6) more = warmBoardSand(map, roads!, step);
       else if (phase === 7) more = this.wilds.warmSand(roads, step);
@@ -695,13 +703,13 @@ export class DefendRenderer {
   }
 
   private warmDesert(map: CityMap, hd: boolean) {
-    if (typeof requestIdleCallback !== "function" || this.area !== "desert" || !map.trails || trailStyle(this.area) !== "sand") return;
+    if (typeof requestIdleCallback !== "function" || !map.trails || trailStyle(this.area) !== "sand") return;
     if (this.warm && this.warm.map === map && this.warm.hd === hd) return;
     const w = this.warm = { map, hd, phase: 0, step: 0, plan: null as TrailPlan | null };
     const run = () => {
       if (this.warm !== w) return;
       let more = true;
-      if (w.phase === 0) more = warmDunes(hd, this.warmSun, w.step);
+      if (w.phase === 0) more = warmDunes(hd, this.warmSun, w.step, driftLookFor(this.area));
       else if (w.phase === 1) { if (w.step === 0) w.plan = trailPlan(map, "sand"); else trailField(w.plan!); more = w.step === 0; }
       else if (w.phase === 2) more = warmBoardSand(map, w.plan!, w.step);
       else if (w.phase === 3) more = this.wilds.warmSand(w.plan, w.step);
@@ -794,11 +802,18 @@ export class DefendRenderer {
     });
     // The desert's dunes lie on the ground under the battle's darkness and
     // tint, so night darkens them and the day's light turns over them.
-    const desert = sim?.atmosphere?.mode === "sand";
+    const desert = drifting(sim?.atmosphere?.mode ?? null);
     if (sim && desert) this.atmosphere.drawGround(ctx, this.px, sim, opts.reduceMotion, opts.effects ?? true, this.worldLighting ? opts.sun : undefined, !!opts.hdSand);
     if (this.forestShare() > 0 || magic > 0 || caves > 0 || forge > 0 || wood > 0 || desert) {
       this.drawFaces();
       paintSpikePoints(ctx, this.px, map, sim);
+    }
+    // The Frozen Vault's ice, pillars, rune stones and relics, standing out
+    // of the snow (in front of the wall's hanging faces).
+    const vault = this.vaultShare();
+    if (vault > 0) {
+      this.vault.sync(map);
+      this.vault.drawFloor(ctx, this.px, vault);
     }
     if ((opts.effects ?? true) && this.forestShare() > 0) {
       this.forestGrass.sync(this.forest.forestPlan!);
@@ -1036,6 +1051,18 @@ export class DefendRenderer {
   }
 
   /** How much of the Ember Forge shows, fading like the forest's. */
+  private vaultShare() {
+    const now = hasFrozenVault(this.area) ? this.areaMix : 0;
+    return now + (this.previousArea && hasFrozenVault(this.previousArea) ? 1 - this.areaMix : 0);
+  }
+
+  /** The Frozen Vault's runes and ice, shining over the battle's darkness. */
+  private drawVaultGlow(opts: DrawOptions) {
+    const alpha = this.vaultShare();
+    if (alpha <= 0) return;
+    this.vault.drawGlow(this.ctx, this.px, { now: opts.now, alpha, still: opts.reduceMotion, night: opts.night, effects: opts.effects ?? true });
+  }
+
   private forgeShare() {
     const now = hasEmberForge(this.area) ? this.areaMix : 0;
     return now + (this.previousArea && hasEmberForge(this.previousArea) ? 1 - this.areaMix : 0);
@@ -1136,7 +1163,7 @@ export class DefendRenderer {
     // The forest's grass and the desert's dunes hide the flagstones (their
     // light, drawn over the dunes, read as squares at night): there the
     // masks aren't baked at all.
-    const bare = sim.atmosphere?.mode === "sand" ? 0 : 1 - Math.min(1, this.forestShare() + this.magicShare() + this.cavesShare() + this.forgeShare() + this.mistShare());
+    const bare = drifting(sim.atmosphere?.mode ?? null) ? 0 : 1 - Math.min(1, this.forestShare() + this.magicShare() + this.cavesShare() + this.forgeShare() + this.mistShare());
     if (bare <= 0 || !this.relief.sync(map, this.px, this.board.W, this.board.H, this.area)) return;
     const intact = standing(map, sim);
     const fixed = () =>

@@ -65,7 +65,7 @@ function scenarios(): Record<string, Scenario> {
     },
     frozenFleet: {
       layout: city(SQUARE, [["wizardTower", 0, -2], ["barracks", 1, 1], ["cannonTower", -1, -1]]),
-      citySeed: 13, levels: maxLevels(), seed: 7, seconds: 60, wave: 101,
+      citySeed: 13, levels: maxLevels(), seed: 7, seconds: 60, wave: 81,
       opening: ['iceGolem', 'iceCube', 'iceCube', 'boatDinghy', 'boatSailboat'],
     },
     newEnemies: {

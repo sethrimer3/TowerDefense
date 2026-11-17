@@ -1,4 +1,4 @@
-// The Mistwood (zone 5, waves 81–100): its moss, ancient trees, rune
+// The Mistwood (zone 6, waves 101–120): its moss, ancient trees, rune
 // stones, fairy rings, wells, logs and ferns, the mist rolling in
 // while building, in battle and at night, desktop and phone, and its
 // wilds past the board. Isolated saves. Needs `npm run dev`.
@@ -23,7 +23,7 @@ try {
       const { defaults } = await import('/src/save.ts');
       const s = defaults(); s.settings.soundOff = true; s.settings.ambienceOff = true;
       s.profile = { name: 'Mist Tester', flag: { base: 3, layers: [] } };
-      s.defend.furthestWave = 82; s.defend.bestWave = 81; s.defend.startWave = 81;
+      s.defend.furthestWave = 102; s.defend.bestWave = 101; s.defend.startWave = 101;
       return s;
     });
     await context.addInitScript(fixture => {

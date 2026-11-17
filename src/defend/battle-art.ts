@@ -268,7 +268,7 @@ function drawCivilians(b: Brush, sim: DefendSim, unit?: (id: number) => void) {
       if (u.jobKind === "sand") {
         c.fillStyle = "#b8874c";
         c.fillRect(u.x * px + s / 2, u.y * px - s / 2, Math.max(1, s / 4), s * 1.4);
-        c.fillStyle = "#d8ba71";
+        c.fillStyle = sim.atmosphere?.mode === "snow" ? "#eef4fc" : "#d8ba71";
         c.fillRect(u.x * px + s / 4, u.y * px + s / 2, Math.max(2, s), Math.max(1, s / 3));
         continue;
       }
