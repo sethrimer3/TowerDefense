@@ -22,7 +22,7 @@ function drain<T>(g: Generator<void, T, void>): T {
 }
 function battle() {
   const sim = new DefendSim(city(), Object.fromEntries(UPGRADES.map((u) => [u.id, 0])) as any, 4);
-  sim.wave = 81; sim.breakT = 1e9;
+  sim.wave = 101; sim.breakT = 1e9;
   sim.atmosphere = new Atmosphere();
   return sim;
 }
@@ -30,8 +30,8 @@ const run = (sim: DefendSim, seconds: number) => { for (let i = 0; i < seconds *
 const open = (sim: DefendSim) => [...Array(CELL_COUNT).keys()].filter((i) => !sim.map.city[i] && !sim.map.wall[i] && !sim.solid[i]);
 const mean = (sim: DefendSim, cells: number[]) => cells.reduce((s, i) => s + sim.atmosphere!.air[i], 0) / cells.length;
 
-test("zone 5 is the Mistwood, a misty forest that never rains", () => {
-  const area = areaForWave(81);
+test("zone 6 is the Mistwood, a misty forest that never rains", () => {
+  const area = areaForWave(101);
   assert.equal(area.id, "fungal");
   assert.equal(area.name, "Mistwood");
   assert.ok(hasMistwood("fungal") && !hasMistwood("moss") && !hasMistwood("ember") && !hasMistwood("magic"));

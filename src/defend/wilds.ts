@@ -39,8 +39,11 @@ import { caveTrailPixel, emberTrailPixel, paintRoadLinesSteps, sandReachCanvases
 import { fillCaveGravel, openingLight, sunlitPixel } from "./crystal-caves-art.ts";
 import { fillCinder, LAVA, paintFissure, paintPool, rgba as forgeRgba, rockPiece, scrapPiece, shardPiece, stand, ventPiece, type Img } from "./ember-forge-art.ts";
 import { fissure, forgeRock, hasEmberForge, type Fissure, type ScrapKind } from "./ember-forge.ts";
+import { hasFrozenVault, type FrozenVaultPlan } from "./frozen-vault.ts";
+import { paintIceSheet, standOn, vaultItems } from "./frozen-vault-art.ts";
 import { boulderPiece, crownPiece, fillMoss, paintWell, pieceItems, deepCanopy } from "./mistwood-art.ts";
 import { hasMistwood, type AncientTree, type MistwoodPlan, type Moonwell } from "./mistwood.ts";
+import { driftLook } from "./drift-look.ts";
 import { duneHeights, duneLightKey, duneTaperPixels, duneTile, warmDuneTaper } from "./atmosphere-art.ts";
 import { segmentDistance, type TrailLine, type TrailPlan } from "./trails.ts";
 
@@ -709,6 +712,42 @@ function wildForge(): WildForge {
     }
   return (forgeWilds = out);
 }
+/** The Frozen Vault's pieces out in the snow past the field, thinning out
+ * further off, never on the mountains, the field or each other. */
+type WildVault = Pick<FrozenVaultPlan, "spires" | "pillars" | "runes" | "relics" | "sheets">;
+let vaultWilds: WildVault | null = null;
+function wildVault(): WildVault {
+  if (vaultWilds) return vaultWilds;
+  const out: WildVault = { spires: [], pillars: [], runes: [], relics: [], sheets: [] };
+  const taken: { x: number; y: number; r: number }[] = [];
+  const room = (x: number, y: number, r: number, up = 0) => {
+    if (x + r + 0.5 > 0 && y + r + 0.5 > 0 && x - r - 0.5 < CELLS_W && y - r - up - 0.5 < CELLS_H) return false;
+    for (const [dx, dy] of [[0, 0], [r, 0], [-r, 0], [0, r], [0, -r - up]]) if (rangeAt(x + dx, y + dy) > -0.15) return false;
+    return taken.every((t) => (t.x - x) ** 2 + (t.y - y) ** 2 >= (t.r + r + 0.9) ** 2);
+  };
+  const RELICS = ["crown", "urn", "sword"] as const;
+  for (let cy = -MARGIN; cy < CELLS_H + MARGIN; cy++)
+    for (let cx = -MARGIN; cx < CELLS_W + MARGIN; cx++) {
+      if (onBoard(cx, cy)) continue;
+      const thin = 1 - 0.75 * smooth(6, 28, beyond(cx, cy)), u = hash01(cx, cy, 1301) / thin, x = cx + 0.5, y = cy + 0.5, seed = hash(cx, cy, 1302);
+      if (u < 0.0006) {
+        const r = 1.3 + hash01(cx, cy, 1303) * 1;
+        if (room(x, y, r + 1)) { out.sheets.push({ x, y, r, seed }); taken.push({ x, y, r }); }
+      } else if (u < 0.0034) {
+        const r = 0.6 + hash01(cx, cy, 1304) ** 1.4 * 0.8;
+        if (room(x, y, r + 0.4, r * 3)) { out.spires.push({ x, y, r, seed, shards: 2 + (seed % 4) }); taken.push({ x, y, r }); }
+      } else if (u < 0.0048) {
+        const r = 0.8 + hash01(cx, cy, 1305) * 0.3;
+        if (room(x, y, r + 0.5, 3)) { out.pillars.push({ x, y, r, seed, fallen: hash01(cx, cy, 1306) < 0.45 }); taken.push({ x, y, r }); }
+      } else if (u < 0.0056) {
+        const r = 0.7 + hash01(cx, cy, 1307) * 0.25;
+        if (room(x, y, r + 0.5, 2.5)) { out.runes.push({ x, y, r, seed }); taken.push({ x, y, r }); }
+      } else if (u < 0.006) {
+        if (room(x, y, 1.2, 1.5)) { out.relics.push({ x, y, r: 0.7, seed, kind: RELICS[seed % RELICS.length] }); taken.push({ x, y, r: 0.7 }); }
+      }
+    }
+  return (vaultWilds = out);
+}
 /** Cells past the field beyond which the Mistwood's canopy closes overhead. */
 const WOOD_DEEP = 30;
 /** The Mistwood's trees, stones, rings, wells, logs, stumps and ferns out in
@@ -776,8 +815,8 @@ const rgbaOf = (c: number) => ((255 << 24) | ((c & 0xff) << 16) | (c & 0xff00) |
  * those under a tree's shadow. */
 export const paintWilds = (...args: Parameters<typeof paintWildsSteps>) => drain(paintWildsSteps(...args));
 /** `paintWilds` a slice at a time: each `next()` paints some rows. */
-export function* paintWildsSteps(forest: boolean, stone?: Stone, reach: readonly TrailLine[] = [], rocks = true, look: "ranges" | "moab" | "basalt" | "volcano" | "mistwood" = "ranges"): Steps<Painted> {
-  const moab = look === "moab", basalt = look === "basalt", volcano = look === "volcano", wood = look === "mistwood";
+export function* paintWildsSteps(forest: boolean, stone?: Stone, reach: readonly TrailLine[] = [], rocks = true, look: "ranges" | "moab" | "basalt" | "volcano" | "mistwood" | "vault" = "ranges"): Steps<Painted> {
+  const moab = look === "moab", basalt = look === "basalt", volcano = look === "volcano", wood = look === "mistwood", vault = look === "vault";
   const out = new Uint32Array(GW * GH), whole = wildsPlan();
   // The trees and rocks clear of the roads carried out here.
   const plan: WildsPlan = reach.length
@@ -812,7 +851,7 @@ export function* paintWildsSteps(forest: boolean, stone?: Stone, reach: readonly
   const bare = basalt ? out.slice() : null;
   // The Ember Forge's cinders carried on past the board, its fissures and
   // pools in them, and what glows of it kept apart for the night.
-  const glow: Img | null = volcano || wood ? { px: new Uint32Array(GW * GH), w: GW, h: GH } : null;
+  const glow: Img | null = volcano || wood || vault ? { px: new Uint32Array(GW * GH), w: GW, h: GH } : null;
   const img: Img = { px: out, w: GW, h: GH };
   const offField = (X: number, Y: number) => !(X >= OX && Y >= OY && X < OX + BW && Y < OY + BH);
   const allForge = volcano ? wildForge() : null;
@@ -840,6 +879,9 @@ export function* paintWildsSteps(forest: boolean, stone?: Stone, reach: readonly
     yield* deepCanopy(out, GW, GH, OX, OY, (X, Y) => offField(X, Y) && beyond(Math.floor((X - OX) / ART), Math.floor((Y - OY) / ART)) > WOOD_DEEP + smoothNoise((X - OX) / 60, (Y - OY) / 60, 1411) * 8, SLICE);
   }
   if (moab) yield* paintMesas(out); else if (basalt) yield* paintBasalt(out); else if (volcano) yield* paintVolcano(out, glow!.px); else if (!wood) yield* paintRanges(out);
+  // The Vault's ranges in its icy stone, snow on their gentle slopes, before
+  // its own pieces stand in front of them.
+  if (vault && stone) recolour(out, GW, stone);
   // Rocks, back to front, each with its shadow down and right.
   const items: { y: number; draw: () => void }[] = [];
   // The forge's own basalt boulders and pieces, standing as on the field.
@@ -851,6 +893,14 @@ export function* paintWildsSteps(forest: boolean, stone?: Stone, reach: readonly
     for (const v of forge.vents) items.push({ y: v.y, draw: () => stand(img, glow, ventPiece(v), v.x * ART + OX, v.y * ART + OY, offField, 1) });
     for (const c of forge.shards) items.push({ y: c.y, draw: () => stand(img, glow, shardPiece(c), c.x * ART + OX, c.y * ART + OY, offField, 1) });
     for (const c of forge.scrap) items.push({ y: c.y, draw: () => stand(img, glow, scrapPiece(c), c.x * ART + OX, c.y * ART + OY, offField, 1) });
+  }
+  else if (vault) {
+    // The Vault's ice, pillars, rune stones and relics out in the snow,
+    // clear of the trails carried out here.
+    const v = wildVault(), keep = <T extends { x: number; y: number; r: number }>(l: T[]) => l.filter((p) => !nearLines(reach, p.x, p.y, p.r + 0.6));
+    for (const s of keep(v.sheets)) paintIceSheet(img, s.x * ART + OX, s.y * ART + OY, s.r, s.seed, offField);
+    for (const it of vaultItems({ spires: keep(v.spires), pillars: keep(v.pillars), runes: keep(v.runes), relics: keep(v.relics) }))
+      items.push({ y: it.y, draw: () => standOn(img, glow, it.p(), it.x * ART + OX, it.y * ART + OY, offField, it.drop) });
   }
   else if (woods) {
     for (const it of pieceItems(woods)) items.push({ y: it.y, draw: () => stand(img, glow, it.p(), it.x * ART + OX, it.y * ART + OY, offField, it.drop) });
@@ -1011,6 +1061,8 @@ export type WildsFrame = {
   caves?: { trails: TrailPlan | null; day: number } | null;
   /** The Ember Forge's trails, carried on out here through the cinders. */
   forge?: { trails: TrailPlan | null } | null;
+  /** The Frozen Vault's trails, which its pieces out here keep clear of. */
+  vault?: { trails: TrailPlan | null } | null;
   /** The day's colour washed over the board (soft light), so the wilds take it too. */
   tint?: { color: string; strength: number };
   /** How dark the board's own night is at its edge (its ambient's opacity),
@@ -1119,9 +1171,9 @@ export class Wilds {
   private pending: { key: string; art: string; steps: Steps<Ground> } | null = null;
 
   private groundKey(forest: boolean, area: AreaId, roads: TrailPlan | null) {
-    const caves = area === "drowned", forge = hasEmberForge(area), trailed = forest || caves || forge;
+    const caves = area === "drowned", forge = hasEmberForge(area), vault = hasFrozenVault(area), trailed = forest || caves || forge || vault;
     const reach = trailed && roads ? this.reach(roads) : null;
-    return { key: trailed ? `${forest ? "forest" : caves ? "caves" : "forge"}:${reach?.key ?? ""}` : area, reach };
+    return { key: trailed ? `${forest ? "forest" : caves ? "caves" : forge ? "forge" : "vault"}:${reach?.key ?? ""}` : area, reach };
   }
 
   private ground(forest: boolean, area: AreaId, roads: TrailPlan | null = null) {
@@ -1158,7 +1210,7 @@ export class Wilds {
 
   private keep(key: string, forest: boolean, area: AreaId, g: Ground) {
     // Only the current city's roads are kept.
-    const prefix = forest ? "forest:" : area === "drowned" ? "caves:" : hasEmberForge(area) ? "forge:" : null;
+    const prefix = forest ? "forest:" : area === "drowned" ? "caves:" : hasEmberForge(area) ? "forge:" : hasFrozenVault(area) ? "vault:" : null;
     if (prefix) for (const k of [...this.grounds.keys()]) if (k.startsWith(prefix)) this.grounds.delete(k);
     this.grounds.set(key, g);
     return g;
@@ -1166,7 +1218,7 @@ export class Wilds {
 
   private *groundSteps(forest: boolean, area: AreaId, reach: { lines: TrailLine[] } | null): Steps<Ground> {
     const caves = area === "drowned";
-    const painted = yield* paintWildsSteps(forest, forest ? undefined : STONES[area], reach?.lines ?? [], area !== "desert" && !caves, area === "desert" ? "moab" : caves ? "basalt" : hasEmberForge(area) ? "volcano" : hasMistwood(area) ? "mistwood" : "ranges");
+    const painted = yield* paintWildsSteps(forest, forest ? undefined : STONES[area], reach?.lines ?? [], area !== "desert" && area !== "frozen" && !caves, area === "desert" ? "moab" : caves ? "basalt" : hasEmberForge(area) ? "volcano" : hasMistwood(area) ? "mistwood" : hasFrozenVault(area) ? "vault" : "ranges");
     const canvas = document.createElement("canvas");
     canvas.width = GW;
     canvas.height = GH;
@@ -1341,7 +1393,7 @@ export class Wilds {
     // Behind the boot screen the ground is painted a slice at a time
     // (`settleWilds`), and nothing past the board is drawn until it's done.
     if (deferring) {
-      const roads = f.forest?.plan.roads ?? f.caves?.trails ?? f.forge?.trails ?? null;
+      const roads = f.forest?.plan.roads ?? f.caves?.trails ?? f.forge?.trails ?? f.vault?.trails ?? null;
       if (this.prepare(forest, f.area, roads, 0)) {
         waiting.set(this, (end) => {
           while (this.prepare(forest, f.area, roads, Math.max(0, end - performance.now()))) if (performance.now() >= end) return true;
@@ -1352,7 +1404,7 @@ export class Wilds {
       }
     }
     const sand = f.sand ? this.sand(f.sand.trails) : null;
-    const g = this.ground(forest, f.area, f.forest?.plan.roads ?? f.caves?.trails ?? f.forge?.trails ?? null);
+    const g = this.ground(forest, f.area, f.forest?.plan.roads ?? f.caves?.trails ?? f.forge?.trails ?? f.vault?.trails ?? null);
     if (f.beyond) {
       // The still ground (the fill, the flagstones, the dunes and the
       // mountains) only changes with the camera, the screen or the art:
@@ -1422,7 +1474,7 @@ export class Wilds {
 
   /** The sand trails' reaches past the board, cut and banked, by their lines. */
   private reachCuts(lines: TrailLine[]) {
-    const key = lines.map((l) => `${l.half},${l.level}:${l.points.map((p) => `${p.x},${p.y}`).join(" ")}`).join("|");
+    const key = `${driftLook()}|${lines.map((l) => `${l.half},${l.level}:${l.points.map((p) => `${p.x},${p.y}`).join(" ")}`).join("|")}`;
     let cuts = this.sandReach.get(key);
     if (cuts) this.sandReach.delete(key);
     else cuts = sandReachCanvases(lines);

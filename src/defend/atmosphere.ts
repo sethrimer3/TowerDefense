@@ -5,7 +5,12 @@ import { ENEMIES } from "./catalog.ts";
 import { areaForWave, type AreaId } from "./areas.ts";
 import type { DefendSim } from "./sim.ts";
 
-export type GroundWeather = "sand" | "mist" | null;
+/** The desert's sand, the Frozen Vault's snow (the same drifts, in its own
+ * colours: `drift-look.ts`), or the Mistwood's mist. */
+export type GroundWeather = "sand" | "snow" | "mist" | null;
+/** Whether the ground weather drifts: sand or snow, which lie in dunes,
+ * blow into the city through a breach and bank against what stands there. */
+export const drifting = (mode: GroundWeather) => mode === "sand" || mode === "snow";
 /** A tumbleweed: where it is, how far it has turned, its size (0 smallest
  * to `WEED_SIZES` - 1) and how long it has been pinned in a corner. */
 export type WindParticle = { x: number; y: number; turn: number; size: number; stuck: number };
@@ -22,7 +27,7 @@ const FIRM = new Set(["wall", "gate", "wallBallista", "keep"]);
 const STEP = .1;
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const cell = (x: number, y: number) => cellIndex(clamp(Math.floor(x), 0, CELLS_W - 1), clamp(Math.floor(y), 0, CELLS_H - 1));
-export const groundWeather = (area: AreaId): GroundWeather => area === "desert" ? "sand" : area === "fungal" ? "mist" : null;
+export const groundWeather = (area: AreaId): GroundWeather => area === "desert" ? "sand" : area === "frozen" ? "snow" : area === "fungal" ? "mist" : null;
 
 /** The Mistwood's mist: it rolls in from the board's edges over `roll`
  * seconds once the zone's battle starts (a front `front` cells deep), thick
@@ -169,8 +174,9 @@ export class Atmosphere {
       this.weeds.length = 0;
       this.mistTime = 0;
       this.clearing.fill(0);
-      // Dunes belong to the desert: past it, the sand is gone with the wind.
-      if (next !== "sand") { this.sand.fill(0); this.cleanup.clear(); this.sandSeeded = false; }
+      // Dunes belong to the desert (and the Vault's snow to the Vault): past
+      // it, they are gone with the wind.
+      if (!drifting(next)) { this.sand.fill(0); this.cleanup.clear(); this.sandSeeded = false; }
       this.syncWalls(sim);
       for (let i = 0; i < CELL_COUNT; i++) if (!sim.map.city[i] && !sim.map.wall[i] && !sim.solid[i]) {
         const noise = weatherNoise((i % CELLS_W) / 6, Math.floor(i / CELLS_W) / 6);
@@ -178,10 +184,10 @@ export class Atmosphere {
         // The mist lies as thick along the edges as over the wilds past them.
         if (next === "mist") this.source[i] += (MIST.edge - this.source[i]) * (1 - Math.min(1, EDGE[i] / 6));
         // The mist rolls in from the edges; the sand is already there.
-        if (next === "sand") this.air[i] = this.source[i];
-        if (next === "sand" && !this.sandSeeded) this.sand[i] = this.duneAt(i);
+        if (drifting(next)) this.air[i] = this.source[i];
+        if (drifting(next) && !this.sandSeeded) this.sand[i] = this.duneAt(i);
       }
-      if (next === "sand") {
+      if (drifting(next)) {
         this.sandSeeded = true;
         for (let i = 0; i < 10; i++) this.weeds.push(this.particle(sim, i + 300));
       }
@@ -194,7 +200,7 @@ export class Atmosphere {
       this.wind = windAt(this.time);
       if (!this.mode) return;
       if (this.mode === "mist") this.mistTime += STEP;
-      if (this.mode === "sand") {
+      if (drifting(this.mode)) {
         this.drift.x = wrap(this.drift.x + this.wind.x * DUNE_SPEED * STEP, DUNE_PERIOD);
         this.drift.y = wrap(this.drift.y + this.wind.y * DUNE_SPEED * STEP, DUNE_PERIOD);
       }
@@ -205,7 +211,7 @@ export class Atmosphere {
       if (this.mode === "mist") this.stirUnits(sim);
       this.stirProjectiles(sim);
       this.transport(sim);
-      if (this.mode === "sand") {
+      if (drifting(this.mode)) {
         this.pressClock += STEP;
         if (this.pressClock + 1e-8 >= SAND_PRESS.every) { this.pressClock -= SAND_PRESS.every; this.press(sim); }
         this.rollWeeds(sim);
@@ -238,12 +244,12 @@ export class Atmosphere {
     const pair = (i: number, j: number, dx: number, dy: number) => {
       const gate = Math.min(this.passage[i], this.passage[j]);
       if (!gate) return;
-      const wind = (this.wind.x * dx + this.wind.y * dy) * (this.mode === "sand" ? .09 : .025);
+      const wind = (this.wind.x * dx + this.wind.y * dy) * (drifting(this.mode) ? .09 : .025);
       const swirl = ((this.vx[i] + this.vx[j]) * dx + (this.vy[i] + this.vy[j]) * dy) * .025;
       const drift = wind + swirl;
       const flow = clamp((a[i] - a[j]) * .13 + (drift > 0 ? a[i] : a[j]) * drift, -a[j] * .22, a[i] * .22) * gate;
       da[i] -= flow; da[j] += flow;
-      if (this.mode !== "sand") return;
+      if (!drifting(this.mode)) return;
       const saltation = wind * .06 + swirl * .35;
       // Sand pours down into any lower ground it can reach: a breach, an open gate.
       const ground = clamp((s[i] - s[j]) * .04 + (saltation > 0 ? s[i] : s[j]) * saltation, -s[j] * .15, s[i] * .15);
@@ -270,7 +276,7 @@ export class Atmosphere {
         a[i] *= 1 - MIST.decay;
         this.clearing[i] = Math.max(0, this.clearing[i] - STEP);
       }
-      if (this.mode === "sand") {
+      if (drifting(this.mode)) {
         s[i] = clamp(s[i] + ds[i] + (this.passage[i] ? a[i] * .0006 : 0), 0, 3);
         // Out on the open ground the sand settles back into the dunes. A
         // broken wall stone is not open ground: sand reaches it only by

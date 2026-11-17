@@ -64,24 +64,24 @@ export const ZONE_STORIES: Partial<Record<AreaId, ZoneStory>> = {
     ],
     signature: "By order of the Crown",
   },
-  fungal: {
-    title: "From the Alchemist's Journal",
-    paragraphs: [
-      "The forge has gone quiet, but the Blight did not die with the dwarves' alliance. It fled west, into the Mistwood, where the trees are older than the kingdom and the old stones still remember their runes.",
-      "The mist there does not lift. It rolls in from the trees once the fighting starts, and it hides what walks in it. I have seen it part only where fire or frost has burst.",
-      "Something in that wood is feeding the Blight. If we can find its roots, we can cut them.",
-    ],
-    signature: "Master Alchemist Orrin",
-  },
   frozen: {
     title: "A Warning from the North",
     greeting: "Your Majesty,",
     paragraphs: [
-      "Beneath the northern glaciers lies the Frozen Vault, where the first kings sealed away the relics too dangerous to keep and too precious to destroy.",
-      "The Blight has turned north. It does not come for our people this time. It comes for the Vault.",
-      "The cold here kills slowly and the ice remembers every footstep. Whatever the first kings locked away, the Dark One wants it. Do not let the doors be opened.",
+      "The forge has gone quiet, but the Blight did not die with the dwarves' alliance. It has turned north, over the glaciers, to the Frozen Vault, where the first kings sealed away the relics too dangerous to keep and too precious to destroy.",
+      "It does not come for our people this time. It comes for the Vault.",
+      "The snow here drifts against anything that stands still, and the ice remembers every footstep. Whatever the first kings locked away, the Dark One wants it. Do not let the doors be opened.",
     ],
     signature: "Warden Halvard of the Northern March",
+  },
+  fungal: {
+    title: "From the Alchemist's Journal",
+    paragraphs: [
+      "The Vault held, but the Blight slipped away from the ice. It fled west, into the Mistwood, where the trees are older than the kingdom and the old stones still remember their runes.",
+      "The mist there does not lift. It rolls in from the trees once the fighting starts, and it hides what walks in it. I have seen it part only where fire or frost has burst.",
+      "Something in that wood is feeding the Blight. If we can find its roots, we can cut them.",
+    ],
+    signature: "Master Alchemist Orrin",
   },
   crystal: {
     title: "From the Alchemist's Journal",

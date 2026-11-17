@@ -38,14 +38,14 @@ try {
     const p=window.stressPage,sim=window.stressSim;
     sim.events.length=0;sim.wave=21;sim.events.push({type:'waveStart',wave:21});p.handleEvents();
     const desert={...p.weather};
-    sim.wave=101;sim.events.push({type:'waveStart',wave:101});p.handleEvents();
+    sim.wave=81;sim.events.push({type:'waveStart',wave:81});p.handleEvents();
     const frozen={...p.weather};
-    p.save.startWave=101;p.save.unlockedWave=200;p.phase='build';p.sim=null;p.renderChrome();p.relayout();
+    p.save.startWave=81;p.save.unlockedWave=200;p.phase='build';p.sim=null;p.renderChrome();p.relayout();
     return {desert,frozen};
   });
   assert.equal(weather.desert.rain,false);assert.equal(weather.frozen.snow,true);assert.equal(weather.frozen.rain,false);
   await page.locator('#defend-wave').click();
-  const rows=await page.evaluate(()=>[1,21,101].map(w=>{
+  const rows=await page.evaluate(()=>[1,21,81].map(w=>{
     const row=document.querySelector(`[data-wave="${w}"]`),s=getComputedStyle(row);
     return {color:s.color,background:s.backgroundColor,area:row.title};
   }));

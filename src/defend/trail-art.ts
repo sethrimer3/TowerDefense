@@ -19,6 +19,7 @@ import { ART } from "./art-scale.ts";
 import { segmentDistance, type TrailLine, type TrailPlan } from "./trails.ts";
 import { CellType, type CityMap } from "./citygen.ts";
 import { rgba } from "./damage-art.ts";
+import { BANKS, TRAIL_ROCKS, driftLook } from "./drift-look.ts";
 
 const W = CELLS_W * ART, H = CELLS_H * ART;
 /** How far past a trail's half width (as a share of it) its ragged edge may reach. */
@@ -297,9 +298,9 @@ export function* paintRoadLinesSteps(out: Uint32Array, ow: number, oh: number, o
   return covered;
 }
 
-const cuts = new WeakMap<TrailPlan, { cut: HTMLCanvasElement; banks: HTMLCanvasElement }>();
+const cuts = new WeakMap<TrailPlan, { cut: HTMLCanvasElement; banks: HTMLCanvasElement; look: string }>();
 /** The same, by the plan's lines and rocks and the ground they cross, newest last. */
-const cutsByContent = new Map<string, { cut: HTMLCanvasElement; banks: HTMLCanvasElement }>();
+const cutsByContent = new Map<string, { cut: HTMLCanvasElement; banks: HTMLCanvasElement; look: string }>();
 const ids = new WeakMap<TrailPlan, number>();
 let nextId = 1;
 /** A number for each plan, for caches keyed on which trails they drew. */
@@ -315,11 +316,13 @@ export function trailId(plan: TrailPlan) {
  * the sand sloping down into the trail either side, lit and shaded by the
  * sun from the upper left, with the trail's rocks. */
 export function sandTrailCanvases(plan: TrailPlan, map: CityMap) {
+  // In the look drawn now (`drift-look.ts`): the desert's sand or the Vault's snow.
+  const look = driftLook();
   let c = cuts.get(plan);
-  if (c) return c;
+  if (c?.look === look) return c;
   // A fresh city every run plans the same trails over the same ground: its
   // art is made once (or ahead of the battle, `warmSandTrails`).
-  const key = `${linesKey(plan)}|${plan.rocks.map((r) => `${r.x},${r.y},${r.r}`).join(" ")}|${openKey(map)}`;
+  const key = `${look}|${linesKey(plan)}|${plan.rocks.map((r) => `${r.x},${r.y},${r.r}`).join(" ")}|${openKey(map)}`;
   c = cutsByContent.get(key);
   if (c) {
     cutsByContent.delete(key); cutsByContent.set(key, c);
@@ -334,7 +337,7 @@ export function sandTrailCanvases(plan: TrailPlan, map: CityMap) {
     ctx.putImageData(image, 0, 0);
     return canvas;
   };
-  c = { cut: make((d) => sandCutPixels(plan, map, d)), banks: make((d) => sandBankPixels(plan, map, d)) };
+  c = { cut: make((d) => sandCutPixels(plan, map, d)), banks: make((d) => sandBankPixels(plan, map, d)), look };
   cuts.set(plan, c);
   cutsByContent.set(key, c);
   if (cutsByContent.size > 2) cutsByContent.delete(cutsByContent.keys().next().value!);
@@ -375,7 +378,7 @@ export function sandBankPixels(plan: TrailPlan, map: CityMap, data: Uint8Clamped
 }
 /** The banks over a box (`distanceField`'s), only where `open`. */
 function bankPixels(t: Float32Array, w: number, h: number, ox: number, oy: number, isOpen: (X: number, Y: number) => boolean, data: Uint8ClampedArray) {
-  const W = w, SUN = { x: -Math.SQRT1_2, y: -Math.SQRT1_2 };
+  const W = w, SUN = { x: -Math.SQRT1_2, y: -Math.SQRT1_2 }, bank = BANKS[driftLook()];
   for (let y = 1; y < h - 1; y++)
     for (let x = 1, i = y * w + 1; x < w - 1; x++, i++) {
       const v = t[i], X = x - ox, Y = y - oy;
@@ -383,7 +386,7 @@ function bankPixels(t: Float32Array, w: number, h: number, ox: number, oy: numbe
       const o = i * 4;
       if (v < FRINGE && carved(v, X, Y)) {
         // Grains blown back over the tiles near the lip.
-        if (v > 0.55 && hash01(X, Y, 927) < (v - 0.55) * 0.5) (data[o] = 200), (data[o + 1] = 148), (data[o + 2] = 88), (data[o + 3] = 200);
+        if (v > 0.55 && hash01(X, Y, 927) < (v - 0.55) * 0.5) (data[o] = bank.grain[0]), (data[o + 1] = bank.grain[1]), (data[o + 2] = bank.grain[2]), (data[o + 3] = 200);
         continue;
       }
       // The bank's slope: down toward the trail's middle (falling `t`).
@@ -395,7 +398,7 @@ function bankPixels(t: Float32Array, w: number, h: number, ox: number, oy: numbe
       // Dithered, not a smooth wash, so the bank keeps the sand's grain.
       const a = Math.min(1, Math.abs(lit) * 0.75);
       if (a < 0.04 || a < BAYER[(Y & 3) * 4 + (X & 3)] * 0.9 + (hash01(X, Y, 929) - 0.5) * 0.25) continue;
-      const c = lit > 0 ? [252, 214, 150] : [96, 58, 30];
+      const c = lit > 0 ? bank.lit : bank.shade;
       data[o] = c[0]; data[o + 1] = c[1]; data[o + 2] = c[2]; data[o + 3] = lit > 0 ? 120 : 140;
     }
   return data;
@@ -433,17 +436,14 @@ export function sandReachCanvases(lines: readonly TrailLine[]) {
   return out;
 }
 
-/** Moab's red sandstone: the rock's top, shadow to sunlit; its cliff side,
- * light to its foot; and its dark rim. */
-const SANDSTONE = [[164, 70, 40], [190, 88, 48], [210, 106, 60], [230, 138, 84]] as const;
-const SIDE = [[136, 54, 34], [114, 44, 30], [94, 36, 26]] as const, RIM = [64, 26, 18] as const;
 
-/** A red sandstone boulder at art pixel (x, y), `R` across, that a trail
- * bends round, as Moab's are: a lumpy, flat-topped block lit from the upper
+/** A red sandstone boulder (`TRAIL_ROCKS`: in the snow, granite capped with
+ * snow) at art pixel (x, y), `R` across, that a trail bends round, as Moab's are: a lumpy, flat-topped block lit from the upper
  * left, its south side a short cliff of bedded rock darkening to its foot,
  * a dark rim, its shadow down and to the right. */
 function trailRock(data: Uint8ClampedArray, x: number, y: number, R: number, seed: number) {
   const ph = hash01(seed, 927) * 6.28, tall = Math.max(3, Math.round(R * 0.7));
+  const { top: SANDSTONE, side: SIDE, rim: RIM } = TRAIL_ROCKS[driftLook()];
   const put = (X: number, Y: number, c: readonly number[], a = 255) => {
     if (X < 0 || Y < 0 || X >= W || Y >= H) return;
     const o = (Y * W + X) * 4;

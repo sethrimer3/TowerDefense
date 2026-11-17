@@ -856,8 +856,11 @@ A surfaced worm head's chance to turn back toward the nearest city edge when it 
 **Crosshairs**: A shooting building's chosen aim point. Enemies within the clipped four-by-four-cell nearby square take priority, using that building's targeting mode.
 - **Landscape layout:** the layout for a screen wider than tall: a simulation fills the whole window, north up, with the tabs, controls and palette floating over it.
 
+**Frozen Vault**:
+Zone 5 (waves 81–100, id `frozen`): the first kings' sealed vault under the northern glaciers. Its ground is the desert's dunes in snow, with ice spires, broken pillars, glowing rune stones and relics sealed in ice standing out of the drifts.
+
 **Mistwood**:
-Zone 5 (waves 81–100, id `fungal`, once the Fungal Hollow): an old misty forest of ancient trees, rune stones, fairy rings and moonwells, with will-o'-wisps drifting over them.
+Zone 6 (waves 101–120, id `fungal`, once the Fungal Hollow): an old misty forest of ancient trees, rune stones, fairy rings and moonwells, with will-o'-wisps drifting over them.
 
 **Mist**:
 The Mistwood's weather. It rolls in from the board's edges once the zone's battle starts and is cleared for a few seconds wherever an area attack (a blast, a frost burst) lands. Where it lies thick, things in it are hidden (for the mist creatures still to come).

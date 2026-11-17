@@ -28,8 +28,8 @@ test('dry and underground areas never rain, cold areas snow, wet areas rain more
       assert.equal(!!w.snow, area.climate === 'cold');
     }
   }
-  assert.equal(skyLabel(rollWeather(() => .5, areaForWave(101)), 0), 'Snow');
-  assert.equal(skyLabel(rollWeather(() => 0, areaForWave(101)), 0), 'Blizzard');
+  assert.equal(skyLabel(rollWeather(() => .5, areaForWave(81)), 0), 'Snow');
+  assert.equal(skyLabel(rollWeather(() => 0, areaForWave(81)), 0), 'Blizzard');
   assert.equal(skyLabel(rollWeather(() => 0, areaForWave(21)), 0), 'Sandstorm');
   assert.equal(skyLabel(rollWeather(() => 0, areaForWave(61)), 0), 'Clear');
 });
