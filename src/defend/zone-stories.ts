@@ -67,9 +67,9 @@ export const ZONE_STORIES: Partial<Record<AreaId, ZoneStory>> = {
   fungal: {
     title: "From the Alchemist's Journal",
     paragraphs: [
-      "The forge has gone quiet, but the Blight did not die with the dwarves' alliance. It fled below, into the Fungal Hollow, where the caps grow taller than towers and the air glitters with spores.",
-      "I have tested the spores in a glass alembic. They take root in anything that breathes. Have the soldiers bind damp cloth over their mouths, and burn whatever moves in the undergrowth.",
-      "Something down here is feeding the Blight. If we can find its roots, we can cut them.",
+      "The forge has gone quiet, but the Blight did not die with the dwarves' alliance. It fled west, into the Mistwood, where the trees are older than the kingdom and the old stones still remember their runes.",
+      "The mist there does not lift. It rolls in from the trees once the fighting starts, and it hides what walks in it. I have seen it part only where fire or frost has burst.",
+      "Something in that wood is feeding the Blight. If we can find its roots, we can cut them.",
     ],
     signature: "Master Alchemist Orrin",
   },

@@ -52,7 +52,7 @@ An entry point on the bottom edge where an owned infantry squad enters a Siege a
 The unit the player builds with: the board is 12 × 12 of them. Only the middle 10 × 10, the **buildable field**, takes building; the outer ring stays open, and enemies enter along the top.
 
 **Wilds**:
-The impassable, visible scenery beyond the board's edges, carrying on the area's own ground: in the forest its grass and trees, then whole mountain ranges (in the desert, sandstone cliffs over flagstones; in the Ember Forge, volcanic crags with lava in their gullies over cinders). Nothing happens there; it fills the view so no dark space shows at any window shape.
+The impassable, visible scenery beyond the board's edges, carrying on the area's own ground: in the forest its grass and trees, then whole mountain ranges (in the desert, sandstone cliffs over flagstones; in the Ember Forge, volcanic crags with lava in their gullies over cinders; in the Mistwood, no mountains but forest closing into a solid canopy over moss). Nothing happens there; it fills the view so no dark space shows at any window shape.
 _Avoid_: border, margin
 
 **Fissure**:
@@ -855,3 +855,9 @@ A surfaced worm head's chance to turn back toward the nearest city edge when it 
 
 **Crosshairs**: A shooting building's chosen aim point. Enemies within the clipped four-by-four-cell nearby square take priority, using that building's targeting mode.
 - **Landscape layout:** the layout for a screen wider than tall: a simulation fills the whole window, north up, with the tabs, controls and palette floating over it.
+
+**Mistwood**:
+Zone 5 (waves 81–100, id `fungal`, once the Fungal Hollow): an old misty forest of ancient trees, rune stones, fairy rings and moonwells, with will-o'-wisps drifting over them.
+
+**Mist**:
+The Mistwood's weather. It rolls in from the board's edges once the zone's battle starts and is cleared for a few seconds wherever an area attack (a blast, a frost burst) lands. Where it lies thick, things in it are hidden (for the mist creatures still to come).

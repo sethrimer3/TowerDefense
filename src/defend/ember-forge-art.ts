@@ -68,7 +68,7 @@ const put = (img: Img, x: number, y: number, c: number) => {
 /** `wash(x, y, scale, salt)` (smooth value noise, 0..1, features `scale`
  * pixels apart) along a row of `w` pixels from `x0`: each column's lattice
  * cell worked out once, the lattice's hashes once a row (`row`, then `at`). */
-function washer(w: number, x0: number, scale: number, salt: number) {
+export function washer(w: number, x0: number, scale: number, salt: number) {
   const ixs = new Int32Array(w), sxs = new Float64Array(w);
   for (let X = 0; X < w; X++) {
     const fx = (X + x0) / scale, ix = Math.floor(fx), tx = fx - ix;
@@ -94,7 +94,7 @@ function washer(w: number, x0: number, scale: number, salt: number) {
   };
 }
 /** Smooth value noise, 0..1, with features `scale` pixels apart. */
-function wash(x: number, y: number, scale: number, salt: number) {
+export function wash(x: number, y: number, scale: number, salt: number) {
   const fx = x / scale, fy = y / scale, ix = Math.floor(fx), iy = Math.floor(fy);
   const tx = fx - ix, ty = fy - iy, sx = tx * tx * (3 - 2 * tx), sy = ty * ty * (3 - 2 * ty);
   const a = hash01(ix, iy, salt), b = hash01(ix + 1, iy, salt), c = hash01(ix, iy + 1, salt), d = hash01(ix + 1, iy + 1, salt);
@@ -144,7 +144,7 @@ export function* fillCinder(out: Uint32Array, w: number, h: number, ox: number, 
  * (or null), its size, and where its foot's middle is in it. */
 export type Piece = { px: Uint32Array; glow: Uint32Array | null; w: number; h: number; ax: number; ay: number };
 const PAD = 2;
-function piece(w: number, h: number, ax: number, ay: number, glows = false): Piece & Img {
+export function piece(w: number, h: number, ax: number, ay: number, glows = false): Piece & Img {
   w += 2 * PAD; h += 2 * PAD;
   return { px: new Uint32Array(w * h), glow: glows ? new Uint32Array(w * h) : null, w, h, ax: ax + PAD, ay: ay + PAD };
 }

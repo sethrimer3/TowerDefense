@@ -39,6 +39,8 @@ import { caveTrailPixel, emberTrailPixel, paintRoadLinesSteps, sandReachCanvases
 import { fillCaveGravel, openingLight, sunlitPixel } from "./crystal-caves-art.ts";
 import { fillCinder, LAVA, paintFissure, paintPool, rgba as forgeRgba, rockPiece, scrapPiece, shardPiece, stand, ventPiece, type Img } from "./ember-forge-art.ts";
 import { fissure, forgeRock, hasEmberForge, type Fissure, type ScrapKind } from "./ember-forge.ts";
+import { boulderPiece, crownPiece, fillMoss, paintWell, pieceItems, deepCanopy } from "./mistwood-art.ts";
+import { hasMistwood, type AncientTree, type MistwoodPlan, type Moonwell } from "./mistwood.ts";
 import { duneHeights, duneLightKey, duneTaperPixels, duneTile, warmDuneTaper } from "./atmosphere-art.ts";
 import { segmentDistance, type TrailLine, type TrailPlan } from "./trails.ts";
 
@@ -707,6 +709,64 @@ function wildForge(): WildForge {
     }
   return (forgeWilds = out);
 }
+/** Cells past the field beyond which the Mistwood's canopy closes overhead. */
+const WOOD_DEEP = 30;
+/** The Mistwood's trees, stones, rings, wells, logs, stumps and ferns out in
+ * the wilds: a few trees by the field thickening into forest, the pieces
+ * thinning out under it, never on the field or (the pieces) each other. */
+type WildWood = Pick<MistwoodPlan, "stones" | "circles" | "rings" | "logs" | "stumps" | "boulders" | "ferns"> & { wells: Moonwell[]; trees: AncientTree[] };
+let woodWilds: WildWood | null = null;
+function wildWood(): WildWood {
+  if (woodWilds) return woodWilds;
+  const out: WildWood = { stones: [], circles: [], rings: [], logs: [], stumps: [], boulders: [], ferns: [], wells: [], trees: [] };
+  const taken: { x: number; y: number; r: number }[] = [];
+  const room = (x: number, y: number, r: number) => {
+    if (x + r + 0.5 > 0 && y + r + 0.5 > 0 && x - r - 0.5 < CELLS_W && y - r - 0.5 < CELLS_H) return false;
+    return taken.every((t) => (t.x - x) ** 2 + (t.y - y) ** 2 >= (t.r + r + 0.6) ** 2);
+  };
+  for (let cy = -MARGIN; cy < CELLS_H + MARGIN; cy++)
+    for (let cx = -MARGIN; cx < CELLS_W + MARGIN; cx++) {
+      if (onBoard(cx, cy)) continue;
+      const d = beyond(cx, cy), x = cx + 0.5, y = cy + 0.5, seed = hash(cx, cy, 1402);
+      // The trees, on a jittered lattice three cells apart, a few near the
+      // field (their crowns never reaching it) and closing in further out.
+      if (((cx % 3) + 3) % 3 === 0 && ((cy % 3) + 3) % 3 === 0 && d < WOOD_DEEP + 8) {
+        const r = 2 + hash01(cx, cy, 1403) * 1.5, tx = cx + hash01(cx, cy, 1404) * 3, ty = cy + hash01(cx, cy, 1405) * 3;
+        const dens = 0.1 + 0.9 * smooth(3, 16, d);
+        if (hash01(cx, cy, 1406) < dens && beyond(Math.floor(tx), Math.floor(ty)) > r + 0.6) out.trees.push({ x: tx, y: ty, r, seed: hash(cx, cy, 1407) });
+      }
+      if (d > 22) continue;
+      const u = hash01(cx, cy, 1401);
+      if (u < 0.0035) {
+        const h = 1.6 + hash01(cx, cy, 1408) * 1.1;
+        if (room(x, y, 1)) { out.stones.push({ x, y, h, seed }); taken.push({ x, y, r: 0.6 }); }
+      } else if (u < 0.0055) {
+        const r = 0.8 + hash01(cx, cy, 1409) * 0.5;
+        if (room(x, y, r + 0.3)) { out.rings.push({ x, y, r, seed }); taken.push({ x, y, r }); }
+      } else if (u < 0.0068) {
+        const r = 1 + hash01(cx, cy, 1410) * 0.4;
+        if (room(x, y, r + 1)) { out.wells.push({ x, y, r, seed }); taken.push({ x, y, r: r + 0.4 }); }
+      } else if (u < 0.011) {
+        const len = 1.8 + hash01(cx, cy, 1412) * 1.4;
+        if (room(x, y, len * 0.55)) { out.logs.push({ x, y, len, angle: (hash01(cx, cy, 1413) - 0.5) * 1.3, seed }); taken.push({ x, y, r: len * 0.5 }); }
+      } else if (u < 0.016) {
+        const r = 0.55 + hash01(cx, cy, 1414) * 0.3;
+        if (room(x, y, r + 0.3)) { out.stumps.push({ x, y, r, seed }); taken.push({ x, y, r }); }
+      } else if (u < 0.05) {
+        const r = 0.6 + hash01(cx, cy, 1415) * 0.4;
+        if (room(x, y, r)) { out.ferns.push({ x, y, r, seed }); taken.push({ x, y, r: r * 0.6 }); }
+      }
+    }
+  return (woodWilds = out);
+}
+/** The wilds' crowns, shared by size and look (a few dozen sprites). */
+const crowns = new Map<number, ReturnType<typeof crownPiece>>();
+function wildCrown(t: AncientTree) {
+  const size = Math.min(2, Math.floor((t.r - 2) / 0.5)), look = t.seed % 16, key = size * 16 + look;
+  let p = crowns.get(key);
+  if (!p) crowns.set(key, (p = crownPiece({ x: 0, y: 0, r: 2.2 + size * 0.55, seed: 7001 + look * 131 })));
+  return p;
+}
 const rgbaOf = (c: number) => ((255 << 24) | ((c & 0xff) << 16) | (c & 0xff00) | ((c >> 16) & 0xff)) >>> 0;
 
 /** The wilds' still ground in art pixels over the whole extent: in the
@@ -716,8 +776,8 @@ const rgbaOf = (c: number) => ((255 << 24) | ((c & 0xff) << 16) | (c & 0xff00) |
  * those under a tree's shadow. */
 export const paintWilds = (...args: Parameters<typeof paintWildsSteps>) => drain(paintWildsSteps(...args));
 /** `paintWilds` a slice at a time: each `next()` paints some rows. */
-export function* paintWildsSteps(forest: boolean, stone?: Stone, reach: readonly TrailLine[] = [], rocks = true, look: "ranges" | "moab" | "basalt" | "volcano" = "ranges"): Steps<Painted> {
-  const moab = look === "moab", basalt = look === "basalt", volcano = look === "volcano";
+export function* paintWildsSteps(forest: boolean, stone?: Stone, reach: readonly TrailLine[] = [], rocks = true, look: "ranges" | "moab" | "basalt" | "volcano" | "mistwood" = "ranges"): Steps<Painted> {
+  const moab = look === "moab", basalt = look === "basalt", volcano = look === "volcano", wood = look === "mistwood";
   const out = new Uint32Array(GW * GH), whole = wildsPlan();
   // The trees and rocks clear of the roads carried out here.
   const plan: WildsPlan = reach.length
@@ -752,7 +812,7 @@ export function* paintWildsSteps(forest: boolean, stone?: Stone, reach: readonly
   const bare = basalt ? out.slice() : null;
   // The Ember Forge's cinders carried on past the board, its fissures and
   // pools in them, and what glows of it kept apart for the night.
-  const glow: Img | null = volcano ? { px: new Uint32Array(GW * GH), w: GW, h: GH } : null;
+  const glow: Img | null = volcano || wood ? { px: new Uint32Array(GW * GH), w: GW, h: GH } : null;
   const img: Img = { px: out, w: GW, h: GH };
   const offField = (X: number, Y: number) => !(X >= OX && Y >= OY && X < OX + BW && Y < OY + BH);
   const allForge = volcano ? wildForge() : null;
@@ -771,7 +831,15 @@ export function* paintWildsSteps(forest: boolean, stone?: Stone, reach: readonly
     for (const p of forge.pools) paintPool(img, glow, p.x * ART + OX, p.y * ART + OY, p.r, p.seed, offField);
   }
   yield;
-  if (moab) yield* paintMesas(out); else if (basalt) yield* paintBasalt(out); else if (volcano) yield* paintVolcano(out, glow!.px); else yield* paintRanges(out);
+  // The Mistwood's moss carried on past the board, its wells in it, and far
+  // out the forest's canopy closing over everything.
+  const woods = wood ? wildWood() : null;
+  if (woods) {
+    yield* fillMoss(out, GW, GH, OX, OY, offField, SLICE);
+    for (const w of woods.wells) paintWell(img, glow, w.x * ART + OX, w.y * ART + OY, w.r, w.seed, offField);
+    yield* deepCanopy(out, GW, GH, OX, OY, (X, Y) => offField(X, Y) && beyond(Math.floor((X - OX) / ART), Math.floor((Y - OY) / ART)) > WOOD_DEEP + smoothNoise((X - OX) / 60, (Y - OY) / 60, 1411) * 8, SLICE);
+  }
+  if (moab) yield* paintMesas(out); else if (basalt) yield* paintBasalt(out); else if (volcano) yield* paintVolcano(out, glow!.px); else if (!wood) yield* paintRanges(out);
   // Rocks, back to front, each with its shadow down and right.
   const items: { y: number; draw: () => void }[] = [];
   // The forge's own basalt boulders and pieces, standing as on the field.
@@ -783,6 +851,16 @@ export function* paintWildsSteps(forest: boolean, stone?: Stone, reach: readonly
     for (const v of forge.vents) items.push({ y: v.y, draw: () => stand(img, glow, ventPiece(v), v.x * ART + OX, v.y * ART + OY, offField, 1) });
     for (const c of forge.shards) items.push({ y: c.y, draw: () => stand(img, glow, shardPiece(c), c.x * ART + OX, c.y * ART + OY, offField, 1) });
     for (const c of forge.scrap) items.push({ y: c.y, draw: () => stand(img, glow, scrapPiece(c), c.x * ART + OX, c.y * ART + OY, offField, 1) });
+  }
+  else if (woods) {
+    for (const it of pieceItems(woods)) items.push({ y: it.y, draw: () => stand(img, glow, it.p(), it.x * ART + OX, it.y * ART + OY, offField, it.drop) });
+    for (const r of plan.rocks) {
+      if (beyond(Math.floor(r.x), Math.floor(r.y)) > WOOD_DEEP) continue;
+      const b = { x: r.x, y: r.y, r: Math.min(1.6, Math.max(0.6, r.size * 0.45)), seed: r.seed * 7919 + 29 };
+      items.push({ y: r.y, draw: () => stand(img, glow, boulderPiece(b), b.x * ART + OX, b.y * ART + OY, offField, b.r > 1.1 ? 2 : 1) });
+    }
+    // The trees, each crown's shadow cast down and right of it.
+    for (const t of woods.trees) items.push({ y: t.y, draw: () => stand(img, glow, wildCrown(t), t.x * ART + OX, t.y * ART + OY, offField, 4) });
   }
   // (None in the desert: its dunes run on over the wilds, as rockless as the field's.)
   else if (rocks) for (const r of plan.rocks)
@@ -1088,7 +1166,7 @@ export class Wilds {
 
   private *groundSteps(forest: boolean, area: AreaId, reach: { lines: TrailLine[] } | null): Steps<Ground> {
     const caves = area === "drowned";
-    const painted = yield* paintWildsSteps(forest, forest ? undefined : STONES[area], reach?.lines ?? [], area !== "desert" && !caves, area === "desert" ? "moab" : caves ? "basalt" : hasEmberForge(area) ? "volcano" : "ranges");
+    const painted = yield* paintWildsSteps(forest, forest ? undefined : STONES[area], reach?.lines ?? [], area !== "desert" && !caves, area === "desert" ? "moab" : caves ? "basalt" : hasEmberForge(area) ? "volcano" : hasMistwood(area) ? "mistwood" : "ranges");
     const canvas = document.createElement("canvas");
     canvas.width = GW;
     canvas.height = GH;

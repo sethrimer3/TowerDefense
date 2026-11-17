@@ -24,6 +24,22 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v
 const cell = (x: number, y: number) => cellIndex(clamp(Math.floor(x), 0, CELLS_W - 1), clamp(Math.floor(y), 0, CELLS_H - 1));
 export const groundWeather = (area: AreaId): GroundWeather => area === "desert" ? "sand" : area === "fungal" ? "mist" : null;
 
+/** The Mistwood's mist: it rolls in from the board's edges over `roll`
+ * seconds once the zone's battle starts (a front `front` cells deep), thick
+ * as `edge` along the edges (as thick as it lies over the wilds past them),
+ * seeping back toward its level at `feed` a step. An area attack clears it
+ * where it lands (`Atmosphere.clearMist`): the hole holds for `hold` seconds,
+ * losing `decay` of what drifts in each step, then the mist creeps back.
+ * Where it lies at least `hides` thick, what is in it can't be seen
+ * (`hiddenInMist`; nothing reads it yet). */
+export const MIST = { roll: 30, front: 6, edge: .75, feed: .04, hold: 3, decay: .3, hides: .45 };
+/** Cells from each cell's middle to the board's nearest edge. */
+const EDGE = Float32Array.from({ length: CELL_COUNT }, (_, i) => {
+  const x = i % CELLS_W + .5, y = Math.floor(i / CELLS_W) + .5;
+  return Math.min(x, y, CELLS_W - x, CELLS_H - y);
+});
+const DEEPEST = Math.max(...EDGE);
+
 /** The wind always blows the same way, down the board and to the left, so
  * the dunes, the drifts and every tumbleweed go with it. */
 export const WIND = { x: -.72, y: .72 };
@@ -137,6 +153,10 @@ export class Atmosphere {
   private sandSeeded = false;
   private wakes = 0;
   private pressClock = 0;
+  /** Seconds the mist has been rolling in; seconds each cell's mist is
+   * still held clear after an area attack. */
+  mistTime = 0;
+  readonly clearing = new Float32Array(CELL_COUNT);
   /** Each pressed building's pressure, last reckoned. */
   readonly pressure = new Map<number, number>();
 
@@ -147,13 +167,18 @@ export class Atmosphere {
       this.air.fill(0);
       this.source.fill(0);
       this.weeds.length = 0;
+      this.mistTime = 0;
+      this.clearing.fill(0);
       // Dunes belong to the desert: past it, the sand is gone with the wind.
       if (next !== "sand") { this.sand.fill(0); this.cleanup.clear(); this.sandSeeded = false; }
       this.syncWalls(sim);
       for (let i = 0; i < CELL_COUNT; i++) if (!sim.map.city[i] && !sim.map.wall[i] && !sim.solid[i]) {
         const noise = weatherNoise((i % CELLS_W) / 6, Math.floor(i / CELLS_W) / 6);
         this.source[i] = .35 + noise * .5;
-        if (next) this.air[i] = this.source[i];
+        // The mist lies as thick along the edges as over the wilds past them.
+        if (next === "mist") this.source[i] += (MIST.edge - this.source[i]) * (1 - Math.min(1, EDGE[i] / 6));
+        // The mist rolls in from the edges; the sand is already there.
+        if (next === "sand") this.air[i] = this.source[i];
         if (next === "sand" && !this.sandSeeded) this.sand[i] = this.duneAt(i);
       }
       if (next === "sand") {
@@ -168,6 +193,7 @@ export class Atmosphere {
       this.time += STEP;
       this.wind = windAt(this.time);
       if (!this.mode) return;
+      if (this.mode === "mist") this.mistTime += STEP;
       if (this.mode === "sand") {
         this.drift.x = wrap(this.drift.x + this.wind.x * DUNE_SPEED * STEP, DUNE_PERIOD);
         this.drift.y = wrap(this.drift.y + this.wind.y * DUNE_SPEED * STEP, DUNE_PERIOD);
@@ -230,9 +256,20 @@ export class Atmosphere {
       pair(i, x + 1 < CELLS_W ? i + 1 : i + 1 - CELLS_W, 1, 0);
       pair(i, y + 1 < CELLS_H ? i + CELLS_W : x, 0, 1);
     }
+    const mist = this.mode === "mist", reach = this.roll * (DEEPEST + MIST.front);
     for (let i = 0; i < CELL_COUNT; i++) {
-      const feed = this.source[i] ? (this.source[i] - a[i]) * .065 : -a[i] * .001;
+      let feed = this.source[i] ? (this.source[i] - a[i]) * .065 : -a[i] * .001;
+      if (mist) {
+        // Only behind the front rolling in from the edges, and not while
+        // an attack holds the cell clear.
+        const behind = clamp((reach - EDGE[i]) / MIST.front, 0, 1);
+        feed = this.clearing[i] > 0 ? 0 : this.source[i] ? (this.source[i] * behind - a[i]) * MIST.feed : -a[i] * .001;
+      }
       a[i] = clamp(a[i] + da[i] + feed, 0, 1.2);
+      if (mist && this.clearing[i] > 0) {
+        a[i] *= 1 - MIST.decay;
+        this.clearing[i] = Math.max(0, this.clearing[i] - STEP);
+      }
       if (this.mode === "sand") {
         s[i] = clamp(s[i] + ds[i] + (this.passage[i] ? a[i] * .0006 : 0), 0, 3);
         // Out on the open ground the sand settles back into the dunes. A
@@ -259,7 +296,42 @@ export class Atmosphere {
         this.vy[i] = clamp(this.vy[i] + k * (dy + ox * scale + (blast ? oy * 3 : 0)), -3, 3);
         if (blast) this.air[i] *= 1 - .65 * k;
       }
+    // A blast clears the mist where it lands.
+    if (blast && this.mode === "mist") this.clearMist(x, y, r * .7);
     this.version++;
+  }
+
+  /** How far the mist has rolled in, 0 (not begun) to 1 (over the board). */
+  get roll() { return this.mode === "mist" ? clamp(this.mistTime / MIST.roll, 0, 1) : 0; }
+  /** How thick the mist lies over the wilds past the board: the edges' own
+   * thickness, reached in the first few seconds of the roll. */
+  get beyondMist() { return this.mode === "mist" ? MIST.edge * clamp(this.mistTime / 6, 0, 1) : 0; }
+
+  /** An area attack at (x, y), `r` cells across, clears the mist under it:
+   * all of it at the middle, less toward the edge, held clear `hold`
+   * seconds (less toward the edge) before it creeps back. */
+  clearMist(x: number, y: number, r: number, hold = MIST.hold) {
+    if (this.mode !== "mist" || r <= 0) return;
+    for (let cy = Math.max(0, Math.floor(y - r)); cy <= Math.min(CELLS_H - 1, Math.floor(y + r)); cy++)
+      for (let cx = Math.max(0, Math.floor(x - r)); cx <= Math.min(CELLS_W - 1, Math.floor(x + r)); cx++) {
+        const i = cellIndex(cx, cy), d = Math.sqrt((cx + .5 - x) ** 2 + (cy + .5 - y) ** 2);
+        if (d > r) continue;
+        const k = 1 - d / r;
+        this.air[i] *= 1 - Math.min(1, k * 2.5);
+        this.clearing[i] = Math.max(this.clearing[i], hold * Math.min(1, .35 + k * 1.3));
+      }
+    this.version++;
+  }
+
+  /** How thick the mist lies at (x, y) cells, between the cells' middles:
+   * 0 where there is none (or outside the Mistwood). */
+  mistAt(x: number, y: number) {
+    if (this.mode !== "mist") return 0;
+    const fx = clamp(x - .5, 0, CELLS_W - 1), fy = clamp(y - .5, 0, CELLS_H - 1);
+    const x0 = Math.floor(fx), y0 = Math.floor(fy), x1 = Math.min(CELLS_W - 1, x0 + 1), y1 = Math.min(CELLS_H - 1, y0 + 1), u = fx - x0, v = fy - y0, a = this.air;
+    const top = a[cellIndex(x0, y0)] + (a[cellIndex(x1, y0)] - a[cellIndex(x0, y0)]) * u;
+    const bottom = a[cellIndex(x0, y1)] + (a[cellIndex(x1, y1)] - a[cellIndex(x0, y1)]) * u;
+    return top + (bottom - top) * v;
   }
 
   wake(x0: number, y0: number, x1: number, y1: number) {
@@ -375,4 +447,10 @@ export class Atmosphere {
     if (this.sand[i] < CLEANUP_DEPTH) this.cleanup.delete(i);
     this.version++;
   }
+}
+
+/** Whether something at (x, y) cells is hidden in the Mistwood's mist (thick
+ * enough there and not cleared). For the mist's own creatures, to come. */
+export function hiddenInMist(sim: Pick<DefendSim, "atmosphere">, x: number, y: number) {
+  return !!sim.atmosphere && sim.atmosphere.mistAt(x, y) >= MIST.hides;
 }

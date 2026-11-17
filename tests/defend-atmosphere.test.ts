@@ -132,6 +132,7 @@ test('the wind always blows down and to the left, and tumbleweeds go with it and
 
 test('explosions and moving projectiles generate bounded vortices in mist', () => {
   const sim = scene(81), env = sim.atmosphere!;
+  run(sim, 30);
   const i = 10 * CELLS_W + 10, before = env.air[i];
   sim.explode(10.5, 10.5, { r: 2, damage: 1, friendlyFire: false });
   assert.ok(env.air[i] < before);

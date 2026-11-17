@@ -21,7 +21,8 @@
  * only the marked pixels of the small chunks that changed. Sand blown into
  * the city is painted at the dunes' own `ART` pixels a cell, only over the
  * cells holding any, each drift a low rise (`DRIFT_RELIEF`) lit and coloured
- * exactly as the dunes are; the Fungal Hollow's mist at `RES`. Then the tumbleweeds,
+ * exactly as the dunes are; the Mistwood's mist at `RES` (and on over the
+ * wilds as a tile that repeats with its noise, `MIST_TILE`). Then the tumbleweeds,
  * black-outlined sprites in several sizes, over it. Presentation only: it
  * reads `sim.atmosphere` and changes nothing. */
 import { CELLS_W, CELLS_H, CELL_COUNT, cellIndex, hash } from "./grid.ts";
@@ -806,8 +807,13 @@ export class SandMarks {
   }
 }
 
-/** The mist's tint, and the brightest swirl in it. */
-const MIST = [206, 214, 222], SPORE = [232, 196, 220];
+/** The mist's tint, and the brightest swirl in it; how opaque each of its
+ * dithered levels is. */
+const MIST = [200, 214, 220], SPORE = [222, 238, 234];
+const MIST_ALPHA = [0, 50, 76, 102, 128];
+/** The mist past the board is a tile this many mist pixels across: one
+ * repeat of both of its noise's octaves, so it meets the board's exactly. */
+const MIST_TILE = TEX * 4;
 
 let texture: Float32Array | null = null;
 function noiseTexture() {
@@ -901,6 +907,18 @@ function weeds() {
   return weedSprites;
 }
 
+/** One pixel of mist `air` thick at mist pixel (x, y), its texture shifted
+ * by (ox, oy), into `out` at byte `k`: dithered into hard levels, the
+ * thickest a paler swirl, its colour dimmed by `dim`. */
+function mistPixel(out: Uint8ClampedArray, k: number, air: number, x: number, y: number, ox: number, oy: number, t: Float32Array, dim: number) {
+  const n = tex(t, Math.floor(x * .5 + ox), Math.floor(y * .5 + oy)) * .6 + tex(t, Math.floor(x * .25 - ox * .5 + 17), Math.floor(y * .25 - oy * .4 + 5)) * .4;
+  const density = air * (.35 + n * 1.1);
+  const level = Math.min(4, Math.floor(density * 4.2 + BAYER[(y & 3) * 4 + (x & 3)] * .9));
+  if (level <= 0) return;
+  const col = level === 4 ? SPORE : MIST;
+  out[k] = col[0] * dim; out[k + 1] = col[1] * dim; out[k + 2] = col[2] * (dim + (1 - dim) * .4); out[k + 3] = MIST_ALPHA[level];
+}
+
 export class AtmosphereArt {
   /** The mist, `RES` art pixels a cell. */
   private canvas: HTMLCanvasElement | null = null;
@@ -952,16 +970,63 @@ export class AtmosphereArt {
     c.restore();
   }
 
-  /** The Fungal Hollow's mist and spores, over the battle's lighting. */
-  draw(c: CanvasRenderingContext2D, px: number, sim: DefendSim, reduceMotion: boolean, effects: boolean) {
+  /** The Mistwood's mist over the battle's lighting (and on out over the
+   * wilds, `beyond` cells past each edge), dimmed by `night`, and the pale
+   * motes drifting in it. */
+  draw(c: CanvasRenderingContext2D, px: number, sim: DefendSim, reduceMotion: boolean, effects: boolean, night = 0, beyond = 0) {
     const env = sim.atmosphere;
     if (!env || env.mode !== "mist") return;
     c.save();
     c.imageSmoothingEnabled = false;
-    const layer = this.layer(env, sim, reduceMotion, effects);
-    if (layer) c.drawImage(layer, 0, 0, CELLS_W * px, CELLS_H * px);
+    const layer = this.layer(env, sim, reduceMotion, effects, night);
+    const tile = beyond > 0 ? this.mistTile(env, reduceMotion, effects, night) : null;
+    if (!tile) { if (layer) c.drawImage(layer, 0, 0, CELLS_W * px, CELLS_H * px); }
+    else {
+      // In device pixels, the board's edges on whole pixels, so the mist
+      // over it and over the wilds meet without overlapping or a gap.
+      const m = c.getTransform(), s = m.a * px;
+      const x0 = Math.round(m.e), y0 = Math.round(m.f), x1 = Math.round(m.e + CELLS_W * s), y1 = Math.round(m.f + CELLS_H * s);
+      const M = Math.ceil(beyond * s), cw = c.canvas.width, ch = c.canvas.height;
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      if (layer) c.drawImage(layer, x0, y0, x1 - x0, y1 - y0);
+      const pattern = c.createPattern(tile, "repeat");
+      if (pattern) {
+        pattern.setTransform(new DOMMatrix().translate(m.e, m.f).scale(s / RES));
+        c.fillStyle = pattern;
+        const L = Math.max(0, x0 - M), T = Math.max(0, y0 - M), R = Math.min(cw, x1 + M), B = Math.min(ch, y1 + M);
+        if (y0 > T) c.fillRect(L, T, R - L, y0 - T);
+        if (B > y1) c.fillRect(L, y1, R - L, B - y1);
+        if (x0 > L) c.fillRect(L, y0, x0 - L, y1 - y0);
+        if (R > x1) c.fillRect(x1, y0, R - x1, y1 - y0);
+      }
+      c.setTransform(m);
+    }
     if (effects && !reduceMotion) this.drawSpores(c, px, env);
     c.restore();
+  }
+
+  private tile: HTMLCanvasElement | null = null;
+  private tileData: ImageData | null = null;
+  private tileKey = "";
+  /** The mist over the wilds, as thick as `Atmosphere.beyondMist` says,
+   * painted pixel for pixel as the board's would be there (no swirls). */
+  private mistTile(env: Atmosphere, reduceMotion: boolean, effects: boolean, night: number) {
+    const air = env.beyondMist;
+    if (!effects || air < .02) return null;
+    const key = `${env.time.toFixed(2)}:${reduceMotion}:${air.toFixed(3)}:${night.toFixed(2)}`;
+    if (key === this.tileKey && this.tile) return this.tile;
+    this.tileKey = key;
+    if (!this.tile) {
+      this.tile = document.createElement("canvas");
+      this.tile.width = this.tile.height = MIST_TILE;
+      this.tileData = this.tile.getContext("2d")!.createImageData(MIST_TILE, MIST_TILE);
+    }
+    const out = this.tileData!.data, t = noiseTexture(), drift = reduceMotion ? 0 : env.time, wind = env.wind;
+    const ox = drift * (wind.x * 3 + 1.5), oy = drift * (wind.y * 3 + .6), dim = 1 - .45 * night;
+    out.fill(0);
+    for (let y = 0; y < MIST_TILE; y++) for (let x = 0; x < MIST_TILE; x++) mistPixel(out, (y * MIST_TILE + x) * 4, air, x, y, ox, oy, t, dim);
+    this.tile.getContext("2d")!.putImageData(this.tileData!, 0, 0);
+    return this.tile;
   }
 
   /** The dune sprite tiled at the field's drift and cut to the open ground
@@ -1065,9 +1130,9 @@ export class AtmosphereArt {
   }
 
   /** The mist, repainted as it moves; null while there is none. */
-  private layer(env: Atmosphere, sim: DefendSim, reduceMotion: boolean, effects: boolean) {
+  private layer(env: Atmosphere, sim: DefendSim, reduceMotion: boolean, effects: boolean, night = 0) {
     if (!effects) return null;
-    const key = `m${env.time.toFixed(2)}:${reduceMotion}`;
+    const key = `m${env.time.toFixed(2)}:${reduceMotion}:${night.toFixed(2)}`;
     if (sim === this.sim && key === this.key) return this.canvas;
     this.sim = sim; this.key = key;
     if (!this.canvas) {
@@ -1076,7 +1141,7 @@ export class AtmosphereArt {
       this.data = this.canvas.getContext("2d")!.createImageData(W, H);
     }
     this.data!.data.fill(0);
-    this.paintMist(env, reduceMotion);
+    this.paintMist(env, reduceMotion, night);
     this.canvas.getContext("2d")!.putImageData(this.data!, 0, 0);
     return this.canvas;
   }
@@ -1129,23 +1194,17 @@ export class AtmosphereArt {
   }
 
   /** The mist, a pixel at a time. */
-  private paintMist(env: Atmosphere, reduceMotion: boolean) {
+  private paintMist(env: Atmosphere, reduceMotion: boolean, night = 0) {
     const out = this.data!.data, t = noiseTexture(), wind = env.wind;
-    const drift = reduceMotion ? 0 : env.time;
+    const drift = reduceMotion ? 0 : env.time, dim = 1 - .45 * night;
+    const dx = drift * (wind.x * 3 + 1.5), dy = drift * (wind.y * 3 + .6);
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const i = cellIndex((x / RES) | 0, (y / RES) | 0), k = (y * W + x) * 4;
       if (!env.passage[i]) continue;
       const air = sample(env.air, x, y);
       if (air < .02) continue;
-      const dither = BAYER[(y & 3) * 4 + (x & 3)];
       // The swirl shifts the texture under it, so vortices visibly turn it.
-      const ox = env.vx[i] * 6 + drift * (wind.x * 3 + 1.5), oy = env.vy[i] * 6 + drift * (wind.y * 3 + .6);
-      const n = tex(t, Math.floor(x * .5 + ox), Math.floor(y * .5 + oy)) * .6 + tex(t, Math.floor(x * .25 - ox * .5 + 17), Math.floor(y * .25 - oy * .4 + 5)) * .4;
-      const density = air * (.35 + n * 1.1);
-      const level = Math.min(3, Math.floor(density * 3.2 + dither * .9));
-      if (level <= 0) continue;
-      const col = level === 3 ? SPORE : MIST;
-      out[k] = col[0]; out[k + 1] = col[1]; out[k + 2] = col[2]; out[k + 3] = [0, 34, 58, 84][level];
+      mistPixel(out, k, air, x, y, env.vx[i] * 6 + dx, env.vy[i] * 6 + dy, t, dim);
     }
   }
 
@@ -1168,7 +1227,7 @@ export class AtmosphereArt {
   /** A few pink spores floating in the thickest mist. */
   private drawSpores(c: CanvasRenderingContext2D, px: number, env: Atmosphere) {
     const dot = artPen(c, px);
-    c.fillStyle = "rgba(240,190,222,.7)";
+    c.fillStyle = "rgba(214,255,240,.7)";
     for (let n = 0; n < 90; n++) {
       const bx = ((n * 37) % CELLS_W) + .5, by = ((n * 53) % CELLS_H) + .5;
       const x = bx + Math.sin(env.time * .4 + n) * 1.5 + env.time * env.wind.x * .15, y = by + Math.cos(env.time * .3 + n * 1.7) * 1.5 + env.time * env.wind.y * .15;
