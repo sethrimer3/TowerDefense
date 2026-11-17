@@ -375,6 +375,9 @@ A stack of crates of bait, a structure for anywhere: while any stands, every ene
 **City gate**:
 A gatehouse set into the city wall on the edge of a city tile: it opens for the city's own people (troops and civilians) and stays shut to the enemy, who must batter it down; but while it stands open for your people, the enemy can slip through too, until a portcullis bars it.
 
+**Ember Forge outpost**:
+In Defend, the second, smaller city the player builds for the Ember Forge's waves: a small keep half as strong, ten fewer city tiles than at home (never fewer than ten), none on the edge of the buildable field, and no Mine or Library. A run stops at the Ember Forge's border and goes on from the other city. Nothing outside Defend sees it. Not an Ambush outpost.
+
 **Outpost gate**:
 In Ambush, the gate where the road meets an outpost's fence (a wooden gate) or, after Palisades III, its stone wall (a stone gatehouse), and where it meets the keep's wall. Units come and go only by the gates; the enemy batters them rather than the wall beside them.
 

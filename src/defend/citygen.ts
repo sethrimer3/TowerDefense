@@ -91,6 +91,9 @@ export type CityMap = {
   /** Set on Defend's own cities only: the seed their worn monster trails are
    * planned from (`trails.ts`). Unset, a map has no trails. */
   trails?: { seed: number };
+  /** Set on the Ember Forge outpost's city (`outpost.ts`): its keep is half
+   * as strong, and enemies come in from all four sides. */
+  outpost?: true;
 };
 
 /** House footprints and how often each is tried first: mostly chunky

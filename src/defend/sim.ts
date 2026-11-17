@@ -19,6 +19,7 @@ import { DefenderIndex } from "./defender-index.ts";
 import { Atmosphere, groundWeather } from "./atmosphere.ts";
 import { areaForWave } from "./areas.ts";
 import { TRAIL, trailCost, trailPlan, trailStyle, type TrailPlan } from "./trails.ts";
+import { OUTPOST_KEEP_HP } from "./outpost.ts";
 import { boulderPlan, hasForest } from "./forest.ts";
 import { IceMotion } from "./ice-motion.ts";
 import { icyCell } from "./boats.ts";
@@ -648,7 +649,7 @@ export class DefendSim {
     this.flash = new Float32Array(n);
     for (const b of map.buildings) {
       if (b.hidden) continue;
-      this.hp[b.id] = this.maxHp[b.id] = maxHpOf(b, levels, bonuses);
+      this.hp[b.id] = this.maxHp[b.id] = maxHpOf(b, levels, bonuses, map);
       this.built[b.id] = b.cells.length;
       for (const c of b.cells) this.solid[c] = 1;
     }
@@ -692,7 +693,7 @@ export class DefendSim {
     b.kind = kind; b.rect = { ...rect }; b.hidden = !active;
     b.cells = [];
     for (let y=rect.y;y<rect.y+rect.h;y++) for (let x=rect.x;x<rect.x+rect.w;x++) b.cells.push(cellIndex(x,y));
-    this.maxHp[id] = active ? maxHpOf(b, this.levels, this.bonuses) : 0;
+    this.maxHp[id] = active ? maxHpOf(b, this.levels, this.bonuses, this.map) : 0;
     this.hp[id] = this.maxHp[id] * health;
     this.built[id] = active && health > 0 ? b.cells.length : 0;
     if (active) for (const cell of b.cells) {
@@ -1019,10 +1020,11 @@ export class DefendSim {
     if (this.waveSpawned + (fort ? 1 + fort.turrets + fort.legs + fort.armor : 1) > waveCap(this.wave)) return;
     for (let tries = 0; tries < 20; tries++) {
       const margin = fort ? ENEMIES[kind].size / 2 + 1 : 1;
-      const heads = this.trailheads(kind);
+      const side = !at && this.map.outpost && !fort && !isBlightWorm(kind) ? this.sideEntry(kind) : null;
+      const heads = side ? null : this.trailheads(kind);
       // A walker enters at one of the trailheads, where there are trails.
-      const x = at?.x ?? (heads ? heads[Math.floor(this.rand() * heads.length)] + (this.rand() * 2 - 1) * TRAIL.spread : margin + this.rand() * (CELLS_W - 2 * margin));
-      const y = at?.y ?? (isBlightWorm(kind) ? wormTuning(kind).entryY : (fort ? fort.height / 2 + .5 : .5) + this.rand() * 2);
+      const x = at?.x ?? side?.x ?? (heads ? heads[Math.floor(this.rand() * heads.length)] + (this.rand() * 2 - 1) * TRAIL.spread : margin + this.rand() * (CELLS_W - 2 * margin));
+      const y = at?.y ?? side?.y ?? (isBlightWorm(kind) ? wormTuning(kind).entryY : (fort ? fort.height / 2 + .5 : .5) + this.rand() * 2);
       if (blocked(this.solid, x, y)) continue;
       this.enemies.push(this.newEnemy(kind, x, y));
       this.waveSpawned++;
@@ -1042,6 +1044,21 @@ export class DefendSim {
       if (kind === "blightWorm" && worm) for (const segment of worm) this.wormRoot.set(segment.id, worm[0].id);
       return;
     }
+  }
+
+  /** Where a new enemy of `kind` comes onto the Ember Forge outpost's
+   * board: a walker at one of the trails' ways in, from whichever side it
+   * comes, anything else (fliers, boats) anywhere along a side picked at
+   * random. Fortresses and Blight worms still come from the top. */
+  private sideEntry(kind: EnemyKind): Point {
+    const def = ENEMIES[kind], entries = !def.flying && !def.boat ? this.trails?.entries : undefined;
+    const depth = 0.5 + this.rand() * 2;
+    if (entries?.length) {
+      const e = entries[Math.floor(this.rand() * entries.length)], off = (this.rand() * 2 - 1) * TRAIL.spread;
+      return { x: e.x - e.dy * off + e.dx * depth, y: e.y + e.dx * off + e.dy * depth };
+    }
+    const side = Math.floor(this.rand() * 4), along = 1 + this.rand() * (CELLS_W - 2);
+    return side === 0 ? { x: along, y: depth } : side === 1 ? { x: along, y: CELLS_H - depth } : side === 2 ? { x: depth, y: along } : { x: CELLS_W - depth, y: along };
   }
 
   /** The trailheads a new enemy of `kind` enters at: those of the area's
@@ -1686,13 +1703,13 @@ export function watchReach(sim: Pick<DefendSim, "levels" | "bonuses">, b?: Build
   return (watchRadius(sim.levels.watchRadius) + (spot >= 2 ? SPOTTERS.radius : 0) + (signal >= 2 ? SIGNAL.radius : 0)) * rangeScale(sim,b);
 }
 
-function maxHpOf(b: Building, levels: Levels, bonuses: Readonly<Bonuses>) {
+function maxHpOf(b: Building, levels: Levels, bonuses: Readonly<Bonuses>, map?: CityMap) {
   if (b.kind === "wall" && b.piece) return wallHp(levels.wallStrength) * bonuses.wallHp * STONEWORK.hp[wallRank(bonuses.walls, "stonework")];
   if (b.kind === "wall") return wallHp(levels.wallStrength) * bonuses.wallHp;
   if (b.kind === "gate") return wallHp(levels.wallStrength) * bonuses.wallHp * GATE.hpPerCell * b.cells.length * gateHpScale(levels.gateStrength ?? 0) * IRONBOUND.hp[gateRank(bonuses.gate, "ironbound")];
   if (b.kind === "wallBallista") return wallHp(levels.wallStrength) * bonuses.wallHp * BALLISTA.hpPerCell * b.cells.length * bonuses.towerHp;
   if (b.kind === "house") return HOUSE_HP_PER_CELL * b.cells.length;
-  if (b.kind === "keep") return keepHp(levels.keepStrength) * bonuses.keepHp * BASTIONS.hp[keepRank(bonuses.keep, "bastions")];
+  if (b.kind === "keep") return keepHp(levels.keepStrength) * bonuses.keepHp * BASTIONS.hp[keepRank(bonuses.keep, "bastions")] * (map?.outpost ? OUTPOST_KEEP_HP : 1);
   if (b.kind === "monsterBait") return STRUCTURES[b.kind].maxHp * FORTIFY.hp[pathRank(buildingPaths({ bonuses }, b), "bait", "fortified")];
   return STRUCTURES[b.kind].maxHp * (b.kind.endsWith("Tower") ? bonuses.towerHp : bonuses.buildingHp) * (b.structureUid === undefined ? 1 : bonuses.equipment?.[b.structureUid]?.hp ?? 1);
 }

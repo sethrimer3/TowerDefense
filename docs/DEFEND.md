@@ -806,7 +806,10 @@ from its seed; `tests/defend-replay.test.ts` pins it.
 - Areas (`areas.ts`) change every twenty waves: Mossbound Ruins, Amber
   Desert, Crystal Caves, Ember Forge, Fungal Hollow, Frozen Vault, Violet
   Geode, Obsidian Crypt, Astral Sanctuary, Nadir and the Magic Forest testing
-  zone (waves 201–220: clovers, wispy trees, lightning bugs), repeating after wave 220. Selected starting
+  zone (waves 201–220: clovers, wispy trees, lightning bugs), repeating after wave 220. The Ember Forge is
+  fought from its own outpost city (smaller keep, ten fewer city tiles but at least ten, none on the edge of
+  the buildable field, no Mine or Library); its trails cross the field from all four sides and its enemies
+  come from every side. A run stops at the forge's border and carries on from the other city. Selected starting
   waves preview their own area. Ground and connected wall cap/face textures
   crossfade over three seconds, with matching wave button and list colors.
   `area-enemies.ts` supplies themed pools; Nadir permits every normal wave species. Offspring remain parent-only. Unspendable area-budget remainders are discarded. Nadir uses crypt masonry with a dark violet floor wash. Frozen Vault (101-120) includes all ship tiers, Ice Golems (240 HP, cost 80, double fire/explosion damage) and Sliding Ice Cubes (45 HP, cost 10, cardinal slides at 3.6 cells/second, meltable ice trails, immune to blast deflection). Both enemies have journal entries; kills award no currency.

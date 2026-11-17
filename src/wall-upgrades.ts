@@ -64,7 +64,12 @@ export const wallAllocated = (ranks: WallRanks | undefined) => sideAllocated(WAL
 /** Runs a change to the walls' ranks, then lets wall sections stand inside
  * the city as the ranks it leaves say (taking up those that no longer may). */
 function andInnerWalls(save: Save, change: SideResult): SideResult {
-  if (change.ok) save.defend.layout = withInnerWalls(save.defend.layout, save.defend.wallRanks);
+  if (change.ok) {
+    save.defend.layout = withInnerWalls(save.defend.layout, save.defend.wallRanks);
+    // The Ember Forge outpost's walls too (`defend/outpost.ts`).
+    const outpost = save.defend.outpost;
+    if (outpost) outpost.layout = withInnerWalls(outpost.layout, save.defend.wallRanks);
+  }
   return change;
 }
 

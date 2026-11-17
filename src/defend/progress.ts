@@ -1,4 +1,5 @@
 import { decodeOrders } from "./building-orders.ts";
+import { outpostOwned, outpostView, type OutpostSave } from "./outpost.ts";
 import { AREAS, WAVES_PER_AREA, type AreaId } from "./areas.ts";
 import { decodeRepairRanks, type RepairRanks } from "../repair-upgrades.ts";
 import { decodeChronoRanks, type ChronoRanks } from "../chrono-upgrades.ts";
@@ -36,6 +37,7 @@ import {
   SIDES,
   cloneLayout,
   cornerOk,
+  cityTileOk as cityFits,
   defaultLayout,
   fitLayout,
   gateOk,
@@ -115,6 +117,9 @@ export type DefendSave = {
    * ever reached, shared by its whole line for the upgrade map
    * (`specializations.ts`'s `foundNodes`); absent while none. */
   upgradesFound?: string[];
+  /** The Ember Forge outpost's own city (`outpost.ts`); absent until the
+   * player first builds there. */
+  outpost?: OutpostSave;
 };
 
 /** The field a save's layout was built on: 12 for the 12 × 12 square. Saves
@@ -243,7 +248,10 @@ export function buyUpgrade(save: DefendSave, w: Wallet, id: UpgradeId): boolean 
   if (!canAfford(w, price)) return false;
   pay(w, price);
   save.levels[id]++;
-  if (PLACED.some((k) => STRUCTURES[k].compact?.upgrade === id)) setLayout(save, sized(save.layout, save.levels));
+  if (PLACED.some((k) => STRUCTURES[k].compact?.upgrade === id)) {
+    setLayout(save, sized(save.layout, save.levels));
+    if (save.outpost) { const outpost = outpostView(save); setLayout(outpost, sized(outpost.layout, save.levels)); }
+  }
   return true;
 }
 
@@ -412,10 +420,14 @@ export function decodeDefendSave(raw: any): DefendSave {
   if(compact.length)d.legacyCompact=[...new Set(compact)];
   const recovered: PlacedStructure[]=[];
   d.layout = decodeLayout(s.field === FIELD ? s.layout : squareField(s.layout), d.owned, d.levels, innerWalls(wallRanks), compact, recovered) ?? d.layout;
-  d.kept = Array.isArray(s.kept) ? s.kept.filter((k: any) => isObject(k) && (PLACED.includes(k.kind) || k.kind === "wallSpikes") && wearFits(k.kind, k.path, k.rank))
-    .slice(0, 9999).map((k: any): Kept => ({ kind: k.kind, path: k.path, rank: k.rank })) : [];
+  d.kept = decodeKept(s.kept);
   for(const p of recovered)if(p.path&&p.rank)d.kept.push({kind:p.kind,path:p.path,rank:p.rank});
   trimKept(d);
+  const outpost = isObject(s.outpost) ? decodeLayout(s.outpost.layout, outpostOwned(d.owned), d.levels, innerWalls(wallRanks), [], [], true) : null;
+  if (outpost) {
+    d.outpost = { layout: outpost, kept: decodeKept(s.outpost.kept) };
+    trimKept(outpostView(d));
+  }
   const keepRanks = decodeKeepRanks(s.keepRanks);
   if (keepRanks) d.keepRanks = keepRanks;
   const gateRanks = decodeGateRanks(s.gateRanks);
@@ -435,6 +447,11 @@ export function decodeDefendSave(raw: any): DefendSave {
   return d;
 }
 
+/** Upgraded copies waiting in a palette, as saved. */
+const decodeKept = (list: unknown): Kept[] =>
+  Array.isArray(list) ? list.filter((k: any) => isObject(k) && (PLACED.includes(k.kind) || k.kind === "wallSpikes") && wearFits(k.kind, k.path, k.rank))
+    .slice(0, 9999).map((k: any): Kept => ({ kind: k.kind, path: k.path, rank: k.rank })) : [];
+
 /** A placement's saved path and rank, when they are its own. Saves from
  * before version 5 kept a path without a rank (the Study's researched rank
  * then; `migrateResearch` settles it): the path is kept for that. */
@@ -451,7 +468,7 @@ const tileOk = (tx: unknown, ty: unknown) => int(tx, 0, TILES_W - 1) && int(ty, 
  * player owns everything on it and its tiles join the keep. Structures that
  * no longer fit (a save from before the tile shares, say) are reshuffled on
  * their tiles, and failing that the newest go back to the palette. */
-function decodeLayout(s: any, owned: Record<PaletteItem, number>, levels: Record<UpgradeId, number>, inner: boolean, legacyCompact: PlacedKind[] = [], recovered: PlacedStructure[] = []): Layout | null {
+function decodeLayout(s: any, owned: Record<PaletteItem, number>, levels: Record<UpgradeId, number>, inner: boolean, legacyCompact: PlacedKind[] = [], recovered: PlacedStructure[] = [], outpost = false): Layout | null {
   if (!isObject(s) || !tileOk(s.keep?.tx, s.keep?.ty) || !int(s.nextUid, 1, 1e9)) return null;
   const keep = { tx: s.keep.tx, ty: s.keep.ty, ...decodeOrders(s.keep) };
   const cityTiles = decodeCityTiles(s.cityTiles, tileKey(keep.tx, keep.ty));
@@ -467,8 +484,8 @@ function decodeLayout(s: any, owned: Record<PaletteItem, number>, levels: Record
   // Saves from before placed walls have none.
   const walls = s.walls === undefined ? [] : decodeWalls(s.walls);
   if (!walls) return null;
-  const layout: Layout = { keep, cityTiles, structures, nextUid: s.nextUid, compact: [...new Set([...compactKinds(levels),...legacyCompact])], gates, spikes, ballistas, ...(walls.length ? { walls } : {}), ...(inner ? { innerWalls: true as const } : {}) };
-  if (!legal(layout, owned)) return null;
+  const layout: Layout = { keep, cityTiles, structures, nextUid: s.nextUid, compact: [...new Set([...compactKinds(levels),...legacyCompact])], gates, spikes, ballistas, ...(walls.length ? { walls } : {}), ...(inner ? { innerWalls: true as const } : {}), ...(outpost ? { outpost: true as const } : {}) };
+  if (!legal(layout, owned) || ![...tiles].every((k) => { const t = parseTileKey(k); return cityFits(layout, t.tx, t.ty); })) return null;
   const normalized=normalizeEconomyTiles(layout,owned);
   const out = fitted(normalized, unplaced.filter(uid=>!normalized.structures.some(s=>s.uid===uid&&STRUCTURES[s.kind].wholeTile)));
   if(fitLayout(out).ok)for(const p of layout.structures)if(!out.structures.some(s=>s.uid===p.uid))recovered.push(p);

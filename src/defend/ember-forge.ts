@@ -10,6 +10,7 @@ import { CELLS_H, CELLS_W, cellIndex, hash, hash01 } from "./grid.ts";
 import { CellType, type CityMap } from "./citygen.ts";
 import type { AreaId } from "./areas.ts";
 import { clearOf } from "./forest.ts";
+import { trailPlan, type TrailPlan } from "./trails.ts";
 
 /** The areas floored as the Ember Forge. */
 export const EMBER_FORGE_AREAS: readonly AreaId[] = ["ember"];
@@ -44,6 +45,8 @@ export type Fissure = { seed: number; points: { x: number; y: number }[]; width:
 /** The plan: `open` is 1 on each open-ground cell, which alone the cinders cover. */
 export type EmberForgePlan = {
   open: Uint8Array; rocks: ForgeRock[]; pools: LavaPool[]; vents: Vent[]; shards: ObsidianCluster[]; scrap: Scrap[]; cracks: Fissure[];
+  /** The trails trodden through the ash from every side (Defend's own cities only). */
+  trails: TrailPlan | null;
 };
 
 const plans = new WeakMap<CityMap, EmberForgePlan>();
@@ -67,8 +70,18 @@ function plan_(map: CityMap): EmberForgePlan {
     return out.sort((a, b) => a[2] - b[2] || a[1] - b[1] || a[0] - b[0]);
   };
   const taken: { x: number; y: number; r: number }[] = [];
+  // The trails (Defend's own cities only): nothing lies on them but the
+  // boulders they bend round.
+  const trails = trailPlan(map, "ember");
+  const onTrail = (x: number, y: number, r: number) => {
+    if (!trails) return false;
+    for (let cy = Math.floor(y - r); cy <= Math.floor(y + r); cy++)
+      for (let cx = Math.floor(x - r); cx <= Math.floor(x + r); cx++)
+        if (cx >= 0 && cy >= 0 && cx < CELLS_W && cy < CELLS_H && (cx + 0.5 - x) ** 2 + (cy + 0.5 - y) ** 2 < r * r && trails.wear[cellIndex(cx, cy)] > 0.1) return true;
+    return false;
+  };
   // Nothing is cut off by the board's edge: the wilds carry their own.
-  const free = (x: number, y: number, r: number) => x - r > 0.2 && y - r > 0.2 && x + r < CELLS_W - 0.2 && y + r < CELLS_H - 0.2 && taken.every((t) => (t.x - x) ** 2 + (t.y - y) ** 2 >= (t.r + r + EMBER_FORGE.apart) ** 2);
+  const free = (x: number, y: number, r: number) => x - r > 0.2 && y - r > 0.2 && x + r < CELLS_W - 0.2 && y + r < CELLS_H - 0.2 && !onTrail(x, y, r + 0.5) && taken.every((t) => (t.x - x) ** 2 + (t.y - y) ** 2 >= (t.r + r + EMBER_FORGE.apart) ** 2);
   const range = (lo: number, hi: number, u: number) => lo + u * (hi - lo);
 
   const pools: LavaPool[] = [];
@@ -113,6 +126,11 @@ function plan_(map: CityMap): EmberForgePlan {
     taken.push({ x, y, r });
   }
   const rocks: ForgeRock[] = [];
+  // The boulders the trails bend round, first.
+  for (const t of trails?.rocks ?? []) {
+    rocks.push(forgeRock(t.x, t.y, t.r, hash(Math.round(t.x * 8), Math.round(t.y * 8), 958)));
+    taken.push({ x: t.x, y: t.y, r: t.r });
+  }
   for (const [cx, cy] of spots(951)) {
     if (rocks.length >= EMBER_FORGE.rocks) break;
     const r = range(...EMBER_FORGE.rock, hash01(cx, cy, 952) ** 1.6), x = cx + 0.5, y = cy + 0.5;
@@ -120,7 +138,7 @@ function plan_(map: CityMap): EmberForgePlan {
     rocks.push(forgeRock(x, y, r, hash(cx, cy, 953)));
     taken.push({ x, y, r });
   }
-  return { open, rocks, pools, vents, shards, scrap, cracks };
+  return { open, rocks, pools, vents, shards, scrap, cracks, trails };
 }
 
 /** A fissure from (x, y): a zigzag of short jags about one heading, every

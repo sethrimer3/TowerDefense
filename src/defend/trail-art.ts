@@ -229,6 +229,35 @@ export function caveTrailPixel(v: number, X: number, Y: number): number {
   return rgba(c);
 }
 
+/** The Ember Forge's trodden ash, darkest to palest: the cinders crushed
+ * to a grey-brown powder down the middle; and the clinker kicked to its
+ * sides, with now and then a live ember in it. */
+const TRODDEN_ASH = [0x2a211d, 0x312721, 0x392d26, 0x41332b, 0x4a3a30];
+const CLINKER = { lit: 0x4d3c33, mid: 0x2b201b, dark: 0x0b0807, ember: 0xc0501a };
+
+/** An Ember Forge trail's pixel at board art pixel (X, Y), `v` of its half
+ * width from its middle: crushed ash paler than the cinders round it, palest
+ * where most worn, with a scuff here and there; along the edge a broken
+ * ridge of kicked clinker lit from the upper left; 0 where the cinders show.
+ * The wilds carry the trails on past the board with it. */
+export function emberTrailPixel(v: number, X: number, Y: number): number {
+  if (v > FRINGE) return 0;
+  const u = v / edgeAt(X, Y, 5), h = hash(X, Y, 951);
+  if (u >= 1.12) return 0;
+  if (u > 0.82) {
+    const p = hash(X >> 1, Y >> 1, 952) % 8;
+    if (p > 2) return 0;
+    return rgba(p === 0 ? CLINKER.lit : p === 1 ? CLINKER.mid : CLINKER.dark);
+  }
+  if (u > 0.68 && hash01(X, Y, 953) < (u - 0.68) / 0.14) return 0;
+  const worn = 1 - u + (blotch(X, Y, 4, 954) - 0.5) * 0.6;
+  let c = TRODDEN_ASH[Math.max(0, Math.min(4, Math.round(worn * 3.6 + (h % 3) - 1)))];
+  if (h % 67 === 0) c = CLINKER.dark;
+  else if (h % 67 === 1) c = CLINKER.lit;
+  else if (h % 211 === 2) c = CLINKER.ember;
+  return rgba(c);
+}
+
 /** As `paintRoads`, for lines (cells, `half` wide) into any `ow × oh` buffer
  * whose board corner is at (ox, oy) art pixels; `keep` says which pixels
  * the road may cover. The pixels it covered. */
