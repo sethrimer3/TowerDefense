@@ -1,6 +1,6 @@
 /** Worn monster trails across the open ground of Defend's first five areas:
  * the Mossbound Ruins' forest trails (`"road"`), the Amber Desert's sand
- * trails (`"sand"`, trodden the same way through the Frozen Vault's snow),
+ * trails (`"sand"`, trodden the same way through the Highlands' snow),
  * the Crystal Caves' trodden ways through the gravel
  * (`"cave"`) and the Ember Forge's crushed ash (`"ember"`, in from all four
  * sides: `entries`), natural game trails or pioneer paths.

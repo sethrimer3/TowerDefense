@@ -1,4 +1,4 @@
-// The Frozen Vault (zone 5, waves 81–100): the desert's dunes in snow, the
+// The Highlands (zone 5, waves 81–100): the desert's dunes in snow, the
 // trails trodden through them, the snowballs, the vault's ice spires,
 // pillars, rune stones, relics and frozen sheets, in battle, at sunset and
 // at night, desktop and phone, and its wilds past the board. Isolated

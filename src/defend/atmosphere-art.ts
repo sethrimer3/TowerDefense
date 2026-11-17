@@ -59,7 +59,7 @@ const SEAM = .45;
  * in the shade as real sand is. */
 export const HD_TONES = [[112, 66, 40], [136, 84, 48], [160, 104, 58], [182, 124, 70], [202, 146, 84], [218, 166, 100], [232, 186, 120], [244, 208, 146], [252, 228, 176]];
 /** The tones of the current look (`drift-look.ts`): the desert's sand, or
- * the Frozen Vault's snow, in the same steps. */
+ * the Highlands' snow, in the same steps. */
 let tones: readonly (readonly number[])[] = SAND_TONES, hdTones: readonly (readonly number[])[] = HD_TONES;
 /** Art pixels the swells stand over their troughs, at their tallest. */
 export const DUNE_RELIEF = 9;
@@ -953,7 +953,7 @@ export function snowballPixels(angle: number, size = 11, ink = true) {
   return { size, px: out };
 }
 let ballSprites: { ink: boolean; frames: HTMLCanvasElement[][] } | null = null;
-/** The snowballs the wind rolls over the Frozen Vault's drifts, where the
+/** The snowballs the wind rolls over the Highlands' drifts, where the
  * desert's tumbleweeds would be: the same sizes and frames. */
 function snowballs() {
   const ink = sceneryOutlinesOn();

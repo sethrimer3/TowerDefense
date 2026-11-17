@@ -44,7 +44,7 @@ export type OneShot = keyof typeof ONE_SHOTS;
 export const BEDS = {
   /** Wind through the trees of the green lands (and the Mine's hillside). */
   windForest: "ambience/wind-forest",
-  /** Icy wind over the Frozen Vault. */
+  /** Icy wind over the Highlands. */
   windFrozen: "ambience/wind-frozen",
   /** Desert wind and blowing sand over the Amber Desert. */
   windDesert: "ambience/wind-desert",

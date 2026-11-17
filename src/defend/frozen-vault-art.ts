@@ -1,9 +1,10 @@
-/** Draws the Frozen Vault (`frozen-vault.ts`) at `ART` pixels a cell, over
- * the snow's dunes (`atmosphere-art.ts` in the snow look): flat sheets of
- * frozen meltwater with a rim of snow, and standing out of the drifts spires
- * of blue ice, broken fluted pillars and their fallen drums capped with snow
- * and hung with icicles, slate rune stones and relics sealed in blocks of
- * ice, each with a soft blue shadow down and to the right (the floor is
+/** Draws the Highlands (`frozen-vault.ts`) at `ART` pixels a cell, over
+ * the snow's dunes (`atmosphere-art.ts` in the snow look), seen from above
+ * like the rest of the board's art: flat sheets of frozen meltwater with a
+ * rim of snow, and out of the drifts clusters of ice crystals, the broken
+ * tops of fluted pillars on their plinths and their fallen drums, slate rune
+ * slabs and relics sealed in blocks of ice, each with a soft blue shadow
+ * down and to the right (the floor is
  * clear elsewhere, so the dunes show through), under the units and the
  * battle's darkness. Then over the darkness (`drawGlow`) what shines: the
  * runes' carvings and the ice's cold light, breathing slowly, with soft
@@ -74,219 +75,217 @@ export function standOn(img: Img, glow: Img | null, p: Piece, x: number, y: numb
     }
 }
 
-/** Snow heaped round a piece's foot: a low mound `rx` pixels either side of
- * (cx, cy) in the piece, lit from the upper left, over what is there. */
-function footDrift(p: Piece & Img, cx: number, cy: number, rx: number, seed: number) {
-  const ry = Math.max(1.5, rx * 0.4);
-  for (let y = Math.floor(cy - ry); y <= Math.ceil(cy + 1); y++)
-    for (let x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x++) {
-      if (x < 0 || y < 0 || x >= p.w || y >= p.h) continue;
-      const dx = (x + 0.5 - cx) / rx, dy = (y + 0.5 - cy) / ry + (hash01(x, seed, 1201) - 0.5) * 0.5;
-      if (dx * dx + dy * dy > 1 || y > cy) continue;
-      const lit = -dx * 0.5 - dy * 0.8 + (dither(x, y) - 0.5) * 0.5;
-      p.px[y * p.w + x] = rgba(pick(SNOW, 1.6 + lit * 1.6));
+/** A square piece `2R + 1` pixels across centred on its middle, seen from
+ * above. */
+const square = (R: number, glows = false) => piece(2 * R + 1, 2 * R + 1, R, R, glows);
+/** Light from the upper left on a face whose outward slope points (nx, ny):
+ * 1 facing the light, -1 away. */
+const facing = (nx: number, ny: number) => {
+  const l = Math.hypot(nx, ny) || 1;
+  return (-nx * 0.6 - ny * 0.8) / l;
+};
+
+/** Snow lying in a soft patch over part of a piece (seen from above): a
+ * lumpy disc round (cx, cy), `r` pixels, lit from the upper left, only on
+ * pixels the piece already covers. */
+function snowPatch(p: Piece & Img, cx: number, cy: number, r: number, seed: number) {
+  for (let y = Math.floor(cy - r - 1); y <= Math.ceil(cy + r + 1); y++)
+    for (let x = Math.floor(cx - r - 1); x <= Math.ceil(cx + r + 1); x++) {
+      if (x < 0 || y < 0 || x >= p.w || y >= p.h || !p.px[y * p.w + x]) continue;
+      const dx = x + 0.5 - cx, dy = y + 0.5 - cy, d = Math.hypot(dx, dy) / r + (wash(x, y, 3, seed) - 0.5) * 0.5;
+      if (d > 1) continue;
+      const lit = (-dx * 0.6 - dy * 0.8) / r * 0.9 + (dither(x, y) - 0.5) * 0.4;
+      p.px[y * p.w + x] = rgba(pick(SNOW, d > 0.8 ? 1 + lit : 2.2 + lit));
       if (p.glow) p.glow[y * p.w + x] = 0;
     }
 }
 
-/** A cluster of ice spires: tall shards leaning a little, each lit on its
- * left face, dim on its right, a white ridge up its middle and dark at its
- * edges, the cold light glowing in their cores; snow heaped round them. */
+/** A cluster of ice crystals seen from above: long six-sided shards
+ * splayed out from a common root, each split down its ridge into a face
+ * lit from the upper left and a face in shade, a white ridge line, dark
+ * edges, and the tallest one in the middle seen end on, a hexagon of
+ * facets; their cold light glows in their cores. */
 export function spirePiece(s: IceSpire): Piece {
-  const R = s.r * ART, top = Math.ceil(R * 3.2) + 2, w = Math.ceil(R * 2.6) + 6;
-  const p = piece(w, top + 4, Math.floor(w / 2), top, true);
-  const shards = Array.from({ length: s.shards }, (_, k) => {
+  const R = Math.ceil(s.r * ART * 1.25) + 2, p = square(R, true), c = R + 0.5;
+  const shards = Array.from({ length: s.shards + 1 }, (_, k) => {
     const u = (salt: number) => hash01(s.seed, k, salt);
-    return {
-      bx: (u(1211) - 0.5) * R * 1.3, by: (u(1212) - 0.5) * R * 0.5,
-      h: R * (k === 0 ? 2.6 + u(1213) * 0.5 : 1.2 + u(1213) * 1.3), hw: 1.4 + R * (0.16 + u(1214) * 0.12), lean: (u(1215) - 0.5) * 0.45,
-    };
-  }).sort((a, b) => a.by - b.by);
+    const a = (k / (s.shards + 1)) * Math.PI * 2 + u(1211) * 1.2;
+    return { a, len: (R - 1) * (0.55 + u(1212) * 0.45), w: 1.6 + s.r * ART * (0.12 + u(1213) * 0.08) };
+  });
+  // Back to front: the shards reaching up the picture first.
+  shards.sort((a, b) => Math.sin(a.a) - Math.sin(b.a));
+  const paint = (x: number, y: number, col: number, g: number) => { const q = y * p.w + x; p.px[q] = rgba(col); p.glow![q] = g ? rgba(g) : 0; };
   for (const sh of shards) {
-    const footY = p.ay + sh.by;
-    for (let j = 0; j <= sh.h; j++) {
-      const f = j / sh.h, half = sh.hw * Math.min(1, (1 - f) * 2.4), mid = p.ax + sh.bx + sh.lean * j, y = Math.round(footY - j);
-      if (half < 0.3 || y < 0 || y >= p.h) continue;
-      for (let x = Math.floor(mid - half); x <= Math.ceil(mid + half); x++) {
-        const off = x + 0.5 - mid;
-        if (Math.abs(off) > half || x < 0 || x >= p.w) continue;
-        const q = y * p.w + x, edge = Math.abs(off) > half - 1;
-        let c: number;
-        if (Math.abs(off) < 0.6 && f > 0.08) c = ICE[5];
-        else if (edge) c = off < 0 ? ICE[2] : ICE[0];
-        else if (off < 0) c = dither(x, y) < 0.3 + f * 0.4 ? ICE[4] : ICE[3];
-        else c = dither(x, y) < 0.25 ? ICE[2] : ICE[1];
-        // A facet line across it, now and then.
-        if (!edge && Math.abs(((j + off * 1.6) % 7) - 3.5) < 0.4 && f < 0.8 && hash(s.seed, Math.floor((j + off * 1.6) / 7), 1216) % 2) c = off < 0 ? ICE[5] : ICE[2];
-        p.px[q] = rgba(c);
-        p.glow![q] = !edge && Math.abs(off) < half * 0.6 ? rgba(ICE_GLOW[f > 0.4 ? 1 : 0]) : 0;
+    const ca = Math.cos(sh.a), sa = Math.sin(sh.a);
+    for (let y = 0; y < p.h; y++)
+      for (let x = 0; x < p.w; x++) {
+        const dx = x + 0.5 - c, dy = y + 0.5 - c, along = dx * ca + dy * sa, across = -dx * sa + dy * ca;
+        if (along < 0 || along > sh.len) continue;
+        const f = along / sh.len, half = sh.w * Math.min(1, (1 - f) * 2.6);
+        if (Math.abs(across) > half) continue;
+        const edge = Math.abs(across) > half - 0.9;
+        // The face on the light's side of the ridge is lit.
+        const side = facing(-sa * Math.sign(across || 1), ca * Math.sign(across || 1));
+        let col: number;
+        if (Math.abs(across) < 0.55) col = ICE[5];
+        else if (edge) col = side > 0 ? ICE[2] : ICE[0];
+        else col = side > 0 ? (dither(x, y) < 0.55 ? ICE[4] : ICE[3]) : (dither(x, y) < 0.3 ? ICE[2] : ICE[1]);
+        paint(x, y, col, !edge && f < 0.7 ? ICE_GLOW[f < 0.35 ? 1 : 0] : 0);
       }
-    }
   }
-  footDrift(p, p.ax, p.ay + 1, R * 1.1 + 2, s.seed);
+  // The middle crystal, end on: a hexagon of six facets round its point.
+  const hr = Math.max(2.2, s.r * ART * 0.42), turn = hash01(s.seed, 1214) * 1.05;
+  for (let y = 0; y < p.h; y++)
+    for (let x = 0; x < p.w; x++) {
+      const dx = x + 0.5 - c, dy = y + 0.5 - c, d = Math.hypot(dx, dy);
+      const a = Math.atan2(dy, dx) - turn, sector = Math.floor((((a % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) / (Math.PI / 3)) % 6;
+      const mid = turn + (sector + 0.5) * (Math.PI / 3), apothem = hr * Math.cos(Math.PI / 6);
+      if (d * Math.cos(Math.atan2(dy, dx) - mid) > apothem) continue;
+      const lit = facing(Math.cos(mid), Math.sin(mid)), rim = d * Math.cos(Math.atan2(dy, dx) - mid) > apothem - 1;
+      paint(x, y, rim ? (lit > 0 ? ICE[3] : ICE[0]) : d < 1 ? ICE[5] : pick(ICE, 2.6 + lit * 2), ICE_GLOW[1]);
+    }
   return p;
 }
 
-/** A pillar of the vault: standing, a fluted column broken off jaggedly,
- * on a plinth, capped with snow and hung with icicles; fallen, one of its
- * drums lying in the snow, its fluted end toward you, snow along its top. */
+/** A pillar of the vault seen from above: standing, the broken top of a
+ * fluted column (its scalloped rim, the break's rough face, snow lying on
+ * it) on a square plinth whose lit edges catch the light; fallen, one of its
+ * drums lying in the snow, rounded across its width, fluted along it, snow
+ * along its top. */
 export function pillarPiece(v: VaultPillar): Piece {
   return v.fallen ? drumPiece(v) : columnPiece(v);
 }
 
 function columnPiece(v: VaultPillar): Piece {
-  const R = v.r * ART, cw = Math.max(7, Math.round(R * 1.5)) | 1, tall = Math.round(R * (2.4 + hash01(v.seed, 1221) * 1.4));
-  const w = cw + 6, p = piece(w, tall + 8, Math.floor(w / 2), tall + 5);
-  const left = p.ax - (cw >> 1), foot = p.ay;
-  const put = (x: number, y: number, c: number) => { if (x >= 0 && y >= 0 && x < p.w && y < p.h) p.px[y * p.w + x] = rgba(c); };
-  // The broken top: each column of the shaft ends a little higher or lower.
-  const tops: number[] = [];
-  for (let i = 0; i < cw; i++) tops.push(foot - tall + Math.floor(hash01(v.seed, i, 1222) * 3) + Math.round(Math.abs(i - cw * hash01(v.seed, 1223)) * 0.5));
-  // The plinth: two steps of dressed stone.
-  for (let j = 0; j < 4; j++) {
-    const ext = j < 2 ? 2 : 1, y = foot - j;
-    for (let x = left - ext; x < left + cw + ext; x++) put(x, y, j === 1 || j === 3 ? STONE[x < left + cw / 2 ? 4 : 3] : STONE[x < left + cw / 3 ? 3 : 2]);
-  }
-  // The shaft: a cylinder lit from the left, every third column a groove.
-  for (let i = 0; i < cw; i++) {
-    const u = (i + 0.5) / cw, groove = i % 3 === 1 && i > 0 && i < cw - 1;
-    const base = u < 0.2 ? 4 : u < 0.45 ? 3 : u < 0.75 ? 2 : 1;
-    for (let y = tops[i]; y <= foot - 4; y++) {
-      let c = STONE[groove ? Math.max(0, base - 1) : base];
-      if (hash(i, y, v.seed, 1224) % 23 === 0) c = SNOW[1];
-      put(left + i, y, c);
+  const r = Math.max(3.5, v.r * ART * 0.62), half = Math.ceil(r + 2), R = half + 1, p = square(R), c = R + 0.5;
+  const put = (x: number, y: number, col: number) => { p.px[y * p.w + x] = rgba(col); };
+  for (let y = 0; y < p.h; y++)
+    for (let x = 0; x < p.w; x++) {
+      const dx = x + 0.5 - c, dy = y + 0.5 - c;
+      // The plinth: a square slab, bevelled, its upper and left edges lit.
+      if (Math.max(Math.abs(dx), Math.abs(dy)) <= half) {
+        const e = half - Math.max(Math.abs(dx), Math.abs(dy));
+        put(x, y, e < 1 ? (dx < 0 && Math.abs(dx) >= Math.abs(dy) || dy < 0 && Math.abs(dy) > Math.abs(dx) ? STONE[4] : STONE[1]) : STONE[(x + y) & 1 ? 2 : 3]);
+      }
+      const d = Math.hypot(dx, dy), a = Math.atan2(dy, dx);
+      // The shaft's rim, scalloped by its flutes.
+      const rim = r * (1 - 0.07 * Math.max(0, Math.cos(a * 10)));
+      if (d > rim) continue;
+      if (d > rim - 1.1) { put(x, y, facing(dx, dy) > 0 ? STONE[4] : STONE[1]); continue; }
+      // The break: rough, lit and shaded in facets.
+      const n = wash(x, y, 2.5, v.seed) - 0.5;
+      put(x, y, pick(STONE, 3.2 + facing(dx, dy) * (d / r) * 1.4 + n * 2.2));
     }
-    // The broken face, lighter, a pixel below the snow.
-    put(left + i, tops[i], STONE[5]);
-  }
-  // Snow on the break, overhanging a pixel each side, icicles under its lip.
-  for (let i = -1; i <= cw; i++) {
-    const t = tops[Math.max(0, Math.min(cw - 1, i))], depth = i < 0 || i >= cw ? 1 : 2 + (hash(v.seed, i, 1225) % 2);
-    for (let k = 0; k < depth; k++) put(left + i, t - 1 - k + (i < 0 || i >= cw ? 2 : 0), SNOW[k === depth - 1 ? (i < cw / 2 ? 3 : 2) : 1]);
-    if ((i === -1 || i === cw || hash(v.seed, i, 1226) % 4 === 0) && i !== 0) {
-      const n = 1 + (hash(v.seed, i, 1227) % 3), y0 = i < 0 || i >= cw ? t + 2 : t + 1;
-      for (let k = 0; k < n; k++) put(left + i, y0 + k, k === n - 1 ? ICE[3] : ICE[4]);
-    }
-  }
+  snowPatch(p, c - r * 0.25 + (hash01(v.seed, 1221) - 0.5) * r * 0.4, c - r * 0.2, r * (0.38 + hash01(v.seed, 1222) * 0.2), v.seed);
   return p;
 }
 
 function drumPiece(v: VaultPillar): Piece {
-  const R = v.r * ART, len = Math.round(R * 2.2), th = Math.max(6, Math.round(R * 1.1));
-  const w = len + th + 4, p = piece(w, th + 5, Math.floor(w / 2), th + 1);
-  const left = p.ax - Math.floor((len + th / 2) / 2), y0 = p.ay - th;
-  const put = (x: number, y: number, c: number) => { if (x >= 0 && y >= 0 && x < p.w && y < p.h) p.px[y * p.w + x] = rgba(c); };
-  // The body: lit along its top, darker underneath, flutes along it.
-  for (let j = 0; j < th; j++) {
-    const f = (j + 0.5) / th, base = f < 0.3 ? 4 : f < 0.55 ? 3 : f < 0.8 ? 2 : 1, groove = j % 3 === 1;
-    for (let x = left; x < left + len; x++) put(x, y0 + j, STONE[groove ? Math.max(0, base - 1) : base]);
-  }
-  // Snow along its top, ragged.
-  for (let x = left; x < left + len; x++) {
-    const n = 1 + (hash(v.seed, x, 1231) % 3 === 0 ? 1 : 0);
-    for (let k = 0; k < n; k++) put(x, y0 + k - 1, SNOW[k === 0 ? 3 : 2]);
-  }
-  // Its end toward you: a fluted round face, scalloped at the rim.
-  const ex = left + len, rx = th / 2 * 0.55, ry = th / 2, cy = y0 + th / 2;
-  for (let y = Math.floor(cy - ry); y <= Math.ceil(cy + ry); y++)
-    for (let x = Math.floor(ex - rx); x <= Math.ceil(ex + rx); x++) {
-      const dx = (x + 0.5 - ex) / rx, dy = (y + 0.5 - cy) / ry, d = Math.sqrt(dx * dx + dy * dy);
-      const scallop = 1 - 0.08 * Math.max(0, Math.cos(Math.atan2(dy, dx) * 8));
-      if (d > scallop) continue;
-      put(x, y, d > scallop - 0.25 ? STONE[2] : d < 0.3 ? STONE[3] : STONE[(x + y) & 1 ? 4 : 5]);
+  const len = Math.round(v.r * ART * 1.9), wid = Math.max(5, Math.round(v.r * ART * 0.95)), R = Math.ceil(Math.hypot(len, wid) / 2) + 1;
+  const p = square(R), c = R + 0.5, a = (hash01(v.seed, 1231) - 0.5) * 1.4, ca = Math.cos(a), sa = Math.sin(a);
+  // Which way across the drum faces the light.
+  const toLight = facing(-sa, ca) > 0 ? 1 : -1;
+  for (let y = 0; y < p.h; y++)
+    for (let x = 0; x < p.w; x++) {
+      const dx = x + 0.5 - c, dy = y + 0.5 - c, along = dx * ca + dy * sa, across = -dx * sa + dy * ca;
+      if (Math.abs(along) > len / 2 || Math.abs(across) > wid / 2) continue;
+      const u = across / (wid / 2), end = Math.abs(along) > len / 2 - 1.2;
+      // Rounded across its width: brightest toward the light, dark under.
+      let lvl = 3 - u * toLight * 1.6 - Math.abs(u) ** 3 * 1.2;
+      // Flutes run along it.
+      if (Math.round((across + wid) * 1.4) % 3 === 0) lvl -= 0.8;
+      if (end) lvl = along < 0 === facing(ca, sa) < 0 ? lvl + 0.6 : lvl - 1;
+      const q = y * p.w + x;
+      p.px[q] = rgba(pick(STONE, lvl + (dither(x, y) - 0.5) * 0.5));
+      // Snow along its top.
+      if (u * toLight < -0.15 && u * toLight > -0.75 + wash(x, y, 3, v.seed) * 0.3 && !end) p.px[q] = rgba(SNOW[u * toLight < -0.45 ? 3 : 2]);
     }
-  footDrift(p, p.ax, p.ay, len * 0.45, v.seed);
   return p;
 }
 
 /** Rune patterns, three by four: bit k is pixel (k % 3, k / 3 | 0). */
 const GLYPHS = [0b010_111_010_010, 0b101_010_101_000, 0b111_100_111_001, 0b010_101_010_101, 0b110_011_110_000, 0b001_011_101_111, 0b100_110_100_111, 0b010_010_111_101];
 
-/** A slate rune stone: a tall slab rounded at its top, lit on its left, its
- * carvings glowing ice blue down its face, snow on its crown and round its
- * foot. */
+/** A slate rune slab lying flat in the snow, seen from above: bevelled,
+ * its upper and left edges lit and its lower and right in shade, rows of
+ * runes cut into its face glowing ice blue, snow drifted over a corner. */
 export function runePiece(r: RuneStone): Piece {
-  const R = r.r * ART, sw = Math.max(6, Math.round(R * 1.5)), tall = Math.round(R * 3.1);
-  const w = sw + 6, p = piece(w, tall + 4, Math.floor(w / 2), tall + 1, true);
-  const left = p.ax - (sw >> 1), foot = p.ay, half = sw / 2, mid = left + half;
-  const inside = (x: number, y: number) => {
-    if (x < left || x >= left + sw || y > foot || y < foot - tall) return false;
-    const dy = y - (foot - tall + half);
-    return dy >= 0 || (x + 0.5 - mid) ** 2 + dy * dy <= half * half;
-  };
-  for (let y = foot - tall; y <= foot; y++)
-    for (let x = left; x < left + sw; x++) {
-      if (!inside(x, y)) continue;
-      const u = (x + 0.5 - left) / sw, n = wash(x, y, 4, r.seed) - 0.5;
-      p.px[y * p.w + x] = rgba(pick(SLATE, (u < 0.3 ? 3.4 : u < 0.7 ? 2.4 : 1.4) + n * 1.2 + (dither(x, y) - 0.5) * 0.4));
+  const sw = Math.max(11, Math.round(r.r * ART * 1.9)), sh = Math.round(sw * 1.35), R = Math.ceil(Math.hypot(sw, sh) / 2) + 1;
+  const p = square(R, true), c = R + 0.5, a = (hash01(r.seed, 1240) - 0.5) * 0.5, ca = Math.cos(a), sa = Math.sin(a);
+  const local = (x: number, y: number) => { const dx = x + 0.5 - c, dy = y + 0.5 - c; return { u: dx * ca + dy * sa, v: -dx * sa + dy * ca }; };
+  for (let y = 0; y < p.h; y++)
+    for (let x = 0; x < p.w; x++) {
+      const { u, v } = local(x, y), eu = sw / 2 - Math.abs(u), ev = sh / 2 - Math.abs(v);
+      // Chipped corners.
+      if (eu < 0 || ev < 0 || eu + ev < 1.5) continue;
+      const q = y * p.w + x, n = wash(x, y, 4, r.seed) - 0.5;
+      if (Math.min(eu, ev) < 1) p.px[q] = rgba((eu < ev ? facing(u, 0) : facing(0, v)) > 0 ? SLATE[4] : SLATE[0]);
+      else p.px[q] = rgba(pick(SLATE, 2.3 + n * 1.4 + (dither(x, y) - 0.5) * 0.4));
     }
-  // The carvings, a column of runes down the face.
-  const gx = Math.round(mid - 1.5);
-  for (let gy = foot - tall + Math.round(half) + 2, k = 0; gy + 4 < foot - 1; gy += 5, k++) {
-    const g = GLYPHS[hash(r.seed, k, 1241) % GLYPHS.length];
-    for (let b = 0; b < 12; b++) {
-      if (!(g >> (11 - b) & 1)) continue;
-      const x = gx + (b % 3), y = gy + Math.floor(b / 3);
-      if (!inside(x, y)) continue;
-      const q = y * p.w + x;
-      p.px[q] = rgba(RUNE[(x + y) & 1 ? 1 : 0]);
-      p.glow![q] = rgba(RUNE_GLOW[(x + y) & 1 ? 1 : 0]);
+  // The runes, in two columns down the face.
+  const cols = sw >= 12 ? 2 : 1;
+  for (let k = 0, row = 0; row * 5 + 4 <= sh - 4; row++)
+    for (let col = 0; col < cols; col++, k++) {
+      const g = GLYPHS[hash(r.seed, k, 1241) % GLYPHS.length];
+      const u0 = (cols === 2 ? (col ? 1 : -4) : -1.5), v0 = -sh / 2 + 2.5 + row * 5;
+      for (let b = 0; b < 12; b++) {
+        if (!(g >> (11 - b) & 1)) continue;
+        const u = u0 + (b % 3) + 0.5, v = v0 + Math.floor(b / 3) + 0.5;
+        const x = Math.floor(c + u * ca - v * sa), y = Math.floor(c + u * sa + v * ca), q = y * p.w + x;
+        if (x < 0 || y < 0 || x >= p.w || y >= p.h || !p.px[q]) continue;
+        p.px[q] = rgba(RUNE[(x + y) & 1 ? 1 : 0]);
+        p.glow![q] = rgba(RUNE_GLOW[(x + y) & 1 ? 1 : 0]);
+      }
     }
-  }
-  // Snow on its crown.
-  for (let x = left; x < left + sw; x++) {
-    let y = foot - tall;
-    while (y < foot && !inside(x, y)) y++;
-    const n = x === left || x === left + sw - 1 ? 1 : 2;
-    for (let k = 0; k < n; k++) { const q = (y + k) * p.w + x; p.px[q] = rgba(SNOW[k === 0 ? (x < mid ? 3 : 2) : 1]); p.glow![q] = 0; }
-  }
-  footDrift(p, mid, foot + 1, half + 2.5, r.seed);
+  // Snow over one corner.
+  const corner = hash(r.seed, 1242) % 4, su = (corner & 1 ? 1 : -1) * sw / 2, sv = (corner & 2 ? 1 : -1) * sh / 2;
+  snowPatch(p, c + su * ca - sv * sa, c + su * sa + sv * ca, sw * 0.42, r.seed);
   return p;
 }
 
-/** A relic sealed in a block of ice: the block's pale top and clear front,
- * a streak of light across it, and inside it, dimmed blue by the ice, a
- * crown, an urn or a sword; snow drifted against its foot. */
+/** A relic sealed in a block of ice, seen from above: the block's square
+ * top, bevelled bright on its upper and left edges, clear blue inside with
+ * a streak of light across it, and in it, dimmed by the ice, a crown (a
+ * ring of points), an urn (its round body and mouth) or a sword (blade and
+ * crossguard). */
 export function relicPiece(r: Relic): Piece {
-  const S = Math.max(9, Math.round(r.r * ART * 1.6)), lid = Math.max(3, Math.round(S * 0.35)), face = Math.round(S * 0.85);
-  const w = S + 4, p = piece(w, lid + face + 3, Math.floor(w / 2), lid + face, true);
-  const left = p.ax - (S >> 1), top = p.ay - lid - face, fy = top + lid;
-  const put = (x: number, y: number, c: number, g = 0) => { if (x >= 0 && y >= 0 && x < p.w && y < p.h) { p.px[y * p.w + x] = rgba(c); p.glow![y * p.w + x] = g; } };
-  for (let y = top; y < fy; y++) for (let x = left; x < left + S; x++) put(x, y, y === top || x === left ? ICE[5] : x === left + S - 1 ? ICE[3] : dither(x, y) < 0.5 ? ICE[4] : ICE[5]);
-  for (let y = fy; y < fy + face; y++)
-    for (let x = left; x < left + S; x++) {
-      const f = (y - fy) / face, edge = x === left || x === left + S - 1 || y === fy + face - 1;
-      put(x, y, edge ? (x === left ? ICE[3] : ICE[1]) : dither(x, y) < 0.35 + f * 0.3 ? ICE[2] : ICE[3], edge ? 0 : rgba(ICE_GLOW[0]));
+  const S = Math.max(13, Math.round(r.r * ART * 2)), half = S / 2, R = Math.ceil(half) + 1, p = square(R, true), c = R + 0.5;
+  const put = (x: number, y: number, col: number, g = 0) => { if (x >= 0 && y >= 0 && x < p.w && y < p.h) { p.px[y * p.w + x] = rgba(col); p.glow![y * p.w + x] = g; } };
+  for (let y = 0; y < p.h; y++)
+    for (let x = 0; x < p.w; x++) {
+      const dx = x + 0.5 - c, dy = y + 0.5 - c, e = half - Math.max(Math.abs(dx), Math.abs(dy));
+      if (e < 0) continue;
+      const lit = Math.abs(dx) >= Math.abs(dy) ? facing(dx, 0) : facing(0, dy);
+      if (e < 1) put(x, y, lit > 0 ? ICE[5] : ICE[1]);
+      else if (e < 2) put(x, y, lit > 0 ? ICE[4] : ICE[2]);
+      else put(x, y, dither(x, y) < 0.4 ? ICE[3] : ICE[2], rgba(ICE_GLOW[0]));
     }
-  // The relic, seen through the ice.
-  const cx = left + S / 2, by = fy + face - 2, inner = (x: number, y: number, c: number) => {
-    if (x > left && x < left + S - 1 && y > fy && y < fy + face - 1) put(x, y, c, 0);
+  const inner = (x: number, y: number, col: number) => {
+    const dx = x + 0.5 - c, dy = y + 0.5 - c;
+    if (half - Math.max(Math.abs(dx), Math.abs(dy)) >= 2) put(x, y, col);
   };
+  const cx = Math.floor(c), cy = Math.floor(c);
   if (r.kind === "crown") {
-    const half = Math.max(2, Math.round(S * 0.28)), base = by - 1;
-    for (let x = Math.round(cx - half); x <= Math.round(cx + half); x++) {
-      inner(x, base, GOLD[1]); inner(x, base - 1, GOLD[2]);
-      const k = x - Math.round(cx - half);
-      if (k % 2 === 0) { inner(x, base - 2, GOLD[2]); inner(x, base - 3, GOLD[3]); }
+    const rr = Math.max(2.5, S * 0.24);
+    for (let y = 0; y < p.h; y++) for (let x = 0; x < p.w; x++) {
+      const dx = x + 0.5 - c, dy = y + 0.5 - c, d = Math.hypot(dx, dy), a = Math.atan2(dy, dx);
+      const point = Math.cos(a * 5) > 0.6 && d < rr + 1.6;
+      if ((d > rr - 1 && d < rr + 0.6) || (point && d >= rr)) inner(x, y, facing(dx, dy) > 0 ? GOLD[3] : GOLD[1]);
     }
-    inner(Math.round(cx), base - 1, 0x58c0e8);
+    inner(cx, cy, 0x58c0e8);
   } else if (r.kind === "urn") {
-    const ry = Math.max(2, Math.round(face * 0.3)), rx = Math.max(2, Math.round(S * 0.22)), cy = by - ry;
-    for (let y = cy - ry; y <= by; y++) for (let x = Math.round(cx - rx); x <= Math.round(cx + rx); x++) {
-      const dx = (x + 0.5 - cx) / rx, dy = (y + 0.5 - cy) / ry;
-      if (dx * dx + dy * dy <= 1) inner(x, y, dx < -0.2 ? GOLD[3] : dx < 0.4 ? GOLD[2] : GOLD[1]);
+    const rr = Math.max(2.5, S * 0.26);
+    for (let y = 0; y < p.h; y++) for (let x = 0; x < p.w; x++) {
+      const dx = x + 0.5 - c, dy = y + 0.5 - c, d = Math.hypot(dx, dy);
+      if (d < rr) inner(x, y, d < rr * 0.38 ? GOLD[0] : d < rr * 0.6 ? GOLD[2] : pick(GOLD, 2 + facing(dx, dy) * 1.2));
     }
-    for (let k = 1; k <= 2; k++) { inner(Math.round(cx) - 1, cy - ry - k, GOLD[2]); inner(Math.round(cx), cy - ry - k, GOLD[1]); }
-    inner(Math.round(cx) - 2, cy - ry - 3, GOLD[2]); inner(Math.round(cx) + 1, cy - ry - 3, GOLD[1]);
   } else {
-    const x = Math.round(cx) - 1, tip = fy + 2;
-    for (let y = tip; y <= by - 3; y++) { inner(x, y, STEEL[2]); inner(x + 1, y, STEEL[1]); }
-    for (let k = -2; k <= 3; k++) inner(x + k, by - 2, GOLD[2]);
-    inner(x, by - 1, GOLD[1]); inner(x + 1, by - 1, GOLD[0]); inner(x, by, GOLD[3]);
+    const L = Math.round(S * 0.32);
+    for (let k = -L; k <= L; k++) { inner(cx, cy + k, k < L - 2 ? STEEL[2] : GOLD[2]); inner(cx + 1, cy + k, k < L - 2 ? STEEL[1] : GOLD[1]); }
+    for (let k = -2; k <= 3; k++) inner(cx + k, cy + L - 3, GOLD[k < 1 ? 3 : 2]);
   }
-  // A streak of light across the front.
-  for (let k = 0; k < face; k++) { const x = left + 2 + k, y = fy + face - 2 - k; if (x < left + S - 1 && y > fy) put(x, y, ICE[5], rgba(ICE_GLOW[1])); }
-  footDrift(p, p.ax, p.ay + 1, S * 0.6 + 1, r.seed);
+  // A streak of light across the top.
+  for (let k = -half + 3; k < half - 3; k++) put(Math.floor(c + k), Math.floor(c - k - 1), ICE[5], rgba(ICE_GLOW[1]));
   return p;
 }
 
@@ -318,9 +317,9 @@ export function paintIceSheet(img: Img, x: number, y: number, r: number, seed: n
  * foot and its shadow's reach. */
 export function vaultItems(plan: Pick<FrozenVaultPlan, "spires" | "pillars" | "runes" | "relics">) {
   return [
-    ...plan.spires.map((s) => ({ y: s.y, x: s.x, p: () => spirePiece(s), drop: s.r > 1 ? 3 : 2 })),
-    ...plan.pillars.map((v) => ({ y: v.y, x: v.x, p: () => pillarPiece(v), drop: 2 })),
-    ...plan.runes.map((r) => ({ y: r.y, x: r.x, p: () => runePiece(r), drop: 2 })),
+    ...plan.spires.map((s) => ({ y: s.y, x: s.x, p: () => spirePiece(s), drop: s.r > 1 ? 4 : 3 })),
+    ...plan.pillars.map((v) => ({ y: v.y, x: v.x, p: () => pillarPiece(v), drop: v.fallen ? 2 : 4 })),
+    ...plan.runes.map((r) => ({ y: r.y, x: r.x, p: () => runePiece(r), drop: 1 })),
     ...plan.relics.map((r) => ({ y: r.y, x: r.x, p: () => relicPiece(r), drop: 2 })),
   ].sort((a, b) => a.y - b.y || a.x - b.x);
 }

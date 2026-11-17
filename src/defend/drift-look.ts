@@ -1,5 +1,5 @@
 /** What the drifting ground is made of: the Amber Desert's sand, or the
- * Frozen Vault's snow. The two share every shape (the same dunes, trails,
+ * Highlands' snow. The two share every shape (the same dunes, trails,
  * drifts, craters and the things the wind rolls along); only their colours
  * differ. The renderer sets the look for the area it draws
  * (`setDriftLook`), and the dune art, the sand trails and the wilds read it,

@@ -1,4 +1,4 @@
-/** The Frozen Vault (zone 5, area id `frozen`): the open ground outside the
+/** The Highlands (zone 5, area id `frozen`): the open ground outside the
  * walls lies under the desert's dunes in snow (`drift-look.ts`), and out of
  * the drifts stand what is left of the first kings' vault: spires of blue
  * ice, broken fluted pillars and their fallen drums, slate rune stones whose
@@ -13,7 +13,7 @@ import type { AreaId } from "./areas.ts";
 import { clearOf } from "./forest.ts";
 import { trailPlan, type TrailPlan } from "./trails.ts";
 
-/** The areas dressed as the Frozen Vault. */
+/** The areas dressed as the Highlands. */
 export const FROZEN_VAULT_AREAS: readonly AreaId[] = ["frozen"];
 export const hasFrozenVault = (area: AreaId) => FROZEN_VAULT_AREAS.includes(area);
 

@@ -37,7 +37,7 @@ export type Scene = {
   /** The old workings' creaks and rumbles, deep underground. */
   mine: number;
   /** Whose recorded wind carries `wind` (the made wind then only fills in
-   * under it): the green lands', the Frozen Vault's or the desert's;
+   * under it): the green lands', the Highlands' or the desert's;
    * absent, the made wind alone. */
   land?: "forest" | "frozen" | "desert";
 };

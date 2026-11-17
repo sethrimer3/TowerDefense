@@ -365,6 +365,57 @@ function* paintRanges(out: Uint32Array): Steps {
       out[i] = c;
     }
 }
+/** The Highlands' ranges as tall snowy alps, from `rangeFieldSteps`: the
+ * same heights lit more steeply, so each ridge stands sharp, bare
+ * blue-grey rock on the cliffs and lower slopes streaked with gullies, and
+ * snow over everything above a wandering snowline and on every slope too
+ * gentle to shed it, brilliant on the faces toward the light and blue in
+ * the shade, with a bright cornice along the ridges; outlined. */
+let alps: Float32Array | null = null;
+function* paintAlps(out: Uint32Array): Steps {
+  const { H: raw, f } = yield* rangeFieldSteps();
+  // The rock's finest crinkles smoothed into broad faces, then the heights
+  // pulled up into peaks: big massifs, not rubble.
+  const H = alps ??= yield* (function* (): Steps<Float32Array> {
+    const S = yield* blurred(raw, GW, GH, 5);
+    const ridge = (x: number, y: number, salt: number) => 1 - Math.abs(2 * smoothNoise(x, y, salt) - 1);
+    for (let Y = 0; Y < GH; Y++, Y % SLICE || (yield))
+      for (let X = 0; X < GW; X++) {
+        const i = Y * GW + X;
+        if (f[i] <= 0) { S[i] = 0; continue; }
+        // Great sharp ridges (arêtes) running between the peaks, and the
+        // peaks rising where they meet.
+        const big = ridge((X * 0.8 + Y * 0.6) / 170, (Y * 0.8 - X * 0.6) / 170, 1314), mid = ridge((X * 0.5 - Y * 0.87) / 70, (Y * 0.5 + X * 0.87) / 70, 1315);
+        const rise = smooth(0, 0.3, f[i]);
+        S[i] = S[i] * 0.45 + (230 * big ** 3 + 70 * mid ** 2 * big) * rise + 20 * rise;
+      }
+    return S;
+  })();
+  const rock = [0x161b26, 0x232a38, 0x333c4e, 0x465166, 0x5c6880, 0x76839c].map((c) => rgbaOf(c));
+  const snow = [0x5470a2, 0x7490c0, 0x9cb4da, 0xc6d6ee, 0xe8f0fb, 0xffffff].map((c) => rgbaOf(c));
+  const edge = sceneryOutlinesOn() ? rgbaOf(0x101522) : rock[1];
+  const inR = (X: number, Y: number) => X >= 0 && Y >= 0 && X < GW && Y < GH && f[Y * GW + X] > 0;
+  for (let Y = 0; Y < GH; Y++, Y % SLICE || (yield))
+    for (let X = 0; X < GW; X++) {
+      const i = Y * GW + X;
+      if (f[i] <= 0) continue;
+      if (!inR(X - 1, Y) || !inR(X + 1, Y) || !inR(X, Y - 1) || !inR(X, Y + 1)) { out[i] = edge; continue; }
+      const gx = H[i + 1] - H[i - 1], gy = H[i + GW] - H[i - GW], steep = Math.hypot(gx, gy);
+      const d = (((X & 3) * 4 + (Y & 3) * 7) % 16 / 16 - 0.5);
+      // Lit steeply: the faces toward the upper left bright, away dark.
+      const k = (0.6 * gx + 0.8 * gy) / (1 + steep * 0.15) * 0.9 + d * 0.25;
+      // Snow everywhere but the steepest faces turned from the light, and
+      // the lower slopes' bare patches below a wandering snowline.
+      const line = 30 + smoothNoise(X / 40, Y / 40, 1311) * 40;
+      const bare = steep > 5.5 - (k < -0.3 ? 2.2 : 0) + d * 1.2 || (H[i] < line && smoothNoise(X / 10, Y / 10, 1312) > 0.62);
+      if (!bare) out[i] = k > 1.1 ? snow[5] : k > 0.45 ? snow[4] : k > -0.05 ? snow[3] : k > -0.55 ? snow[2] : k > -1.2 ? snow[1] : snow[0];
+      else {
+        const gully = smoothNoise(X / 3, Y / 22, 1313) > 0.7;
+        const c = k > 0.9 ? 5 : k > 0.35 ? 4 : k > -0.1 ? 3 : k > -0.6 ? 2 : k > -1.2 ? 1 : 0;
+        out[i] = rock[Math.max(0, c - (gully ? 1 : 0))];
+      }
+    }
+}
 /** Moab's sandstone, a stratum a step of height up the ranges: dark red
  * mudstone at the foot, red-orange cliff sandstone, bright orange slickrock,
  * then buff and cream caprock on the heights (RGB). */
@@ -712,7 +763,7 @@ function wildForge(): WildForge {
     }
   return (forgeWilds = out);
 }
-/** The Frozen Vault's pieces out in the snow past the field, thinning out
+/** The Highlands' pieces out in the snow past the field, thinning out
  * further off, never on the mountains, the field or each other. */
 type WildVault = Pick<FrozenVaultPlan, "spires" | "pillars" | "runes" | "relics" | "sheets">;
 let vaultWilds: WildVault | null = null;
@@ -878,10 +929,8 @@ export function* paintWildsSteps(forest: boolean, stone?: Stone, reach: readonly
     for (const w of woods.wells) paintWell(img, glow, w.x * ART + OX, w.y * ART + OY, w.r, w.seed, offField);
     yield* deepCanopy(out, GW, GH, OX, OY, (X, Y) => offField(X, Y) && beyond(Math.floor((X - OX) / ART), Math.floor((Y - OY) / ART)) > WOOD_DEEP + smoothNoise((X - OX) / 60, (Y - OY) / 60, 1411) * 8, SLICE);
   }
-  if (moab) yield* paintMesas(out); else if (basalt) yield* paintBasalt(out); else if (volcano) yield* paintVolcano(out, glow!.px); else if (!wood) yield* paintRanges(out);
-  // The Vault's ranges in its icy stone, snow on their gentle slopes, before
-  // its own pieces stand in front of them.
-  if (vault && stone) recolour(out, GW, stone);
+  if (moab) yield* paintMesas(out); else if (basalt) yield* paintBasalt(out); else if (volcano) yield* paintVolcano(out, glow!.px); else if (vault) yield* paintAlps(out); else if (!wood) yield* paintRanges(out);
+
   // Rocks, back to front, each with its shadow down and right.
   const items: { y: number; draw: () => void }[] = [];
   // The forge's own basalt boulders and pieces, standing as on the field.
@@ -1061,7 +1110,7 @@ export type WildsFrame = {
   caves?: { trails: TrailPlan | null; day: number } | null;
   /** The Ember Forge's trails, carried on out here through the cinders. */
   forge?: { trails: TrailPlan | null } | null;
-  /** The Frozen Vault's trails, which its pieces out here keep clear of. */
+  /** The Highlands' trails, which its pieces out here keep clear of. */
   vault?: { trails: TrailPlan | null } | null;
   /** The day's colour washed over the board (soft light), so the wilds take it too. */
   tint?: { color: string; strength: number };

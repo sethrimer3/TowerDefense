@@ -808,7 +808,7 @@ export class DefendRenderer {
       this.drawFaces();
       paintSpikePoints(ctx, this.px, map, sim);
     }
-    // The Frozen Vault's ice, pillars, rune stones and relics, standing out
+    // The Highlands' ice, pillars, rune stones and relics, standing out
     // of the snow (in front of the wall's hanging faces).
     const vault = this.vaultShare();
     if (vault > 0) {
@@ -1056,7 +1056,7 @@ export class DefendRenderer {
     return now + (this.previousArea && hasFrozenVault(this.previousArea) ? 1 - this.areaMix : 0);
   }
 
-  /** The Frozen Vault's runes and ice, shining over the battle's darkness. */
+  /** The Highlands' runes and ice, shining over the battle's darkness. */
   private drawVaultGlow(opts: DrawOptions) {
     const alpha = this.vaultShare();
     if (alpha <= 0) return;
