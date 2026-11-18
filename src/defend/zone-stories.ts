@@ -93,14 +93,14 @@ export const ZONE_STORIES: Partial<Record<AreaId, ZoneStory>> = {
     signature: "Master Alchemist Orrin",
   },
   obsidian: {
-    title: "A Letter from the Crypt Keeper",
+    title: "A Letter from Scout Edda",
     greeting: "Your Majesty,",
     paragraphs: [
-      "The dead are restless in the Obsidian Crypt. Lids have slid from tombs that were sealed for a thousand years.",
-      "I will not hide the worst of it from you. Your father's tomb stands open, and the black glass around it is warm to the touch.",
-      "Whatever walks these halls now, it is not him. Remember him as he was, and do not hesitate.",
+      "We followed the Blight down into the black glass under the mountains. What we took for a crypt is a palace, and it belongs to the Dark One's son, the Blight Prince.",
+      "His masons have cut halfway through the cave. Gold veins run through the obsidian, polished into floors and pillars, and violet fire burns before an empty throne.",
+      "The rest is raw rock and scaffolding. Strike before his halls are finished, while the Prince is still away.",
     ],
-    signature: "Brother Aldous, Keeper of the Crypt",
+    signature: "Your scout, Edda",
   },
   astral: {
     title: "From the Alchemist's Journal",

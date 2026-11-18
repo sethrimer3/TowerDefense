@@ -195,7 +195,7 @@ Fungal Hollow creatures: a crawler trailing spores, a heavy fungus that regenera
 Violet Geode creatures: a crab whose crystal shell resists physical attacks but is vulnerable to explosions, a swift flying moth and a brood that releases three shardlings when destroyed.
 
 **Crypt Hound** and **Grave Wisp**:
-Obsidian Crypt creatures: a swift ground hunter and a flying spirit that regenerates lost health.
+Obsidian Palace creatures: a swift ground hunter and a flying spirit that regenerates lost health.
 
 **Nova Moth**:
 A luminous Astral Sanctuary flier that releases two star wisps when destroyed.
@@ -864,6 +864,12 @@ Zone 6 (waves 101–120, id `fungal`, once the Fungal Hollow): an old misty fore
 
 **Mist**:
 The Mistwood's weather. It rolls in from the board's edges once the zone's battle starts and is cleared for a few seconds wherever an area attack (a blast, a frost burst) lands. Where it lies thick, things in it are hidden (for the mist creatures still to come).
+
+**Blight Prince**:
+The Dark One's son. His palace is the Obsidian Palace (zone 8, waves 141–160).
+
+**Obsidian Palace**:
+Zone 8's ground, once the Obsidian Crypt: the Blight Prince's throne room, an obsidian cave veined with gold that has been halfway turned into a palace. Polished slabs, a carpet, a colonnade and his throne toward the north edge; raw rock, monoliths, quarried blocks and shards to the south.
 
 **Sky island**:
 The Astral Sanctuary's ground (zone 9, waves 161–180): an island floating in open sky. Its land grows round wherever the keep stands, lush meadow near the keep and drier, barer ground toward the far edges, and past the board it bulges out on the keep's side before breaking off over the clouds.
