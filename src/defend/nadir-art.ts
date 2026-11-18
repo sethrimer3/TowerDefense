@@ -101,11 +101,11 @@ export function* fillVoidstone(out: Uint32Array, w: number, h: number, ox: numbe
 /** A piece that stands up from the ground: `ht` is how high each pixel is
  * (0..1), which sets how long its shadow is there. */
 export type Tall = Piece & Img & { ht: Float32Array };
-function tall(w: number, h: number, ax: number, ay: number, glows = false): Tall {
+export function tall(w: number, h: number, ax: number, ay: number, glows = false): Tall {
   const p = piece(w, h, ax, ay, glows);
   return Object.assign(p, { ht: new Float32Array(p.w * p.h) });
 }
-const set = (p: Tall, x: number, y: number, c: number, ht = 0, glow = 0) => {
+export const setTall = (p: Tall, x: number, y: number, c: number, ht = 0, glow = 0) => {
   x = Math.floor(x); y = Math.floor(y);
   if (x < 0 || y < 0 || x >= p.w || y >= p.h) return;
   const i = y * p.w + x;
@@ -118,7 +118,7 @@ const set = (p: Tall, x: number, y: number, c: number, ht = 0, glow = 0) => {
  * `glow`): first its shadow, thrown `len` pixels (times each pixel's
  * height, plus one) toward (`sx`, `sy`), then its outline (while scenery
  * outlines are on), then the piece itself; only on pixels `ok` allows. */
-export function standToward(img: Img, glow: Img | null, p: Tall, x: number, y: number, ok: (X: number, Y: number) => boolean, sx: number, sy: number, len: number) {
+export function standToward(img: Img, glow: Img | null, p: Tall, x: number, y: number, ok: (X: number, Y: number) => boolean, sx: number, sy: number, len: number, dark = 0.38) {
   const x0 = Math.round(x) - p.ax, y0 = Math.round(y) - p.ay, ink = sceneryOutlinesOn() ? rgba(INK) : 0;
   const at = (i: number, j: number) => (i >= 0 && j >= 0 && i < p.w && j < p.h ? p.px[j * p.w + i] : 0);
   const shade = new Set<number>();
@@ -134,7 +134,7 @@ export function standToward(img: Img, glow: Img | null, p: Tall, x: number, y: n
     }
   for (const q of shade) {
     const X = q % img.w, Y = (q - X) / img.w;
-    if (ok(X, Y)) img.px[q] = darken(img.px[q], (X + Y) & 1 ? 0.38 : 0.46);
+    if (ok(X, Y)) img.px[q] = darken(img.px[q], (X + Y) & 1 ? dark : dark + 0.08);
   }
   for (let j = -1; j <= p.h; j++)
     for (let i = -1; i <= p.w; i++) {
@@ -165,10 +165,10 @@ export function pyramidPiece(py: Pyramid): Tall {
       tone = Math.max(0, Math.min(5, tone + (bayer(i, j) - 0.5 > 0.3 && tone > 0 && tone < 5 ? -1 : 0)));
       let c = STONE[tone], g = 0;
       if (ht > 0.15 && ht < 0.75 && Math.abs(ax - ay) > 1.2 && hash(py.seed, i, j, 1514) % 14 === 0) { c = RED[0]; g = RED[0]; }
-      set(p, p.ax - Math.floor(half) + i, p.ay - Math.floor(half) + j, c, ht, g);
+      setTall(p, p.ax - Math.floor(half) + i, p.ay - Math.floor(half) + j, c, ht, g);
     }
   const m = Math.floor(half) - 1;
-  for (const [i, j] of [[0, 0], [1, 0], [0, 1], [1, 1]]) set(p, p.ax - Math.floor(half) + m + i, p.ay - Math.floor(half) + m + j, i + j === 0 ? RED[2] : RED[1], 1, RED[2]);
+  for (const [i, j] of [[0, 0], [1, 0], [0, 1], [1, 1]]) setTall(p, p.ax - Math.floor(half) + m + i, p.ay - Math.floor(half) + m + j, i + j === 0 ? RED[2] : RED[1], 1, RED[2]);
   return p;
 }
 
@@ -199,7 +199,7 @@ export function stairPiece(s: Stair): Tall {
       // The side rails, lit on whichever side faces the upper left.
       if (edge) tone = (side ? Y < h / 2 : X < w / 2) ? 4 : 0;
       const c = tone < 0 ? RED[0] : STONE[Math.max(0, Math.min(5, tone))];
-      set(p, p.ax - Math.floor(w / 2) + X, p.ay - Math.floor(h / 2) + Y, c, s.sinks ? 0 : (k + 1) / s.steps, glow);
+      setTall(p, p.ax - Math.floor(w / 2) + X, p.ay - Math.floor(h / 2) + Y, c, s.sinks ? 0 : (k + 1) / s.steps, glow);
     }
   return p;
 }
@@ -217,11 +217,11 @@ export function doorPiece(d: Trapdoor): Tall {
       else if (i % 3 === 0) c = WOOD[0];
       else c = hash(d.seed, i, j, 1534) % 7 === 0 ? WOOD[1] : WOOD[(i % 3 === 1 ? 3 : 2) - ((i / 3) | 0) % 2];
       const [X, Y] = d.turned ? [j, cw - 1 - i] : [i, j];
-      set(p, p.ax - Math.floor(w / 2) + X, p.ay - Math.floor(h / 2) + Y, c, 0.15, g);
+      setTall(p, p.ax - Math.floor(w / 2) + X, p.ay - Math.floor(h / 2) + Y, c, 0.15, g);
     }
   // The ring.
   const rx = d.turned ? 8 : 8, ry = d.turned ? 4 : 8;
-  for (const [i, j] of [[0, -1], [-1, 0], [1, 0], [0, 1]]) set(p, p.ax - Math.floor(w / 2) + rx + i, p.ay - Math.floor(h / 2) + ry + j, IRON[3], 0.2);
+  for (const [i, j] of [[0, -1], [-1, 0], [1, 0], [0, 1]]) setTall(p, p.ax - Math.floor(w / 2) + rx + i, p.ay - Math.floor(h / 2) + ry + j, IRON[3], 0.2);
   return p;
 }
 
