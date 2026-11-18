@@ -864,3 +864,9 @@ Zone 6 (waves 101–120, id `fungal`, once the Fungal Hollow): an old misty fore
 
 **Mist**:
 The Mistwood's weather. It rolls in from the board's edges once the zone's battle starts and is cleared for a few seconds wherever an area attack (a blast, a frost burst) lands. Where it lies thick, things in it are hidden (for the mist creatures still to come).
+
+**Sky island**:
+The Astral Sanctuary's ground (zone 9, waves 161–180): an island floating in open sky. Its land grows round wherever the keep stands, lush meadow near the keep and drier, barer ground toward the far edges, and past the board it bulges out on the keep's side before breaking off over the clouds.
+
+**Islet**:
+A little piece of land floating in the Astral Sanctuary's sky, or hovering over its meadow.

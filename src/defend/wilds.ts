@@ -45,6 +45,8 @@ import { boulderPiece, crownPiece, fillMoss, paintWell, pieceItems, deepCanopy }
 import { hasMistwood, type AncientTree, type MistwoodPlan, type Moonwell } from "./mistwood.ts";
 import { hasNadir } from "./nadir.ts";
 import { voidWildsSteps } from "./nadir-art.ts";
+import { hasAstral } from "./astral.ts";
+import { skyWildsSteps } from "./astral-art.ts";
 import { driftLook } from "./drift-look.ts";
 import { duneHeights, duneLightKey, duneTaperPixels, duneTile, warmDuneTaper } from "./atmosphere-art.ts";
 import { segmentDistance, type TrailLine, type TrailPlan } from "./trails.ts";
@@ -867,8 +869,8 @@ const rgbaOf = (c: number) => ((255 << 24) | ((c & 0xff) << 16) | (c & 0xff00) |
  * those under a tree's shadow. */
 export const paintWilds = (...args: Parameters<typeof paintWildsSteps>) => drain(paintWildsSteps(...args));
 /** `paintWilds` a slice at a time: each `next()` paints some rows. */
-export function* paintWildsSteps(forest: boolean, stone?: Stone, reach: readonly TrailLine[] = [], rocks = true, look: "ranges" | "moab" | "basalt" | "volcano" | "mistwood" | "vault" | "void" = "ranges"): Steps<Painted> {
-  const moab = look === "moab", basalt = look === "basalt", volcano = look === "volcano", wood = look === "mistwood", vault = look === "vault", voids = look === "void";
+export function* paintWildsSteps(forest: boolean, stone?: Stone, reach: readonly TrailLine[] = [], rocks = true, look: "ranges" | "moab" | "basalt" | "volcano" | "mistwood" | "vault" | "void" | "sky" = "ranges", keep: { x: number; y: number } = { x: CELLS_W / 2, y: CELLS_H / 2 }): Steps<Painted> {
+  const moab = look === "moab", basalt = look === "basalt", volcano = look === "volcano", wood = look === "mistwood", vault = look === "vault", voids = look === "void", sky = look === "sky";
   const out = new Uint32Array(GW * GH), whole = wildsPlan();
   // The trees and rocks clear of the roads carried out here.
   const plan: WildsPlan = reach.length
@@ -903,7 +905,7 @@ export function* paintWildsSteps(forest: boolean, stone?: Stone, reach: readonly
   const bare = basalt ? out.slice() : null;
   // The Ember Forge's cinders carried on past the board, its fissures and
   // pools in them, and what glows of it kept apart for the night.
-  const glow: Img | null = volcano || wood || vault || voids ? { px: new Uint32Array(GW * GH), w: GW, h: GH } : null;
+  const glow: Img | null = volcano || wood || vault || voids || sky ? { px: new Uint32Array(GW * GH), w: GW, h: GH } : null;
   const img: Img = { px: out, w: GW, h: GH };
   const offField = (X: number, Y: number) => !(X >= OX && Y >= OY && X < OX + BW && Y < OY + BH);
   const allForge = volcano ? wildForge() : null;
@@ -933,7 +935,10 @@ export function* paintWildsSteps(forest: boolean, stone?: Stone, reach: readonly
   // Nadir: the field's ground breaking off over the void, pieces of it
   // floating out there (no mountains, no rocks).
   if (voids) yield* voidWildsSteps(out, glow!.px, GW, GH, OX, OY, BW, BH, MARGIN, SLICE);
-  if (moab) yield* paintMesas(out); else if (basalt) yield* paintBasalt(out); else if (volcano) yield* paintVolcano(out, glow!.px); else if (vault) yield* paintAlps(out); else if (!wood && !voids) yield* paintRanges(out);
+  // The Astral Sanctuary: the island carried on round the keep, breaking
+  // off over open sky, islets floating out there.
+  if (sky) yield* skyWildsSteps(out, glow!.px, GW, GH, OX, OY, BW, BH, MARGIN, SLICE, keep);
+  if (moab) yield* paintMesas(out); else if (basalt) yield* paintBasalt(out); else if (volcano) yield* paintVolcano(out, glow!.px); else if (vault) yield* paintAlps(out); else if (!wood && !voids && !sky) yield* paintRanges(out);
 
   // Rocks, back to front, each with its shadow down and right.
   const items: { y: number; draw: () => void }[] = [];
@@ -1116,6 +1121,8 @@ export type WildsFrame = {
   forge?: { trails: TrailPlan | null } | null;
   /** The Highlands' trails, which its pieces out here keep clear of. */
   vault?: { trails: TrailPlan | null } | null;
+  /** The Astral Sanctuary's keep (cells, whole), round which its island grows. */
+  sky?: { keep: { x: number; y: number } } | null;
   /** The day's colour washed over the board (soft light), so the wilds take it too. */
   tint?: { color: string; strength: number };
   /** How dark the board's own night is at its edge (its ambient's opacity),
@@ -1219,36 +1226,41 @@ export class Wilds {
   private overhang = new WeakMap<ForestPlan, ForestTree[]>();
 
   private groundsArt = "";
+  /** The Astral Sanctuary's island last drawn. */
+  private lastSky: Ground | null = null;
 
   /** A ground being painted ahead (`prepare`), by its key in `grounds`. */
   private pending: { key: string; art: string; steps: Steps<Ground> } | null = null;
 
-  private groundKey(forest: boolean, area: AreaId, roads: TrailPlan | null) {
+  private groundKey(forest: boolean, area: AreaId, roads: TrailPlan | null, keep?: { x: number; y: number }) {
+    // The Astral Sanctuary's island grows round the keep: one painting for
+    // each place it stands.
+    if (hasAstral(area)) return { key: `sky:${keep ? `${keep.x},${keep.y}` : ""}`, reach: null };
     const caves = area === "drowned", forge = hasEmberForge(area), vault = hasFrozenVault(area), trailed = forest || caves || forge || vault;
     const reach = trailed && roads ? this.reach(roads) : null;
     return { key: trailed ? `${forest ? "forest" : caves ? "caves" : forge ? "forge" : "vault"}:${reach?.key ?? ""}` : area, reach };
   }
 
-  private ground(forest: boolean, area: AreaId, roads: TrailPlan | null = null) {
+  private ground(forest: boolean, area: AreaId, roads: TrailPlan | null = null, keep?: { x: number; y: number }) {
     // Repainted when the art changes (scenery outlines turned on or off).
     if (pixelKey() !== this.groundsArt) { this.groundsArt = pixelKey(); this.grounds.clear(); }
-    const { key, reach } = this.groundKey(forest, area, roads);
+    const { key, reach } = this.groundKey(forest, area, roads, keep);
     const g = this.grounds.get(key);
     if (g) return g;
     // Finished now if it was being painted ahead.
     const p = this.pending;
     this.pending = null;
-    return this.keep(key, forest, area, drain(p && p.key === key && p.art === pixelKey() ? p.steps : this.groundSteps(forest, area, reach)));
+    return this.keep(key, forest, area, drain(p && p.key === key && p.art === pixelKey() ? p.steps : this.groundSteps(forest, area, reach, keep)));
   }
 
   /** Paints the ground `ground` would for (`forest`, `area`, `roads`) ahead
    * of need, for about `ms` milliseconds a call. Whether any is left. */
-  prepare(forest: boolean, area: AreaId, roads: TrailPlan | null, ms: number) {
+  prepare(forest: boolean, area: AreaId, roads: TrailPlan | null, ms: number, keep?: { x: number; y: number }) {
     if (typeof document === "undefined") return false;
     if (pixelKey() !== this.groundsArt) { this.groundsArt = pixelKey(); this.grounds.clear(); }
-    const { key, reach } = this.groundKey(forest, area, roads);
+    const { key, reach } = this.groundKey(forest, area, roads, keep);
     if (this.grounds.has(key)) return false;
-    if (!this.pending || this.pending.key !== key || this.pending.art !== pixelKey()) this.pending = { key, art: pixelKey(), steps: this.groundSteps(forest, area, reach) };
+    if (!this.pending || this.pending.key !== key || this.pending.art !== pixelKey()) this.pending = { key, art: pixelKey(), steps: this.groundSteps(forest, area, reach, keep) };
     const p = this.pending, end = performance.now() + ms;
     do {
       const r = p.steps.next();
@@ -1263,15 +1275,15 @@ export class Wilds {
 
   private keep(key: string, forest: boolean, area: AreaId, g: Ground) {
     // Only the current city's roads are kept.
-    const prefix = forest ? "forest:" : area === "drowned" ? "caves:" : hasEmberForge(area) ? "forge:" : hasFrozenVault(area) ? "vault:" : null;
+    const prefix = forest ? "forest:" : area === "drowned" ? "caves:" : hasEmberForge(area) ? "forge:" : hasFrozenVault(area) ? "vault:" : hasAstral(area) ? "sky:" : null;
     if (prefix) for (const k of [...this.grounds.keys()]) if (k.startsWith(prefix)) this.grounds.delete(k);
     this.grounds.set(key, g);
     return g;
   }
 
-  private *groundSteps(forest: boolean, area: AreaId, reach: { lines: TrailLine[] } | null): Steps<Ground> {
+  private *groundSteps(forest: boolean, area: AreaId, reach: { lines: TrailLine[] } | null, keep?: { x: number; y: number }): Steps<Ground> {
     const caves = area === "drowned";
-    const painted = yield* paintWildsSteps(forest, forest ? undefined : STONES[area], reach?.lines ?? [], area !== "desert" && area !== "frozen" && !caves && !hasNadir(area), area === "desert" ? "moab" : caves ? "basalt" : hasEmberForge(area) ? "volcano" : hasMistwood(area) ? "mistwood" : hasFrozenVault(area) ? "vault" : hasNadir(area) ? "void" : "ranges");
+    const painted = yield* paintWildsSteps(forest, forest ? undefined : STONES[area], reach?.lines ?? [], area !== "desert" && area !== "frozen" && !caves && !hasNadir(area) && !hasAstral(area), area === "desert" ? "moab" : caves ? "basalt" : hasEmberForge(area) ? "volcano" : hasMistwood(area) ? "mistwood" : hasFrozenVault(area) ? "vault" : hasNadir(area) ? "void" : hasAstral(area) ? "sky" : "ranges", keep);
     const canvas = document.createElement("canvas");
     canvas.width = GW;
     canvas.height = GH;
@@ -1447,9 +1459,9 @@ export class Wilds {
     // (`settleWilds`), and nothing past the board is drawn until it's done.
     if (deferring) {
       const roads = f.forest?.plan.roads ?? f.caves?.trails ?? f.forge?.trails ?? f.vault?.trails ?? null;
-      if (this.prepare(forest, f.area, roads, 0)) {
+      if (this.prepare(forest, f.area, roads, 0, f.sky?.keep)) {
         waiting.set(this, (end) => {
-          while (this.prepare(forest, f.area, roads, Math.max(0, end - performance.now()))) if (performance.now() >= end) return true;
+          while (this.prepare(forest, f.area, roads, Math.max(0, end - performance.now()), f.sky?.keep)) if (performance.now() >= end) return true;
           return false;
         });
         ctx.restore();
@@ -1457,7 +1469,11 @@ export class Wilds {
       }
     }
     const sand = f.sand ? this.sand(f.sand.trails) : null;
-    const g = this.ground(forest, f.area, f.forest?.plan.roads ?? f.caves?.trails ?? f.forge?.trails ?? f.vault?.trails ?? null);
+    // When the Astral Sanctuary's keep moves, its island is repainted a
+    // slice a frame, the old one shown meanwhile.
+    const g = (f.sky && this.lastSky && this.prepare(forest, f.area, null, 6, f.sky.keep) ? this.lastSky : null)
+      ?? this.ground(forest, f.area, f.forest?.plan.roads ?? f.caves?.trails ?? f.forge?.trails ?? f.vault?.trails ?? null, f.sky?.keep);
+    this.lastSky = f.sky ? g : null;
     if (f.beyond) {
       // The still ground (the fill, the flagstones, the dunes and the
       // mountains) only changes with the camera, the screen or the art:
@@ -1471,14 +1487,14 @@ export class Wilds {
         const c = canvas.getContext("2d")!;
         c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.globalCompositeOperation = "source-over"; c.imageSmoothingEnabled = false;
         c.fillStyle = f.beyond; c.fillRect(0, 0, cw, ch);
-        if (!forest && !hasNadir(f.area)) this.floor(c, f, view, toX, toY, k);
+        if (!forest && !hasNadir(f.area) && !hasAstral(f.area)) this.floor(c, f, view, toX, toY, k);
         if (sand) blitTo(c, sand, view);
         blitTo(c, g.canvas, view);
         base = this.baseCache = { key, ground: g, canvas };
       }
       ctx.drawImage(base.canvas, 0, 0);
     } else {
-      if (!forest && !hasNadir(f.area)) this.floor(ctx, f, view, toX, toY, k);
+      if (!forest && !hasNadir(f.area) && !hasAstral(f.area)) this.floor(ctx, f, view, toX, toY, k);
       if (sand) blit(sand, view);
       blit(g.canvas, view);
     }
