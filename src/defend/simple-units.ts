@@ -17,6 +17,7 @@ import { drawSprite } from "./damage-art.ts";
  * handful of fills. Presentation only. */
 import { ENEMIES, enemySize } from "./catalog.ts";
 import { blightDrawnPixels } from "./blight-size.ts";
+import { gaitPosition } from "./blight-gait.ts";
 import type { Enemy, Soldier } from "./sim.ts";
 import type { UnitInks } from "./unit-outline.ts";
 
@@ -80,9 +81,9 @@ function queue(px: number, k: number, x: number, y: number, size: number, color:
 
 /** Enemies as squares, gold-outlined while marked, white while struck.
  * With `rims`, the outlines go there (merged outlines, `unit-outline.ts`). */
-export function drawSimpleEnemies({ c, px }: Brush, enemies: readonly Enemy[], rims = c, inks?: UnitInks, rimFor?: (color: string) => CanvasRenderingContext2D) {
+export function drawSimpleEnemies({ c, px }: Brush, enemies: readonly Enemy[], rims = c, inks?: UnitInks, rimFor?: (color: string) => CanvasRenderingContext2D, time?: number) {
   const k = artPixel(px);
-  drawDarklingBodies({ c, px }, enemies, false);
+  drawDarklingBodies({ c, px }, enemies, false, time);
   for (const e of enemies) {
     const def = ENEMIES[e.kind];
     if (def.darkPixels) continue;
@@ -107,19 +108,21 @@ export function drawSimpleTroops({ c, px }: Brush, soldiers: readonly Soldier[],
 }
 
 /** Fill pixel bodies as one union. Separate antialiased fillRect calls can
- * leave faint seams where two flush bodies meet under a fractional camera. */
-export function drawDarklingBodies({ c, px }: Brush, enemies: readonly Enemy[], sourceArt = true) {
+ * leave faint seams where two flush bodies meet under a fractional camera.
+ * With a battle `time`, Darklings lurch (`blight-gait.ts`). */
+export function drawDarklingBodies({ c, px }: Brush, enemies: readonly Enemy[], sourceArt = true, time?: number) {
   c.fillStyle = "#000000"; c.beginPath();
   const replacements = sourceArt && DARKLING_SOURCES.some(hasArtOverride);
   let any = false;
   for (const e of enemies) {
     if (!ENEMIES[e.kind].darkPixels || e.raidProxy || !wormBodyVisible(e)) continue;
     const d = px / ART * blightDrawnPixels(e.kind)!;
+    const { x, y } = gaitPosition(e, time);
     if (replacements && hasArtOverride(basicName(e.kind, true))) {
-      drawSprite(c, basicUnitSprite(e.kind, true), e.x * px - d / 2, e.y * px - d / 2, d, d);
+      drawSprite(c, basicUnitSprite(e.kind, true), x * px - d / 2, y * px - d / 2, d, d);
       continue;
     }
-    c.rect(e.x * px - d / 2, e.y * px - d / 2, d, d); any = true;
+    c.rect(x * px - d / 2, y * px - d / 2, d, d); any = true;
   }
   if (any) c.fill();
 }
