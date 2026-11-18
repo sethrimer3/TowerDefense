@@ -95,6 +95,8 @@ import { NadirArt } from "./nadir-art.ts";
 import { hasNadir } from "./nadir.ts";
 import { AstralArt } from "./astral-art.ts";
 import { hasAstral, keepCenter } from "./astral.ts";
+import { PalaceArt } from "./palace-art.ts";
+import { hasPalace } from "./palace.ts";
 import { crystalCavesPlan, hasCrystalCaves, shaftLight } from "./crystal-caves.ts";
 import { EmberForgeArt } from "./ember-forge-art.ts";
 import { emberForgePlan, hasEmberForge } from "./ember-forge.ts";
@@ -215,6 +217,7 @@ export class DefendRenderer {
   readonly forge = new EmberForgeArt();
   readonly nadir = new NadirArt();
   readonly astral = new AstralArt();
+  readonly palace = new PalaceArt();
   readonly vault = new FrozenVaultArt();
   /** The battle time the wizard art last advanced to. */
   private wizardTime = 0;
@@ -603,6 +606,7 @@ export class DefendRenderer {
     this.drawVaultGlow(opts);
     this.drawNadirGlow(opts);
     this.drawAstralGlow(opts);
+    this.drawPalaceGlow(opts);
     this.drawMistwood(sim, opts);
     // The mountains' long shadows past the board, over the field too (the
     // Mistwood has none: its wilds are forest; nor the Nadir, over the void).
@@ -669,7 +673,7 @@ export class DefendRenderer {
    * doesn't stall as it crosses over. */
   private ahead: { map: CityMap; area: AreaId; run: (ms: number) => void } | null = null;
   private prepareNext(map: CityMap, sim: DefendSim, opts: DrawOptions) {
-    const covered = (a: AreaId) => hasForest(a) || hasMagicForest(a) || hasCrystalCaves(a) || hasEmberForge(a) || hasMistwood(a) || hasNadir(a) || hasAstral(a);
+    const covered = (a: AreaId) => hasForest(a) || hasMagicForest(a) || hasCrystalCaves(a) || hasEmberForge(a) || hasMistwood(a) || hasNadir(a) || hasAstral(a) || hasPalace(a);
     if (sim.unitTester) return;
     // Through the last two waves before it.
     const soon = areaForWave(sim.wave + 1).id, area = soon !== this.area ? soon : areaForWave(sim.wave + 2).id;
@@ -690,7 +694,7 @@ export class DefendRenderer {
       // them on both sides of the crossing (they show through its fade).
       else if (phase === 2) more = !(covered(area) && covered(this.area)) && this.relief.prepare(map, this.px, this.board.W, this.board.H, area, ms);
       // The Crystal Caves' floor.
-      else if (phase === 3) more = (hasCrystalCaves(area) && this.caves.prepare(map, ms)) || (hasEmberForge(area) && this.forge.prepare(map, ms)) || (hasMistwood(area) && this.mistwood.prepare(map, ms)) || (hasFrozenVault(area) && this.vault.prepare(map, ms)) || (hasNadir(area) && this.nadir.prepare(map, ms)) || (hasAstral(area) && this.astral.prepare(map, ms));
+      else if (phase === 3) more = (hasCrystalCaves(area) && this.caves.prepare(map, ms)) || (hasEmberForge(area) && this.forge.prepare(map, ms)) || (hasMistwood(area) && this.mistwood.prepare(map, ms)) || (hasFrozenVault(area) && this.vault.prepare(map, ms)) || (hasNadir(area) && this.nadir.prepare(map, ms)) || (hasAstral(area) && this.astral.prepare(map, ms)) || (hasPalace(area) && this.palace.prepare(map, ms));
       else if (style !== "sand" || !map.trails) { phase = -1; return; }
       // The desert's dunes (or the Vault's snow) and its trails, as its
       // build phase warms them.
@@ -820,6 +824,12 @@ export class DefendRenderer {
       this.astral.drawFloor(ctx, this.px, astral);
       this.astral.drawLive(ctx, this.px, { now: opts.now, alpha: astral, still: opts.reduceMotion });
     }
+    // The Blight Prince's palace: its floor, half laid, and what stands on it.
+    const palace = this.palaceShare();
+    if (palace > 0) {
+      this.palace.sync(map);
+      this.palace.drawFloor(ctx, this.px, palace);
+    }
     this.river.sync(map);
     this.river.draw({
       c: ctx, px: this.px, now: opts.now, dt, rain: !!(sim && opts.weather?.rain), cold: sim?.cold ?? !!opts.weather?.snow, thawed: sim?.thawedPonds,
@@ -829,7 +839,7 @@ export class DefendRenderer {
     // tint, so night darkens them and the day's light turns over them.
     const desert = drifting(sim?.atmosphere?.mode ?? null);
     if (sim && desert) this.atmosphere.drawGround(ctx, this.px, sim, opts.reduceMotion, opts.effects ?? true, this.worldLighting ? opts.sun : undefined, !!opts.hdSand);
-    if (this.forestShare() > 0 || magic > 0 || caves > 0 || forge > 0 || wood > 0 || nadir > 0 || astral > 0 || desert) {
+    if (this.forestShare() > 0 || magic > 0 || caves > 0 || forge > 0 || wood > 0 || nadir > 0 || astral > 0 || palace > 0 || desert) {
       this.drawFaces();
       paintSpikePoints(ctx, this.px, map, sim);
     }
@@ -1125,6 +1135,19 @@ export class DefendRenderer {
     this.astral.drawGlow(this.ctx, this.px, { now: opts.now, alpha, still: opts.reduceMotion, night: opts.night, effects: opts.effects ?? true });
   }
 
+  /** How much of the Blight Prince's palace shows, fading like the forest's. */
+  private palaceShare() {
+    const now = hasPalace(this.area) ? this.areaMix : 0;
+    return now + (this.previousArea && hasPalace(this.previousArea) ? 1 - this.areaMix : 0);
+  }
+
+  /** The palace's fires, amethyst, gold and glints, over the battle's darkness. */
+  private drawPalaceGlow(opts: DrawOptions) {
+    const alpha = this.palaceShare();
+    if (alpha <= 0) return;
+    this.palace.drawGlow(this.ctx, this.px, { now: opts.now, alpha, still: opts.reduceMotion, night: opts.night, effects: opts.effects ?? true });
+  }
+
   /** How much of the Mistwood shows, fading like the forest's. */
   private mistShare() {
     const now = hasMistwood(this.area) ? this.areaMix : 0;
@@ -1220,7 +1243,7 @@ export class DefendRenderer {
     // The forest's grass and the desert's dunes hide the flagstones (their
     // light, drawn over the dunes, read as squares at night): there the
     // masks aren't baked at all.
-    const bare = drifting(sim.atmosphere?.mode ?? null) ? 0 : 1 - Math.min(1, this.forestShare() + this.magicShare() + this.cavesShare() + this.forgeShare() + this.mistShare() + this.nadirShare() + this.astralShare());
+    const bare = drifting(sim.atmosphere?.mode ?? null) ? 0 : 1 - Math.min(1, this.forestShare() + this.magicShare() + this.cavesShare() + this.forgeShare() + this.mistShare() + this.nadirShare() + this.astralShare() + this.palaceShare());
     if (bare <= 0 || !this.relief.sync(map, this.px, this.board.W, this.board.H, this.area)) return;
     const intact = standing(map, sim);
     const fixed = () =>

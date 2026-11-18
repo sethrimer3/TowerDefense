@@ -279,11 +279,12 @@ const CRYSTAL: Look = {
   accent: [0x7238bc, 0xb274f0, 0xe6c0ff],
 };
 
-/** Black volcanic glass with a hard sheen and smouldering veins. */
+/** The Blight Prince's palace: black glass with a hard sheen, its joints
+ * and veins gold. */
 const OBSIDIAN: Look = {
   mortar: 0x050305,
-  joint: (gx, gy) => (hash01(gx >> 1, gy, 461) < 0.1 ? 0x5a1410 : undefined),
-  stone: [0x0e0a0e, 0x1e171e, 0x2c232c, 0x3e323e, 0x6e5c70],
+  joint: (gx, gy) => (hash01(gx >> 1, gy, 461) < 0.14 ? 0x8a5e12 : undefined),
+  stone: [0x0a0810, 0x15111e, 0x201a2c, 0x30283f, 0x5e5478],
   dress(p, b, seed) {
     // A diagonal glint across the glass.
     const off = 3 + (hash(seed, 70) % 5);
@@ -295,17 +296,17 @@ const OBSIDIAN: Look = {
       }
     if (hash01(seed, 71) < 0.3) {
       const [x, y] = spotIn(b, seed, 72, 2);
-      crack(p, b, x, y, 5, seed, [0x8c2218, 0xc8401e]);
+      crack(p, b, x, y, 5, seed, [0x8a5e12, 0xf2cc5a]);
     }
   },
   face(p, cx, seed) {
     if (hash01(seed, cx, 73) < 0.2) {
       const x = 2 + (hash(seed, cx, 74) % (WALL_ART - 4));
-      for (let j = 1; j < FACE_ROWS - 1; j++) p.set(x + (j >> 1), j, j % 2 ? 0x8c2218 : 0x5a1410);
+      for (let j = 1; j < FACE_ROWS - 1; j++) p.set(x + (j >> 1), j, j % 2 ? 0xc99424 : 0x8a5e12);
     }
   },
-  rubble: [0x151015, 0x211a21, 0x3a2e3a],
-  accent: [0x5a1410, 0x8c2218, 0xc8401e],
+  rubble: [0x100d16, 0x1c1727, 0x342b4e],
+  accent: [0x8a5e12, 0xc99424, 0xf2cc5a],
 };
 
 /** Star-blue stone set in gilded joints, with inlaid stars. */

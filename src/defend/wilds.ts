@@ -47,6 +47,8 @@ import { hasNadir } from "./nadir.ts";
 import { voidWildsSteps } from "./nadir-art.ts";
 import { hasAstral } from "./astral.ts";
 import { skyWildsSteps } from "./astral-art.ts";
+import { hasPalace } from "./palace.ts";
+import { paintHallWalls, palaceWildsSteps } from "./palace-art.ts";
 import { driftLook } from "./drift-look.ts";
 import { duneHeights, duneLightKey, duneTaperPixels, duneTile, warmDuneTaper } from "./atmosphere-art.ts";
 import { segmentDistance, type TrailLine, type TrailPlan } from "./trails.ts";
@@ -869,8 +871,8 @@ const rgbaOf = (c: number) => ((255 << 24) | ((c & 0xff) << 16) | (c & 0xff00) |
  * those under a tree's shadow. */
 export const paintWilds = (...args: Parameters<typeof paintWildsSteps>) => drain(paintWildsSteps(...args));
 /** `paintWilds` a slice at a time: each `next()` paints some rows. */
-export function* paintWildsSteps(forest: boolean, stone?: Stone, reach: readonly TrailLine[] = [], rocks = true, look: "ranges" | "moab" | "basalt" | "volcano" | "mistwood" | "vault" | "void" | "sky" = "ranges", keep: { x: number; y: number } = { x: CELLS_W / 2, y: CELLS_H / 2 }): Steps<Painted> {
-  const moab = look === "moab", basalt = look === "basalt", volcano = look === "volcano", wood = look === "mistwood", vault = look === "vault", voids = look === "void", sky = look === "sky";
+export function* paintWildsSteps(forest: boolean, stone?: Stone, reach: readonly TrailLine[] = [], rocks = true, look: "ranges" | "moab" | "basalt" | "volcano" | "mistwood" | "vault" | "void" | "sky" | "palace" = "ranges", keep: { x: number; y: number } = { x: CELLS_W / 2, y: CELLS_H / 2 }): Steps<Painted> {
+  const moab = look === "moab", basalt = look === "basalt", volcano = look === "volcano", wood = look === "mistwood", vault = look === "vault", voids = look === "void", sky = look === "sky", palace = look === "palace";
   const out = new Uint32Array(GW * GH), whole = wildsPlan();
   // The trees and rocks clear of the roads carried out here.
   const plan: WildsPlan = reach.length
@@ -905,7 +907,7 @@ export function* paintWildsSteps(forest: boolean, stone?: Stone, reach: readonly
   const bare = basalt ? out.slice() : null;
   // The Ember Forge's cinders carried on past the board, its fissures and
   // pools in them, and what glows of it kept apart for the night.
-  const glow: Img | null = volcano || wood || vault || voids || sky ? { px: new Uint32Array(GW * GH), w: GW, h: GH } : null;
+  const glow: Img | null = volcano || wood || vault || voids || sky || palace ? { px: new Uint32Array(GW * GH), w: GW, h: GH } : null;
   const img: Img = { px: out, w: GW, h: GH };
   const offField = (X: number, Y: number) => !(X >= OX && Y >= OY && X < OX + BW && Y < OY + BH);
   const allForge = volcano ? wildForge() : null;
@@ -938,7 +940,14 @@ export function* paintWildsSteps(forest: boolean, stone?: Stone, reach: readonly
   // The Astral Sanctuary: the island carried on round the keep, breaking
   // off over open sky, islets floating out there.
   if (sky) yield* skyWildsSteps(out, glow!.px, GW, GH, OX, OY, BW, BH, MARGIN, SLICE, keep);
-  if (moab) yield* paintMesas(out); else if (basalt) yield* paintBasalt(out); else if (volcano) yield* paintVolcano(out, glow!.px); else if (vault) yield* paintAlps(out); else if (!wood && !voids && !sky) yield* paintRanges(out);
+  // The Blight Prince's palace: its floor and pieces carried on past the
+  // board, then the cave's walls of black glass veined with gold.
+  if (palace) {
+    const { H, f } = yield* rangeFieldSteps();
+    yield* palaceWildsSteps(out, glow!.px, GW, GH, OX, OY, BW, BH, MARGIN, SLICE, (x, y) => rangeAt(x, y) > -0.25);
+    yield* paintHallWalls(out, glow!.px, GW, GH, H, f, SLICE);
+  }
+  if (moab) yield* paintMesas(out); else if (basalt) yield* paintBasalt(out); else if (volcano) yield* paintVolcano(out, glow!.px); else if (vault) yield* paintAlps(out); else if (!wood && !voids && !sky && !palace) yield* paintRanges(out);
 
   // Rocks, back to front, each with its shadow down and right.
   const items: { y: number; draw: () => void }[] = [];
@@ -1283,7 +1292,7 @@ export class Wilds {
 
   private *groundSteps(forest: boolean, area: AreaId, reach: { lines: TrailLine[] } | null, keep?: { x: number; y: number }): Steps<Ground> {
     const caves = area === "drowned";
-    const painted = yield* paintWildsSteps(forest, forest ? undefined : STONES[area], reach?.lines ?? [], area !== "desert" && area !== "frozen" && !caves && !hasNadir(area) && !hasAstral(area), area === "desert" ? "moab" : caves ? "basalt" : hasEmberForge(area) ? "volcano" : hasMistwood(area) ? "mistwood" : hasFrozenVault(area) ? "vault" : hasNadir(area) ? "void" : hasAstral(area) ? "sky" : "ranges", keep);
+    const painted = yield* paintWildsSteps(forest, forest ? undefined : STONES[area], reach?.lines ?? [], area !== "desert" && area !== "frozen" && !caves && !hasNadir(area) && !hasAstral(area) && !hasPalace(area), area === "desert" ? "moab" : caves ? "basalt" : hasEmberForge(area) ? "volcano" : hasMistwood(area) ? "mistwood" : hasFrozenVault(area) ? "vault" : hasNadir(area) ? "void" : hasAstral(area) ? "sky" : hasPalace(area) ? "palace" : "ranges", keep);
     const canvas = document.createElement("canvas");
     canvas.width = GW;
     canvas.height = GH;
@@ -1487,14 +1496,14 @@ export class Wilds {
         const c = canvas.getContext("2d")!;
         c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.globalCompositeOperation = "source-over"; c.imageSmoothingEnabled = false;
         c.fillStyle = f.beyond; c.fillRect(0, 0, cw, ch);
-        if (!forest && !hasNadir(f.area) && !hasAstral(f.area)) this.floor(c, f, view, toX, toY, k);
+        if (!forest && !hasNadir(f.area) && !hasAstral(f.area) && !hasPalace(f.area)) this.floor(c, f, view, toX, toY, k);
         if (sand) blitTo(c, sand, view);
         blitTo(c, g.canvas, view);
         base = this.baseCache = { key, ground: g, canvas };
       }
       ctx.drawImage(base.canvas, 0, 0);
     } else {
-      if (!forest && !hasNadir(f.area) && !hasAstral(f.area)) this.floor(ctx, f, view, toX, toY, k);
+      if (!forest && !hasNadir(f.area) && !hasAstral(f.area) && !hasPalace(f.area)) this.floor(ctx, f, view, toX, toY, k);
       if (sand) blit(sand, view);
       blit(g.canvas, view);
     }

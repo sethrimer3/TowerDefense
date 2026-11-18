@@ -805,7 +805,8 @@ from its seed; `tests/defend-replay.test.ts` pins it.
 
 - Areas (`areas.ts`) change every twenty waves: Mossbound Ruins, Amber
   Desert, Crystal Caves, Ember Forge, Mistwood, Frozen Vault, Violet
-  Geode, Obsidian Crypt, Astral Sanctuary, Nadir and the Magic Forest testing
+  Geode, Obsidian Palace (the Blight Prince's throne room, cut halfway out of a
+  gold-veined obsidian cave), Astral Sanctuary, Nadir and the Magic Forest testing
   zone (waves 201–220: clovers, wispy trees, lightning bugs), repeating after wave 220. The Ember Forge is
   fought from its own outpost city (smaller keep, ten fewer city tiles but at least ten, none on the edge of
   the buildable field, no Mine or Library); its trails cross the field from all four sides and its enemies
@@ -831,7 +832,7 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   | Crystal Caves | Kelp Stalker 80 | Regenerating kelp hunter |
   | Mistwood | Cap Crawler 50, Mycelium Hulk 400, Rot Mite 10 | Spore clouds, regenerating heavy fungus, fast venomous mites |
   | Violet Geode | Geode Crab 300, Prism Moth 100, Shard Brood 450 | Armored shell vulnerable to explosions, fast flier, brood releasing three shardlings |
-  | Obsidian Crypt | Crypt Hound 350, Grave Wisp 500 | Fast ground hunter, regenerating flying spirit |
+  | Obsidian Palace | Crypt Hound 350, Grave Wisp 500 | Fast ground hunter, regenerating flying spirit |
   | Astral Sanctuary | Nova Moth 800 | Flying brood releasing two star wisps |
 
   Split parents reserve all their children against the wave cap. The small

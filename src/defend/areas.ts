@@ -14,7 +14,9 @@ export const AREAS = [
   // name it); it is the Mistwood now (mistwood.ts).
   { id: "fungal", name: "Mistwood", climate: "temperate", rainChance: 0, color: "#a9d8c6", dark: "#1f3a34" },
   { id: "crystal", name: "Violet Geode", climate: "underground", rainChance: 0, color: "#d4a2f5", dark: "#49305e" },
-  { id: "obsidian", name: "Obsidian Crypt", climate: "dry", rainChance: 0, color: "#ba9c9c", dark: "#382d33" },
+  // Its id is kept from when it was the Obsidian Crypt (saves and journals
+  // name it); it is the Blight Prince's palace now (palace.ts).
+  { id: "obsidian", name: "Obsidian Palace", climate: "underground", rainChance: 0, color: "#ba9c9c", dark: "#382d33" },
   { id: "astral", name: "Astral Sanctuary", climate: "dry", rainChance: 0, color: "#e4d299", dark: "#273d63" },
   { id: "nadir", name: "Nadir", climate: "underground", rainChance: 0, color: "#c86a6a", dark: "#1a0709" },
   // A testing zone, after the ten: clovers, wispy trees and lightning bugs
