@@ -48,6 +48,7 @@ import { drawExplosion, drawScorches as drawScorchArt } from "./blast-art.ts";
 import { BUILDING_FLASH, type DefendSim, type Effect, type Enemy, type Soldier } from "./sim.ts";
 import { hallPaths } from "./muskets.ts";
 import { sniperAim } from "./snipers.ts";
+import { gaitPosition } from "./blight-gait.ts";
 import { drawDarklingBodies, drawSimpleEnemies, drawSimpleTroops } from "./simple-units.ts";
 import { drawPixel, enemySprite } from "./pixel-sprites.ts";
 import { isMelee, meleeFacing } from "./melee-facing.ts";
@@ -188,16 +189,16 @@ export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, hea
         const pixels = group.filter(e => ENEMIES[e.kind].darkPixels);
         if (pixels.length) {
           outline!.mergePixelGaps();
-          drawDarklingBodies(u, pixels, !simple.enemies);
+          drawDarklingBodies(u, pixels, !simple.enemies, sim.time);
           outline!.mergePixelGaps(false);
         }
         const others = group.filter(e => !ENEMIES[e.kind].darkPixels);
-        if (simple.enemies) drawSimpleEnemies(u, others, rim, sides);
+        if (simple.enemies) drawSimpleEnemies(u, others, rim, sides, undefined, sim.time);
       }
       // Preserve native sprite ordering across factions, after the pixel mass.
       if (!simple.enemies) for (const e of sim.enemies) if (!e.raidProxy && wormBodyVisible(e) && !ENEMIES[e.kind].darkPixels) { unit?.(e.id); drawEnemyArt(u, e, sim, layers ? b : undefined, simple.reduceMotion); }
     }
-    else if (simple.enemies) drawSimpleEnemies(u, sim.enemies.filter(e=>!e.raidProxy && wormBodyVisible(e)), layers?.rims, sides, rimFor);
+    else if (simple.enemies) drawSimpleEnemies(u, sim.enemies.filter(e=>!e.raidProxy && wormBodyVisible(e)), layers?.rims, sides, rimFor, sim.time);
     else {
       for (const e of sim.enemies) if (!e.raidProxy && wormBodyVisible(e)) { unit?.(e.id); drawEnemyArt(u, e, sim, layers ? b : undefined, simple.reduceMotion); }
     }
@@ -689,7 +690,8 @@ export function drawEnemyArt(b: Brush, e: Enemy, sim: DefendSim, under = b, redu
   if (def.darkPixels) {
     // No sprite lookup, rims, shading, torch, or animated decoration.
     const d = b.px / ART * blightDrawnPixels(e.kind)!;
-    drawSprite(b.c, basicUnitSprite(e.kind,true),e.x * b.px - d / 2,e.y * b.px - d / 2,d,d);
+    const { x, y } = gaitPosition(e, sim.time);
+    drawSprite(b.c, basicUnitSprite(e.kind,true),x * b.px - d / 2,y * b.px - d / 2,d,d);
   }
   else if (def.siege) drawSiegeEngine(b, e, sim.time);
   else if (def.boat) drawBoat(b, e, sim.time, reduceMotion);

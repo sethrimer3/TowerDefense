@@ -1,3 +1,4 @@
+import { gaitPosition } from "./blight-gait.ts";
 import { isBlightWorm } from "./blight-worm-tuning.ts";
 import { enemySize } from "./catalog.ts";
 import { ENEMIES } from "./catalog.ts";
@@ -39,8 +40,9 @@ export function healthbarEnemies(sim: DefendSim): Enemy[] {
 export function drawEnemyHealthbars({ c, px }: Brush, sim: DefendSim) {
   for (const e of healthbarEnemies(sim)) {
     const width = Math.max(12, Math.round(px * 1.2)), height = Math.max(2, Math.round(px * .1));
-    const x = Math.round(e.x * px - width / 2);
-    const y = Math.round(e.y * px - enemySize(e) * px / 2 - height - 4);
+    const at = gaitPosition(e, sim.time);
+    const x = Math.round(at.x * px - width / 2);
+    const y = Math.round(at.y * px - enemySize(e) * px / 2 - height - 4);
     c.fillStyle = "#170e12"; c.fillRect(x - 1, y - 1, width + 2, height + 2);
     const segments = isBlightWorm(e.kind) ? sim.enemies.filter(o => o.kind === e.kind && o.hp > 0) : [e];
     const hp = segments.reduce((sum, o) => sum + o.hp, 0), maxHp = segments.reduce((sum, o) => sum + o.maxHp, 0);
