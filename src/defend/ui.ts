@@ -1675,7 +1675,7 @@ export class DefendPage {
       climbed.unshift({id:n.id,face:face(n),name:n.step?stepName(n.step):ITEM_NAMES[n.kind as PaletteItem]??""});
     const free=game.settings.devMode;
     const next=nodes.filter(n=>n.state==="next"&&n.step).map(n=>({id:n.id,face:face(n.step!.type==="path"?n.step!:{kind:n.step!.to}),name:stepName(n.step!),cost:n.step!.cost,can:free||game.knowledge>=n.step!.cost}));
-    return {climbed,next,back:undoTo(kind,wear,here)?undoRefund(kind,wear,here):undefined,live:this.phase==="build"};
+    return {climbed,next,back:undoTo(kind,wear,here)?undoRefund(kind,wear,here):undefined,live:this.phase==="build",have:free?Infinity:game.knowledge};
   }
   /** The side panel's tree bought node `id` for `b`. */
   private panelBuy(b:Building,id:string) {

@@ -15,6 +15,7 @@ import { TARGET_MODES, MENU_RANGE, snapRange, setMenuRange, type MenuControls, t
 import { menuIconImg, type MenuIcon } from "./building-menu-icons.ts";
 import { paintIcon, type IconItem } from "../defend/structure-art.ts";
 import { paintPathIcons } from "./path-badge.ts";
+import { iconCanvas, installCurrencyArt } from "./currency-icons.ts";
 import { controlsOf, aimPoint } from "../defend/building-controls.ts";
 import { center } from "../defend/pathing.ts";
 import type { PlacedMenuHost } from "./placed-building-menu.ts";
@@ -26,8 +27,12 @@ export type PanelNode = { id: string; face: string; name: string; cost: number; 
 /** The panel's small tree for a building: what it has climbed (its basic
  * building first), the upgrades open to it next, and what a downgrade
  * gives back (absent at its basic building). `live` while upgrades can be
- * bought (Defend's build phase). */
-export type PanelTree = { climbed: Omit<PanelNode, "cost" | "can">[]; next: PanelNode[]; back?: number; live: boolean };
+ * bought (Defend's build phase), and `have` the player's Knowledge. */
+export type PanelTree = {
+  climbed: Omit<PanelNode, "cost" | "can">[]; next: PanelNode[]; back?: number; live: boolean;
+  /** The player's Knowledge, shown beside each cost (Infinity with unlimited money). */
+  have: number;
+};
 /** The portrait: the palette icon and the path look it wears. */
 export type PanelPortrait = { icon: IconItem; look?: string; badge?: string };
 
@@ -67,9 +72,10 @@ export type PanelSpec = {
 export function panelTreeHtml(tree: PanelTree, back = ""): string {
   const climbed = tree.climbed.map((n, i) =>
     `${i ? '<span class="bp-link" aria-hidden="true"></span>' : ""}<span class="bp-climbed${i === tree.climbed.length - 1 ? " bp-here" : ""}" title="${esc(n.name)}">${n.face}</span>`).join("");
+  const have = `<span class="bp-have">(${iconCanvas("knowledge")}${Number.isFinite(tree.have) ? tree.have.toLocaleString("en") : "∞"})</span>`;
   const next = tree.next.map((n) =>
     `<button type="button" class="bp-next" data-bp-buy="${esc(n.id)}" ${tree.live && n.can ? "" : "disabled"} aria-label="${esc(t("panel.buy", { name: n.name, cost: knowledgeText(n.cost) }))}">` +
-    `<span class="bp-next-face">${n.face}</span><span class="bp-next-name">${esc(n.name)}</span><span class="bp-cost${n.can ? "" : " short"}">${n.cost ? knowledgeText(n.cost) : t("panel.free")}</span></button>`).join("");
+    `<span class="bp-next-face">${n.face}</span><span class="bp-next-name">${esc(n.name)}</span><span class="bp-costs"><span class="bp-cost${n.can ? "" : " short"}">${n.cost ? knowledgeText(n.cost) : t("panel.free")}</span>${have}</span></button>`).join("");
   const down = tree.back !== undefined
     ? `<button type="button" class="bp-down" data-bp="downgrade" ${tree.live ? "" : "disabled"}><span>${t("panel.downgrade")}</span><span class="bp-cost">+${knowledgeText(tree.back)}</span></button>`
     : "";
@@ -154,6 +160,7 @@ export class BuildingPanel {
     const el = (this.element = wrapper.firstElementChild as HTMLElement);
     for (const c of Array.from(el.querySelectorAll<HTMLCanvasElement>("canvas[data-icon]"))) paintIcon(c, c.dataset.icon as IconItem);
     paintPathIcons(el);
+    installCurrencyArt(el);
     if (!same && !reducedMotion()) el.classList.add("opening");
     this.host.board().append(el);
     el.onpointerdown = (e) => e.stopPropagation();
