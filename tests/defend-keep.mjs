@@ -26,7 +26,7 @@ try {
     const fixture = await page.evaluate(async () => {
       const { defaults } = await import('/src/save.ts');
       const { placeCityTile } = await import('/src/defend/layout.ts');
-      const s = defaults(); s.profile = { name: "Building tester", flag: {base:3,layers:[]} }; s.settings.soundOff = true; s.settings.ambienceOff = true;
+      const s = defaults(); s.profile = { name: "Building tester", flag: {base:3,layers:[]} }; s.settings.soundOff = true; s.settings.ambienceOff = true; s.settings.ringMenu = true;
       s.knowledge = 100; s.smithy.copper = 20;
       s.defend.owned.cityTile = 8;
       let l = s.defend.layout;

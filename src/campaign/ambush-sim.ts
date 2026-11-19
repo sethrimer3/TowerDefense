@@ -338,7 +338,6 @@ export class AmbushSim {
       this.release(this.queue.shift()!);
       this.spawnClock += this.waves[this.wave - 1].gap;
     }
-    for (const u of this.engine.soldiers) this.engine.tallyHomes!.set(u.id, u.home);
     this.engine.step(dt);
     this.outposts.update();
     if (this.engine.keepHp() <= 0) this.phase = "lost";

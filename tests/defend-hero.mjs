@@ -25,7 +25,7 @@ try {
     const fixture = await page.evaluate(async (halls) => {
       const { defaults } = await import('/src/save.ts');
       const { placeCityTile, placeStructure } = await import('/src/defend/layout.ts');
-      const s = defaults(); s.profile = { name: "Building tester", flag: {base:3,layers:[]} }; s.settings.soundOff = true; s.settings.ambienceOff = true;
+      const s = defaults(); s.profile = { name: "Building tester", flag: {base:3,layers:[]} }; s.settings.soundOff = true; s.settings.ambienceOff = true; s.settings.ringMenu = true;
       s.knowledge = 100000;
       s.defend.owned.chapterHouse = 1; s.defend.owned.heroHall = 4;
       s.defend.owned.cityTile = 8;

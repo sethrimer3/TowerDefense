@@ -2653,6 +2653,68 @@ nav button[data-mode] > .tab-label { min-height: 2.4em; }
 .building-menu.placing .bm-aim button { outline:2px solid var(--brass); }
 .campaign-inspect-actions[hidden] { display:none; }
 
+/* ── The building panel (ui/building-panel.ts): a picked building's
+ * controls at the board's right side, or its left when the right would
+ * cover the building. */
+.building-panel {
+  --bp-w: 200px;
+  position: absolute; z-index: 20; top: 50%; right: 8px; transform: translateY(-50%);
+  width: var(--bp-w); max-height: calc(100% - 16px); overflow-y: auto; overscroll-behavior: contain;
+  box-sizing: border-box; padding: 10px 10px 12px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.building-panel[data-side="left"] { right: auto; left: 8px; }
+.building-panel .bp-head { display: flex; align-items: center; gap: 6px; min-height: 24px; }
+.building-panel .bp-name { flex: 1; min-width: 0; font-size: 14px; line-height: 1.15; text-align: center; overflow-wrap: anywhere; }
+.building-panel .bp-close { width: 24px; height: 24px; min-width: 0; min-height: 0; padding: 0; font-size: 16px; line-height: 1; flex: none; }
+.building-panel .bp-portrait { position: relative; align-self: center; width: 96px; height: 96px; display: grid; place-items: center; }
+.building-panel .bp-portrait canvas[data-icon] { width: 96px; height: 96px; image-rendering: pixelated; }
+.building-panel .bp-portrait .path-badge { position: absolute; right: -4px; bottom: -4px; }
+.building-panel .bp-kills { margin: 0; display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; padding: 0 4px; }
+.building-panel .bp-kills[hidden] { display: none; }
+.building-panel .bp-modes { display: flex; justify-content: space-between; gap: 3px; }
+.building-panel .bp-icon { width: 34px; height: 34px; min-width: 0; min-height: 0; padding: 0; display: grid; place-items: center; flex: none; }
+.building-panel .bm-icon { width: 32px; height: 32px; image-rendering: pixelated; }
+.building-panel .bp-icon .bm-icon { width: 24px; height: 24px; }
+.building-panel .bp-mode-name { margin: 0; text-align: center; font-size: 13px; line-height: 1; }
+.building-panel .bp-range { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 6px; font-size: 12px; }
+.building-panel .bp-range input { width: 100%; min-width: 0; margin: 0; }
+.building-panel .bp-range [data-bm="range-value"] { min-width: 3.2em; text-align: right; }
+.building-panel .bp-aim, .building-panel .bp-actions button, .building-panel .bp-full, .building-panel .bp-down {
+  display: flex; align-items: center; gap: 6px; min-height: 36px; padding: 2px 8px; font-size: 12px; line-height: 1.1; text-align: left;
+}
+.building-panel .bp-aim .bm-icon, .building-panel .bp-actions .bm-icon, .building-panel .bp-full .bm-icon { width: 24px; height: 24px; flex: none; }
+.building-panel .bp-actions { display: flex; flex-direction: column; gap: 6px; margin-top: 2px; }
+.building-panel .bp-actions button { justify-content: flex-start; }
+.building-panel .bp-tree { display: flex; flex-direction: column; gap: 8px; }
+.building-panel .bp-path-row { display: flex; align-items: center; gap: 4px; }
+.building-panel .bp-back { width: 26px; height: 26px; min-width: 0; min-height: 0; padding: 0; font-size: 16px; line-height: 1; flex: none; }
+.building-panel .bp-path { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 2px; min-height: 32px; }
+.building-panel .bp-climbed { display: grid; place-items: center; width: 32px; height: 32px; }
+.building-panel .bp-climbed canvas[data-icon], .building-panel .bp-next-face canvas[data-icon] { width: 32px; height: 32px; image-rendering: pixelated; }
+.building-panel .bp-link { width: 6px; height: 2px; }
+.building-panel .bp-nexts { display: flex; flex-direction: column; gap: 6px; }
+.building-panel .bp-next { display: grid; grid-template-columns: 34px 1fr; grid-template-rows: auto auto; column-gap: 10px; align-items: center; min-height: 48px; padding: 4px 6px; text-align: left; }
+.building-panel .bp-next-face { grid-row: 1 / 3; display: grid; place-items: center; }
+.building-panel .bp-next-name { font-size: 12px; line-height: 1.1; overflow-wrap: anywhere; }
+.building-panel .bp-cost { font-size: 12px; }
+.building-panel .bp-down { justify-content: space-between; }
+.building-panel .bp-max { text-align: center; font-size: 12px; padding: 6px 0; }
+@media (max-width: 559px) {
+  .building-panel { --bp-w: 148px; padding: 8px 7px 10px; gap: 6px; }
+  .building-panel .bp-name { font-size: 12px; }
+  .building-panel .bp-portrait, .building-panel .bp-portrait canvas[data-icon] { width: 72px; height: 72px; }
+  .building-panel .bp-modes { gap: 2px; }
+  .building-panel .bp-icon { width: 25px; height: 28px; }
+  .building-panel .bp-icon .bm-icon { width: 18px; height: 18px; }
+  .building-panel .bp-aim, .building-panel .bp-actions button, .building-panel .bp-full, .building-panel .bp-down { font-size: 11px; padding: 2px 6px; }
+  .building-panel .bp-range { grid-template-columns: 1fr auto; }
+  .building-panel .bp-climbed, .building-panel .bp-climbed canvas[data-icon] { width: 24px; height: 24px; }
+  .building-panel .bp-climbed .path-face { transform: scale(0.75); }
+  .building-panel .bp-link { width: 3px; }
+  .building-panel .bp-range > span:first-child { display: none; }
+}
+
 /* Ambush: a building's next upgrades on its menu's top bar, each with its
  * gold cost above it; the one tapped once shows its card in the sidebar. */
 .building-menu .bm-upgrades { display: flex; gap: 10px; align-items: center; pointer-events: auto; }

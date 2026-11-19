@@ -23,7 +23,7 @@ try {
     const fixture = await page.evaluate(async () => {
       const { defaults } = await import('/src/save.ts');
       const { placeCityTile, placeStructure } = await import('/src/defend/layout.ts');
-      const s = defaults(); s.profile = { name: "Building tester", flag: {base:3,layers:[]} }; s.settings.soundOff = true; s.settings.ambienceOff = true;
+      const s = defaults(); s.profile = { name: "Building tester", flag: {base:3,layers:[]} }; s.settings.soundOff = true; s.settings.ambienceOff = true; s.settings.ringMenu = true;
       s.knowledge = 1e7;
       s.defend.owned.revolutionary = 1; s.defend.owned.sniperLodge = 1; s.defend.owned.cityTile = 8;
       s.defend.revolutionaryRanks = { squad: 2, chain: 2, critChance: 2, critDamage: 3, splash: 2 };

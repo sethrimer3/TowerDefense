@@ -3,7 +3,8 @@ import type { Highlight } from "./placed-shimmer.ts";
 import { wallAtCell, type SpikeSpot } from "./layout.ts";
 import { STRUCTURES } from "./catalog.ts";
 import type { Building } from "./citygen.ts";
-import { PlacedBuildingMenu } from "../ui/placed-building-menu.ts";
+import { PlacedBuildingMenu, type PlacedMenuHost } from "../ui/placed-building-menu.ts";
+import { BuildingPanel, type PanelTree, type PanelPortrait, type PickedControls } from "../ui/building-panel.ts";
 import type { MenuSizing } from "../ui/building-menu.ts";
 import { decodeOrders, layoutOrders, type BuildingOrders } from "./building-orders.ts";
 import { applyOrders, restoreOrders, aimPoint, controlsOf, clampOrders } from "./building-controls.ts";
@@ -15,7 +16,7 @@ import { musterWatch } from "./city-watch.ts";
 import {t} from "../i18n/index.ts";
 import { MagicCircle } from "../magic-circle/render.ts";
 import { SpellBar, STRIKE_SPELLS, castStrike } from "../ui/spell-bar.ts";
-import { buildingTree, foundNodes, hasTree, mergedFrom, respecBuilding, undoUpgrade, rootOf, specialtyLabel, specialtyOf, stepName, targetKind, upgradeBuilding, type PaletteKind, type SpecialtyTarget } from "../specializations.ts";
+import { buildingTree, foundNodes, hasTree, mergedFrom, respecBuilding, undoUpgrade, undoTo, undoRefund, rootOf, specialtyLabel, specialtyOf, stepName, targetKind, upgradeBuilding, type PaletteKind, type SpecialtyTarget } from "../specializations.ts";
 import { pathById, type PathId } from "../knowledge-paths.ts";
 import { SIDE_UI, graftedGraph, mapCardHtml, mapCount, mapGraph, mapWeb, sharedBranches, specialtyCircle, treeAllocated, treeBeyond, treeCardHtml, treeStep, type SideKind, type SideUi } from "../ui/specialty.ts";
 import { UpgradeGraph } from "../ui/upgrade-graph.ts";
@@ -142,6 +143,9 @@ export type DefendHost = {
   dragRally?(): boolean;
   /** Settings' Building menu size. */
   menuSizing?(): MenuSizing;
+  /** Settings' Building controls around the building: the square menu
+   * round a picked building instead of the side panel. */
+  ringMenu?(): boolean;
   /** The Always highlight selectable buildings setting, null while off. */
   highlight?(): Highlight | null;
   dragCrosshair?(): boolean;
@@ -156,6 +160,11 @@ export type DefendHost = {
 
 /** How soon (ms) and how near (CSS pixels) a second tap must come to make a double tap. */
 const DOUBLE_TAP_MS = 350, DOUBLE_TAP_SLOP = 30;
+/** A path rank's face for the side panel's tree: its icon with the numeral. */
+const panelPathFace = (path: PathId, rank: number) => {
+  const p = pathById(path), r = p.ranks[rank - 1];
+  return r ? `<span class="path-face hue-${p.hue}"><canvas data-path-icon="${r.icon}:${p.hue}"></canvas><b>${["", "I", "II", "III", "IV", "V"][rank] ?? rank}</b></span>` : "";
+};
 const plural = (name: string) => (name.endsWith("s") ? name : `${name}s`);
 /** A building whose upgrade tree shows: one with paths, or one of the
  * trees climbed side by side (`SIDE_UI`): the keep's, or the one every
@@ -204,7 +213,9 @@ export class DefendPage {
   /** The building the player tapped (its id in the map), outlined with its
    * reach and troops, and what its reach is reckoned from before a battle. */
   private pickedSpike:SpikeSpot|undefined;
-  private menu = new PlacedBuildingMenu({
+  /** What both the square menu and the side panel ask of the page. */
+  private menuHost(): PlacedMenuHost {
+    return {
     board:()=>this.root.querySelector<HTMLElement>("#defend-board")!,
     renderer:()=>this.renderer!, map:()=>this.sim?.map??this.currentMap(),
     sizing:()=>this.host.menuSizing?.()??"fixed",
@@ -215,7 +226,27 @@ export class DefendPage {
       remove:this.phase==="build"&&b.kind!=="keep"&&(b.structureUid!==undefined||b.gate||b.corner||b.piece||this.pickedSpike)?{kind:"inventory"}:null}),
     tree:b=>{const target=this.treeTarget(b);if(target)this.openSpecialty(target);},
     remove:b=>this.removeBuilding(b),closed:()=>this.pick(null,false),
+    };
+  }
+  /** The square menu round a picked building (Settings' Building controls around the building). */
+  private ring = new PlacedBuildingMenu(this.menuHost());
+  /** The side panel for a picked building (the default). */
+  private panel = new BuildingPanel({
+    ...this.menuHost(),
+    portrait:b=>this.portrait(b),
+    kills:b=>this.sim&&this.phase!=="build"?this.kills.get(b.id)??0:undefined,
+    panelTree:b=>this.panelTree(b),
+    buy:(b,id)=>this.panelBuy(b,id),
+    downgrade:b=>this.panelDowngrade(b),
   });
+  /** The picked building's controls Settings chose; the other is put away. */
+  private get menu(): PickedControls {
+    const ring = !!this.host.ringMenu?.(), on = ring ? this.ring : this.panel, off = ring ? this.panel : this.ring;
+    if (off.element) off.dismiss(false);
+    return on;
+  }
+  /** Each building's kills this battle, by its id in the battle's map. */
+  private kills = new Map<number, number>();
   private picked: { id: number; armed: Armed } | null = null;
   /** The picked building's aim while it is dragged: a Minelayer's
    * crosshair or a troop building's rally point (none: back to its own
@@ -1120,6 +1151,10 @@ export class DefendPage {
     this.menu.dismiss();
     this.sim = new DefendSim(map, { ...this.save.levels }, (defendRandom("rolls")() * 2147483648) | 0, { ...this.bonuses(), watch: cityWatch(this.save.keepRanks) });
     restoreOrders(this.sim);
+    // Kills for the side panel: tallied by the building whose shot, troop or fire landed the blow.
+    const kills = (this.kills = new Map());
+    this.sim.tally = (id, _damage, killed) => { if (killed) kills.set(id, (kills.get(id) ?? 0) + 1); };
+    this.sim.tallyHomes = new Map();
     musterWatch(this.sim, this.renderer?.cityLife.watchmenAt() ?? []);
     this.sim.speed = Math.min(this.save.battleSpeed, this.save.speed3 ? 3 : 2);
     if (this.testerSelected && this.host.devMode()) this.sim.startUnitTester();
@@ -1614,6 +1649,67 @@ export class DefendPage {
     }
     if(this.picked)this.picked.armed={levels:this.save.levels,bonuses:this.bonuses()};
     this.host.persist();
+  }
+  /** The side panel's portrait of `b`: its palette icon, in the look of the path it wears. */
+  private portrait(b:Building):PanelPortrait {
+    if(this.pickedSpike)return {icon:"wallSpikes"};
+    if(b.kind==="gate"||b.gate)return {icon:"cityGate"};
+    if(b.kind==="wallBallista")return {icon:"wallBallista"};
+    if(b.piece)return {icon:"wallBlock"};
+    if(!(b.kind in STRUCTURES))return {icon:"cityTile"};
+    const target=this.treeTarget(b),wear=target&&"uid" in target?specialtyOf(this.save,target):undefined;
+    return {icon:b.kind as IconItem,look:artLook(b.kind,wear?.path),badge:pathBadge(wear)};
+  }
+  /** The side panel's small tree for `b`: the nodes it has climbed, the
+   * upgrades open next and what a downgrade gives back. Null for the trees
+   * that open whole (the keep's, walls', gates', the economy buildings'). */
+  private panelTree(b:Building):PanelTree|null {
+    const target=this.treeTarget(b),game=this.game();
+    if(!target||!("uid" in target)||!game)return null;
+    const kind=targetKind(this.save,target);
+    if(!kind||isEconomyBuilding(kind)||sharedBranches(kind))return null;
+    const wear=specialtyOf(this.save,target),nodes=buildingTree(kind,wear),here=wear?`p:${wear.path}:${wear.rank}`:`k:${kind}`;
+    const face=(n:{kind?:string;path?:PathId;rank?:number})=>n.path&&n.rank?panelPathFace(n.path,n.rank):`<canvas width="32" height="32" data-icon="${n.kind}"></canvas>`;
+    const climbed:PanelTree["climbed"]=[];
+    for(let n=nodes.find(o=>o.id===here);n;n=n.parent?nodes.find(o=>o.id===n!.parent):undefined)
+      climbed.unshift({id:n.id,face:face(n),name:n.step?stepName(n.step):ITEM_NAMES[n.kind as PaletteItem]??""});
+    const free=game.settings.devMode;
+    const next=nodes.filter(n=>n.state==="next"&&n.step).map(n=>({id:n.id,face:face(n.step!.type==="path"?n.step!:{kind:n.step!.to}),name:stepName(n.step!),cost:n.step!.cost,can:free||game.knowledge>=n.step!.cost}));
+    return {climbed,next,back:undoTo(kind,wear,here)?undoRefund(kind,wear,here):undefined,live:this.phase==="build"};
+  }
+  /** The side panel's tree bought node `id` for `b`. */
+  private panelBuy(b:Building,id:string) {
+    const target=this.treeTarget(b),game=this.game();
+    if(!target||!("uid" in target)||!game||this.phase!=="build")return;
+    const kind=targetKind(this.save,target),step=kind&&treeStep(kind,specialtyOf(this.save,target),id);
+    if(!step)return;
+    const r=upgradeBuilding(game,target,step);
+    if(!r.ok)return this.setMessage(r.reason,2);
+    if(step.type==="merge")this.setMessage(`Merged into a ${stepName(step)}: the other two buildings were used up.`,3);
+    this.panelChanged(target.uid,!!r.waiting,step.type==="path"?"chime":"unlock",`${stepName(step)}: its size changed, so it waits in the palette to be placed again.`);
+  }
+  /** The side panel's Downgrade: `b` steps back down its tree, the Knowledge back. */
+  private panelDowngrade(b:Building) {
+    const target=this.treeTarget(b),game=this.game();
+    if(!target||!("uid" in target)||!game||this.phase!=="build")return;
+    const kind=targetKind(this.save,target),wear=specialtyOf(this.save,target);
+    if(!kind)return;
+    const r=undoUpgrade(game,target,wear?`p:${wear.path}:${wear.rank}`:`k:${kind}`);
+    if(!r.ok)return this.setMessage(r.reason,2);
+    this.panelChanged(target.uid,!!r.waiting,"coin","Downgraded: no room where it stood, so it waits in the palette.");
+  }
+  /** After the side panel changed structure `uid`: save, play, redraw, and pick it again. */
+  private panelChanged(uid:number,waiting:boolean,cue:"chime"|"unlock"|"coin",waitNote:string) {
+    this.host.spentKnowledge?.();
+    const source={levels:this.save.levels,bonuses:this.bonuses()};
+    for(const o of this.currentMap().buildings){const placed=layoutOrders(this.save.layout,o);if(placed)clampOrders(o,source,placed);}
+    this.host.persist();
+    play(cue);
+    this.renderPalette();
+    if(waiting){this.pick(null);this.setMessage(waitNote,3);return;}
+    const b=this.currentMap().buildings.find(o=>o.structureUid===uid);
+    this.pick(b?.id??null);
+    if(cue!=="coin")sparksOver(this.root.querySelector<HTMLElement>(".building-panel .bp-portrait"),"arcane");
   }
   private treeTarget(b:Building):TreeTarget|null {
     if(this.pickedSpike)return {spikes:this.pickedSpike};

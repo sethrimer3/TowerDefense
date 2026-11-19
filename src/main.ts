@@ -185,6 +185,7 @@ const defendPage = new DefendPage(el("defend"), {
   showEmpty: () => save.settings.showEmpty,
   dragRally: () => save.settings.dragRally,
   menuSizing: () => save.settings.menuSizing,
+  ringMenu: () => save.settings.ringMenu,
   dragCrosshair: () => save.settings.dragCrosshair,
   raiseDrag: () => save.settings.raiseDrag,
   magnifier: () => save.settings.magnifier,

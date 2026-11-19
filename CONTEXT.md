@@ -849,7 +849,9 @@ A connected run of living worm segments after a cut. A piece needs at least four
 A surfaced worm head's chance to turn back toward the nearest city edge when it strays beyond a few city tiles. The chance increases with distance; a little angular variation remains, and the body follows the head's trail.
 
 
-**Building menu**: The square set of controls around one selected placed building, distinct from the build palette.
+**Building menu**: The square set of controls around one selected placed building, distinct from the build palette. Shown only with the Building controls around the building setting on.
+
+**Building panel**: The board-side panel for one selected placed building (its portrait, kills this battle, targeting, range, rally flag or crosshairs, Upgrades and Remove); the default in Defend. Its **small tree** shows the upgrades climbed, the next ones to buy, and Downgrade.
 
 **Targeting mode**: A building's rule for choosing eligible enemies: Closest, First, Strongest, Weakest or Groups.
 
