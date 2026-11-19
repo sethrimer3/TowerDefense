@@ -4,9 +4,10 @@
  * throne has been laid with polished slabs in a checker, gold inlaid along
  * their seams with the veins polished through them; the purple carpet down
  * the middle; and on it, back to front with their shadows, the throne on its
- * dais, the colonnade, braziers, roughed-out monoliths, stacked blocks and
+ * dais (drawn live, rising past the board's top edge), the colonnade, the
+ * torches down each side, roughed-out monoliths, stacked blocks and
  * obsidian shards), then over the battle's darkness (`drawGlow`) what
- * shines: the braziers' violet fire, the throne's amethyst, the gold veins
+ * shines: the lit torches' violet fire, the throne's amethyst, the gold veins
  * at night, glints twinkling along the gold and gold dust drifting up. The
  * pieces are drawn bare: their outline is added round them while scenery
  * outlines are on. The wilds (`palaceWildsSteps`, `paintHallWalls`) carry
@@ -18,7 +19,7 @@ import { CELLS_H, CELLS_W, hash, hash01 } from "./grid.ts";
 import type { CityMap } from "./citygen.ts";
 import {
   flicker, glintAt, onCarpet, palacePlan, PALACE, slabLaid, workAt,
-  type Blocks, type Brazier, type Crystal, type PalacePlan, type Pillar, type Throne,
+  type Blocks, type Crystal, type PalacePlan, type Pillar, type Throne, type Torch,
 } from "./palace.ts";
 import { haloSprite, rgba, wash, washer, type Img } from "./ember-forge-art.ts";
 import { artPen, puff } from "./pixel-fx.ts";
@@ -30,14 +31,14 @@ const darken = (v: number, k: number) =>
   ((v & 0xff000000) | (Math.round(((v >> 16) & 0xff) * k) << 16) | (Math.round(((v >> 8) & 0xff) * k) << 8) | Math.round((v & 0xff) * k)) >>> 0;
 
 /** Raw obsidian, darkest to lightest, and its glassy sheen. */
-export const OBS = [0x060509, 0x0a0810, 0x0f0c16, 0x15111e, 0x1c1727, 0x241e31];
-export const SHEEN = [0x2c2640, 0x463d64, 0x8c82b8];
+export const OBS = [0x060608, 0x0a0a0d, 0x0f0e13, 0x15141a, 0x1c1a22, 0x24222b];
+export const SHEEN = [0x2b2a34, 0x45434f, 0x8e8b9c];
 /** Gold, shade to shine. */
 export const GOLD = [0x4a300a, 0x8a5e12, 0xc99424, 0xf2cc5a, 0xfff0b0];
 /** The laid slabs: their dark edge, the checker's two bodies, the bevel. */
-const SLAB = [0x08060c, 0x100d17, 0x17131f, 0x272038];
-/** The Prince's purple: carpet, cushions, banners. */
-const PURPLE = [0x240a2a, 0x3c1244, 0x561c60, 0x742a80];
+const SLAB = [0x070609, 0x0f0e13, 0x16151b, 0x26242e];
+/** The Prince's dark red velvet: carpet, cushions, banners. */
+const VELVET = [0x240607, 0x3c0b0e, 0x561217, 0x721c20];
 /** Violet fire, hot to cool. */
 const FIRE = ["#fff0ff", "#eab0ff", "#bc72f4", "#8238cc", "#4a1a8e"];
 /** Amethyst: shade, body, light. */
@@ -99,12 +100,8 @@ export function* fillPalaceFloor(out: Uint32Array, w: number, h: number, ox: num
       if (laid[sk]) {
         const u = x - Math.floor(x / SLAB_PX) * SLAB_PX, sx = sx0 + sk;
         if (u === 0 || v === 0) {
-          // The seams: dark between the slabs, inlaid with gold round each
-          // block of four, a stud where those meet.
-          const gu = u === 0 && (sx & 1) === 0, gv = v === 0 && (sy & 1) === 0;
-          const stud = gu && gv;
-          c = stud ? GOLD[4] : gu || gv ? GOLD[1] : SLAB[0];
-          if (stud && (u === 0 && v === 0) && glints && hash01(x, y, 1810) < 0.3) glints.push(x, y);
+          // The seams, dark between the slabs.
+          c = SLAB[0];
         } else if (u === 1 || v === 1) c = SLAB[3];
         else if (u === SLAB_PX - 1 || v === SLAB_PX - 1) c = SLAB[0];
         else {
@@ -132,7 +129,7 @@ export function* fillPalaceFloor(out: Uint32Array, w: number, h: number, ox: num
         if (hash01(x, y, 1814) < 0.0005) c = GOLD[3];
         if (veinCore && glow) glow[i] = rgba(GOLD[2]);
       }
-      if (veinCore && glints && hash01(x, y, 1815) < 0.012) glints.push(x, y);
+      if (veinCore && glints && hash01(x, y, 1815) < 0.06) glints.push(x, y);
       out[i] = rgba(c);
     }
   }
@@ -151,11 +148,11 @@ export function paintCarpet(img: Img, throne: Throne, ok: (X: number, Y: number)
       else if (last === 1) c = GOLD[1];
       else if (u === 0 || u === wd - 1) c = GOLD[0];
       else if (u === 1 || u === wd - 2) c = GOLD[2];
-      else if (u === 2) c = PURPLE[0];
+      else if (u === 2) c = VELVET[0];
       else {
         const p = Math.abs(u - (wd - 1) / 2) + Math.abs((v % 24) - 12);
-        c = p < 1.5 ? GOLD[3] : p >= 7 && p < 8 ? GOLD[1] : p < 7 ? PURPLE[2] : PURPLE[1];
-        if (c === PURPLE[1] && (u + v) % 4 === 0) c = PURPLE[0];
+        c = p < 1.5 ? GOLD[3] : p >= 7 && p < 8 ? GOLD[1] : p < 7 ? VELVET[2] : VELVET[1];
+        if (c === VELVET[1] && (u + v) % 4 === 0) c = VELVET[0];
       }
       img.px[y * img.w + x] = rgba(c);
     }
@@ -265,7 +262,7 @@ export function pillarPiece(p: Pillar): Standing {
       const from = top - j;
       for (let x = -3; x <= 3; x++) {
         if (from >= len - 2 && Math.abs(x) <= len - 1 - from) continue;
-        let c = x === -3 || x === 3 ? GOLD[1] : x === -1 ? PURPLE[3] : x === 2 ? PURPLE[1] : PURPLE[2];
+        let c = x === -3 || x === 3 ? GOLD[1] : x === -1 ? VELVET[3] : x === 2 ? VELVET[1] : VELVET[2];
         if (from >= 3 && from <= 5) {
           const crown = [[-2, 0, 2], [-2, -1, 0, 1, 2], [-2, -1, 0, 1, 2]][from - 3];
           if (crown.includes(x)) c = from === 3 ? GOLD[3] : GOLD[2];
@@ -277,26 +274,26 @@ export function pillarPiece(p: Pillar): Standing {
   return s;
 }
 
-/** A brazier: a gold bowl of coals glowing violet on an obsidian stem. Its
- * fire is drawn live (`PalaceArt.drawGlow`) at `BOWL` up from its foot. */
-export const BOWL = 9;
-export function brazierPiece(b: Brazier): Standing {
-  const s = standing(7, 7, 14);
+/** A torch: a gold cup on a tall obsidian stand banded in gold, its
+ * coals dead until it is lit (its fire and embers are drawn live,
+ * `PalaceArt.drawGlow`, at `TORCH_TOP` up from its foot). */
+export const TORCH_TOP = 17;
+export function torchPiece(t: Torch): Standing {
+  const s = standing(6, 6, TORCH_TOP + 4);
   for (let x = -3; x <= 3; x++) { s.set(x, 0, x === -3 ? GOLD[2] : GOLD[1]); s.set(x, 1, x < 0 ? GOLD[3] : GOLD[2]); }
-  for (let j = 2; j <= 6; j++)
-    for (let x = -1; x <= 1; x++) s.set(x, j, j === 4 ? GOLD[x < 0 ? 3 : 2] : x < 0 ? OBS[5] : x > 0 ? OBS[2] : OBS[4]);
-  for (let j = 6; j <= 8; j++) {
-    const r = j - 3;
+  for (let j = 2; j <= TORCH_TOP - 4; j++)
+    for (let x = -1; x <= 1; x++) s.set(x, j, j === 5 || j === TORCH_TOP - 6 ? GOLD[x < 0 ? 3 : 2] : x < 0 ? OBS[5] : x > 0 ? OBS[2] : OBS[4]);
+  for (let j = TORCH_TOP - 3; j <= TORCH_TOP - 1; j++) {
+    const r = j - (TORCH_TOP - 5);
     for (let x = -r; x <= r; x++) s.set(x, j, GOLD[x < -r / 2 ? 3 : x > r / 2 ? 1 : 2]);
   }
-  // The rim and the coals inside it.
-  for (let x = -5; x <= 5; x++)
+  // The rim and the dead coals inside it.
+  for (let x = -4; x <= 4; x++)
     for (let dj = -2; dj <= 2; dj++) {
-      const e = (x / 5.5) ** 2 + (dj / 2.4) ** 2;
+      const e = (x / 4.5) ** 2 + (dj / 2.2) ** 2;
       if (e > 1) continue;
       const rim = e > 0.45;
-      const coal = hash(b.seed, x, dj, 1826) % 3;
-      s.set(x, BOWL + dj, rim ? (dj > 0 ? GOLD[2] : GOLD[3]) : coal ? GEM[0] : GEM[1], rim ? 0 : coal ? GEM[0] : GEM[1]);
+      s.set(x, TORCH_TOP + dj, rim ? (dj > 0 ? GOLD[2] : GOLD[3]) : hash(t.seed, x, dj, 1826) % 3 ? OBS[2] : SHEEN[0]);
     }
   return s;
 }
@@ -364,13 +361,13 @@ export function thronePiece(t: Throne): Standing {
   for (let j = 0; j <= 24; j++)
     for (let x = -9; x <= 9; x++) {
       const front = j % 7 < 3 && j < 17;
-      s.set(x, j, Math.abs(x) === 9 ? GOLD[2] : Math.abs(x) === 8 ? GOLD[1] : front ? PURPLE[1] : PURPLE[2]);
+      s.set(x, j, Math.abs(x) === 9 ? GOLD[2] : Math.abs(x) === 8 ? GOLD[1] : front ? VELVET[1] : VELVET[2]);
     }
   // The back: velvet in a gold frame, the Prince's crown worked on it.
   for (let j = 26; j <= 56; j++)
     for (let x = -13; x <= 13; x++) {
       const frame = Math.abs(x) >= 12 || j >= 55;
-      let c = frame ? (x < 0 ? GOLD[3] : GOLD[2]) : x === -11 ? PURPLE[3] : x === 11 ? PURPLE[0] : (x + (j >> 1)) % 5 === 0 ? PURPLE[1] : PURPLE[2];
+      let c = frame ? (x < 0 ? GOLD[3] : GOLD[2]) : x === -11 ? VELVET[3] : x === 11 ? VELVET[0] : (x + (j >> 1)) % 5 === 0 ? VELVET[1] : VELVET[2];
       if (!frame && j >= 38 && j <= 42) {
         const row = j - 38, crown = [[-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5], [-5, 5], [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5], [-5, -4, -3, -1, 0, 1, 3, 4, 5], [-5, -3, 0, 3, 5]][row];
         if (crown.includes(x)) c = row === 4 ? GOLD[4] : GOLD[3 - (row & 1)];
@@ -392,7 +389,7 @@ export function thronePiece(t: Throne): Standing {
     }
   // The seat: obsidian trimmed in gold under a purple cushion.
   for (let j = 19; j <= 27; j++)
-    for (let x = -11; x <= 11; x++) s.set(x, j, j >= 24 ? (j === 27 ? PURPLE[3] : PURPLE[2]) : j === 23 ? GOLD[3] : x < -9 ? OBS[4] : OBS[3]);
+    for (let x = -11; x <= 11; x++) s.set(x, j, j >= 24 ? (j === 27 ? VELVET[3] : VELVET[2]) : j === 23 ? GOLD[3] : x < -9 ? OBS[4] : OBS[3]);
   // The arms, gold capped.
   for (const side of [-1, 1])
     for (let j = 19; j <= 32; j++)
@@ -445,14 +442,13 @@ export function standPiece(img: Img, glow: Img | null, p: Standing, x: number, y
 
 type Item = { y: number; draw: (img: Img, glow: Img | null, ox: number, oy: number, ok: (X: number, Y: number) => boolean) => void };
 /** The standing pieces back to front. */
-export function palaceItems(plan: Pick<PalacePlan, "pillars" | "braziers" | "crystals" | "blocks"> & { throne?: Throne | null }): Item[] {
+export function palaceItems(plan: Pick<PalacePlan, "pillars" | "crystals" | "blocks"> & { torches?: Torch[] }): Item[] {
   const item = <T extends { x: number; y: number }>(p: T, make: (p: T) => Standing) => ({
     y: p.y, draw: (img: Img, glow: Img | null, ox: number, oy: number, ok: (X: number, Y: number) => boolean) => standPiece(img, glow, make(p), p.x * ART + ox, p.y * ART + oy, ok),
   });
   return [
-    ...(plan.throne ? [item(plan.throne, thronePiece)] : []),
     ...plan.pillars.map((p) => item(p, pillarPiece)),
-    ...plan.braziers.map((b) => item(b, brazierPiece)),
+    ...(plan.torches ?? []).map((t) => item(t, torchPiece)),
     ...plan.crystals.map((c) => item(c, crystalPiece)),
     ...plan.blocks.map((b) => item(b, blocksPiece)),
   ].sort((a, b) => a.y - b.y);
@@ -487,7 +483,34 @@ function canvasOf(pixels: Uint32Array, w: number, h: number) {
   return cv;
 }
 
-export type PalaceGlowOptions = { now: number; alpha: number; still: boolean; night: number; effects: boolean };
+export type PalaceGlowOptions = { now: number; alpha: number; still: boolean; night: number; effects: boolean;
+  /** How many torches burn (`torchesLit`). */
+  lit: number };
+
+/** The throne baked for drawing live (it rises past the board's top
+ * edge): its pixels, its light, its shadow (opaque black, drawn faint),
+ * and where its foot is in them. */
+export function throneSprite(t: Throne) {
+  const p = thronePiece(t), padR = 60, padB = 24, w = p.w + padR, h = p.h + padB;
+  const img: Img = { px: new Uint32Array(w * h), w, h }, glow: Img = { px: new Uint32Array(w * h), w, h };
+  standPiece(img, glow, p, p.ax, p.ay, () => true);
+  // The shadow, thrown as `standPiece` throws it, kept apart.
+  const shadow = new Uint32Array(w * h), black = rgba(0);
+  for (let j = 0; j < p.h; j++)
+    for (let i = 0; i < p.w; i++) {
+      const k = j * p.w + i;
+      if (!p.px[k]) continue;
+      const hp = p.ht[k];
+      for (let q = 0; q <= hp * 0.85 + 1; q++) {
+        const X = Math.round(i + q * 0.75), Y = Math.round(j + hp + q * 0.32);
+        if (X < w && Y < h && !img.px[Y * w + X]) shadow[Y * w + X] = black;
+      }
+    }
+  return { px: img.px, glow: glow.px, shadow, w, h, ax: p.ax, ay: p.ay };
+}
+
+/** How long a torch flares as it catches (ms). */
+const CATCH_MS = 900;
 
 export class PalaceArt {
   private map: CityMap | null = null;
@@ -499,6 +522,10 @@ export class PalaceArt {
   private gold: HTMLCanvasElement | null = null;
   private ink = true;
   private painting: { plan: PalacePlan; steps: ReturnType<typeof palaceFloorSteps> } | null = null;
+  private throne: { look: HTMLCanvasElement; light: HTMLCanvasElement; shadow: HTMLCanvasElement; ax: number; ay: number } | null = null;
+  /** How many torches burned when last drawn, and when each caught. */
+  private litNow = -1;
+  private caught: number[] = [];
 
   /** Plans `map`'s palace (and repaints it) when the map changes, or when
    * scenery outlines are turned on or off. */
@@ -511,6 +538,7 @@ export class PalaceArt {
     this.floor = this.glow = null;
     this.glints = null;
     this.painting = null;
+    this.throne = null;
   }
 
   /** Plans `map`'s palace and paints, for about `ms`, its floor ahead of a
@@ -543,18 +571,40 @@ export class PalaceArt {
     return !!this.floor;
   }
 
-  /** The floor over the open cells. */
+  /** The floor over the open cells, then the throne with its shadow. */
   drawFloor(c: CanvasRenderingContext2D, px: number, alpha: number) {
     if (!this.plan || alpha <= 0 || typeof document === "undefined" || !this.ready()) return;
     c.save();
     c.imageSmoothingEnabled = false;
     c.globalAlpha *= alpha;
     c.drawImage(this.floor!, 0, 0, CELLS_W * px, CELLS_H * px);
+    const th = this.throneLooks(), t = this.plan.throne, k = px / ART;
+    const X = (Math.round(t.x * ART) - th.ax) * k, Y = (Math.round(t.y * ART) - th.ay) * k, w = th.look.width * k, h = th.look.height * k;
+    const a = c.globalAlpha;
+    c.globalAlpha = a * 0.5;
+    c.drawImage(th.shadow, X, Y, w, h);
+    c.globalAlpha = a;
+    c.drawImage(th.look, X, Y, w, h);
     c.restore();
   }
 
+  private throneLooks() {
+    if (!this.throne) {
+      const s = throneSprite(this.plan!.throne);
+      this.throne = { look: canvasOf(s.px, s.w, s.h), light: canvasOf(s.glow, s.w, s.h), shadow: canvasOf(s.shadow, s.w, s.h), ax: s.ax, ay: s.ay };
+    }
+    return this.throne;
+  }
+
+  /** Notes when each torch caught, for its flare. */
+  private catchUp(lit: number, now: number) {
+    if (this.litNow < 0 || lit < this.litNow) this.caught = Array.from({ length: lit }, () => -Infinity);
+    else for (let k = this.litNow; k < lit; k++) this.caught[k] = now;
+    this.litNow = lit;
+  }
+
   /** What shines, over the battle's darkness: the gold veins (at night),
-   * the braziers' violet fire and halos, the throne's amethyst, glints
+   * the lit torches' violet fire and halos, the throne's amethyst, glints
    * twinkling along the gold and gold dust drifting up. */
   drawGlow(c: CanvasRenderingContext2D, px: number, o: PalaceGlowOptions) {
     const plan = this.plan;
@@ -573,10 +623,12 @@ export class PalaceArt {
       const s = r * px * 2;
       c.drawImage(sprite, x * px - s / 2, y * px - s / 2, s, s);
     };
-    const fireAt = (b: Brazier) => ({ x: b.x, y: b.y - BOWL / ART });
-    for (const b of plan.braziers) {
-      const f = o.still ? 0.85 : flicker(b.seed, t), at = fireAt(b);
-      halo(this.violet, at.x, at.y, 3.2 + f, (0.35 + 0.6 * night) * f);
+    this.catchUp(o.lit, o.now);
+    // The torches burning, each flaring as it catches.
+    const burning = plan.torches.filter((b) => b.order < o.lit), flare = (b: Torch) => (o.still ? 0 : Math.max(0, 1 - (o.now - (this.caught[b.order] ?? -Infinity)) / CATCH_MS));
+    for (const b of burning) {
+      const f = o.still ? 0.85 : flicker(b.seed, t), fl = flare(b);
+      halo(this.violet, b.x, b.y - TORCH_TOP / ART, 3.2 + f + fl * 4, (0.35 + 0.6 * night) * f + fl * 0.8);
     }
     // The throne's amethyst, beating slowly.
     const th = plan.throne, beat = o.still ? 0.6 : 0.5 + 0.5 * Math.sin(t * 1.7);
@@ -584,17 +636,24 @@ export class PalaceArt {
     halo(this.gold, th.x, th.y - 3.5, 7, 0.12 + 0.2 * night);
     c.imageSmoothingEnabled = false;
     const dot = artPen(c, px);
-    // The braziers' fire: tongues of violet rising and shrinking.
+    // The throne's amethyst.
+    {
+      const th = this.throneLooks(), k = px / ART;
+      c.globalAlpha = Math.min(1, base * (0.35 + 0.65 * night));
+      c.drawImage(th.light, (Math.round(plan.throne.x * ART) - th.ax) * k, (Math.round(plan.throne.y * ART) - th.ay) * k, th.light.width * k, th.light.height * k);
+    }
+    // The torches' fire: tongues of violet rising and shrinking, taller as
+    // each catches.
     c.globalCompositeOperation = "source-over";
-    for (const b of plan.braziers) {
-      const bx = Math.round(b.x * ART), by = Math.round(b.y * ART) - BOWL - 1;
+    for (const b of burning) {
+      const bx = Math.round(b.x * ART), by = Math.round(b.y * ART) - TORCH_TOP - 1, tall = 1 + flare(b) * 1.2;
       c.globalAlpha = Math.min(1, base);
       c.fillStyle = FIRE[3];
-      dot(bx - 3, by, 7, 2);
+      dot(bx - 2, by, 5, 2);
       for (let k = 0; k < 9; k++) {
         const u = (s: number) => hash01(b.seed, k, s);
         const age = (t * (1.1 + u(1840) * 0.8) + u(1841)) % 1;
-        const x = bx + (u(1842) - 0.5) * 6 * (1 - age) + Math.sin(t * 5 + k) * 1.2 * age, y = by - age * (8 + u(1843) * 4);
+        const x = bx + (u(1842) - 0.5) * 5 * (1 - age) + Math.sin(t * 5 + k) * 1.2 * age, y = by - age * (8 + u(1843) * 4) * tall;
         const r = Math.round((1 - age) * 2.2 - 0.3);
         c.fillStyle = age < 0.18 ? FIRE[0] : age < 0.42 ? FIRE[1] : age < 0.7 ? FIRE[2] : FIRE[3];
         puff(dot, Math.round(x), Math.round(y), Math.max(0, r));
@@ -624,13 +683,13 @@ export class PalaceArt {
         c.fillStyle = a % 4 ? "#d8a838" : "#fff0a0";
         dot(Math.floor((x + Math.sin(t * 0.6 + a) * 0.25) * ART), Math.floor((y0 - age * 3) * ART));
       }
-      for (const b of plan.braziers)
+      for (const b of burning)
         for (let k = 0; k < 4; k++) {
           const u = (s: number) => hash01(b.seed, k, s);
           const age = (t * (0.45 + u(1855) * 0.3) + u(1856)) % 1;
           c.globalAlpha = Math.min(1, base * (1 - age));
           c.fillStyle = FIRE[2];
-          dot(Math.round(b.x * ART + (u(1857) - 0.5) * 8 + Math.sin(t * 3 + k) * 2 * age), Math.round(b.y * ART - BOWL - 6 - age * 22));
+          dot(Math.round(b.x * ART + (u(1857) - 0.5) * 8 + Math.sin(t * 3 + k) * 2 * age), Math.round(b.y * ART - TORCH_TOP - 6 - age * 22));
         }
     }
     c.restore();
@@ -641,14 +700,14 @@ export class PalaceArt {
 
 /** The pieces standing about the cave past the board, as
  * `palaceWildsSteps` paints them. */
-export type PalaceWilds = { pillars: Pillar[]; crystals: Crystal[]; blocks: Blocks[]; braziers: Brazier[] };
+export type PalaceWilds = { pillars: Pillar[]; crystals: Crystal[]; blocks: Blocks[] };
 
 /** Plans the pieces past the board, `margin` cells past every edge, clear
  * of the cave's walls (`wall(x, y)` in cells): finished pillars where the
  * floor is laid, half-carved and roughed-out ones at its edge, shards and
  * blocks out in the raw rock. */
 export function palaceWilds(margin: number, wall: (x: number, y: number) => boolean): PalaceWilds {
-  const out: PalaceWilds = { pillars: [], crystals: [], blocks: [], braziers: [] };
+  const out: PalaceWilds = { pillars: [], crystals: [], blocks: [] };
   const taken: { x: number; y: number; r: number }[] = [];
   const off = (x: number, y: number) => { const dx = x < 0 ? -x : x > CELLS_W ? x - CELLS_W : 0, dy = y < 0 ? -y : y > CELLS_H ? y - CELLS_H : 0; return Math.hypot(dx, dy); };
   for (let cy = -margin; cy < CELLS_H + margin; cy++)
@@ -662,8 +721,7 @@ export function palaceWilds(margin: number, wall: (x: number, y: number) => bool
       if (taken.some((t) => (t.x - x) ** 2 + (t.y - y) ** 2 < (t.r + r + 2) ** 2)) continue;
       taken.push({ x, y, r });
       if (w > 0.62) {
-        if (u < 0.004) out.braziers.push({ x, y, r: 0.8, seed });
-        else out.pillars.push({ x, y, r: 1, seed, stage: 0, banner: hash01(seed, 1863) < 0.4 });
+        out.pillars.push({ x, y, r: 1, seed, stage: 0, banner: hash01(seed, 1863) < 0.4 });
       } else if (w > 0.45) {
         if (u < 0.005) out.blocks.push({ x, y, r: 1.1, seed });
         else out.pillars.push({ x, y, r: 1, seed, stage: u < 0.008 ? 1 : 2, banner: false });
@@ -686,31 +744,83 @@ export function* palaceWildsSteps(out: Uint32Array, glow: Uint32Array, gw: numbe
   for (let k = 0; k < items.length; k++, k % 32 || (yield)) items[k].draw(img, light, ox, oy, offField);
 }
 
-/** The cave's walls into `out` (and their gold's light into `glow`), from
- * the wilds' mountain heights `H` where `f` is above 0: black glass lit
- * from the upper left, its faces catching violet sheen and white glints,
- * shot through with veins of gold; outlined while scenery outlines are on. */
+/** The cave's walls into `out` (and their inscriptions' light into
+ * `glow`), from the wilds' mountain heights `H` where `f` is above 0: a
+ * strange jumble of obsidian cubes stacked in columns of every height,
+ * each cube's top and south face showing, bevelled, a few of them cut
+ * with golden inscriptions; loose cubes lying at the walls' foot; outlined
+ * while scenery outlines are on. */
 export function* paintHallWalls(out: Uint32Array, glow: Uint32Array, gw: number, gh: number, Hs: Float32Array, f: Float32Array, slice: number): Generator<void, void, void> {
-  const ramp = [0x020104, 0x050409, 0x090710, 0x0e0b18, 0x151124, 0x201a34].map((c) => rgba(c)), spec = rgba(0x7a7490), sheen = rgba(0x262234), bright = rgba(0x3c3650);
-  const edge = rgba(sceneryOutlinesOn() ? INK : OBS[1]);
-  const gold = GOLD.map((c) => rgba(c)), lit = rgba(GOLD[2]);
-  const vein = washer(gw, 0, 80, 1871), bend = washer(gw, 0, 16, 1872), where = washer(gw, 0, 70, 1873);
-  const inR = (X: number, Y: number) => X >= 0 && Y >= 0 && X < gw && Y < gh && f[Y * gw + X] > 0;
-  for (let Y = 0; Y < gh; Y++, Y % slice || (yield)) {
-    vein.row(Y); bend.row(Y); where.row(Y);
-    for (let X = 0; X < gw; X++) {
-      const i = Y * gw + X;
-      if (f[i] <= 0) continue;
-      if (!inR(X - 1, Y) || !inR(X + 1, Y) || !inR(X, Y - 1) || !inR(X, Y + 1)) { out[i] = edge; continue; }
-      const gx = Hs[i + 1] - Hs[i - 1], gy = Hs[i + gw] - Hs[i - gw];
-      const k = (0.6 * gx + 0.8 * gy) * 0.32 + (Hs[i] - 50) * 0.003 + (bayer(X, Y) - 0.5) * 0.3;
-      let c = k > 1.7 ? spec : k > 1.25 ? bright : k > 0.9 ? sheen : k > 0.45 ? ramp[5] : k > 0.1 ? ramp[4] : k > -0.25 ? ramp[3] : k > -0.6 ? ramp[2] : k > -1 ? ramp[1] : ramp[0];
-      const m = where.at(X), wk = Math.max(0, (m - 0.3) / 0.7);
-      const a = Math.abs(vein.at(X) + (bend.at(X) - 0.5) * 0.1 - 0.5);
-      if (a < 0.005 * wk) { c = k > 0.1 ? gold[4] : gold[3]; glow[i] = lit; }
-      else if (a < 0.012 * wk) c = k > 0.1 ? gold[2] : gold[1];
-      else if (hash01(X, Y, 1874) < 0.0006) c = gold[3];
-      out[i] = c;
+  const C = CUBE.size, FH = CUBE.face, nx = Math.ceil(gw / C), ny = Math.ceil(gh / C);
+  const ramp = [0x020203, 0x060608, 0x0b0b0e, 0x121116, 0x1e1d24, 0x2a2832, 0x393643, 0x4c4958].map((c) => rgba(c));
+  const shine = rgba(SHEEN[1]), gold = GOLD.map((c) => rgba(c)), lit = rgba(GOLD[2]), ink = rgba(INK);
+  const level = new Uint8Array(nx * ny);
+  const at = (X: number, Y: number) => f[Math.min(gh - 1, Y) * gw + Math.min(gw - 1, X)];
+  for (let gy = 0; gy < ny; gy++)
+    for (let gx = 0; gx < nx; gx++) {
+      const X = gx * C + (C >> 1), Y = gy * C + (C >> 1), i = Math.min(gh - 1, Y) * gw + Math.min(gw - 1, X);
+      if (f[i] > 0) {
+        let n = 1 + Math.floor(Hs[i] / 20 + (hash01(gx, gy, 1881) - 0.35) * 3.4);
+        if (hash01(gx, gy, 1882) < 0.05) n -= 2;
+        level[gy * nx + gx] = Math.max(1, Math.min(CUBE.most, n));
+      } else if (hash01(gx, gy, 1883) < 0.22 && (at(X + C, Y) > 0 || at(Math.max(0, X - C), Y) > 0 || at(X, Y + C) > 0 || at(X, Math.max(0, Y - C)) > 0))
+        level[gy * nx + gx] = 1;
     }
-  }
+  yield;
+  const solid = new Uint8Array(gw * gh);
+  const put = (X: number, Y: number, c: number, g = 0) => {
+    if (X < 0 || Y < 0 || X >= gw || Y >= gh) return;
+    const i = Y * gw + X;
+    out[i] = c; glow[i] = g; solid[i] = 1;
+  };
+  const glyph = (seed: number, X0: number, Y0: number) => {
+    const rows = GLYPHS[seed % GLYPHS.length];
+    rows.forEach((row, j) => { for (let i = 0; i < row.length; i++) if (row[i] === "#") put(X0 + i, Y0 + j, gold[3], lit); });
+  };
+  for (let gy = 0; gy < ny; gy++, gy % 4 || (yield))
+    for (let gx = 0; gx < nx; gx++) {
+      const n = level[gy * nx + gx];
+      if (!n) continue;
+      const X0 = gx * C, foot = gy * C + C;
+      // The south faces, the bottom cube first.
+      for (let L = 1; L <= n; L++) {
+        const top = foot - L * FH, seed = hash(gx, gy, L, 1884), tone = 2 + (seed % 3 === 0 ? 1 : 0) - (L === 1 ? 1 : 0);
+        for (let v = 0; v < FH; v++)
+          for (let u = 0; u < C; u++) {
+            const t = v < FH / 2 && (u + v) & 1 ? tone : v < 2 ? tone : Math.max(1, tone - 1);
+            put(X0 + u, top + v, v === 0 ? ramp[tone + 3] : v === FH - 1 ? ramp[0] : u === 0 ? ramp[tone + 1] : u === C - 1 ? ramp[0] : ramp[t]);
+          }
+        if (hash01(seed, 1885) < CUBE.inscribed) glyph(seed, X0 + 5, top + 2);
+      }
+      // The top face.
+      const y0 = foot - n * FH - C, seed = hash(gx, gy, 1886), tone = 5 + (seed % 4 === 0 ? 1 : 0) - (seed % 5 === 0 ? 1 : 0);
+      for (let v = 0; v < C; v++)
+        for (let u = 0; u < C; u++) {
+          let c = u === 0 || v === 0 ? (u + v < 3 ? shine : ramp[7]) : u === C - 1 || v === C - 1 ? ramp[3] : ramp[tone];
+          if (u > 1 && v > 1 && u < C - 1 && v < C - 1 && u + v === 11) c = ramp[Math.min(7, tone + 1)];
+          put(X0 + u, y0 + v, c);
+        }
+      if (hash01(seed, 1887) < CUBE.inscribed * 0.6) glyph(seed, X0 + 5, y0 + 5);
+    }
+  if (!sceneryOutlinesOn()) return;
+  // The outline round the walls where they meet the floor.
+  for (let Y = 1; Y < gh - 1; Y++, Y % (slice * 4) || (yield))
+    for (let X = 1; X < gw - 1; X++) {
+      const i = Y * gw + X;
+      if (!solid[i] && (solid[i - 1] || solid[i + 1] || solid[i - gw] || solid[i + gw])) { out[i] = ink; glow[i] = 0; }
+    }
 }
+
+/** The walls' cubes: their size (art pixels across the top), the height
+ * of their south face, the most stacked in a column, and the share cut
+ * with an inscription. */
+export const CUBE = { size: 16, face: 12, most: 9, inscribed: 0.03 } as const;
+/** The inscriptions, golden runes five pixels square. */
+const GLYPHS = [
+  ["#...#", ".#.#.", "..#..", ".#.#.", "#...#"],
+  ["#####", "#...#", "#.#.#", "#...#", "#####"],
+  ["..#..", ".###.", "#.#.#", "..#..", "..#.."],
+  ["###..", "#....", "####.", "...#.", "..##."],
+  [".###.", "#...#", "#.#.#", "#...#", ".#.#."],
+  ["#.#.#", "#.#.#", "#####", "..#..", ".###."],
+];

@@ -1,8 +1,8 @@
 // The Obsidian Palace (zone 8, waves 141–160), the Blight Prince's throne
 // room: its half-laid floor veined with gold, the throne, carpet,
-// colonnade, braziers, monoliths, blocks and shards, while building, in
-// battle and at night, desktop and phone, and the cave's walls past the
-// board. Isolated saves. Needs `npm run dev`.
+// colonnade, torches, monoliths, blocks and shards, while building, in
+// battle and at night, desktop and phone, and the walls of stacked cubes past
+// the board. Isolated saves. Needs `npm run dev`.
 import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
@@ -50,18 +50,18 @@ try {
     await page.waitForTimeout(3500);
     const plan = await page.evaluate(() => {
       const r = window.__dp.renderer, p = r.palace?.plan;
-      return { area: r.area, pillars: p?.pillars.length ?? -1, braziers: p?.braziers.length ?? -1, crystals: p?.crystals.length ?? -1, blocks: p?.blocks.length ?? -1 };
+      return { area: r.area, pillars: p?.pillars.length ?? -1, torches: p?.torches.length ?? -1, crystals: p?.crystals.length ?? -1, blocks: p?.blocks.length ?? -1 };
     });
     console.log(width, JSON.stringify(plan));
     assert.equal(plan.area, 'obsidian');
-    if (!process.env.BASELINE) assert.ok(plan.pillars >= 6 && plan.braziers >= 3 && plan.crystals >= 3, JSON.stringify(plan));
+    if (!process.env.BASELINE) assert.ok(plan.pillars >= 6 && plan.torches === 20 && plan.crystals >= 3, JSON.stringify(plan));
     await page.screenshot({ path: `${out}/palace-${width}-building.png` });
     await page.evaluate(() => document.querySelector('#defend-start').click());
     await page.waitForTimeout(4000);
     await page.screenshot({ path: `${out}/palace-${width}-battle.png` });
     // Close-ups of each feature.
     if (!process.env.BASELINE)
-      for (const what of ['throne', 'pillars', 'braziers', 'crystals', 'blocks']) {
+      for (const what of ['throne', 'pillars', 'torches', 'crystals', 'blocks']) {
         await page.evaluate((what) => {
           const r = window.__dp.renderer, p = r.palace.plan[what], t = Array.isArray(p) ? p[p.length - 1] : { x: p.x, y: p.y - 3 };
           if (!t) return;

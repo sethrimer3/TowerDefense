@@ -871,7 +871,10 @@ The Mistwood's weather. It rolls in from the board's edges once the zone's battl
 The Dark One's son. His palace is the Obsidian Palace (zone 8, waves 141–160).
 
 **Obsidian Palace**:
-Zone 8's ground, once the Obsidian Crypt: the Blight Prince's throne room, an obsidian cave veined with gold that has been halfway turned into a palace. Polished slabs, a carpet, a colonnade and his throne toward the north edge; raw rock, monoliths, quarried blocks and shards to the south.
+Zone 8's ground, once the Obsidian Crypt: the Blight Prince's throne room, an obsidian cave veined with gold that has been halfway turned into a palace. His throne stands at the top just outside the building field, with polished slabs, a carpet and a colonnade below it; raw rock, monoliths, quarried blocks and shards to the south; walls of stacked obsidian cubes.
+
+**Palace torch**:
+One of the twenty torches down the Obsidian Palace's sides, ten a side. One more is lit each wave of the zone, so all twenty burn on its last.
 
 **Sky island**:
 The Astral Sanctuary's ground (zone 9, waves 161–180): an island floating in open sky. Its land grows round wherever the keep stands, lush meadow near the keep and drier, barer ground toward the far edges, and past the board it bulges out on the keep's side before breaking off over the clouds.
