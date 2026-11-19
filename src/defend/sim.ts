@@ -747,6 +747,8 @@ export class DefendSim {
   readonly blight = new BlightTrail();
 
   step(dt: number) {
+    // Kill tallies credit a fallen troop's blows (arrows still flying) to its home.
+    if (this.tallyHomes) for (const s of this.soldiers) this.tallyHomes.set(s.id, s.home);
     this.time += dt;
     if (this.wave > 0) this.stats.current.seconds += dt;
     this.fieldT -= dt;

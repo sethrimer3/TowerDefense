@@ -25,7 +25,7 @@ try {
     const fixture = await page.evaluate(async () => {
       const { defaults } = await import('/src/save.ts');
       const { placeCityTile, placeWall } = await import('/src/defend/layout.ts');
-      const s = defaults(); s.profile = { name: "Building tester", flag: {base:3,layers:[]} }; s.settings.soundOff = true; s.settings.ambienceOff = true; s.settings.crispZoom = false; // Keep both drag destinations visible on the phone.
+      const s = defaults(); s.profile = { name: "Building tester", flag: {base:3,layers:[]} }; s.settings.soundOff = true; s.settings.ambienceOff = true; s.settings.ringMenu = true; s.settings.crispZoom = false; // Keep both drag destinations visible on the phone.
       s.knowledge = 400; s.smithy.copper = 20;
       s.defend.owned.wallBlock = 40;
       let l = s.defend.layout;

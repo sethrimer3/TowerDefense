@@ -2416,6 +2416,58 @@ nav button:disabled {opacity:.45;}
 :root.reduce-motion .building-menu { animation: none; }
 @media (prefers-reduced-motion: reduce) { .building-menu { animation: none; } }
 
+/* ── The building panel: an oak board bound in brass, nailed at its
+ * corners, its buttons on dark brickwork like the square menu's. */
+.building-panel {
+  color: #e6d2a6;
+  text-shadow: 0 1px 0 #000, 0 0 2px #000;
+  background: var(--brass-nails), linear-gradient(#ffffff0c, transparent 40%, #00000055), linear-gradient(#00000048, #00000048), var(--wood), #3a2616;
+  border: 2px solid #0c0a0a;
+  box-shadow: inset 0 0 0 1px var(--brass), inset 0 0 0 3px #00000080, 0 3px 0 #000000b0;
+}
+.building-panel .bp-name { color: #f2c14e; }
+.building-panel .bp-portrait {
+  background: radial-gradient(circle at 50% 60%, #ff9a3c22, transparent 70%), linear-gradient(#00000060, #00000060), var(--stone), #2a2620;
+  border: 2px solid #0c0a0a; box-shadow: inset 0 0 0 1px var(--brass), inset 0 0 14px #000000c0;
+  padding: 4px;
+}
+.building-panel .bp-kills { border-top: 1px solid #00000080; border-bottom: 1px solid #ffffff14; padding-block: 3px; }
+.building-panel .bp-kills b { color: #ffd768; font-weight: normal; }
+.building-panel .bp-icon, .building-panel .bp-icon:hover, .building-panel .bp-icon[aria-checked="true"] { background: none; isolation: isolate; }
+.building-panel .bp-icon::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; opacity: 0.6;
+  background: linear-gradient(#ffffff0a, transparent 40%, #00000040), var(--brick), #1a1212;
+  image-rendering: pixelated;
+}
+.building-panel .bp-icon { border-color: #0c0a0a; box-shadow: 0 2px 0 #000000b0; }
+.building-panel .bp-icon[aria-checked="true"], .building-panel .bp-aim[aria-pressed="true"] { border-color: #f2c14e; box-shadow: inset 0 0 0 1px #000, inset 0 0 12px #ff9a3c50, 0 2px 0 #000000b0; }
+.building-panel .bp-mode-name { color: #f2c14e; text-shadow: 1px 0 #000, -1px 0 #000, 0 1px #000, 0 -1px #000; }
+.building-panel .bp-range input { -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer; height: 16px; }
+.building-panel .bp-range input::-webkit-slider-runnable-track {
+  height: 10px; border: 2px solid #0c0a0a; border-radius: 0;
+  background: linear-gradient(to right, #d1a446 var(--fill, 100%), #1a120b var(--fill, 100%));
+  box-shadow: inset 0 0 0 1px #00000080;
+}
+.building-panel .bp-range input::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 12px; height: 20px; margin-top: -7px;
+  border: 2px solid #0c0a0a; border-radius: 0; background: linear-gradient(to right, #fff1b0, #f2c14e 45%, #a77818);
+}
+.building-panel .bp-range input::-moz-range-track { height: 10px; border: 2px solid #0c0a0a; background: #1a120b; }
+.building-panel .bp-range input::-moz-range-progress { height: 10px; background: #d1a446; }
+.building-panel .bp-range input::-moz-range-thumb { width: 10px; height: 18px; border: 2px solid #0c0a0a; border-radius: 0; background: #f2c14e; }
+.building-panel.placing .bp-aim { outline: 2px solid var(--brass-hi); }
+.building-panel .bp-climbed.bp-here { outline: 2px solid #f2c14e; outline-offset: 1px; }
+.building-panel .bp-link { background: var(--brass); }
+.building-panel .bp-next { border-color: #6e4c1c; }
+.building-panel .bp-cost { color: #ffd768; }
+.building-panel .bp-cost.short { color: #ff6a55; }
+.building-panel .bp-next:disabled > * { opacity: 0.6; }
+.building-panel .bp-max { color: #f2c14e; }
+@keyframes bp-in-right { from { transform: translate(24px, -50%); opacity: 0; } to { transform: translateY(-50%); opacity: 1; } }
+@keyframes bp-in-left { from { transform: translate(-24px, -50%); opacity: 0; } to { transform: translateY(-50%); opacity: 1; } }
+.building-panel.opening { animation: bp-in-right 140ms ease-out; }
+.building-panel.opening[data-side="left"] { animation-name: bp-in-left; }
+
 /* Mine and Library skill icons: 15 × 15 pixel art (outline included) at 2×. */
 canvas.skill-icon, .ug-node canvas.skill-icon { width: 30px; height: 30px; image-rendering: pixelated; }
 .research-skill-glyph canvas.skill-icon { width: 45px; height: 45px; }

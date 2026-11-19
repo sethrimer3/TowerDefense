@@ -27,7 +27,7 @@ try {
     const fixture = await page.evaluate(async ([kinds, WEAR]) => {
       const { defaults } = await import('/src/save.ts');
       const { placeCityTile, placeStructure } = await import('/src/defend/layout.ts');
-      const s = defaults(); s.profile = { name: "Building tester", flag: {base:3,layers:[]} }; s.settings.soundOff = true; s.settings.ambienceOff = true;
+      const s = defaults(); s.profile = { name: "Building tester", flag: {base:3,layers:[]} }; s.settings.soundOff = true; s.settings.ambienceOff = true; s.settings.ringMenu = true;
       s.knowledge = 100000;
       for (const k of kinds) s.defend.owned[k] = 1;
       s.defend.owned.cityTile = 8;

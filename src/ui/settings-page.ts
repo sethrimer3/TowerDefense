@@ -8,7 +8,7 @@ import { LANGUAGES, isLanguage, t } from "../i18n/index.ts";
 
 /** The settings on the page, in order; each control comes from its row in SETTINGS. */
 /** Gameplay settings, under their own heading first. */
-const GAMEPLAY = ["showEmpty"] as const satisfies readonly SettingKey[];
+const GAMEPLAY = ["showEmpty", "ringMenu"] as const satisfies readonly SettingKey[];
 const CONTROLS = ["dragRally", "dragCrosshair", "raiseDrag", "magnifier", "tripleTapFlag"] as const satisfies readonly SettingKey[];
 const PAGE = ["pixelArt", "legacyGraphics", "legacyWalls", "dayNightCycle", "fasterSunCatchup", "reduceMotion", "effectsOff", "simpleEnemies", "simpleTroops", "mergedOutlines", "sceneryOutlines", "stillAir", "pixelPortals", "crispZoom", "hdSand", "ultraGraphics", "highlightBuildings", "tileGrid", "soundOff", "ambienceOff", "pixelFont"] as const satisfies readonly SettingKey[];
 /** The dev options, under ALL ON. */
