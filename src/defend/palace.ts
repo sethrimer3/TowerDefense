@@ -4,13 +4,16 @@
  * into a palace: polished obsidian slabs inlaid with gold, a purple carpet
  * running down the middle from the Prince's throne on its dais, a
  * colonnade along it whose pillars grow less finished the further they are
- * from the throne, braziers burning violet. To the south the cave is still
+ * from the throne. Down each side, just outside the building field, ten
+ * torches stand unlit, one more catching violet fire each wave of the
+ * zone until all twenty burn on its last. To the south the cave is still
  * raw: glassy black rock with veins of gold, obsidian shards, roughed-out
  * monoliths and stacks of quarried blocks waiting to be laid. Planned from
  * the map alone (each cell's own hashes), presentation only: nothing here
  * blocks, slows or draws from the battle's random stream. `palace-art.ts`
  * draws it. */
-import { CELLS_H, CELLS_W, cellIndex, hash, hash01 } from "./grid.ts";
+import { BUILD_MARGIN, CELLS_H, CELLS_W, SUB, cellIndex, hash, hash01 } from "./grid.ts";
+import { WAVES_PER_AREA } from "./areas.ts";
 import { CellType, type CityMap } from "./citygen.ts";
 import type { AreaId } from "./areas.ts";
 import { clearOf } from "./forest.ts";
@@ -19,20 +22,24 @@ import { clearOf } from "./forest.ts";
 export const PALACE_AREAS: readonly AreaId[] = ["obsidian"];
 export const hasPalace = (area: AreaId) => PALACE_AREAS.includes(area);
 
+/** Cells from the board's edge to the building field's. */
+const EDGE = BUILD_MARGIN * SUB;
+
 /** How the palace is planned. */
 export const PALACE = {
-  /** The throne's foot (cells): down the middle, as far down as the first
-   * of `ys` with room for it (clear of the controls along the top), else
-   * in the open ring along the north edge; and its dais's half width and
-   * height (cells) that must be open ground. */
-  throne: { x: CELLS_W / 2, ys: [15, 7.9], half: 6.5, tall: 9 },
+  /** The throne's foot (cells): down the middle, at the top, just outside
+   * the building field. (The zone's boss will rise from it.) */
+  throne: { x: CELLS_W / 2, y: EDGE - 0.1 },
+  /** The torches: so many down each side, `inset` cells outside the
+   * building field, evenly spaced along it. */
+  torches: { each: 10, inset: 2 },
   /** The carpet's half width and where it ends (cells). */
   carpet: { half: 2, end: 44 },
   /** The colonnade: how far each row stands from the carpet's middle, and
    * the rows (cells down from the throne's foot). */
   colonnade: { off: 7.5, rows: [6, 13, 20, 27] },
   /** At most so many of each piece placed about the cave. */
-  braziers: 3, crystals: 9, blocks: 4, monoliths: 2,
+  crystals: 9, blocks: 4, monoliths: 2,
   apart: 1.2,
   /** Gold glints twinkling at once at most, and how often each comes round (s). */
   glints: 140, glintEvery: [2.5, 7] as const,
@@ -42,8 +49,9 @@ export const PALACE = {
  * finished (a banner on it, maybe), 1 half carved in its scaffold, 2 only
  * roughed out of the rock. */
 export type Pillar = { x: number; y: number; r: number; seed: number; stage: 0 | 1 | 2; banner: boolean };
-/** A brazier of gold on an obsidian stand, burning violet. */
-export type Brazier = { x: number; y: number; r: number; seed: number };
+/** A torch on an obsidian stand, lit (violet) from the `order`th wave of
+ * the zone on. */
+export type Torch = { x: number; y: number; r: number; seed: number; order: number };
 /** A cluster of obsidian shards growing out of the floor. */
 export type Crystal = { x: number; y: number; r: number; seed: number };
 /** Quarried obsidian blocks stacked waiting to be laid. */
@@ -52,7 +60,7 @@ export type Blocks = { x: number; y: number; r: number; seed: number };
 export type Throne = { x: number; y: number; r: number; seed: number };
 /** The plan: `open` is 1 on each open-ground cell, which alone the floor covers. */
 export type PalacePlan = {
-  open: Uint8Array; throne: Throne; pillars: Pillar[]; braziers: Brazier[]; crystals: Crystal[]; blocks: Blocks[];
+  open: Uint8Array; throne: Throne; pillars: Pillar[]; torches: Torch[]; crystals: Crystal[]; blocks: Blocks[];
 };
 
 const smooth = (a: number, b: number, v: number) => {
@@ -96,14 +104,9 @@ export function palacePlan(map: CityMap): PalacePlan {
 
 function plan_(map: CityMap): PalacePlan {
   const open = Uint8Array.from(map.type, (t) => (t === CellType.OUT ? 1 : 0));
-  const T = PALACE.throne, roomy = (y: number) => {
-    for (let cy = Math.floor(y - T.tall); cy <= Math.floor(y + 0.5); cy++)
-      for (let cx = Math.floor(T.x - T.half); cx <= Math.floor(T.x + T.half); cx++)
-        if (cy >= 0 && cy < CELLS_H && !open[cellIndex(cx, cy)]) return false;
-    return true;
-  };
-  const throne: Throne = { x: T.x, y: T.ys.find(roomy) ?? T.ys[T.ys.length - 1], r: 6, seed: 1711 };
-  const taken: { x: number; y: number; r: number }[] = [{ x: throne.x, y: throne.y - 3.5, r: 6.5 }];
+  const throne: Throne = { x: PALACE.throne.x, y: PALACE.throne.y, r: 6, seed: 1711 };
+  const torches = palaceTorches();
+  const taken: { x: number; y: number; r: number }[] = [{ x: throne.x, y: throne.y - 3.5, r: 6.5 }, ...torches];
   const inside = (x: number, y: number, r: number) => x - r > 0.2 && y - r > 0.2 && x + r < CELLS_W - 0.2 && y + r < CELLS_H - 0.2;
   const free = (x: number, y: number, r: number) => inside(x, y, r) && !aisle(x, y, r)
     && taken.every((t) => (t.x - x) ** 2 + (t.y - y) ** 2 >= (t.r + r + PALACE.apart) ** 2);
@@ -139,13 +142,6 @@ function plan_(map: CityMap): PalacePlan {
     }
     return out;
   };
-  // A brazier either side of the throne, then a few about the laid floor.
-  const braziers: Brazier[] = [];
-  for (const side of [-1, 1]) {
-    const x = throne.x + side * 9.5, y = throne.y - 2.4;
-    braziers.push({ x, y, r: 0.8, seed: hash(side, 1713) });
-  }
-  braziers.push(...place(1714, PALACE.braziers, (cx, cy) => (workAt(cx + 0.5, cy + 0.5) > 0.75 ? { x: cx + 0.5, y: cy + 0.5, r: 0.8, seed: hash(cx, cy, 1715) } : null)));
   const monoliths = place(1716, PALACE.monoliths, (cx, cy) => {
     const w = workAt(cx + 0.5, cy + 0.5);
     return w > 0.3 && w < 0.55 ? { x: cx + 0.5, y: cy + 0.5, r: 1, seed: hash(cx, cy, 1717), stage: 2 as const, banner: false } : null;
@@ -157,7 +153,27 @@ function plan_(map: CityMap): PalacePlan {
   });
   const crystals = place(1720, PALACE.crystals, (cx, cy) =>
     workAt(cx + 0.5, cy + 0.5) < 0.42 ? { x: cx + 0.5, y: cy + 0.5, r: 0.7 + hash01(cx, cy, 1721) * 0.5, seed: hash(cx, cy, 1722) } : null);
-  return { open, throne, pillars, braziers, crystals, blocks };
+  return { open, throne, pillars, torches, crystals, blocks };
+}
+
+/** The torches down each side, the same on every map: mirrored, evenly
+ * spaced along the building field, lit in turn from the top down,
+ * alternating sides. */
+export function palaceTorches(): Torch[] {
+  const { each, inset } = PALACE.torches, out: Torch[] = [];
+  for (let k = 0; k < each; k++)
+    for (const side of [0, 1]) {
+      const x = side ? CELLS_W - EDGE + inset : EDGE - inset, y = EDGE + ((CELLS_H - 2 * EDGE) * (k + 0.5)) / each;
+      out.push({ x, y, r: 0.8, seed: hash(k, side, 1713), order: k * 2 + side });
+    }
+  return out;
+}
+
+/** How many torches burn: one for each wave of the zone fought so far,
+ * counting `wave` itself while it is being `fought`. */
+export function torchesLit(wave: number, fought: boolean) {
+  const at = (((wave - 1) % WAVES_PER_AREA) + WAVES_PER_AREA) % WAVES_PER_AREA;
+  return Math.min(PALACE.torches.each * 2, at + (fought ? 1 : 0));
 }
 
 /** Glint `k` of `n` at `t` seconds: 0 dark, up to 1 at its brightest; each

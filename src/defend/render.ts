@@ -104,6 +104,8 @@ import { FrozenVaultArt } from "./frozen-vault-art.ts";
 import { frozenVaultPlan, hasFrozenVault } from "./frozen-vault.ts";
 
 export type DrawOptions = {
+  /** How many of the Obsidian Palace's torches burn (`torchesLit`); absent, none. */
+  torches?: number;
   /** How many watchmen walk the city (the keep's City watch, in Defend);
    * absent, a few by the city's size. */
   watchmen?: number;
@@ -1145,7 +1147,7 @@ export class DefendRenderer {
   private drawPalaceGlow(opts: DrawOptions) {
     const alpha = this.palaceShare();
     if (alpha <= 0) return;
-    this.palace.drawGlow(this.ctx, this.px, { now: opts.now, alpha, still: opts.reduceMotion, night: opts.night, effects: opts.effects ?? true });
+    this.palace.drawGlow(this.ctx, this.px, { now: opts.now, alpha, still: opts.reduceMotion, night: opts.night, effects: opts.effects ?? true, lit: opts.torches ?? 0 });
   }
 
   /** How much of the Mistwood shows, fading like the forest's. */

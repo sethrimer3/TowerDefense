@@ -74,6 +74,7 @@ import type { Drag } from "./drag-rules.ts";
 import { EditSession, type Drop } from "./edit-session.ts";
 import { BattleSound } from "./battle-sound.ts";
 import { QUIET, type Scene } from "../ambience.ts";
+import { torchesLit } from "./palace.ts";
 import { NIGHT_FADE_SECONDS, isBossWave, rollWeather, type Weather } from "./weather.ts";
 import { play } from "../sound.ts";
 import { replay, sparksOver } from "../ui/flourish.ts";
@@ -1280,6 +1281,7 @@ export class DefendPage {
     const lifting = this.phase === "build" ? this.pointers.liftProgress() : null;
     this.renderer.draw(map, this.sim, this.overlay(), {
       area: areaForWave(this.sim?.unitTester ? 1 : Math.max(this.sim?.wave ?? 1, startingWave(this.save))).id,
+      torches: this.sim?.unitTester ? 0 : torchesLit(this.sim?.wave ?? startingWave(this.save), !!this.sim),
       grid: this.phase === "build" ? (this.host.gridLines?.() ?? 0) : 0,
       watchmen: cityWatch(this.save.keepRanks).guards,
       gridColor: this.host.gridColor?.(),
