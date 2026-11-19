@@ -22,6 +22,7 @@ import { CellType, type Building, type CityMap } from "./citygen.ts";
 import { isArcherTower, isCannonTower, isMageHall, isWizardTower } from "./catalog.ts";
 import { FIELD_H, FIELD_W, LightField, RES, poolSamples, type PoolSamples } from "./light-field.ts";
 import { cellPieces } from "./paint-box.ts";
+import { FLAME, artPen, fireTongues } from "./pixel-fx.ts";
 
 export type LightKind = "lantern" | "archerTower" | "cannonTower" | "watchTower" | "wizardTower" | "mageGuild" | "door";
 export type Light = {
@@ -907,17 +908,23 @@ export class DefendLighting {
       c.drawImage(this.flameSprite, (l.x + sway.x) * px - r, (l.y + sway.y) * px - r, r * 2, r * 2);
     }
     c.restore();
-    // A pixel of actual flame on top.
-    const s = Math.max(1, px * 0.18);
+    // The fire itself, burning as the Obsidian Palace's torches do, in
+    // finer pixels (`TORCH_FIRE_ART` a cell) and the city's own flame.
+    const dot = artPen(c, (px * ART) / TORCH_FIRE_ART), t = reduceMotion ? 0 : now / 1000;
     for (const l of lit) {
-      const sway = getTorchSway({ x: l.id * 7, y: l.id * 13 }, now, reduceMotion);
-      c.globalAlpha = this.burn(l);
-      c.fillStyle = "#ffe6a8";
-      c.fillRect((l.x + sway.x) * px - s / 2, (l.y + sway.y * 0.5) * px - s / 2, s, s * sway.stretch);
+      const sway = getTorchSway({ x: l.id * 7, y: l.id * 13 }, now, reduceMotion), b = this.burn(l);
+      const small = l.kind === "lantern" || l.kind === "door";
+      c.globalAlpha = Math.min(1, b);
+      fireTongues(c, dot, TORCH_FIRE, Math.round((l.x + sway.x) * TORCH_FIRE_ART), Math.round((l.y + sway.y * 0.5) * TORCH_FIRE_ART) + 1, l.id * 7919 + 17, t, (small ? 0.7 : 1) * (0.4 + 0.6 * b) * sway.stretch);
     }
     c.globalAlpha = 1;
   }
 }
+
+/** The city torches' fire: art pixels a cell (twice as fine as the board's
+ * art), and its colours, hottest first. */
+const TORCH_FIRE_ART = ART * 2;
+const TORCH_FIRE = [FLAME[4], FLAME[3], FLAME[2], FLAME[1]] as const;
 
 /** What the lights are drawn for this frame: canvas pixels per cell, the
  * time, and whether each light's building still stands. */

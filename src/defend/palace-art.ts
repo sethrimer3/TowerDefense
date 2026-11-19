@@ -22,7 +22,7 @@ import {
   type Blocks, type Crystal, type PalacePlan, type Pillar, type Throne, type Torch,
 } from "./palace.ts";
 import { haloSprite, rgba, wash, washer, type Img } from "./ember-forge-art.ts";
-import { artPen, puff } from "./pixel-fx.ts";
+import { artPen, fireTongues } from "./pixel-fx.ts";
 import { sceneryOutlinesOn } from "./scenery-looks.ts";
 
 const W = CELLS_W * ART, H = CELLS_H * ART;
@@ -648,16 +648,7 @@ export class PalaceArt {
     for (const b of burning) {
       const bx = Math.round(b.x * ART), by = Math.round(b.y * ART) - TORCH_TOP - 1, tall = 1 + flare(b) * 1.2;
       c.globalAlpha = Math.min(1, base);
-      c.fillStyle = FIRE[3];
-      dot(bx - 2, by, 5, 2);
-      for (let k = 0; k < 9; k++) {
-        const u = (s: number) => hash01(b.seed, k, s);
-        const age = (t * (1.1 + u(1840) * 0.8) + u(1841)) % 1;
-        const x = bx + (u(1842) - 0.5) * 5 * (1 - age) + Math.sin(t * 5 + k) * 1.2 * age, y = by - age * (8 + u(1843) * 4) * tall;
-        const r = Math.round((1 - age) * 2.2 - 0.3);
-        c.fillStyle = age < 0.18 ? FIRE[0] : age < 0.42 ? FIRE[1] : age < 0.7 ? FIRE[2] : FIRE[3];
-        puff(dot, Math.round(x), Math.round(y), Math.max(0, r));
-      }
+      fireTongues(c, dot, FIRE, bx, by, b.seed, t, tall);
     }
     c.globalCompositeOperation = "lighter";
     // Glints twinkling along the gold.

@@ -4,6 +4,7 @@ import { drawSprite, spriteSize } from "./damage-art.ts";
  * pixels snapped to whole screen pixels at any zoom, a blitter for baked
  * sprites, and the palettes the fire and ice draw from. */
 import { ART } from "./art-scale.ts";
+import { hash01 } from "./grid.ts";
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -32,6 +33,23 @@ export function puff(dot: ReturnType<typeof artPen>, x: number, y: number, r: nu
   if (r <= 0) return dot(x, y);
   dot(x - r + 1, y - r, 2 * r - 1, 2 * r + 1);
   dot(x - r, y - r + 1, 2 * r + 1, 2 * r - 1);
+}
+
+/** A torch's fire, as the Obsidian Palace's torches burn: a bed of embers
+ * `fire[3]` at art pixel (bx, by), and nine tongues rising off it and
+ * shrinking, hottest (`fire[0]`) as they leave the bed, `tall` times their
+ * height. `seed` keeps each torch's tongues its own; `t` is in seconds. */
+export function fireTongues(c: Ctx, dot: ReturnType<typeof artPen>, fire: readonly string[], bx: number, by: number, seed: number, t: number, tall = 1) {
+  c.fillStyle = fire[3];
+  dot(bx - 2, by, 5, 2);
+  for (let k = 0; k < 9; k++) {
+    const u = (s: number) => hash01(seed, k, s);
+    const age = (t * (1.1 + u(1840) * 0.8) + u(1841)) % 1;
+    const x = bx + (u(1842) - 0.5) * 5 * (1 - age) + Math.sin(t * 5 + k) * 1.2 * age, y = by - age * (8 + u(1843) * 4) * tall;
+    const r = Math.round((1 - age) * 2.2 - 0.3);
+    c.fillStyle = age < 0.18 ? fire[0] : age < 0.42 ? fire[1] : age < 0.7 ? fire[2] : fire[3];
+    puff(dot, Math.round(x), Math.round(y), Math.max(0, r));
+  }
 }
 
 /** Draws a baked sprite (one canvas pixel an art pixel) with its top left at
