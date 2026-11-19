@@ -6,6 +6,7 @@
  * save (`DefendSave.keepRanks`, absent while it has none: there is only
  * ever one keep, and it never leaves the city) and snapshotted into
  * `Bonuses.keep` when a battle starts. */
+import { THROWN_SPEAR } from "./defend/catalog.ts";
 import { studyPathCost } from "./economy.ts";
 import type { Save } from "./save.ts";
 import { buySide, decodeSideRanks, respecSide, sideAllocated, sideRank, undoSide, type SidePath, type SideRanks, type SideResult } from "./side-ranks.ts";
@@ -29,10 +30,12 @@ export const BOILING_OIL = { reach: [0, 1.5, 2, 2.5], every: [0, 3, 2.5, 2], dam
 
 /** City watch: the keep's guards, who patrol the streets with spears and,
  * in a Defend battle, fight what gets into the city (`defend/city-watch.ts`).
- * `guards[rank]` of them, trained back one every `drill[rank]` seconds while
- * the keep stands, their HP and damage times `hp[rank]` and `damage[rank]`,
- * their spears `reach[rank]` cells long. */
-export const CITY_WATCH = { guards: [4, 4, 4, 8], drill: [15, 15, 15, 7.5], hp: [1, 1.6, 1.6, 1.6], damage: [1, 1, 1.5, 1.5], reach: [0.85, 0.85, 1.1, 1.1] };
+ * The keep has none until rank I raises the watch. `guards[rank]` of them,
+ * trained back one every `drill[rank]` seconds while the keep stands, their
+ * HP and damage times `hp[rank]` and `damage[rank]`, their spears
+ * `reach[rank]` cells long. From `THROWN_SPEAR.rank` they also throw. */
+export const CITY_WATCH = { guards: [0, 4, 4, 4, 8, 8], drill: [15, 15, 15, 15, 7.5, 7.5], hp: [1, 1, 1.6, 1.6, 1.6, 1.6], damage: [1, 1, 1, 1.5, 1.5, 1.5], reach: [0.85, 0.85, 0.85, 1.1, 1.1, 1.1] };
+export { THROWN_SPEAR };
 
 export const KEEP_PATHS: SidePath<KeepPathId>[] = [
   {
@@ -62,19 +65,23 @@ export const KEEP_PATHS: SidePath<KeepPathId>[] = [
   {
     id: "watch", name: "City watch", motto: "Guards who fight for the streets", hue: "steel",
     ranks: [
-      { name: "Mail shirts", icon: "mail", cost: studyPathCost(4, 0), text: "The keep's 4 guards have 60% more HP" },
-      { name: "Spear drill", icon: "stake", cost: studyPathCost(4, 1), text: "Guards strike 50% harder with longer spears" },
-      { name: "Muster roll", icon: "helm", cost: studyPathCost(4, 2), text: "8 guards instead of 4, and the keep trains them twice as fast" },
+      { name: "Raise the watch", icon: "oath", cost: studyPathCost(4, 0), text: "The keep musters 4 guards who walk the streets and fight what gets into the city" },
+      { name: "Mail shirts", icon: "mail", cost: studyPathCost(4, 1), text: "Guards have 60% more HP" },
+      { name: "Spear drill", icon: "stake", cost: studyPathCost(4, 2), text: "Guards strike 50% harder with longer spears" },
+      { name: "Muster roll", icon: "helm", cost: studyPathCost(4, 3), text: "8 guards instead of 4, and the keep trains them twice as fast" },
+      { name: "Throwing spears", icon: "arrow", cost: studyPathCost(4, 4), text: "Guards throw spears at enemies up to 4 cells away, every 3 seconds, 50% harder than they strike" },
     ],
   },
 ];
 
-/** What the keep's guards fight with at `ranks` (for `Bonuses.watch`). */
-export function cityWatch(ranks: KeepRanks | undefined) {
+export type CityWatch = { guards: number; drill: number; hp: number; damage: number; reach: number; throws: boolean };
+/** What the keep's guards fight with at `ranks` (for `Bonuses.watch`);
+ * undefined until the watch is raised. */
+export function cityWatch(ranks: KeepRanks | undefined): CityWatch | undefined {
   const r = sideRank(ranks, "watch");
-  return { guards: CITY_WATCH.guards[r], drill: CITY_WATCH.drill[r], hp: CITY_WATCH.hp[r], damage: CITY_WATCH.damage[r], reach: CITY_WATCH.reach[r] };
+  if (!r) return undefined;
+  return { guards: CITY_WATCH.guards[r], drill: CITY_WATCH.drill[r], hp: CITY_WATCH.hp[r], damage: CITY_WATCH.damage[r], reach: CITY_WATCH.reach[r], throws: r >= THROWN_SPEAR.rank };
 }
-export type CityWatch = ReturnType<typeof cityWatch>;
 
 export const keepRank = (ranks: KeepRanks | undefined, id: KeepPathId) => sideRank(ranks, id);
 /** The Knowledge allocated to the keep: every rank bought, at today's prices

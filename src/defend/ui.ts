@@ -1318,7 +1318,7 @@ export class DefendPage {
       area: areaForWave(this.sim?.unitTester ? 1 : Math.max(this.sim?.wave ?? 1, startingWave(this.save))).id,
       torches: this.sim?.unitTester ? 0 : torchesLit(this.sim?.wave ?? startingWave(this.save), !!this.sim),
       grid: this.phase === "build" ? (this.host.gridLines?.() ?? 0) : 0,
-      watchmen: cityWatch(this.save.keepRanks).guards,
+      watchmen: cityWatch(this.save.keepRanks)?.guards ?? 0,
       gridColor: this.host.gridColor?.(),
       timings: this.frameTimes.enabled,
       weather: this.weather,

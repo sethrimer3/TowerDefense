@@ -48,6 +48,7 @@ import {
   trainSeconds,
   VALKYRIE,
   WATCHMAN,
+  THROWN_SPEAR,
 } from "./catalog.ts";
 import { patrolPath, WATCH_PATROL } from "./city-watch.ts";
 import type { Building } from "./citygen.ts";
@@ -237,8 +238,21 @@ export function stepSwordsman(sim: DefendSim, s: Soldier, dt: number) {
     const cooldown=melee(s).cooldown*(s.kind==="sword"&&paths(sim,s.home).berserk?BERSERK.cooldown:1);
     if(chargeIdle(sim,s,swordReach(sim,s),bannerDamage(sim,s),()=>s.cd<=0,()=>{s.cd=cooldown;},true))return;
   }
+  if (s.kind === "watchman" && sim.bonuses.watch?.throws) throwSpear(sim, s);
   if (s.thinkT <= 0) target = replan(sim, s, patrol);
   sim.followPath(s, target, swordSpeed(sim, s), dt);
+}
+
+/** When each guard may next throw a spear (sim time). */
+const NEXT_THROW = new WeakMap<Soldier, number>();
+/** Throwing spears: a guard with nothing in reach throws one at the nearest
+ * enemy within `THROWN_SPEAR.range`, then walks on. */
+function throwSpear(sim: DefendSim, s: Soldier) {
+  if (sim.time < (NEXT_THROW.get(s) ?? 0)) return;
+  const e = sim.troopTarget(s, THROWN_SPEAR.range);
+  if (!e || inSwordReach(sim, s, e)) return;
+  NEXT_THROW.set(s, sim.time + THROWN_SPEAR.cooldown);
+  sim.arrows.push({ x: s.x, y: s.y, origin: { x: s.x, y: s.y, attacker: s.id }, target: e.id, damage: bannerDamage(sim, s) * THROWN_SPEAR.damage, tx: e.x, ty: e.y, life: 2, shot: "spear" });
 }
 
 /** Answering the war banner: strike whatever is in reach, else close on

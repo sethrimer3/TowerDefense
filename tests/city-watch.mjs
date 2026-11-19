@@ -22,7 +22,7 @@ try {
     const fixture = await page.evaluate(async () => {
       const { defaults } = await import('/src/save.ts');
       const s = defaults(); s.settings.soundOff = true; s.settings.ambienceOff = true; s.settings.reduceMotion = false;
-      s.defend.keepRanks = { watch: 3 };
+      s.defend.keepRanks = { watch: 4 };
       s.profile = { name: 'Watch Tester', flag: { base: 3, layers: [] } };
       return s;
     });

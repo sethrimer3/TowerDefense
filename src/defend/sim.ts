@@ -284,7 +284,7 @@ export type Arrow = {
   burn?: number; burnFor?: number;
   /** What flies, when not an arrow: a thrown stone, a sniper's bullet or a
    * musketman's ball; absent for arrows. */
-  shot?: "stone" | "bullet" | "ball" | "rocket" | "javelin";
+  shot?: "stone" | "bullet" | "ball" | "rocket" | "javelin" | "spear";
   /** An explosive ball's burst radius where it hits (sparing your own
    * people); absent otherwise. */
   blast?: number;

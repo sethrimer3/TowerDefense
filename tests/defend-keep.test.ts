@@ -100,10 +100,22 @@ test("the keep's ranks survive a save, and only well formed ones", () => {
   assert.equal(decode(JSON.stringify(defaults())).defend.keepRanks, undefined, "absent while it has none");
 });
 
+test("a save from before Raise the watch keeps its City watch upgrades, one rank up", () => {
+  const raw = JSON.parse(JSON.stringify(defaults()));
+  raw.version = 8;
+  raw.defend.keepRanks = { bastions: 2, watch: 3 };
+  assert.deepEqual(decode(JSON.stringify(raw)).defend.keepRanks, { bastions: 2, watch: 4 });
+  raw.defend.keepRanks = { bastions: 2 };
+  assert.deepEqual(decode(JSON.stringify(raw)).defend.keepRanks, { bastions: 2 }, "no watch bought, none raised");
+  const now = defaults();
+  now.defend.keepRanks = { watch: 3 };
+  assert.deepEqual(decode(JSON.stringify(now)).defend.keepRanks, { watch: 3 }, "today's saves are left as they are");
+});
+
 test("the tree shows each branch from the keep, and buys only the next rank", () => {
   const ranks = { arrowLoops: 1 };
   const g = keepGraph(ranks);
-  assert.equal(g.length, 1 + KEEP_PATHS.length * 3);
+  assert.equal(g.length, 1 + KEEP_PATHS.reduce((n, p) => n + p.ranks.length, 0));
   assert.equal(g.find((n) => n.id === "q:arrowLoops:1")!.state, "owned");
   assert.equal(g.find((n) => n.id === "q:arrowLoops:2")!.state, "next");
   assert.equal(g.find((n) => n.id === "q:bastions:1")!.parent, "k:keep");
