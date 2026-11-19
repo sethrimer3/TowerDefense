@@ -71,3 +71,22 @@ test("a bullet is one pale yellow pixel trailing a fading fiery tail in a thin b
   const fresh = bulletPixels(0, 0);
   assert.equal(fresh.data[((row * side) + cell(n - 1)) * 4 + 3], 0);
 });
+
+test("a thrown spear points its steel head the way it flies, bound in the watch's blue", () => {
+  const seen = new Set<string>();
+  for (let dir = 0; dir < ARROW_DIRS; dir++) {
+    const px = arrowPixels(dir, "spear"), n = Math.sqrt(px.length);
+    const where = (color: string) => {
+      let x = 0, y = 0, k = 0;
+      px.forEach((p, i) => { if (p === color) { x += i % n; y += Math.floor(i / n); k++; } });
+      return { x: x / k, y: y / k, k };
+    };
+    const head = where(HEAD), binding = where("#3f5f8f");
+    assert.ok(head.k >= 2 && binding.k === 1, `heading ${dir} has a head and a binding`);
+    const a = (dir / ARROW_DIRS) * Math.PI * 2;
+    assert.ok((head.x - binding.x) * Math.cos(a) + (head.y - binding.y) * Math.sin(a) > 1.5, `heading ${dir} points its head forward`);
+    assert.ok(!px.includes("#c23a2a"), "no fletching");
+    seen.add(px.join());
+  }
+  assert.equal(seen.size, ARROW_DIRS);
+});

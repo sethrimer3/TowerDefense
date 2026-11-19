@@ -12,6 +12,8 @@ import { skyArrowView } from "./archer-attunements.ts";
  *   and drawn on the art lattice where the sim says each flies.
  * - **Javelins** (the javelineers'): a dark ash shaft with no fletching
  *   and a long iron head, baked per heading like the arrows.
+ * - **Spears** (the City watch's, thrown): a pale ash shaft bound in the
+ *   watch's blue below a broad leaf-shaped steel head.
  * - **Shots** (the ranged guilds' troops): a thrown stone, grey and lit
  *   from the upper left; a grenadier's explosive ball, black with a
  *   burning fuse spark. Each is a small outlined disc baked once.
@@ -59,6 +61,17 @@ const JAVELIN_ART = [
   ["s......", ".S.....", "..S....", "...S...", "....j..", ".....J.", "......."],
 ];
 
+/** A thrown spear at the same three headings: S/s shaft, B the watch's blue
+ * binding, H/h a leaf-shaped head, its wings either side. */
+const SPEAR_ART = [
+  [".......", ".......", ".....h.", "sSSBSHH", ".....h.", ".......", "......."],
+  [".......", ".......", "sS.....", "..SB.h.", "....HHH", "....h..", "......."],
+  ["s......", ".S.....", "..B....", "...S.h.", "....H..", "...h.H.", "......H"],
+];
+
+/** Which shaft a projectile of `arrowPixels` is. */
+export type ShaftKind = "arrow" | "javelin" | "spear";
+
 /** How many puffs make a dragon's breath, and how far it reaches, in cells. */
 const BREATH_PUFFS = 18;
 const BREATH_REACH = 4.6;
@@ -70,6 +83,7 @@ const C = {
   shaftLo: "#8c6236",
   fletch: "#f2ead2",
   fletchRed: "#c23a2a",
+  watch: "#3f5f8f",
   iron: "#2c2a2e",
   ironLo: "#1b1a1d",
   ironHi: "#8c8c96",
@@ -84,9 +98,11 @@ export function arrowDir(dx: number, dy: number) {
 
 /** One arrow's pixels at heading `dir`: a `ARROW_BOX`² grid of palette
  * colours, outline included ("" where clear). Pure, for tests. */
-export function arrowPixels(dir: number, javelin = false): string[] {
+export function arrowPixels(dir: number, kind: ShaftKind = "arrow"): string[] {
   const n = ARROW_BOX;
-  const key: Record<string, string> = javelin ? { J: C.head, j: C.headLo, S: C.shaftLo, s: "#5a3d22" } : { H: C.head, h: C.headLo, S: C.shaft, s: C.shaftLo, F: C.fletch, R: C.fletchRed };
+  const key: Record<string, string> = kind === "javelin" ? { J: C.head, j: C.headLo, S: C.shaftLo, s: "#5a3d22" }
+    : kind === "spear" ? { H: C.head, h: C.headLo, S: C.shaft, s: C.shaftLo, B: C.watch }
+    : { H: C.head, h: C.headLo, S: C.shaft, s: C.shaftLo, F: C.fletch, R: C.fletchRed };
   // Which hand-drawn heading, and how to turn its (x, y) into this one's.
   let base = dir, turn = (x: number, y: number) => [x, y];
   if (dir > 8) {
@@ -95,7 +111,7 @@ export function arrowPixels(dir: number, javelin = false): string[] {
     turn = (x, y) => { const [tx, ty] = up.turn(x, y); return [tx, 6 - ty]; };
   } else ({ base, turn } = arrowTurn(dir));
   const px: string[] = new Array(n * n).fill("");
-  const art = (javelin ? JAVELIN_ART : ARROW_ART)[base];
+  const art = (kind === "javelin" ? JAVELIN_ART : kind === "spear" ? SPEAR_ART : ARROW_ART)[base];
   for (let y = 0; y < 7; y++)
     for (let x = 0; x < 7; x++) {
       const ch = art[y][x];
@@ -121,10 +137,9 @@ function paint(px: string[], w: number, h: number, name?: string, outline = true
   return spriteCanvas(name ? sourcePixels(name,w,h,()=>data) : data,w,h,undefined,outline ? {} : false);
 }
 
-const arrowSprites: HTMLCanvasElement[] = [], javelinSprites: HTMLCanvasElement[] = [];
-function arrowSprite(dir: number, javelin = false) {
-  if (javelin) return (javelinSprites[dir] ??= paint(arrowPixels(dir, true), ARROW_BOX, ARROW_BOX, ART_NAMES.projectile("javelin",dir)));
-  return (arrowSprites[dir] ??= paint(arrowPixels(dir), ARROW_BOX, ARROW_BOX, ART_NAMES.projectile("arrow",dir)));
+const shaftSprites: Record<ShaftKind, HTMLCanvasElement[]> = { arrow: [], javelin: [], spear: [] };
+function arrowSprite(dir: number, kind: ShaftKind = "arrow") {
+  return (shaftSprites[kind][dir] ??= paint(arrowPixels(dir, kind), ARROW_BOX, ARROW_BOX, ART_NAMES.projectile(kind, dir)));
 }
 
 /** Arrows in flight, pointing where they fly (from where they were loosed
@@ -142,7 +157,7 @@ export function drawArrows(c: Ctx, px: number, sim: DefendSim, reduced = false) 
       drawBullet(c, px, a);
       continue;
     }
-    if (a.shot && a.shot !== "javelin") {
+    if (a.shot && a.shot !== "javelin" && a.shot !== "spear") {
       const s = shotSprite(a.shot);
       blit(c, px, s.cv, Math.round(a.x * ART - s.size / 2), Math.round(a.y * ART - s.size / 2));
       continue;
@@ -153,7 +168,7 @@ export function drawArrows(c: Ctx, px: number, sim: DefendSim, reduced = false) 
     const dir = arrowDir(dx, dy);
     const fan=a.volleyIndex===undefined?0:(a.volleyIndex%2?1:-1)*Math.ceil(a.volleyIndex/2)*.12;
     const mx = a.x - (dx / d) * ARROW_BACK - dy/d*fan, my = a.y - (dy / d) * ARROW_BACK + dx/d*fan;
-    blit(c, px, arrowSprite(dir, a.shot === "javelin"), Math.round(mx * ART - ARROW_BOX / 2), Math.round(my * ART - ARROW_BOX / 2));
+    blit(c, px, arrowSprite(dir, a.shot === "javelin" || a.shot === "spear" ? a.shot : "arrow"), Math.round(mx * ART - ARROW_BOX / 2), Math.round(my * ART - ARROW_BOX / 2));
   }
 }
 
@@ -279,7 +294,7 @@ const SHOTS: Record<Shot, [number, string, string, string]> = {
   ball: [3, "#2c2a2e", "#1b1a1d", "#8c8c96"],
   rocket: [2, "#b3372f", "#6e1c18", "#e8dcc0"],
 };
-type Shot = Exclude<NonNullable<Arrow["shot"]>, "javelin">;
+type Shot = Exclude<NonNullable<Arrow["shot"]>, "javelin" | "spear">;
 const shotSprites = new Map<string, { cv: HTMLCanvasElement; size: number }>();
 function shotSprite(shot: Shot) {
   let s = shotSprites.get(shot);
@@ -419,7 +434,8 @@ export function drawSparks(c: Ctx, px: number, fx: Effect) {
 
 export function projectilePieces(): ArtPiece[] {
   const out: ArtPiece[]=[];
-  for (let dir=0;dir<ARROW_DIRS;dir++) for (const javelin of [false,true]) out.push({name:ART_NAMES.projectile(javelin ? "javelin" : "arrow",dir),w:ARROW_BOX,h:ARROW_BOX,about:`${javelin ? "Javelin" : "Arrow"}, heading ${dir}`,pixels:()=>sourcePixels(ART_NAMES.projectile(javelin ? "javelin" : "arrow",dir),ARROW_BOX,ARROW_BOX,()=>colorPixels(arrowPixels(dir,javelin)))});
+  const about: Record<ShaftKind, string> = { arrow: "Arrow", javelin: "Javelin", spear: "Thrown spear" };
+  for (let dir=0;dir<ARROW_DIRS;dir++) for (const kind of ["arrow","javelin","spear"] as const) out.push({name:ART_NAMES.projectile(kind,dir),w:ARROW_BOX,h:ARROW_BOX,about:`${about[kind]}, heading ${dir}`,pixels:()=>sourcePixels(ART_NAMES.projectile(kind,dir),ARROW_BOX,ARROW_BOX,()=>colorPixels(arrowPixels(dir,kind)))});
   for (const shot of Object.keys(SHOTS) as Shot[]) {
     const p=shotPixels(shot),name=ART_NAMES.projectile(shot);
     out.push({name,w:p.size,h:p.size,about:`${shot} projectile`,pixels:()=>sourcePixels(name,p.size,p.size,()=>colorPixels(shotPixels(shot).px))});
@@ -427,4 +443,4 @@ export function projectilePieces(): ArtPiece[] {
   for(const d of [4,5]) {const p=ballPixels(d),name=ART_NAMES.projectile("cannon-ball",d);out.push({name,w:p.size,h:p.size,about:`Cannon shell, ${d} art pixels`,pixels:()=>sourcePixels(name,p.size,p.size,()=>colorPixels(ballPixels(d).px))});}
   return out;
 }
-onPixelArt(()=>{arrowSprites.length=javelinSprites.length=0;shotSprites.clear();balls.clear();});
+onPixelArt(()=>{for (const k in shaftSprites) shaftSprites[k as ShaftKind].length=0;shotSprites.clear();balls.clear();});

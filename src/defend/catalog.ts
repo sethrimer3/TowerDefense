@@ -1377,6 +1377,11 @@ export const NO_BONUSES: Readonly<Bonuses> = Object.freeze({
 
 /** A keep guard (`city-watch.ts`): a 3 × 3 art-pixel body with a spear,
  * lighter than a swordsman and a little slower. */
+/** Throwing spears (the keep's City watch V, `keep-upgrades.ts`): a guard
+ * with nothing in reach throws a spear at the nearest enemy within `range`
+ * cells every `cooldown` seconds, for its own damage times `damage`, and
+ * keeps walking. */
+export const THROWN_SPEAR = { rank: 5, range: 4, cooldown: 3, damage: 1.5 };
 export const WATCHMAN = { hp: 30, damage: 5, cooldown: 0.9, speed: 2, reach: 0.85, leash: Infinity, size: 3 / 8, color: "#3f5f8f" };
 
 export const SOLDIER = { hp: 40, damage: 6, cooldown: 0.8, speed: 2.4, reach: 0.75, leash: 16, size: 0.4, color: "#5b8fd9" };

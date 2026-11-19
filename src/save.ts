@@ -31,8 +31,10 @@ export const SAVE_KEY = "towerdefense.v1";
  * the Study researches only the spells. 6: the Ranged Guild's musket hall
  * and sniper lodge moved behind the Gunner hall (`migrateGunLine`). 7: every
  * line one shape, its ultimate merged from three buildings (`migrateTrees`).
- * 8: Realm economy buildings, individual Smithy equipment and shared combat refunds. */
-export const SAVE_VERSION = 8;
+ * 8: Realm economy buildings, individual Smithy equipment and shared combat refunds.
+ * 9: the keep's City watch is raised by its own first rank, so a branch
+ * bought before keeps its upgrades one rank up. */
+export const SAVE_VERSION = 9;
 
 export type Save = {
   version: number;
@@ -184,6 +186,7 @@ export function decode(raw: string | null): Save {
   refundRetiredAssassins(s, d);
   if (s.version < 6) migrateGunLine(d);
   if (s.version < 7) migrateTrees(s, d);
+  if (s.version < 9 && d.defend.keepRanks?.watch) d.defend.keepRanks.watch += 1;
   d.researchJob = decodeResearchJob(s.researchJob, d);
   d.researchClock = num(s.researchClock, 0);
   d.forgeJob = decodeForgeJob(s.forgeJob, d);
