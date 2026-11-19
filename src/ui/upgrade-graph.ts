@@ -114,6 +114,10 @@ export class UpgradeGraph {
   private moteArea: MoteArea | null = null;
   /** The furthest the view zooms out: `ZOOM_OUT` past fitting the tree. */
   private minS = 0.2;
+  /** The host's size when the tree was last fitted: a host that grows or
+   * shrinks (a window resize, a card below changing height, a host fitted
+   * before it was attached) refits, so the fit and the motes' area cover it. */
+  private fitted = { w: 0, h: 0 };
   private drag: { id: string; pointer: number; x0: number; y0: number; moved: boolean; pan?: { x: number; y: number } } | null = null;
   private pinch = new Map<number, { x: number; y: number }>();
 
@@ -215,7 +219,8 @@ export class UpgradeGraph {
     }
     if (x0 > x1) return;
     this.area = panArea(x0, y0, x1, y1);
-    const w = this.el.clientWidth || 300, h = this.el.clientHeight || 300, pad = 46;
+    this.fitted = { w: this.el.clientWidth, h: this.el.clientHeight };
+    const w = this.fitted.w || 300, h = this.fitted.h || 300, pad = 46;
     const s = Math.min(1.25, (w - pad * 2) / Math.max(1, x1 - x0), (h - pad * 2) / Math.max(1, y1 - y0));
     this.fit = { s, x: w / 2 - ((x0 + x1) / 2) * s, y: h / 2 - ((y0 + y1) / 2) * s };
     this.minS = s / ZOOM_OUT;
@@ -250,6 +255,7 @@ export class UpgradeGraph {
     this.last = t;
     this.now = t;
     if (!this.el.isConnected || this.el.offsetParent === null) return;
+    if (this.area && (this.el.clientWidth !== this.fitted.w || this.el.clientHeight !== this.fitted.h)) this.refit();
     if (this.opts.reduceMotion()) {
       for (const [id, b] of this.bodies) if (b.dying >= 0) this.drop(id);
       for (const b of this.bodies.values()) if (!(this.drag?.id === b.n.id && this.drag.moved)) { b.x = b.hx; b.y = b.hy; }
