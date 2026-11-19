@@ -2461,6 +2461,7 @@ nav button:disabled {opacity:.45;}
 .building-panel .bp-next { border-color: #6e4c1c; }
 .building-panel .bp-cost { color: #ffd768; }
 .building-panel .bp-cost.short { color: #ff6a55; }
+.building-panel .bp-have { color: #c08cff; }
 .building-panel .bp-next:disabled > * { opacity: 0.6; }
 .building-panel .bp-max { color: #f2c14e; }
 @keyframes bp-in-right { from { transform: translate(24px, -50%); opacity: 0; } to { transform: translateY(-50%); opacity: 1; } }

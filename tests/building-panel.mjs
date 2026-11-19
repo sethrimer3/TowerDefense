@@ -54,6 +54,7 @@ try {
   // The small tree: buy the first next upgrade, then downgrade back.
   await page.locator('[data-bp="upgrades"]').click();await page.waitForSelector('.bp-tree');
   assert.equal(await page.locator('.bp-climbed').count(),2,'watch tower, then archer tower');
+  assert.equal(await page.locator('.bp-next .bp-have').first().textContent(),'(500)','the Knowledge in hand beside the cost');
   const before=(await stored()).knowledge,cost=Number((await page.locator('.bp-next .bp-cost').first().textContent()).replace(/\D/g,''));
   await page.locator('.bp-next').first().click();
   await page.waitForFunction(()=>!JSON.parse(localStorage.getItem('towerdefense.v1')).defend.layout.structures.some(s=>s.kind==='archerTower'));

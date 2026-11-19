@@ -2698,6 +2698,9 @@ nav button[data-mode] > .tab-label { min-height: 2.4em; }
 .building-panel .bp-next-face { grid-row: 1 / 3; display: grid; place-items: center; }
 .building-panel .bp-next-name { font-size: 12px; line-height: 1.1; overflow-wrap: anywhere; }
 .building-panel .bp-cost { font-size: 12px; }
+.building-panel .bp-costs { display: flex; flex-wrap: wrap; align-items: center; column-gap: 6px; }
+.building-panel .bp-have { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; white-space: nowrap; }
+.building-panel .bp-have .currency-icon { width: 14px; height: 14px; image-rendering: pixelated; }
 .building-panel .bp-down { justify-content: space-between; }
 .building-panel .bp-max { text-align: center; font-size: 12px; padding: 6px 0; }
 @media (max-width: 559px) {
