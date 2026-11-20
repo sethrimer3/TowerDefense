@@ -24,7 +24,7 @@ import { Chamber, Descent } from "./ui/chamber.ts";
 import { paintIcon, type IconItem } from "./defend/structure-art.ts";
 import { onPixelArt, setPixelArt } from "./defend/pixel-sprites.ts";
 import { setSceneryOutlines, setStillAir } from "./defend/scenery-looks.ts";
-import { setLegacyWalls } from "./defend/city-layer.ts";
+import { setAngleView, setLegacyWalls } from "./defend/city-layer.ts";
 import { renderSettingsPage } from "./ui/settings-page.ts";
 import type { Weather } from "./defend/weather.ts";
 import { play, soundEnabledBy } from "./sound.ts";
@@ -52,6 +52,7 @@ let equipmentLayout = save.defend.layout;
 setLanguage(save.settings.language);
 fitViewport();
 setLegacyWalls(save.settings.legacyWalls);
+setAngleView(save.settings.angleView);
 installSeal();
 buildShell(document.querySelector<HTMLDivElement>("#app")!, save.settings.legacyGraphics);
 installScrollArrows();
@@ -182,6 +183,8 @@ const defendPage = new DefendPage(el("defend"), {
   frameTimes: () => save.settings.developerMode && save.settings.devFrameTimes,
   lighting: () => !(save.settings.developerMode && save.settings.devNoLighting),
   setCrispZoom: (value) => { save.settings.crispZoom = value; store(); },
+  angleView: () => save.settings.angleView,
+  setAngleView: (value) => { save.settings.angleView = value; setAngleView(value); store(); },
   showEmpty: () => save.settings.showEmpty,
   dragRally: () => save.settings.dragRally,
   menuSizing: () => save.settings.menuSizing,
@@ -331,6 +334,7 @@ function refreshCurrencies() {
   document.documentElement.classList.toggle("legacy-graphics", save.settings.legacyGraphics);
   setPixelArt(save.settings.pixelArt);
   setLegacyWalls(save.settings.legacyWalls);
+  setAngleView(save.settings.angleView);
   setSceneryOutlines(save.settings.sceneryOutlines);
   setStillAir(save.settings.stillAir);
   const show = (id: string, n: number) => {

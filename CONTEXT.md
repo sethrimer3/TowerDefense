@@ -19,6 +19,9 @@ One of an Ambush track's ways in, from its own entry at the board's edge to the 
 **Tutorial lesson**:
 A short run of parchment cards that dims the page and points at one part of the game the first time the player meets it (the build menu, the first battle, the Mine, the Library). Each shows once.
 
+**Angle view**:
+The optional look of the castle seen at a slant from the south: the walls and every building inside them show their south faces below their roofs, as most scenery does. Off, the castle is seen straight down.
+
 **Story scroll**:
 The scroll that unrolls before a zone's first wave in Defend, with that zone's chapter of the story written on it.
 

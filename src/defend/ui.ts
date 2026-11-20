@@ -138,6 +138,10 @@ export type DefendHost = {
   /** False when the developer turned the battle's lighting off. */
   lighting?(): boolean;
   setCrispZoom?(value: boolean): void;
+  /** Angle view: the castle and its buildings seen at a slant (the
+   * Settings page's Angle view, also the board's own checkbox). */
+  angleView?(): boolean;
+  setAngleView?(value: boolean): void;
   /** Whether the palette lists items the player has none of. */
   showEmpty?(): boolean;
   /** Whether dragged items ride above the pointer. */
@@ -479,7 +483,7 @@ export class DefendPage {
             <div class="defend-specialty" id="defend-specialty" role="dialog" aria-label="Specialization" hidden></div>
             <div class="defend-banner" id="defend-banner" role="dialog" aria-label="The keep has fallen" hidden></div>
             <div class="defend-message" id="defend-message" aria-live="polite"></div>
-            <label class="defend-crisp"><input type="checkbox" id="defend-crisp"> Crisp pixels</label></div>
+            <div class="defend-crisp"><label><input type="checkbox" id="defend-angle"> Angle view</label><label><input type="checkbox" id="defend-crisp"> Crisp pixels</label></div></div>
         </div>
       </div>
       <dialog class="defend-journal-dialog" aria-labelledby="defend-journal-title"></dialog>
@@ -495,6 +499,12 @@ export class DefendPage {
     crisp.checked = !!this.host.crispZoom?.();
     crisp.onchange = () => {
       this.host.setCrispZoom?.(crisp.checked);
+      this.draw();
+    };
+    const angle = this.root.querySelector<HTMLInputElement>("#defend-angle")!;
+    angle.checked = !!this.host.angleView?.();
+    angle.onchange = () => {
+      this.host.setAngleView?.(angle.checked);
       this.draw();
     };
     const canvas = this.renderer.canvas;
@@ -1309,6 +1319,8 @@ export class DefendPage {
     this.renderer.maxDpr = this.host.resolution?.() ?? 0;
     const box = this.root.querySelector<HTMLInputElement>("#defend-crisp");
     if (box && box.checked !== crisp) box.checked = crisp;
+    const angle = this.root.querySelector<HTMLInputElement>("#defend-angle");
+    if (angle && angle.checked !== !!this.host.angleView?.()) angle.checked = !!this.host.angleView?.();
     if (fit) this.fitView();
     if (!this.renderer.canvas.width) return;
     const map = this.sim ? this.sim.map : this.currentMap();

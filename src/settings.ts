@@ -96,6 +96,10 @@ export const SETTINGS = {
   /** City walls with their brick south face hung below the stones (the
    * old slanted look); off, walls are drawn top-down only. */
   legacyWalls: { kind: "toggle", default: false, page: { id: "legacy-walls", label: "Legacy Walls" } },
+  /** The castle, its walls and everything inside them seen at a slant from
+   * the south, south faces showing (`setAngleView` in `city-layer.ts`);
+   * off, straight down. Also the board's own checkbox. */
+  angleView: { kind: "toggle", default: false, page: { id: "angle-view", label: "Angle view" } },
   /** Alembic, the game's own pixel font, for every word on the page; off, Cinzel. */
   pixelFont: { kind: "toggle", default: true, page: { id: "pixel-font", label: "Use Custom Font" } },
   /** Master switch for developer controls, including the enemy tester. */
