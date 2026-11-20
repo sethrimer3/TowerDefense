@@ -32,7 +32,7 @@ import { enemySize } from "./catalog.ts";
  * rain in screen space. */
 import { onPixelArt, pixelArtOn, pixelKey } from "./pixel-sprites.ts";
 import { CELL_COUNT, CELLS_H, CELLS_W, boardSize, cellInBounds, cellIndex, hash01, type TilePos } from "./grid.ts";
-import { changeBoxes, changedCells, noteEdit } from "./map-change.ts";
+import { changeBoxes, changedCells, mergeBoxes, noteEdit } from "./map-change.ts";
 import type { CityMap } from "./citygen.ts";
 import type { DefendSim } from "./sim.ts";
 import { DefendLighting, MASK, type CellBox, type LightFrame } from "./lighting.ts";
@@ -58,6 +58,8 @@ import { drawFlag, drawWarBanner } from "./structure-art.ts";
 import { RallyFlagArt } from "./rally-flag-art.ts";
 import { bannerReach } from "./war-banner.ts";
 import { ParkGrass, type Walker } from "./park-grass.ts";
+import { ArrivalArt } from "./arrival-art.ts";
+import { planArrival } from "./arrival.ts";
 import { PondWater } from "./pond-water.ts";
 import { RiverLife } from "./river-art.ts";
 import { ENEMIES } from "./catalog.ts";
@@ -178,6 +180,13 @@ export type DrawOptions = {
 const DOUSE = { delay: 1.2, perCell: 0.16, jitter: 0.6, fade: 0.7 };
 
 export class DefendRenderer {
+  /** The last edit falling into place (`arrival.ts`), if it still is. */
+  private arrival: ArrivalArt | null = null;
+  /** The next city drawn comes from an edit, and falls in. */
+  private arriveNext = false;
+  /** This frame's wall clock (ms) and whether motion is allowed. */
+  private frameNow = 0;
+  private motion = true;
   private shimmerOpen = false;
   private shimmerOpened = 0;
   private shimmerClosed = -Infinity;
@@ -498,8 +507,17 @@ export class DefendRenderer {
     }
   }
 
+  /** The next city drawn is an edit the player just made (a building
+   * placed, moved or taken up, a city tile placed or moved): what it
+   * replaced dissolves and what it made falls into place. */
+  arrive() {
+    this.arriveNext = true;
+  }
+
   draw(map: CityMap, sim: DefendSim | null, overlay: Overlay | null, opts: DrawOptions) {
     this.stepGlide();
+    this.frameNow = opts.now;
+    this.motion = !opts.reduceMotion;
     const sky = worldSky();
     this.worldLighting = !!sky;
     if (sky) opts = { ...opts, sun: sky.sun, tint: sky.tint, night: sky.night, weather: opts.weather ?? { rain: false, clear: true } };
@@ -616,6 +634,11 @@ export class DefendRenderer {
     this.ghosts.watch(sim, opts.now / 1000);
     this.ghosts.draw(this.ctx, this.px, opts.now / 1000, opts.reduceMotion);
     if (opts.effects ?? true) this.drawSmoke(map, sim, opts);
+    // An edit's buildings falling into place, over all on the ground.
+    if (this.arrival) {
+      this.arrival.drawFalling(this.ctx, this.px, opts.now, this.arrival.omit.size > 0);
+      if (!this.arrival.omit.size && this.arrival.done(opts.now)) this.arrival = null;
+    }
     // Cloudborne palaces sail over everything on the ground.
     this.sky.draw(this.ctx, this.px, map, sim, opts.looks, { now: opts.now, dt, reduceMotion: opts.reduceMotion, night: opts.night });
     // Rain is world scenery too: wash it before the visibility/UI overlays.
@@ -772,7 +795,8 @@ export class DefendRenderer {
       ctx.restore();
     }
     ctx.imageSmoothingEnabled = false;
-    drawBallistas(ctx, this.px, map, sim, sim ? sim.bonuses.gate : opts.gate);
+    const omit = this.arrival?.omit;
+    drawBallistas(ctx, this.px, omit?.size ? { ...map, buildings: map.buildings.filter((b) => !omit.has(b.id)) } : map, sim, sim ? sim.bonuses.gate : opts.gate);
     drawSpikeThrusts(ctx, this.px, map, sim);
     const feet = this.drawParkLife(map, sim, opts, dt);
     // The forest's grass, dirt, rocks and shadows outside the walls, and
@@ -875,8 +899,12 @@ export class DefendRenderer {
     // Park fences sit on the ground layer, under the lighting and units.
     this.fences.sync(map);
     if (sim) this.fences.update(sim);
-    this.fences.draw(ctx, this.px);
+    this.fences.draw(ctx, this.px, this.arrival?.fences(opts.now));
+    // A new park's bare earth, where its grass hasn't grown yet.
+    this.arrival?.drawCover(ctx, this.px, opts.now);
     if (this.worldLighting && opts.sun) this.sunlight.draw(ctx, this.px, map, sim, opts.sun, opts.looks);
+    // What the last edit replaced, dissolving.
+    this.arrival?.drawVanish(ctx, this.px, opts.now);
     // Magic boats' water over the ground, sinking what it reaches.
     if (sim) this.floods.draw({ c: ctx, px: this.px, sim, area: this.area, rain: !!opts.weather?.rain, reduceMotion: opts.reduceMotion, reflections: opts.effects ?? true, layer: this.layer, layerScale: this.layerScale });
   }
@@ -906,7 +934,7 @@ export class DefendRenderer {
    * gate's leaves, shut or not, are drawn here over its posts). */
   private drawGates(map: CityMap, sim: DefendSim | null, opts: DrawOptions, dt: number) {
     for (const b of map.buildings) {
-      if (b.kind !== "gate" || !b.gate) continue;
+      if (b.kind !== "gate" || !b.gate || this.arrival?.omit.has(b.id)) continue;
       if (sim && !sim.intact(b)) {
         this.gateOpen.delete(b.id);
         continue;
@@ -930,6 +958,7 @@ export class DefendRenderer {
   private drawParkLife(map: CityMap, sim: DefendSim | null, opts: DrawOptions, dt: number): Walker[] {
     const rain = !!(sim && opts.weather?.rain);
     this.water.sync(map);
+    this.water.ducks.fall = this.arrival ? this.arrival.duck(opts.now) : null;
     const feet = [...(sim ? walkers(sim) : []), ...this.cityLife.visible];
     if (sim?.cold || opts.weather?.snow || (opts.effects ?? true)) this.water.draw({ c: this.ctx, px: this.px, now: opts.now, rain, cold: sim?.cold ?? !!opts.weather?.snow, thawedPonds: sim?.thawedPonds, night: opts.night, walkers: feet, reduceMotion: opts.reduceMotion, layer: this.layer, layerScale: this.layerScale });
     if (sim) {
@@ -1066,6 +1095,7 @@ export class DefendRenderer {
   private drawTrees(map: CityMap, sim: DefendSim | null, opts: DrawOptions, dt: number) {
     this.trees.sync(map);
     this.trees.update([...(sim ? beneath(sim) : []), ...this.cityLife.visible], dt, opts.reduceMotion);
+    this.trees.fall = this.arrival ? this.arrival.tree(opts.now) : null;
     const dim = this.lit && opts.weather ? (o: CanvasRenderingContext2D) => {
       o.fillStyle = `rgba(118,118,118,${opts.weather!.rain ? 0.2 : 0.12})`;
       o.fillRect(0, 0, this.board.W, this.board.H);
@@ -1273,6 +1303,18 @@ export class DefendRenderer {
    * stay crisp. */
   private refreshLayer(map: CityMap, sim: DefendSim | null, looks?: Readonly<Record<number, string>>) {
     const { W, H } = this.board;
+    // The last edit's buildings have all landed (or something else came
+    // first): the layer takes them back.
+    const leave = !!sim || map !== this.map || !this.motion;
+    if (this.arrival && (leave || this.arrival.landed(this.frameNow))) this.settleArrival(leave);
+    if (map !== this.map) {
+      if (this.arriveNext && this.motion && !sim && !this.stagedSim && this.map && this.layer.width && !this.previousArea) {
+        const plan = planArrival(this.map, map, this.paintedLooks, looks);
+        if (plan) this.arrival = new ArrivalArt(plan, this.frameNow, map, this.area, looks, this.map, this.paintedLooks, this.layer, this.layer.width / CELLS_W);
+      }
+      this.arriveNext = false;
+    }
+    const omit = this.arrival?.omit.size ? this.arrival.omit : undefined;
     let k = this.cam.s >= 4 ? 4 : this.cam.s >= 2.5 ? 3 : this.cam.s >= 1.4 ? 2 : 1;
     while (k > 1 && W * H * k * k > 18e6) k--;
     this.layerScale = k;
@@ -1294,13 +1336,13 @@ export class DefendRenderer {
       if (damage && this.previousBase === base && this.previousLayer) {
         const c = this.previousLayer.getContext("2d")!, area = this.previousArea;
         for (const box of damage)
-          repaintBox(c, P, box, (c) => paintCityLayer(c, P, { map, sim, area, lights: this.lighting.lights, stones: this.lighting.roadStones, looks, omitSunShadows: this.worldLighting, within: box }));
+          repaintBox(c, P, box, (c) => paintCityLayer(c, P, { map, sim, area, lights: this.lighting.lights, stones: this.lighting.roadStones, looks, omitSunShadows: this.worldLighting, within: box, omit }));
       } else {
         this.previousLayer ??= document.createElement("canvas");
         this.previousLayer.width = W * k;
         this.previousLayer.height = H * k;
         this.lighting.setMap(map);
-        paintCityLayer(this.previousLayer.getContext("2d")!, P, { map, sim, area: this.previousArea, lights: this.lighting.lights, stones: this.lighting.roadStones, looks, omitSunShadows: this.worldLighting });
+        paintCityLayer(this.previousLayer.getContext("2d")!, P, { map, sim, area: this.previousArea, lights: this.lighting.lights, stones: this.lighting.roadStones, looks, omitSunShadows: this.worldLighting, omit });
       }
       this.previousKey = key;
       this.previousBase = base;
@@ -1320,7 +1362,7 @@ export class DefendRenderer {
       this.layerKey = key;
       this.maskKey = maskKey;
       for (const box of boxes)
-        repaintBox(this.lctx, P, box, (c) => paintCityLayer(c, P, { map, sim, area: this.area, lights: this.lighting.lights, stones: this.lighting.roadStones, looks, omitSunShadows: this.worldLighting, within: box }));
+        repaintBox(this.lctx, P, box, (c) => paintCityLayer(c, P, { map, sim, area: this.area, lights: this.lighting.lights, stones: this.lighting.roadStones, looks, omitSunShadows: this.worldLighting, within: box, omit }));
       this.patchMasks(map, sim, looks, boxes);
       this.findFaces(map, sim);
       return;
@@ -1330,7 +1372,7 @@ export class DefendRenderer {
     this.lighting.setMap(map);
     this.layer.width = W * k;
     this.layer.height = H * k;
-    paintCityLayer(this.lctx, this.px * k, { map, sim, area: this.area, lights: this.lighting.lights, stones: this.lighting.roadStones, looks, omitSunShadows: this.worldLighting });
+    paintCityLayer(this.lctx, this.px * k, { map, sim, area: this.area, lights: this.lighting.lights, stones: this.lighting.roadStones, looks, omitSunShadows: this.worldLighting, omit });
     // Native-resolution occlusion masks do not depend on camera zoom, board
     // pixel size or whether sunlight is composited outside the city layer.
     if (map !== this.maskMap || maskKey !== this.maskKey) {
@@ -1340,6 +1382,22 @@ export class DefendRenderer {
       else this.paintMasks(map, sim, looks);
     }
     this.findFaces(map, sim);
+  }
+
+  /** Puts the last edit's fallen buildings back into the city layer (a
+   * repaint round each), and with `leave` drops the rest of its arrival. */
+  private settleArrival(leave: boolean) {
+    const a = this.arrival!;
+    if (a.omit.size && this.map && this.layer.width) {
+      const P = this.layer.width / CELLS_W, m = DAMAGE_MARGIN;
+      const boxes = mergeBoxes(this.map.buildings.filter((b) => a.omit.has(b.id)).map(({ rect: r }) => ({ x0: Math.max(0, r.x - m), y0: Math.max(0, r.y - m), x1: Math.min(CELLS_W, r.x + r.w + m), y1: Math.min(CELLS_H, r.y + r.h + m) })));
+      a.omit.clear();
+      const map = this.map, sim = this.stagedSim, looks = this.paintedLooks;
+      for (const box of boxes)
+        repaintBox(this.lctx, P, box, (c) => paintCityLayer(c, P, { map, sim, area: this.area, lights: this.lighting.lights, stones: this.lighting.roadStones, looks, omitSunShadows: this.worldLighting, within: box }));
+    }
+    a.omit.clear();
+    if (leave) this.arrival = null;
   }
 
   /** Repaints the lighting's body/rim masks inside `boxes` alone. */

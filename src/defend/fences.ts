@@ -11,6 +11,7 @@ const fx = defendRandom("effects");
 import { CellType, type CityMap } from "./citygen.ts";
 import { ENEMIES } from "./catalog.ts";
 import type { DefendSim, Effect } from "./sim.ts";
+import type { Drop, Fall } from "./arrival.ts";
 
 /** One cell-long section of fence, in cell coordinates. */
 export type FenceSection = { x1: number; y1: number; x2: number; y2: number; broken: boolean };
@@ -206,14 +207,49 @@ export class Fences {
     }
   }
 
-  draw(c: CanvasRenderingContext2D, px: number) {
+  /** With `fall`, the fences of a park just placed go up a piece at a
+   * time (`arrival.ts`): what hasn't started is left out, what is falling
+   * is drawn raised and faint, and the rest as usual. */
+  draw(c: CanvasRenderingContext2D, px: number, fall?: FenceFall) {
     const intact = this.sections.filter((s) => !s.broken);
     c.save();
-    drawRails(c, px, intact);
-    drawPosts(c, px, intact);
+    if (fall) {
+      const rails: FenceSection[] = [], dropping: [FenceSection, Drop][] = [];
+      for (const s of intact) {
+        const f = fall.rail(s.x1, s.y1, s.x2, s.y2);
+        if (f === null) rails.push(s);
+        else if (f) dropping.push([s, f]);
+      }
+      drawRails(c, px, rails);
+      for (const [s, f] of dropping) dropped(c, px, (s.x1 + s.x2) / 2, (s.y1 + s.y2) / 2, f, () => drawRails(c, px, [s]));
+      drawPosts(c, px, intact, (x, y) => fall.post(x, y));
+    } else {
+      drawRails(c, px, intact);
+      drawPosts(c, px, intact);
+    }
     for (const p of this.splinters) drawSplinter(c, px, p);
     c.restore();
   }
+}
+
+/** Which pieces of a fence are falling into place, and how (`arrival.ts`). */
+export type FenceFall = { post: (x: number, y: number) => Fall; rail: (x1: number, y1: number, x2: number, y2: number) => Fall };
+
+/** Runs `paint` raised, scaled and faded as `f` says, about cell point (x, y). */
+function dropped(c: CanvasRenderingContext2D, px: number, x: number, y: number, f: Drop, paint: () => void) {
+  c.save();
+  c.globalAlpha *= f.alpha;
+  c.translate(x * px, (y + f.dy) * px);
+  c.scale(f.scale, f.scale);
+  c.translate(-x * px, -y * px);
+  paint();
+  c.restore();
+}
+
+/** A park's fence sections drawn whole (what an edit replaced, dissolving). */
+export function drawParkFences(c: CanvasRenderingContext2D, px: number, sections: FenceSection[]) {
+  drawRails(c, px, sections);
+  drawPosts(c, px, sections);
 }
 
 /** An outpost's wooden fence at `ART` art pixels a cell, as stout as its
@@ -297,7 +333,7 @@ function drawRails(c: CanvasRenderingContext2D, px: number, sections: FenceSecti
 }
 
 /** Posts at each end of an intact section (one where sections meet). */
-function drawPosts(c: CanvasRenderingContext2D, px: number, sections: FenceSection[]) {
+function drawPosts(c: CanvasRenderingContext2D, px: number, sections: FenceSection[], fall?: (x: number, y: number) => Fall) {
   const post = Math.max(2, Math.round(px * 0.2)),
     off = Math.floor(post / 2);
   const done = new Set<number>();
@@ -311,10 +347,16 @@ function drawPosts(c: CanvasRenderingContext2D, px: number, sections: FenceSecti
       const key = X * 65536 + Y;
       if (done.has(key)) continue;
       done.add(key);
-      c.fillStyle = OUTLINE;
-      c.fillRect(X, Y, post, post);
-      c.fillStyle = "#7a5a34";
-      c.fillRect(X + 1, Y + 1, Math.max(1, post - 2), Math.max(1, post - 2));
+      const f = fall ? fall(x, y) : null;
+      if (f === false) continue;
+      const one = () => {
+        c.fillStyle = OUTLINE;
+        c.fillRect(X, Y, post, post);
+        c.fillStyle = "#7a5a34";
+        c.fillRect(X + 1, Y + 1, Math.max(1, post - 2), Math.max(1, post - 2));
+      };
+      if (f) dropped(c, px, x, y, f, one);
+      else one();
     }
 }
 
