@@ -15,11 +15,11 @@ import { ROAD, keepStage, paintKeepRubble, paintStructureArt, paintStructureRubb
 import { houseRubbleSprite, roofSeed, roofSprite } from "./roof-art.ts";
 import { ART, openAt, parkArt } from "./park-art.ts";
 import { paintBridges } from "./bridge-art.ts";
-import { damageStage, drawSprite, maskMode, sprite, wallDamagePixels, wallRubblePixels, withMask, type MaskMode } from "./damage-art.ts";
+import { damageStage, drawSprite, maskMode, sprite, spriteCanvas, wallDamagePixels, wallRubblePixels, withMask, type MaskMode } from "./damage-art.ts";
 import { mooringPixels } from "./sky-palace-art.ts";
 import { GRASS, grassPatch, groundArt } from "./ground-art.ts";
 import { heights, paintShadows, shadowMask, type Footprint } from "./shadow-art.ts";
-import { gatePixels, gateRubblePixels } from "./gate-art.ts";
+import { TOWER as GATE_TOWER, gatePixels, gateRubblePixels } from "./gate-art.ts";
 import { WOOD_GATE, gateArtRect, woodGatePixels, woodGateRubblePixels } from "./wood-gate-art.ts";
 import { gateRect, type Side } from "./layout.ts";
 import { SPIKE_REACH, bastionPixels, bastionRubblePixels, spikePixels } from "./wall-defense-art.ts";
@@ -81,10 +81,26 @@ export const FACE_HANG = WALL_FACE_HANG;
  * (the old slanted look). Off, the default, walls are drawn top-down only:
  * cap stones and their outline, no face. Presentation only. */
 let legacyWalls = false;
-export const wallFaces = () => legacyWalls;
+/** Whether walls hang their brick south face: Legacy Walls, or Angle view. */
+export const wallFaces = () => legacyWalls || angleView;
 export function setLegacyWalls(on: boolean) {
   if (on === legacyWalls) return;
   legacyWalls = on;
+  artListeners.forEach((f) => f());
+}
+
+/** Angle view: the castle seen from the south at a slant, as most scenery
+ * is. The walls hang their brick faces (as Legacy Walls) and every standing
+ * building inside them (houses, the keep, towers, halls, Realm pieces,
+ * gates and bastions) hangs its own south face below its roof
+ * (`paintFace`), and they are painted from the back row forward so each
+ * covers the faces behind it. Off, the default, the city is drawn straight
+ * down. Presentation only: lots, contact and selection are unchanged. */
+let angleView = false;
+export const angled = () => angleView;
+export function setAngleView(on: boolean) {
+  if (on === angleView) return;
+  angleView = on;
   artListeners.forEach((f) => f());
 }
 
@@ -133,6 +149,8 @@ type Paint = {
   solid: (i: number) => boolean;
   looks?: Readonly<Record<number, string>>;
   omit?: ReadonlySet<number>;
+  /** Leave Angle view's south faces off (what they are cut from). */
+  flat?: true;
 };
 
 /** Paints the whole city onto `c` (sized by the caller) at `px` per cell. */
@@ -155,9 +173,16 @@ export function paintCityLayer(c: CanvasRenderingContext2D, px: number, scene: C
   paintSpikes(p);
   const omit = scene.omit;
   const near = (b: Building) => reaches(p.within, b.rect.x, b.rect.y, b.rect.w, b.rect.h) && !omit?.has(b.id);
-  for (const b of map.buildings) if (b.kind === "wall" && near(b)) paintBuilding(p, b);
-  paintFences(c, px, map, sim);
-  for (const b of map.buildings) if (b.kind !== "wall" && near(b)) paintBuilding(p, b);
+  if (angleView) {
+    // From the back row forward: whatever stands nearer covers the faces
+    // hanging from the roofs and wall stones behind it.
+    paintFences(c, px, map, sim);
+    for (const b of frontOrder(map)) if (near(b)) paintBuilding(p, b);
+  } else {
+    for (const b of map.buildings) if (b.kind === "wall" && near(b)) paintBuilding(p, b);
+    paintFences(c, px, map, sim);
+    for (const b of map.buildings) if (b.kind !== "wall" && near(b)) paintBuilding(p, b);
+  }
   if (!scene.omitSunShadows) paintShadows(c, cityShadows(map, sim, scene.looks), px);
   paintLanternBrackets(p, scene.lights);
 }
@@ -173,7 +198,7 @@ export function paintBuildingMask(c: CanvasRenderingContext2D, px: number, scene
   const p: Paint = { c, px, map, sim, solid, area: scene.area ?? "moss", looks: scene.looks, within: scene.within };
   c.imageSmoothingEnabled = false;
   withMask(mode, () => {
-    for (const b of map.buildings) {
+    for (const b of angleView ? frontOrder(map) : map.buildings) {
       if (!reaches(p.within, b.rect.x, b.rect.y, b.rect.w, b.rect.h)) continue;
       if (b.hidden || b.fence || (sim && !sim.intact(b)) || !b.cells.length || !solid(b.cells[0])) continue;
       paintBuilding(p, b);
@@ -189,7 +214,7 @@ export function paintBuildingMask(c: CanvasRenderingContext2D, px: number, scene
 /** The shadows of what stands, cached for the last city and battle state. */
 let shadows: { map: CityMap; sim: DefendSim | null; version: number; looks: string; mask: Uint8Array } | null = null;
 function cityShadows(map: CityMap, sim: DefendSim | null, looks?: Readonly<Record<number, string>>) {
-  const version = sim ? sim.mapVersion : -1, key = (looks ? Object.entries(looks).join(",") : "") + `|${pixelKey()}`;
+  const version = sim ? sim.mapVersion : -1, key = (looks ? Object.entries(looks).join(",") : "") + `|${pixelKey()}|${angleView}`;
   if (shadows?.map !== map || shadows.sim !== sim || shadows.version !== version || shadows.looks !== key) {
     const standing = (b: Building) => (!sim || sim.intact(b)) && !aloft({ looks }, b);
     const footprint = (b: Building) => spriteFootprint(map, b, b.structureUid !== undefined ? looks?.[b.structureUid] : undefined);
@@ -204,7 +229,7 @@ function cityShadows(map: CityMap, sim: DefendSim | null, looks?: Readonly<Recor
 const footprints = new Map<string, Omit<Footprint, "x0" | "y0"> | null>();
 export function spriteFootprint(map: CityMap, b: Building, look: string | undefined): Footprint | null {
   if (typeof document === "undefined") return null;
-  const r = b.rect, key = `${b.kind}:${r.w}x${r.h}:${look ?? ""}:${pixelKey()}`;
+  const r = b.rect, key = `${b.kind}:${r.w}x${r.h}:${look ?? ""}:${pixelKey()}:${angleView ? "angle" : ""}`;
   let f = footprints.get(key);
   if (f === undefined) {
     const w = (r.w + 2) * ART, h = (r.h + 2) * ART;
@@ -377,6 +402,7 @@ function paintBuilding(p: Paint, b: Building) {
     else if (hasWallArt(p.area) || !paintPixelRubble(p, b)) paintArt(p, wallRubbleSprite(lotSeed(b), p.area), box);
     return;
   }
+  if (angleView && !p.flat && !b.woodGate && (!sim || sim.intact(b)) && !aloft(p, b)) paintFace(p, b);
   if (b.kind === "gate") {
     const side = b.gate!.side, a = gateArtRect(b);
     const ax = Math.round(a.x * px), ay = Math.round(a.y * px);
@@ -503,7 +529,7 @@ function paintSpikes({ c, px, map, solid }: Paint, outside = false) {
     for (const i of row.cells) {
       if (!solid(i)) continue;
       const cx = i % CELLS_W, cy = (i - cx) / CELLS_W;
-      const hung = legacyWalls && row.side === "s" && cy + 1 < CELLS_H && !solid(i + CELLS_W);
+      const hung = wallFaces() && row.side === "s" && cy + 1 < CELLS_H && !solid(i + CELLS_W);
       const reach = SPIKE_REACH / ART + (hung ? FACE_HANG : 0);
       const x = Math.round((cx + dx * reach) * px), y = Math.round((cy + dy * reach) * px);
       const w = Math.round((cx + dx * reach + 1) * px) - x, h = Math.round((cy + dy * reach + 1) * px) - y;
@@ -587,7 +613,7 @@ function paintWall(p: Paint, b: Building) {
     return map.wall[i] === 1 && solid(i);
   };
   const w = Math.round((cx + 1) * px) - x, h = Math.round((cy + 1) * px) - y;
-  const face = legacyWalls && !standing(0, 1) && cy + 1 < CELLS_H;
+  const face = wallFaces() && !standing(0, 1) && cy + 1 < CELLS_H;
   // A mask (`paintBuildingMask`): the stone and its face, or its outline alone.
   const mode = maskMode();
   if (mode) {
@@ -618,10 +644,29 @@ function paintWall(p: Paint, b: Building) {
  * face hangs over, in runs along each row: `y` the row, `x0` to `x1`
  * (exclusive) the cells. Whatever is drawn on that ground after the city
  * layer (the forest's floor) must leave the face showing. */
-export function hangingFaces(map: CityMap, sim: DefendSim | null): { y: number; x0: number; x1: number }[] {
-  if (!legacyWalls) return [];
+export function hangingFaces(map: CityMap, sim: DefendSim | null): { y: number; x0: number; x1: number; rows?: number }[] {
+  if (!wallFaces()) return [];
   const standing = (i: number) => map.wall[i] === 1 && !map.buildings[map.owner[i]]?.fence && (sim ? sim.solid[i] === 1 : map.owner[i] >= 0);
-  const runs: { y: number; x0: number; x1: number }[] = [];
+  const runs: { y: number; x0: number; x1: number; rows?: number }[] = [];
+  // Angle view: a building standing out on the open ground hangs its face
+  // over it too, `rows` art pixels deep into each cell row below its lot
+  // (`paintOpenFaces` paints those again).
+  if (angleView)
+    for (const b of map.buildings) {
+      if (b.kind === "wall" || b.hidden || b.woodGate || (sim && !sim.intact(b))) continue;
+      const r = b.rect;
+      for (let left = faceDepth(b) + 1, y = r.y + r.h; left > 0 && y < CELLS_H; left -= ART, y++) {
+        let start = -1;
+        for (let x = r.x; x <= r.x + r.w; x++) {
+          const open = x < r.x + r.w && cellInBounds(x, y) && map.type[cellIndex(x, y)] === CellType.OUT;
+          if (open && start < 0) start = x;
+          else if (!open && start >= 0) {
+            runs.push({ y, x0: start, x1: x, rows: Math.min(ART, left) });
+            start = -1;
+          }
+        }
+      }
+    }
   for (let cy = 1; cy < CELLS_H; cy++) {
     let start = -1;
     for (let cx = 0; cx <= CELLS_W; cx++) {
@@ -740,4 +785,169 @@ function paintPondPlants({ c, px, map }: Paint) {
       const r = Math.max(1.5, px * 0.15);
       if (!drawPixel(c, hash01(cx, cy, 69) < 0.7 ? "pond-lily" : "pond-reeds", Math.round(lx * px - r), Math.round(ly * px - r), Math.round(r * 2))) return;
     }
+}
+
+/** The city's buildings and wall stones from the back row forward (by
+ * where each lot ends, then its top), for Angle view. */
+let ordered: { map: CityMap; list: Building[] } | null = null;
+function frontOrder(map: CityMap): readonly Building[] {
+  if (ordered?.map !== map || ordered.list.length !== map.buildings.length) {
+    const list = [...map.buildings].sort((a, b) => a.rect.y + a.rect.h - (b.rect.y + b.rect.h) || a.rect.y - b.rect.y || a.id - b.id);
+    ordered = { map, list };
+  }
+  return ordered.list;
+}
+
+/** Cells of room round a lot that a building's art and its face are cut in. */
+const FACE_PAD = 2;
+
+/** How many art pixels building `b`'s south face hangs below its roof in
+ * Angle view: towers stand tallest after the keep, houses lowest. */
+export function faceDepth(b: Building): number {
+  if (b.kind === "house") return 5;
+  if (b.kind === "keep") return 11;
+  if (b.kind === "gate" || b.kind === "wallBallista") return Math.round(ART * FACE_HANG) + 1;
+  if (b.kind.endsWith("Tower")) return 9;
+  return 7;
+}
+
+/** Building `b`'s south face hung below its roof (Angle view), drawn before
+ * the roof so the roof's own outline stays on top. */
+function paintFace(p: Paint, b: Building) {
+  const cv = faceSprite(p, b);
+  if (!cv) return;
+  const r = b.rect, px = p.px;
+  const x0 = Math.round((r.x - FACE_PAD) * px), y0 = Math.round((r.y - FACE_PAD) * px);
+  drawSprite(p.c, cv, x0, y0, Math.round((r.x + r.w + FACE_PAD) * px) - x0, Math.round((r.y + r.h + FACE_PAD) * px) - y0);
+}
+
+const faces = new Map<string, HTMLCanvasElement | null>();
+/** Plaster for houses' walls, timber for their posts and beams, and the dark
+ * of a door, a window or an arrow loop, as [r, g, b]. */
+const PLASTER = [190, 172, 136], TIMBER = [74, 52, 34], OPENING = [30, 23, 18], DOOR = [92, 58, 32];
+/** The neutral masonry every other face is mixed toward. */
+const MASONRY = [128, 120, 106];
+
+/** The face of building `b` as it stands whole, cut from its own art at
+ * `ART` pixels a cell (`FACE_PAD` cells of room round the lot): each column
+ * of the roof hangs a wall `faceDepth` art pixels deep from its lowest pixel,
+ * in shade (the sun is to the upper left), coloured from the roof's edge
+ * mixed toward masonry (houses in plaster and timber), coursed, with arrow
+ * loops, windows and a door. The outline is drawn round it like any
+ * sprite's, so its top edge is the roof's own lower outline. */
+function faceSprite(p: Paint, b: Building): HTMLCanvasElement | null {
+  if (typeof document === "undefined") return null;
+  const r = b.rect, look = b.structureUid !== undefined ? p.looks?.[b.structureUid] : undefined;
+  const key = `${b.kind}:${r.x},${r.y},${r.w}x${r.h}:${b.variant}:${b.gate?.side ?? ""}:${b.woodGate ? 1 : 0}:${look ?? ""}:${p.area}:${pixelKey()}`;
+  let cv = faces.get(key);
+  if (cv !== undefined) return cv;
+  const W = (r.w + 2 * FACE_PAD) * ART, H = (r.h + 2 * FACE_PAD) * ART;
+  const art = document.createElement("canvas");
+  art.width = W;
+  art.height = H;
+  const c = art.getContext("2d", { willReadFrequently: true })!;
+  c.imageSmoothingEnabled = false;
+  c.translate((FACE_PAD - r.x) * ART, (FACE_PAD - r.y) * ART);
+  // The bodies alone, without their outlines: the face's outline is its own.
+  withMask("body", () => paintBuilding({ c, px: ART, map: p.map, sim: null, solid: () => true, area: p.area, looks: p.looks, flat: true }, b));
+  const src = c.getImageData(0, 0, W, H).data;
+  // A gate in a wall running east-west shows its two towers' faces, the
+  // passage between them open to the street.
+  let columns: ((x: number) => boolean) | undefined;
+  if (b.gate && (b.gate.side === "n" || b.gate.side === "s")) {
+    const a = gateArtRect(b), x0 = (a.x - r.x + FACE_PAD) * ART, x1 = x0 + a.w * ART;
+    columns = (x) => x < x0 + GATE_TOWER || x >= x1 - GATE_TOWER;
+  }
+  const out = facePixels(src, W, H, faceDepth(b), b.kind === "house" ? "house" : b.kind === "keep" ? "keep" : b.kind.endsWith("Tower") ? "tower" : b.kind === "gate" || b.kind === "wallBallista" ? "wall" : "hall", hash(r.x, r.y, 419), columns);
+  cv = out ? spriteCanvas(out, W, H) : null;
+  if (faces.size > 2000) faces.clear();
+  faces.set(key, cv);
+  return cv;
+}
+
+export type FaceStyle = "house" | "keep" | "tower" | "hall" | "wall";
+
+/** A south face for the art `src` (RGBA bytes, `w` × `h`): `depth` art
+ * pixels from the lowest pixel of each column down (only of the `columns`
+ * kept, where given), the topmost of them left for the roof's outline. Null
+ * when the art is empty. Pure. */
+export function facePixels(src: Uint8ClampedArray, w: number, h: number, depth: number, style: FaceStyle, seed: number, columns?: (x: number) => boolean): Uint32Array | null {
+  const foot = new Int32Array(w).fill(-1);
+  for (let x = 0; x < w; x++) {
+    if (columns && !columns(x)) continue;
+    for (let y = h - 1; y >= 0; y--)
+      if (src[(y * w + x) * 4 + 3] >= 128) {
+        foot[x] = y;
+        break;
+      }
+  }
+  if (!foot.some((y) => y >= 0)) return null;
+  const out = new Uint32Array(w * h);
+  const put = (x: number, y: number, [R, G, B]: readonly number[], f: number) => {
+    if (y < 0 || y >= h) return;
+    const k = (n: number) => Math.max(0, Math.min(255, Math.round(n * f)));
+    out[y * w + x] = (255 << 24 | k(B) << 16 | k(G) << 8 | k(R)) >>> 0;
+  };
+  // Runs of neighbouring columns whose roofs end level (within a pixel):
+  // each one wall, with its openings spaced along it.
+  for (let x0 = 0; x0 < w; ) {
+    if (foot[x0] < 0) { x0++; continue; }
+    let x1 = x0 + 1;
+    while (x1 < w && foot[x1] >= 0 && Math.abs(foot[x1] - foot[x1 - 1]) <= 1) x1++;
+    const len = x1 - x0, mid = x0 + Math.floor(len / 2);
+    for (let x = x0; x < x1; x++) {
+      const at = (foot[x] * w + x) * 4, edge = [src[at], src[at + 1], src[at + 2]];
+      const top = foot[x] + 2, rows = depth - 1, i = x - x0;
+      const base = style === "house" ? PLASTER : mix(edge, MASONRY, style === "wall" ? 0.25 : 0.45);
+      for (let k = 0; k < rows; k++) {
+        const y = top + k;
+        // The sun grazes the face from the left, and the eaves shade its top.
+        let f = (style === "house" ? 0.74 : 0.64) + (len > 2 ? 0.08 * (1 - i / (len - 1)) : 0);
+        if (k === 0) f *= 0.72;
+        f *= 0.96 + 0.08 * hash01(x, y, seed);
+        let color: readonly number[] = base;
+        if (style === "house") {
+          // Timber posts at the corners and every few pixels, a beam along the top.
+          const post = i === 0 || i === len - 1 || (len > 6 && i % 5 === 0);
+          if (k === 0 || post) color = TIMBER;
+          else if (len >= 6 && Math.abs(x - mid) <= 0 && k >= rows - 3) color = DOOR;
+          else if (k === 1 && i % 5 === 2 && Math.abs(x - mid) > 1) color = OPENING;
+        } else {
+          const course = Math.floor((k - 1) / 3);
+          if (k > 0 && (k - 1) % 3 === 2) f *= 0.84;
+          else if (k > 0 && ((x + (course & 1) * 2) & 3) === 0) f *= 0.88;
+          const slit = style !== "wall" && len >= 5 && k >= 1 && k <= 2 && i >= 2 && i <= len - 3 && (i - 2) % 4 === 0;
+          const door = (style === "keep" || style === "hall") && len >= 9 && Math.abs(x - mid + 0.5) <= (style === "keep" ? 2 : 1) && k >= rows - (style === "keep" ? 5 : 3);
+          if (door) {
+            color = k === rows - (style === "keep" ? 5 : 3) ? OPENING : DOOR;
+            f = 1;
+          } else if (slit && Math.abs(x - mid) > 2) {
+            color = OPENING;
+            f = 1;
+          }
+        }
+        put(x, y, color, color === OPENING ? 1 : f);
+      }
+    }
+    x0 = x1;
+  }
+  return out;
+}
+
+const mix = (a: readonly number[], b: readonly number[], t: number) => a.map((v, i) => v + (b[i] - v) * t);
+
+/** Angle view: the faces of the buildings standing out on the open ground,
+ * painted again (at `px` a cell) over whatever covered that ground after the
+ * city layer (the forest's floor, the dunes), as `hangingFaces` marks them. */
+export function paintOpenFaces(c: CanvasRenderingContext2D, px: number, map: CityMap, sim: DefendSim | null, area: AreaId, looks?: Readonly<Record<number, string>>, omit?: ReadonlySet<number>) {
+  if (!angleView) return;
+  const p: Paint = { c, px, map, sim, solid: () => true, area, looks };
+  c.imageSmoothingEnabled = false;
+  for (const b of frontOrder(map)) {
+    if (b.kind === "wall" || b.hidden || b.woodGate || omit?.has(b.id) || (sim && !sim.intact(b)) || aloft(p, b)) continue;
+    const r = b.rect, y = r.y + r.h;
+    let open = false;
+    for (let x = r.x; x < r.x + r.w && !open; x++) open = cellInBounds(x, y) && map.type[cellIndex(x, y)] === CellType.OUT;
+    if (open) paintFace(p, b);
+  }
 }

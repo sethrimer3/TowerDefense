@@ -49,6 +49,7 @@ export const SETTINGS_TEXT = [
  ["settings.resolution.1.5","1.5×","1.5×","1,5×","1,5×","1,5×","1,5×","1.5×","1.5×","1.5×"],
  ["settings.resolution.1","1×","1×","1×","1×","1×","1×","1×","1×","1×"],
  ["setting.ultraGraphics","Ultra graphics","Gráficos ultra","Graphismes ultra","Ultra-Grafik","Gráficos ultra","Grafica ultra","ウルトラグラフィック","울트라 그래픽","超高画质"],
+  ["setting.angleView","Angle view","Vista en ángulo","Vue inclinée","Schrägansicht","Vista em ângulo","Vista angolata","斜め視点","비스듬한 시점","斜视角"],
   ["setting.crispZoom","Crisp pixel zoom","Zoom de píxeles nítidos","Zoom aux pixels nets","Scharfer Pixel-Zoom","Zoom de pixels nítidos","Zoom a pixel nitidi","ピクセルをくっきり拡大","선명한 픽셀 확대","清晰像素缩放"],
  ["setting.pixelArt","Pixel Art","Arte píxel","Pixel art","Pixelgrafik","Pixel Art","Pixel art","ピクセルアート","픽셀 아트","像素画"],
  ["setting.legacyGraphics","Show legacy graphics","Mostrar gráficos clásicos","Afficher les graphismes classiques","Klassische Grafik anzeigen","Mostrar gráficos clássicos","Mostra grafica classica","従来のグラフィックを表示","이전 그래픽 표시","显示经典画面"],

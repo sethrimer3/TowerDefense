@@ -40,7 +40,7 @@ import { Fences } from "./fences.ts";
 import { Rain, Snow, ambientFor, type Weather } from "./weather.ts";
 import { areaFade, areaForWave, type AreaId } from "./areas.ts";
 import { gateArtRect } from "./wood-gate-art.ts";
-import { FACE_HANG, buildingState, damageKey, gateSpriteOf, shapeOf, hangingFaces, onCityArtLoaded, paintBuildingMask, paintCityLayer, paintFences, paintSpikePoints, paintStanding, stageOf } from "./city-layer.ts";
+import { FACE_HANG, buildingState, damageKey, gateSpriteOf, shapeOf, hangingFaces, onCityArtLoaded, paintBuildingMask, paintOpenFaces, paintCityLayer, paintFences, paintSpikePoints, paintStanding, stageOf } from "./city-layer.ts";
 import { GATE_FRAMES } from "./gate-art.ts";
 import { peopleAt } from "./gates.ts";
 import type { GateRanks } from "../gate-upgrades.ts";
@@ -249,7 +249,7 @@ export class DefendRenderer {
   private gateOpen = new Map<number, number>();
   private layerScale = 1;
   /** The open ground the wall's brick faces hang over, as of the layer. */
-  private faces: { y: number; x0: number; x1: number }[] = [];
+  private faces: { y: number; x0: number; x1: number; rows?: number }[] = [];
   private faced = new Uint8Array(CELL_COUNT);
   /** Camera: zoom `s` and translation (canvas pixels) applied to the whole
    * board. s = 1 fits the board to the stage it sits in; along an edge the
@@ -866,7 +866,7 @@ export class DefendRenderer {
     const desert = drifting(sim?.atmosphere?.mode ?? null);
     if (sim && desert) this.atmosphere.drawGround(ctx, this.px, sim, opts.reduceMotion, opts.effects ?? true, this.worldLighting ? opts.sun : undefined, !!opts.hdSand);
     if (this.forestShare() > 0 || magic > 0 || caves > 0 || forge > 0 || wood > 0 || nadir > 0 || astral > 0 || palace > 0 || desert) {
-      this.drawFaces();
+      this.drawFaces(map, sim, opts.looks);
       paintSpikePoints(ctx, this.px, map, sim);
     }
     // The Highlands' ice, pillars, rune stones, relics and huts, standing out
@@ -889,7 +889,7 @@ export class DefendRenderer {
         c: ctx, px: this.px, now: opts.now, dt, reduceMotion: opts.reduceMotion, alpha: this.forestShare(),
         wind: sim && opts.weather?.rain ? "rain" : opts.weather ? "cloud" : "calm",
         walkers: feet,
-        faced: this.faced, hangRows: Math.ceil(ART * FACE_HANG),
+        faced: this.faced,
       });
     }
     // An outpost's wooden fences stand on the forest's grass, and the gates
@@ -912,10 +912,12 @@ export class DefendRenderer {
   /** The wall's brick faces hang over the open ground south of it, which
    * the forest's floor covers: copied back over it from the city layer
    * (and the fading one), exactly as they were painted. */
-  private drawFaces() {
+  private drawFaces(map: CityMap, sim: DefendSim | null, looks?: Readonly<Record<number, string>>) {
     const ctx = this.ctx, k = this.layerScale, P = this.px * k, hang = Math.round(P * FACE_HANG);
     const copy = (layer: HTMLCanvasElement) => {
       for (const f of this.faces) {
+        // A building's face (Angle view) is painted again whole, below.
+        if (f.rows) continue;
         const sx = Math.round(f.x0 * P), sy = Math.round(f.y * P), sw = Math.round(f.x1 * P) - sx;
         ctx.drawImage(layer, sx, sy, sw, hang, sx / k, sy / k, sw / k, hang / k);
       }
@@ -927,6 +929,7 @@ export class DefendRenderer {
       copy(this.previousLayer);
       ctx.restore();
     }
+    paintOpenFaces(ctx, this.px, map, sim, this.area, looks, this.arrival?.omit);
   }
 
   /** The city gates swing open while any of the city's people plan to pass through
@@ -1417,7 +1420,8 @@ export class DefendRenderer {
   private findFaces(map: CityMap, sim: DefendSim | null) {
     this.faces = hangingFaces(map, sim);
     this.faced.fill(0);
-    for (const f of this.faces) for (let x = f.x0; x < f.x1; x++) this.faced[cellIndex(x, f.y)] = 1;
+    const wall = Math.ceil(ART * FACE_HANG);
+    for (const f of this.faces) for (let x = f.x0; x < f.x1; x++) this.faced[cellIndex(x, f.y)] = Math.max(this.faced[cellIndex(x, f.y)], f.rows ?? wall);
   }
 
   /** The boxes (in cells) round the buildings whose look changed since
