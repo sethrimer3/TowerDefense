@@ -351,6 +351,9 @@ The grass, trees (large, larger and huge, seen from above), small berry bushes, 
 **Boulder**:
 A great stone, alone, in a cluster or heaped into a small mountain, in the forest outside Mossbound Ruins' walls: unlike the rest of the forest it blocks everyone on foot in the battle, though shots fly over it.
 
+**Arrival**:
+How an edit made while building lands: what it replaced dissolves away, and what it made falls out of the sky, a placed building whole, a city tile's pieces each on their own.
+
 **Park life**:
 The city's live dressing, never part of the battle: grass swaying and parting around walkers, and on the ponds rain rings, reflections and ducks.
 

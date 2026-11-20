@@ -106,6 +106,9 @@ export type CityScene = {
   /** Cells (x1/y1 exclusive) the caller has clipped the canvas to: what
    * can't reach them is skipped, so a small repaint is cheap. */
   within?: Within;
+  /** Buildings left out, by id: an edit's pieces still falling into place
+   * (`arrival.ts`). */
+  omit?: ReadonlySet<number>;
 };
 
 /** A box of cells the repaint is clipped to. */
@@ -129,13 +132,14 @@ type Paint = {
   /** The cell holds a standing building or wall stone. */
   solid: (i: number) => boolean;
   looks?: Readonly<Record<number, string>>;
+  omit?: ReadonlySet<number>;
 };
 
 /** Paints the whole city onto `c` (sized by the caller) at `px` per cell. */
 export function paintCityLayer(c: CanvasRenderingContext2D, px: number, scene: CityScene) {
   const { map, sim } = scene;
   const solid = (i: number) => (sim ? sim.solid[i] === 1 : map.owner[i] >= 0 && map.type[i] !== CellType.ROAD);
-  const p: Paint = { c, px, map, sim, solid, area: scene.area ?? "moss", looks: scene.looks, within: scene.within };
+  const p: Paint = { c, px, map, sim, solid, area: scene.area ?? "moss", looks: scene.looks, within: scene.within, omit: scene.omit };
   c.imageSmoothingEnabled = false;
   paintFlagstones(p);
   paintCityGround(p);
@@ -149,7 +153,8 @@ export function paintCityLayer(c: CanvasRenderingContext2D, px: number, scene: C
   // the wall. Walls next: a wall's face hangs over the cell below it, and a
   // house or structure standing there is in front of the face, so it covers it.
   paintSpikes(p);
-  const near = (b: Building) => reaches(p.within, b.rect.x, b.rect.y, b.rect.w, b.rect.h);
+  const omit = scene.omit;
+  const near = (b: Building) => reaches(p.within, b.rect.x, b.rect.y, b.rect.w, b.rect.h) && !omit?.has(b.id);
   for (const b of map.buildings) if (b.kind === "wall" && near(b)) paintBuilding(p, b);
   paintFences(c, px, map, sim);
   for (const b of map.buildings) if (b.kind !== "wall" && near(b)) paintBuilding(p, b);
@@ -290,7 +295,8 @@ function paintCityGround(p: Paint) {
       // forest, its grass grows under it: `paintFences`).
       if (t === CellType.OUT || (t === CellType.STRUCT && !map.city[i]) || map.buildings[map.owner[i]]?.fence) continue;
       if (t === CellType.PARK || t === CellType.WATER) paintGrass(p, cx, cy);
-      else if (t !== CellType.WALL || !solid(i) || map.buildings[map.owner[i]]?.woodGate) paintGravel(p, cx, cy);
+      // A wall stone still falling into place (`omit`) leaves its street bare.
+      else if (t !== CellType.WALL || !solid(i) || map.buildings[map.owner[i]]?.woodGate || p.omit?.has(map.owner[i])) paintGravel(p, cx, cy);
     }
 }
 

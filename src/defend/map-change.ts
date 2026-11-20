@@ -10,7 +10,7 @@ import type { CellBox } from "./lighting.ts";
 type Looks = Readonly<Record<number, string>> | undefined;
 
 /** Everything the city layer draws of a building, as a string. */
-function signature(b: Building, looks: Looks) {
+export function signature(b: Building, looks: Looks) {
   const look = b.structureUid !== undefined ? looks?.[b.structureUid] ?? "" : "";
   const gate = b.gate ? `${b.gate.tx},${b.gate.ty},${b.gate.side}` : "";
   const corner = b.corner ? `${b.corner.vx},${b.corner.vy},${b.corner.out.x},${b.corner.out.y}` : "";

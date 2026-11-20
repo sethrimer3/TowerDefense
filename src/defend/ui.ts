@@ -1530,6 +1530,7 @@ export class DefendPage {
     // Moving keeps a building's upgrades; taking one up keeps them in the
     // palette (`setLayout`).
     const changed = drop.layout !== s.layout;
+    if (changed) this.renderer?.arrive();
     setLayout(s, drop.layout);
     if (drop.message) this.setMessage(drop.message);
     if (changed) this.host.persist();
@@ -1723,6 +1724,7 @@ export class DefendPage {
     if(this.phase!=="build"||b.kind==="keep")return;
     const l=this.save.layout;
     const next=this.pickedSpike?removeSpikes(l,this.pickedSpike):b.structureUid!==undefined?removeStructure(l,b.structureUid):b.corner?removeBallista(l,b.corner):b.gate?removeGate(l,b.gate):b.piece?removeWall(l,wallAtCell(l,b.rect.x,b.rect.y)!):l;
+    if(next!==l)this.renderer?.arrive();
     setLayout(this.save,next);this.pick(null);this.host.persist();this.renderPalette();
   }
 

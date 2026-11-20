@@ -14,6 +14,7 @@
  * - **flee:** anyone walking close to the bank sends them paddling hard to
  *   the far side, rippling as they go;
  * - **sleep:** at night they rest, heads tucked, ducklings huddled close. */
+import type { Fall } from "./arrival.ts";
 import { ART, openAt, type ParkArt } from "./park-art.ts";
 import type { Pond } from "./pond-water.ts";
 
@@ -60,6 +61,9 @@ const SPEED = { paddle: 0.32, follow: 0.42, flee: 1.05, duckling: 0.5 };
 const SHY = 2.2;
 
 export class Ducks {
+  /** While a pond just placed fills in (`arrival.ts`): how duck number `i`,
+   * at (x, y), is dropping onto the water. */
+  fall: ((x: number, y: number, i: number) => Fall) | null = null;
   private ducks: Duck[] = [];
   private art: ParkArt | null = null;
   private rand: () => number = () => 0.5;
@@ -239,7 +243,18 @@ export class Ducks {
   draw(c: CanvasRenderingContext2D, px: number, now: number, art: ParkArt) {
     const s = px / DUCK, t = now / 1000, k = DUCK / ART;
     c.save();
-    for (const d of [...this.ducks].sort((a, b) => a.y - b.y)) {
+    const order = this.ducks.map((d, i) => [d, i] as const).sort((a, b) => a[0].y - b[0].y);
+    for (const [d, i] of order) {
+      const f = this.fall?.(d.x, d.y, i) ?? null;
+      if (f === false) continue;
+      if (f) {
+        c.save();
+        c.globalAlpha = f.alpha;
+        c.translate(d.x * px, (d.y + f.dy) * px);
+        c.scale(f.scale, f.scale);
+        c.translate(-d.x * px, -d.y * px);
+      }
+      const base = f ? f.alpha : 1;
       const sprite = SPRITES[spriteOf(d)], colors = COLORS[d.kind === "duckling" ? "duckling" : d.kind];
       const w = sprite[0].length, h = sprite.length;
       // Bobbing: a pixel up and down while sitting still.
@@ -251,16 +266,18 @@ export class Ducks {
           const color = colors[ch];
           if (!color) continue;
           const x = ax + col, y = ay + row;
-          c.globalAlpha = ch === "w" ? 0.55 : 1;
+          c.globalAlpha = (ch === "w" ? 0.55 : 1) * base;
           c.fillStyle = color;
           c.fillRect(x * s, y * s, s, s);
-          // The reflection: the same pixel mirrored below the waterline, faint.
+          // The reflection: the same pixel mirrored below the waterline,
+          // faint (none while the duck is still in the air).
           const ry = ay + h + (h - 1 - row);
-          if (ch !== "w" && ch !== "d" && openAt(art, Math.floor(x / k), Math.floor(ry / k))) {
+          if (!f && ch !== "w" && ch !== "d" && openAt(art, Math.floor(x / k), Math.floor(ry / k))) {
             c.globalAlpha = 0.22;
             c.fillRect(x * s, ry * s, s, s);
           }
         }
+      if (f) c.restore();
     }
     c.restore();
   }

@@ -11,6 +11,7 @@ import { drawPixel, pixelKey } from "./pixel-sprites.ts";
 import { hash01 } from "./grid.ts";
 import type { CityMap } from "./citygen.ts";
 import { ART, parkArt, parkTreeSource, type TreeSprite } from "./park-art.ts";
+import type { Fall } from "./arrival.ts";
 
 /** A tree's opacity while someone is under it. */
 export const UNDER_ALPHA = 0.5;
@@ -35,6 +36,9 @@ export class ParkTrees {
   /** Each tree's opacity, easing toward 1 or `UNDER_ALPHA`. */
   readonly alpha: number[] = [];
   private off: HTMLCanvasElement | null = null;
+  /** While a park just placed fills in (`arrival.ts`): how each tree, by
+   * its canopy's middle, is falling into place. */
+  fall: ((cx: number, cy: number) => Fall) | null = null;
 
   sync(map: CityMap) {
     const key = pixelKey();
@@ -96,7 +100,24 @@ export class ParkTrees {
     target.imageSmoothingEnabled = false;
     this.trees.forEach((t, i) => {
       if (!t.canvas) return;
-      target.globalAlpha = this.alpha[i];
+      const f = this.fall?.(t.cx, t.cy) ?? null;
+      if (f === false) return;
+      if (f) {
+        target.save();
+        target.translate(t.cx * px, (t.cy + f.dy) * px);
+        target.scale(f.scale, f.scale);
+        target.translate(-t.cx * px, -t.cy * px);
+      }
+      target.globalAlpha = this.alpha[i] * (f ? f.alpha : 1);
+      this.paintTree(target, t, i, px, k, blight);
+      if (f) target.restore();
+    });
+    target.restore();
+    this.finishShade(c, target, shade, box);
+  }
+
+  private paintTree(target: CanvasRenderingContext2D, t: TreeSprite, i: number, px: number, k: number, blight?: BlightTrail) {
+    {
       // Pixel Art's oak or pine over the canopy's disc (the pine where the canopy is dark).
       const pine = hash01(Math.floor(t.cx), Math.floor(t.cy), 22) < 0.5;
       const stage = blight?.treeStage(t.cx, t.cy, t.r) ?? 0;
@@ -108,9 +129,11 @@ export class ParkTrees {
         return;
       }
       if (drawPixel(target, pine ? "city-pine" : "city-oak", (t.cx - t.r) * px, (t.cy - t.r) * px, t.r * 2 * px)) return;
-      drawSprite(target,t.canvas, t.x * k, t.y * k, t.w * k, t.h * k);
-    });
-    target.restore();
+      drawSprite(target, t.canvas, t.x * k, t.y * k, t.w * k, t.h * k);
+    }
+  }
+
+  private finishShade(c: CanvasRenderingContext2D, target: CanvasRenderingContext2D, shade: ((o: CanvasRenderingContext2D) => void) | undefined, box: { x: number; y: number; w: number; h: number } | null) {
     if (!shade || !box) return;
     target.save();
     target.setTransform(1, 0, 0, 1, 0, 0);
