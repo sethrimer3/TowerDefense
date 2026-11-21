@@ -18,8 +18,11 @@ export function faceDepth(b: Building): number {
   if (b.kind === "keep") return 11;
   if (b.kind === "gate" || b.kind === "wallBallista") return Math.round(ART * WALL_FACE_HANG);
   if (b.kind.endsWith("Tower")) return 9;
-  return 7;
+  return HALL_FACE;
 }
+
+/** How many art pixels a hall's south face hangs (any structure not a tower). */
+export const HALL_FACE = 7;
 
 /** How far up (in cells) standing building `b`'s sprite is drawn in Angle
  * view, so the foot of its south face is where the foot of its lot is: a

@@ -72,3 +72,32 @@ test("the slanted keep fills its art the same at every damage stage", async () =
     assert.notDeepEqual(hurt, whole);
   }
 });
+
+test("a guild's yard lies behind its hall, and Angle view shortens only the roof", async () => {
+  const { structurePixels, structureYard, KINDS } = await import("../src/defend/tower-art.ts");
+  const { HALL_FACE } = await import("../src/defend/angle-view.ts");
+  const w = 4 * ART;
+  for (const kind of ["meleeGuild", "rangedGuild", "archerBarracks", "heroHall", "bloodHall"] as const) {
+    const yard = structureYard(kind, 4, 4), dropped = structureYard(kind, 4, 4, "", HALL_FACE);
+    assert.ok(yard > 0 && yard < w / 2, `${kind} has a yard on the north`);
+    assert.ok(dropped > yard + 1 && dropped - HALL_FACE <= yard, `${kind}'s yard runs on under the lifted hall`);
+    // The hall reaches the lot's foot in both.
+    for (const drop of [0, HALL_FACE]) {
+      const px = structurePixels(kind, 4, 4, 0, 1, "", drop);
+      assert.ok(px[(w - 4) * w + w / 2] >>> 24 === 255, `${kind} stands on its foot (drop ${drop})`);
+    }
+  }
+  for (const kind of ["barracks", "archerTower", "mageGuild", "wizardTower"]) assert.equal(structureYard(kind, 4, 4), 0);
+  assert.ok(KINDS.filter((k) => structureYard(k, 4, 4) > 0).length >= 15);
+});
+
+test("houses' walls vary from lot to lot", async () => {
+  const { houseLook } = await import("../src/defend/city-layer.ts");
+  const looks = Array.from({ length: 200 }, (_, i) => houseLook(i * 7919));
+  for (const material of ["plaster", "stone", "brick", "boards"]) assert.ok(looks.some((l) => l.material === material), material);
+  assert.ok(new Set(looks.map((l) => `${l.material}:${l.wall}:${l.door}:${l.doorAt}:${l.windows}:${!!l.shutters}`)).size > 100);
+  // Two faces of the same art differ when their seeds give different walls.
+  const src = art(20, 16, (x, y) => x >= 1 && x < 19 && y >= 1 && y < 9);
+  const a = facePixels(src, 20, 16, 5, "house", 1)!, faces = Array.from({ length: 12 }, (_, i) => facePixels(src, 20, 16, 5, "house", 1000 + i)!);
+  assert.ok(faces.some((f) => f.some((v, i) => v !== a[i])));
+});

@@ -27,7 +27,8 @@ import { AREAS, areaArtId, type AreaId } from "./areas.ts";
 import { hasForest } from "./forest.ts";
 import { hasWallArt, wallCapSprite, wallFaceSprite, wallRubbleTones, wallRubbleSource } from "./area-wall-art.ts";
 import { drawPixel, drawRoof, pixelKey, type PixelSprite } from "./pixel-sprites.ts";
-import { angled, faceDepth, liftOf, liftPx, setAngled } from "./angle-view.ts";
+import { HALL_FACE, angled, faceDepth, liftOf, liftPx, setAngled } from "./angle-view.ts";
+import { structureYard } from "./tower-art.ts";
 
 export { faceDepth, liftOf } from "./angle-view.ts";
 
@@ -247,6 +248,9 @@ export function spriteFootprint(map: CityMap, b: Building, look: string | undefi
     paintStanding(c, ART, map, b, "moss", look === undefined || b.structureUid === undefined ? undefined : { [b.structureUid]: look }, true);
     const data = c.getImageData(0, 0, w, h).data, mask = new Uint8Array(w * h);
     for (let k = 0; k < w * h; k++) mask[k] = data[k * 4 + 3] >= 128 ? 1 : 0;
+    // An open yard casts nothing: only its hall stands.
+    const yard = b.structureUid === undefined || b.kind === "keep" ? 0 : structureYard(b.kind, r.w, r.h, look ?? "");
+    if (yard) mask.fill(0, 0, (ART + yard) * w);
     // Nothing drawn (art still on its way): its lot stands in.
     f = mask.includes(1) ? { w, h, mask } : null;
     footprints.set(key, f);
@@ -397,10 +401,37 @@ function paintBuilding(p: Paint, b: Building) {
   if (b.hidden) return;
   const up = p.flat || !standsLifted(p, b) ? 0 : liftPx(b, p.px);
   if (!up) return paintBuildingAt(p, b);
-  p.c.save();
-  p.c.translate(0, -up);
+  const c = p.c, yard = yardOf(p, b);
+  if (yard) {
+    // A yarded hall: its yard lies on the ground, only the hall rises, over
+    // the yard's far end (`structurePixels`' drop).
+    const cut = (b.rect.y + yard / ART) * p.px, big = 1e6;
+    c.save();
+    c.beginPath();
+    c.rect(-big, -big, 2 * big, big + cut);
+    c.clip();
+    paintBuildingAt(p, b);
+    c.restore();
+    c.save();
+    c.translate(0, -up);
+    c.beginPath();
+    c.rect(-big, cut - p.px / ART, 2 * big, big);
+    c.clip();
+    paintBuildingAt(p, b);
+    c.restore();
+    return;
+  }
+  c.save();
+  c.translate(0, -up);
   paintBuildingAt(p, b);
-  p.c.restore();
+  c.restore();
+}
+
+/** The art rows of open yard atop structure `b`'s lot as Angle view draws
+ * it (`structureYard`), 0 for anything else. */
+function yardOf(p: Paint, b: Building) {
+  if (b.structureUid === undefined || b.kind === "keep") return 0;
+  return structureYard(b.kind, b.rect.w, b.rect.h, p.looks?.[b.structureUid] ?? "", HALL_FACE);
 }
 
 /** Whether `b` stands (a wall stone, or a building not fallen or aloft). */
@@ -895,6 +926,7 @@ export function facePixels(src: Uint8ClampedArray, w: number, h: number, depth: 
     const k = (n: number) => Math.max(0, Math.min(255, Math.round(n * f)));
     out[y * w + x] = (255 << 24 | k(B) << 16 | k(G) << 8 | k(R)) >>> 0;
   };
+  const house = houseLook(seed);
   // Runs of neighbouring columns whose roofs end level (within a pixel):
   // each one wall, with its openings spaced along it.
   for (let x0 = 0; x0 < w; ) {
@@ -905,7 +937,7 @@ export function facePixels(src: Uint8ClampedArray, w: number, h: number, depth: 
     for (let x = x0; x < x1; x++) {
       const at = (foot[x] * w + x) * 4, edge = [src[at], src[at + 1], src[at + 2]];
       const top = foot[x] + 2, rows = depth - 1, i = x - x0;
-      const base = style === "house" ? PLASTER : mix(edge, MASONRY, style === "wall" ? 0.25 : 0.45);
+      const base = style === "house" ? house.wall : mix(edge, MASONRY, style === "wall" ? 0.25 : 0.45);
       for (let k = 0; k < rows; k++) {
         const y = top + k;
         // The sun grazes the face from the left, and the eaves shade its top.
@@ -914,11 +946,10 @@ export function facePixels(src: Uint8ClampedArray, w: number, h: number, depth: 
         f *= 0.96 + 0.08 * hash01(x, y, seed);
         let color: readonly number[] = base;
         if (style === "house") {
-          // Timber posts at the corners and every few pixels, a beam along the top.
-          const post = i === 0 || i === len - 1 || (len > 6 && i % 5 === 0);
-          if (k === 0 || post) color = TIMBER;
-          else if (len >= 6 && Math.abs(x - mid) <= 0 && k >= rows - 3) color = DOOR;
-          else if (k === 1 && i % 5 === 2 && Math.abs(x - mid) > 1) color = OPENING;
+          const [c2, f2] = houseWall(house, i, k, len, rows, x, y, seed);
+          color = c2;
+          if (f2 !== null) f = f2;
+          else if (k === 0) f *= house.framed ? 1 : 0.9;
         } else {
           const course = Math.floor((k - 1) / 3);
           if (k > 0 && (k - 1) % 3 === 2) f *= 0.84;
@@ -942,6 +973,97 @@ export function facePixels(src: Uint8ClampedArray, w: number, h: number, depth: 
 }
 
 const mix = (a: readonly number[], b: readonly number[], t: number) => a.map((v, i) => v + (b[i] - v) * t);
+
+type Rgb = readonly number[];
+/** What a house's south wall is built of and how it is laid out, seeded by
+ * its lot so neighbours differ: plaster in one of several washes (framed
+ * in timber, some braced), rough stone, brick or boards; its door's place,
+ * colour and height; its windows' spacing, height and shutters; a stone
+ * plinth, flower boxes. */
+type HouseLook = {
+  material: "plaster" | "stone" | "brick" | "boards";
+  wall: Rgb;
+  framed: boolean;
+  braced: boolean;
+  posts: number;
+  door: Rgb;
+  doorAt: number;
+  doorTall: number;
+  windows: number;
+  windowOff: number;
+  windowTall: boolean;
+  shutters: Rgb | null;
+  plinth: boolean;
+  flowers: boolean;
+};
+const WASHES: readonly Rgb[] = [PLASTER, [214, 204, 180], [196, 160, 112], [200, 168, 150], [176, 168, 140]];
+const STONE_WALL: Rgb = [138, 130, 116], BRICK: Rgb = [148, 78, 54], BOARDS: Rgb = [118, 84, 54];
+const DOORS: readonly Rgb[] = [DOOR, [60, 82, 52], [58, 70, 98], [112, 44, 36], [70, 48, 30]];
+const SHUTTERS: readonly Rgb[] = [[66, 92, 60], [62, 78, 110], [128, 52, 40], [96, 70, 44]];
+const FLOWERS: readonly Rgb[] = [[200, 60, 60], [230, 190, 80], [190, 110, 200]];
+
+export function houseLook(seed: number): HouseLook {
+  const h = (n: number) => hash(seed, n, 421);
+  const kind = h(1) % 10;
+  const material = kind < 5 ? "plaster" : kind < 7 ? "stone" : kind < 9 ? "brick" : "boards";
+  const plaster = material === "plaster";
+  return {
+    material,
+    wall: plaster ? WASHES[h(2) % WASHES.length] : material === "stone" ? STONE_WALL : material === "brick" ? BRICK : BOARDS,
+    framed: plaster && h(3) % 3 !== 0,
+    braced: plaster && h(4) % 2 === 0,
+    posts: 4 + (h(5) % 3),
+    door: DOORS[h(6) % DOORS.length],
+    doorAt: [0.5, 0.3, 0.7, 0.2, 0.8][h(7) % 5],
+    doorTall: 2 + (h(8) % 2),
+    windows: 3 + (h(9) % 3),
+    windowOff: h(10) % 3,
+    windowTall: h(11) % 3 === 0,
+    shutters: h(12) % 3 === 0 ? SHUTTERS[h(13) % SHUTTERS.length] : null,
+    plinth: material !== "stone" && h(14) % 3 === 0,
+    flowers: h(15) % 4 === 0,
+  };
+}
+
+/** The colour of a house's wall `i` pixels along a run `len` wide and `k`
+ * rows down (of `rows`), and its shading if it overrides the face's (null
+ * keeps it). Pure. */
+function houseWall(l: HouseLook, i: number, k: number, len: number, rows: number, x: number, y: number, seed: number): [Rgb, number | null] {
+  const doorX = Math.max(1, Math.min(len - 2, Math.round((len - 1) * l.doorAt)));
+  const door = len >= 5 && i === doorX && k >= rows - l.doorTall;
+  const edge = i === 0 || i === len - 1;
+  const post = l.framed && (edge || (len > l.posts + 2 && i % l.posts === 0));
+  // Windows between the posts, clear of the door and the corners.
+  const winCol = i >= 2 && i <= len - 3 && Math.abs(i - doorX) > 1 && (i + l.windowOff) % l.windows === 0 && !post;
+  const winRow = k === 1 || (l.windowTall && k === 2 && rows > 3);
+  if (door) return [k === rows - l.doorTall ? mix(l.door, OPENING, 0.5) : l.door, 1];
+  if (k === 0) return [l.framed || l.material === "boards" ? TIMBER : mix(l.wall, OPENING, 0.35), null];
+  if (winCol && winRow) return [OPENING, 1];
+  if (l.shutters && winRow && !post && (i >= 1 && i <= len - 2) && Math.abs(i - doorX) > 0) {
+    const nextTo = (j: number) => j >= 2 && j <= len - 3 && Math.abs(j - doorX) > 1 && (j + l.windowOff) % l.windows === 0;
+    if ((nextTo(i - 1) || nextTo(i + 1)) && !(l.framed && (i % l.posts === 0))) return [l.shutters, 0.9];
+  }
+  if (l.flowers && winCol && k === (l.windowTall ? 3 : 2) && k < rows) return [FLOWERS[hash(seed, i, 422) % FLOWERS.length], 1];
+  if (post) return [TIMBER, null];
+  if (l.plinth && k === rows - 1) return [STONE_WALL, 0.7];
+  if (l.braced && l.framed) {
+    // A diagonal brace in each panel, alternating its slant.
+    const panel = Math.floor(i / l.posts), j = i % l.posts;
+    if (j > 0 && (panel % 2 ? l.posts - j : j) === k) return [TIMBER, null];
+  }
+  if (l.material === "stone") {
+    // Rough coursed rubble: stones of two tones, dark joints between.
+    const course = Math.floor((k - 1) / 2), joint = (k - 1) % 2 === 1 && hash(x, y, seed) % 3 !== 0;
+    if (joint || (x + course * 3 + (hash(course, seed) % 3)) % 4 === 0) return [mix(STONE_WALL, OPENING, 0.4), null];
+    return [hash(x >> 1, y, seed) % 3 === 0 ? mix(STONE_WALL, [190, 182, 166], 0.4) : STONE_WALL, null];
+  }
+  if (l.material === "brick") {
+    if ((x + (k & 1) * 2) % 4 === 0) return [mix(BRICK, [190, 180, 160], 0.45), null];
+    return [hash(x >> 2, y, seed) % 4 === 0 ? mix(BRICK, [90, 40, 30], 0.3) : BRICK, null];
+  }
+  if (l.material === "boards") return [(x + (hash(x, seed) % 2)) % 3 === 0 ? mix(BOARDS, OPENING, 0.4) : BOARDS, null];
+  return [l.wall, null];
+}
 
 /** Angle view: the wall stones and buildings whose lifted art (`liftOf`)
  * reaches out over the open ground, painted again (at `px` a cell) over
