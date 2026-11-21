@@ -1,4 +1,6 @@
 import { drawSquareRange } from "./square-range-art.ts";
+import { angled } from "./angle-view.ts";
+import { ANGLED_KEEP_H, ANGLED_KEEP_W, angledKeepPixels } from "./keep-angle-art.ts";
 import { sourcePixels } from "./sprite-source.ts";
 import { flagPixels as profilePixels, type Flag } from "../profile/model.ts";
 /** DEFEND's structure art, seen from above: the keep, and the barracks and
@@ -30,10 +32,10 @@ export type ArtBox = { x: number; y: number; w: number; h: number; px: number };
 /** Paints a structure into `box`: the keep at its damage `stage` (see
  * `keepStage`), anything else at its `damageStage`, seeded by `seed` (its
  * lot) so each looks its own, in its path's `look` (`PATH_LOOKS`). */
-export function paintStructureArt(c: CanvasRenderingContext2D, kind: StructureKind, box: ArtBox, stage = 0, seed = 0, path?: string) {
+export function paintStructureArt(c: CanvasRenderingContext2D, kind: StructureKind, box: ArtBox, stage = 0, seed = 0, path?: string, angle = false) {
   const x = Math.round(box.x), y = Math.round(box.y), w = Math.round(box.w), h = Math.round(box.h);
   const cw = Math.max(1, Math.round(box.w / box.px)), ch = Math.max(1, Math.round(box.h / box.px));
-  if (kind === "keep") return paintKeep(c, { x, y, w, h, px: box.px }, stage);
+  if (kind === "keep") return paintKeep(c, { x, y, w, h, px: box.px }, stage, angle);
   const look = artLook(kind, path);
   const art = sprite(`${kind}:${cw}x${ch}:${stage}:${seed}${look ? `:${look}` : ""}`, cw * ART, ch * ART, () => structurePixels(kind, cw, ch, stage, seed, look));
   drawSprite(c, art, x, y, w, h);
@@ -632,6 +634,7 @@ let rubbleSprite: HTMLCanvasElement | null = null;
 onPixelArt(() => {
   keepSprites.length = 0;
   smallKeepSprites.length = 0;
+  angledKeepSprites.length = 0;
   smallFlashSprite = null;
   keepFlashSprite = rubbleSprite = null;
 });
@@ -640,11 +643,24 @@ onPixelArt(() => {
  * (a single quarter tile, `outpost.ts`). */
 const smallKeep = ({ w, px }: ArtBox) => px > 0 && w / px < 3;
 const smallKeepSprites: HTMLCanvasElement[] = [];
+const angledKeepSprites: HTMLCanvasElement[] = [];
+let angledFlashSprite: HTMLCanvasElement | null = null;
 let smallFlashSprite: HTMLCanvasElement | null = null;
 
 /** Pale damage overlay with exactly the keep sprite's silhouette. */
 export function paintKeepFlash(c: CanvasRenderingContext2D, box: ArtBox, alpha: number) {
   const { x, y, w, h } = box, small = smallKeep(box);
+  if (angled() && !small) {
+    // Angle view's slanted keep, lifted by its face.
+    const up = Math.round((box.px * (ANGLED_KEEP_H - ANGLED_KEEP_W)) / ART);
+    const flash = (angledFlashSprite ??= spriteCanvas(angledKeepPixels().map((v) => (v ? rgba(0xfff4dc) : 0)), ANGLED_KEEP_W, ANGLED_KEEP_H, undefined, false));
+    c.save();
+    c.imageSmoothingEnabled = false;
+    c.globalAlpha = alpha;
+    c.drawImage(flash, x, y - up, w, h + up);
+    c.restore();
+    return;
+  }
   const sprite = small
     ? (smallFlashSprite ??= spriteCanvas(outpostKeepPixels().map(v => v ? rgba(0xfff4dc) : 0), SMALL_KEEP, SMALL_KEEP, undefined, false))
     : (keepFlashSprite ??= spriteCanvas(keepPixels().map(v => v ? rgba(0xfff4dc) : 0), KEEP, KEEP, undefined, false));
@@ -657,9 +673,13 @@ export function paintKeepFlash(c: CanvasRenderingContext2D, box: ArtBox, alpha: 
 
 /** The keep's pixels at damage `stage` drawn up to fill its box,
  * smoothing off. */
-function paintKeep(c: CanvasRenderingContext2D, box: ArtBox, stage: number) {
+function paintKeep(c: CanvasRenderingContext2D, box: ArtBox, stage: number, angle = false) {
   if (typeof document === "undefined") return;
   const { x, y, w, h } = box;
+  if (angle && !smallKeep(box)) {
+    const art = (angledKeepSprites[stage] ??= spriteCanvas(angledKeepPixels(stage), ANGLED_KEEP_W, ANGLED_KEEP_H));
+    return drawSprite(c, art, x, y, w, Math.round(y + (h * ANGLED_KEEP_H) / ANGLED_KEEP_W) - y);
+  }
   if (smallKeep(box)) drawSprite(c, (smallKeepSprites[stage] ??= spriteCanvas(outpostKeepPixels(stage), SMALL_KEEP, SMALL_KEEP)), x, y, w, h);
   else drawSprite(c, (keepSprites[stage] ??= spriteCanvas(keepPixels(stage), KEEP, KEEP)), x, y, w, h);
 }

@@ -58,3 +58,17 @@ test("Angle view lifts each standing sprite by its face, and nothing while off",
   assert.equal(liftOf(b("gate", { woodGate: true })), 0);
   setAngleView(false);
 });
+
+test("the slanted keep fills its art the same at every damage stage", async () => {
+  const { ANGLED_KEEP_H, ANGLED_KEEP_W, angledKeepPixels } = await import("../src/defend/keep-angle-art.ts");
+  assert.equal(ANGLED_KEEP_H, ANGLED_KEEP_W + 11);
+  const whole = angledKeepPixels(0), solid = (px: Uint32Array) => px.map((v) => (v >>> 24 === 255 ? 1 : 0));
+  assert.equal(whole.length, ANGLED_KEEP_W * ANGLED_KEEP_H);
+  // Its foot reaches the bottom row, across the middle.
+  assert.ok(whole[(ANGLED_KEEP_H - 1) * ANGLED_KEEP_W + ANGLED_KEEP_W / 2] >>> 24 === 255);
+  for (let s = 1; s <= 4; s++) {
+    const hurt = angledKeepPixels(s);
+    assert.deepEqual(solid(hurt), solid(whole), `stage ${s} only repaints`);
+    assert.notDeepEqual(hurt, whole);
+  }
+});

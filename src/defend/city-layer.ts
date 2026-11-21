@@ -425,7 +425,9 @@ function paintBuildingAt(p: Paint, b: Building) {
     else if (hasWallArt(p.area) || !paintPixelRubble(p, b)) paintArt(p, wallRubbleSprite(lotSeed(b), p.area), box);
     return;
   }
-  if (angleView && !p.flat && !b.woodGate && (!sim || sim.intact(b)) && !aloft(p, b)) paintFace(p, b);
+  // The keep at full size has its own slanted art (`keep-angle-art.ts`).
+  const ownAngle = b.kind === "keep" && r.w >= 3;
+  if (angleView && !p.flat && !ownAngle && !b.woodGate && (!sim || sim.intact(b)) && !aloft(p, b)) paintFace(p, b);
   if (b.kind === "gate") {
     const side = b.gate!.side, a = gateArtRect(b);
     const ax = Math.round(a.x * px), ay = Math.round(a.y * px);
@@ -457,7 +459,7 @@ function paintBuildingAt(p: Paint, b: Building) {
   // Pixel Art's roofs on undamaged houses; a damaged one keeps its own, showing the damage.
   if (b.kind === "house" && !stageOf(sim, b) && drawRoof(c, b.variant, box, px)) return;
   if (b.kind === "house") return paintArt(p, roofSprite(r.w, r.h, b.variant, roofSeed(r.x, r.y, r.w, r.h), stageOf(sim, b)), box);
-  paintStructureArt(c, b.kind, box, stageOf(sim, b), lotSeed(b), b.structureUid !== undefined ? p.looks?.[b.structureUid] : undefined);
+  paintStructureArt(c, b.kind, box, stageOf(sim, b), lotSeed(b), b.structureUid !== undefined ? p.looks?.[b.structureUid] : undefined, angleView && !p.flat);
 }
 
 /** Paints building `b` whole and undamaged onto `c` at `px` per cell (a

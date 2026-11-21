@@ -40,7 +40,7 @@ import { Fences } from "./fences.ts";
 import { Rain, Snow, ambientFor, type Weather } from "./weather.ts";
 import { areaFade, areaForWave, type AreaId } from "./areas.ts";
 import { gateArtRect } from "./wood-gate-art.ts";
-import { liftPx } from "./angle-view.ts";
+import { angled, liftPx } from "./angle-view.ts";
 import { FACE_HANG, buildingState, damageKey, gateSpriteOf, shapeOf, hangingFaces, onCityArtLoaded, paintBuildingMask, paintOpenLifts, paintCityLayer, paintFences, paintSpikePoints, paintStanding, stageOf } from "./city-layer.ts";
 import { GATE_FRAMES } from "./gate-art.ts";
 import { peopleAt } from "./gates.ts";
@@ -614,10 +614,12 @@ export class DefendRenderer {
       }
     }
     this.drawKeepFlag(map, sim, opts);
+    this.snapOverhangs();
     if (sim) this.drawBattleUnits(sim, opts.weather && !(opts.sun && opts.night === 0) ? this.burning ?? (() => 1) : null, opts);
     if (this.lit) this.lighting.drawUnitShadows(this.ctx, this.px, this.cityLife.visible, .65);
     drawCityLife(this.ctx, this.px, this.cityLife, sky?.time ?? 0, opts.now, opts.reduceMotion);
     drawMineFolk(this.ctx, this.px, map.buildings, (b) => !sim || sim.intact(b), opts.now, opts.reduceMotion);
+    this.coverOverhangs(map);
     opts.scenery?.(this.ctx, this.px);
     this.drawTrees(map, sim, opts, dt);
     this.drawForest(sim, opts, dt);
@@ -1020,7 +1022,7 @@ export class DefendRenderer {
     const keep = standingKeep(map, sim);
     if (!keep || opts.keepFlag === null) return;
     const r = keep.rect;
-    drawFlag(this.ctx, this.px, { x: (r.x + r.w / 2) * this.px, y: (r.y + r.h / 2) * this.px - liftPx(keep, this.px), t: opts.now / 1000, reduceMotion: opts.reduceMotion }, true, opts.keepFlag);
+    drawFlag(this.ctx, this.px, { x: (r.x + r.w / 2) * this.px, y: (angled() && r.w >= 3 ? r.y + 6 / ART : r.y + r.h / 2) * this.px - liftPx(keep, this.px), t: opts.now / 1000, reduceMotion: opts.reduceMotion }, true, opts.keepFlag);
   }
 
   /** Blast scorches, burning ground and the wizards' ice, then units, projectiles and
@@ -1416,6 +1418,7 @@ export class DefendRenderer {
         repaintBox(cv.getContext("2d", { willReadFrequently: true })!, MASK, box, (c) => paintBuildingMask(c, MASK, { map, sim, area: this.area, looks, lights: this.lighting.lights, stones: this.lighting.roadStones, within: box }, mode));
     }
     if (masked.length) this.lighting.patchMasks(masked);
+    this.masksVersion++;
   }
 
   /** The wall's brick faces hanging over open ground, as they stand. */
@@ -1508,6 +1511,70 @@ export class DefendRenderer {
       return cv;
     };
     this.lighting.setMasks(paint(this.bodyMask, "body"), paint(this.rimMask, "rim"));
+    this.masksVersion++;
+  }
+
+  /** Bumped whenever the body/rim masks are repainted. */
+  private masksVersion = 0;
+  /** Angle view: where buildings, drawn lifted, rise over the ground north of
+   * their lots (at `MASK` a cell), and the board as it stood before anyone
+   * walked over it, copied back there over them (`snapOverhangs`,
+   * `coverOverhangs`). */
+  private overhang: { cv: HTMLCanvasElement; version: number; map: CityMap | null } | null = null;
+  private overhangShot: HTMLCanvasElement | null = null;
+  private overhangPaste: HTMLCanvasElement | null = null;
+  private overhangLive = false;
+
+  /** The overhang mask for `map`: the standing art (bodies and outlines)
+   * outside every lot, repainted with the masks. */
+  private overhangMask(map: CityMap) {
+    let o = this.overhang;
+    if (o && o.version === this.masksVersion && o.map === map) return o.cv;
+    const cv = o?.cv ?? document.createElement("canvas");
+    cv.width = this.bodyMask.width;
+    cv.height = this.bodyMask.height;
+    const c = cv.getContext("2d")!;
+    c.drawImage(this.bodyMask, 0, 0);
+    c.drawImage(this.rimMask, 0, 0);
+    for (const b of map.buildings) if (!b.hidden && !b.fence) c.clearRect(b.rect.x * MASK, b.rect.y * MASK, b.rect.w * MASK, b.rect.h * MASK);
+    o = this.overhang = { cv, version: this.masksVersion, map };
+    return cv;
+  }
+
+  /** Angle view: keeps the board as it stands before the walkers are drawn. */
+  private snapOverhangs() {
+    this.overhangLive = angled() && !!this.bodyMask.width;
+    if (!this.overhangLive) return;
+    const w = this.canvas.width, h = this.canvas.height;
+    const shot = (this.overhangShot ??= document.createElement("canvas"));
+    if (shot.width !== w || shot.height !== h) { shot.width = w; shot.height = h; }
+    const c = shot.getContext("2d")!;
+    c.clearRect(0, 0, w, h);
+    c.drawImage(this.canvas, 0, 0);
+  }
+
+  /** Angle view: the lifted buildings drawn back over whoever walks behind
+   * them (their outlines, drawn later, still show through, as in an RTS). */
+  private coverOverhangs(map: CityMap) {
+    if (!this.overhangLive || !this.overhangShot) return;
+    const w = this.canvas.width, h = this.canvas.height, { W, H } = this.board;
+    const paste = (this.overhangPaste ??= document.createElement("canvas"));
+    if (paste.width !== w || paste.height !== h) { paste.width = w; paste.height = h; }
+    const c = paste.getContext("2d")!;
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.globalCompositeOperation = "source-over";
+    c.clearRect(0, 0, w, h);
+    c.setTransform(this.ctx.getTransform());
+    c.imageSmoothingEnabled = false;
+    c.drawImage(this.overhangMask(map), 0, 0, W, H);
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.globalCompositeOperation = "source-in";
+    c.drawImage(this.overhangShot, 0, 0);
+    c.globalCompositeOperation = "source-over";
+    this.ctx.save();
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+    this.ctx.drawImage(paste, 0, 0);
+    this.ctx.restore();
   }
   /** The lighting was drawn this frame (its glow is current). */
   private lit = false;
