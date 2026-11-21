@@ -3,7 +3,9 @@
 // roof's outline, only in the columns kept, and nothing for empty art.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { angled, facePixels, setAngleView, wallFaces } from "../src/defend/city-layer.ts";
+import { angled, facePixels, liftOf, setAngleView, wallFaces } from "../src/defend/city-layer.ts";
+import { ART, WALL_FACE_HANG } from "../src/defend/art-scale.ts";
+import type { Building } from "../src/defend/citygen.ts";
 
 /** RGBA art `w` × `h` with the given opaque pixels. */
 function art(w: number, h: number, solid: (x: number, y: number) => boolean) {
@@ -41,5 +43,18 @@ test("Angle view hangs the walls' faces too", () => {
   assert.equal(wallFaces(), false);
   setAngleView(true);
   assert.equal(wallFaces(), true);
+  setAngleView(false);
+});
+
+test("Angle view lifts each standing sprite by its face, and nothing while off", () => {
+  const b = (kind: string, extra: Partial<Building> = {}) => ({ id: 0, kind, cells: [], rect: { x: 0, y: 0, w: 2, h: 2 }, variant: 0, ...extra }) as Building;
+  setAngleView(false);
+  assert.equal(liftOf(b("archerTower")), 0);
+  setAngleView(true);
+  assert.equal(liftOf(b("archerTower")), 9 / ART);
+  assert.equal(liftOf(b("house")), 5 / ART);
+  for (const kind of ["wall", "gate", "wallBallista"]) assert.equal(liftOf(b(kind)), WALL_FACE_HANG);
+  assert.equal(liftOf(b("wall", { fence: { x1: 0, y1: 0, x2: 1, y2: 0 } })), 0);
+  assert.equal(liftOf(b("gate", { woodGate: true })), 0);
   setAngleView(false);
 });
