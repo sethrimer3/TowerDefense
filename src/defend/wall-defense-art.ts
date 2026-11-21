@@ -1,4 +1,5 @@
 import { drawPike } from "./weapon-art.ts";
+import { liftOf } from "./angle-view.ts";
 import { sourcePixels } from "./sprite-source.ts";
 import { drawSmall } from "./small-art.ts";
 /** The wall's own defenses as pixel art at `ART` pixels a cell, in black
@@ -279,10 +280,12 @@ export function drawBallistas(c: CanvasRenderingContext2D, px: number, map: City
   const towers = gateRank(gate, "gateTowers");
   for (const b of map.buildings) {
     if (sim && !sim.intact(b)) continue;
-    if (b.kind === "wallBallista" && b.corner) one(b.id, center(b.rect), b.corner.out, 1);
+    // Angle view draws the stones they stand on lifted.
+    const up = liftOf(b);
+    if (b.kind === "wallBallista" && b.corner) { const at = center(b.rect); one(b.id, { x: at.x, y: at.y - up }, b.corner.out, 1); }
     else if (b.kind === "gate" && b.gate && towers) {
       const [sx, sy] = OUTWARD[b.gate.side];
-      gateTowerSpots(b, towers >= GATE_TOWERS.twin).forEach((at, n) => one(gateTowerKey(b, n), at, { x: sx, y: sy }, 0.5));
+      gateTowerSpots(b, towers >= GATE_TOWERS.twin).forEach((at, n) => one(gateTowerKey(b, n), { x: at.x, y: at.y - up }, { x: sx, y: sy }, 0.5));
     }
   }
   if (sim) for (const t of sim.ballistaBolts) drawBolt(c, px, t.x, t.y, t.dx, t.dy, t.small ? 0.6 : 1, !!t.burn);

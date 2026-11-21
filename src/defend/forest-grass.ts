@@ -113,10 +113,9 @@ export function forestBlades(plan: ForestPlan, prior?: { plan: ForestPlan; blade
   return out;
 }
 
-/** `faced` holds, for each cell a wall's brick face or (in Angle view) a
- * building's face hangs over, how many art pixels of its top it covers,
- * where no blade grows. */
-export type ForestGrassFrame = GrassFrame & { alpha: number; damage: ForestDamage | null; faced?: Uint8Array };
+/** `faced` marks the cells the wall's brick face hangs over (`hangRows`
+ * art pixels of their tops), where no blade grows. */
+export type ForestGrassFrame = GrassFrame & { alpha: number; damage: ForestDamage | null; faced?: Uint8Array; hangRows?: number };
 
 /** Every blade's root (art pixels) and the sines and cosines of the parts of
  * `paintBlade`'s sway and gust angles that don't change with time, so
@@ -278,7 +277,7 @@ export class ForestGrass {
       for (const b of list) {
         const gx = sw.gx[k], gy = sw.gy[k], j = k++;
         if ((b.under >= 0 && (!f.damage || f.damage.upright(trees[b.under]))) || !turfAt(gx, gy)) continue;
-        if (f.faced?.[i] && gy % ART < f.faced[i]) continue;
+        if (f.faced?.[i] && gy % ART < (f.hangRows ?? 0)) continue;
         const shade = shadedAt(gx, gy) ? SHADOW : 0;
         palette = (f.blight?.at(gx / ART, gy / ART) ?? 0) >= BLIGHT_TRAIL.grass ? DEAD_PALETTE32 : PALETTE32;
         // Held still: the parks' own way.

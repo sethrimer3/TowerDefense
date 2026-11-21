@@ -27,6 +27,9 @@ import { AREAS, areaArtId, type AreaId } from "./areas.ts";
 import { hasForest } from "./forest.ts";
 import { hasWallArt, wallCapSprite, wallFaceSprite, wallRubbleTones, wallRubbleSource } from "./area-wall-art.ts";
 import { drawPixel, drawRoof, pixelKey, type PixelSprite } from "./pixel-sprites.ts";
+import { angled, faceDepth, liftOf, liftPx, setAngled } from "./angle-view.ts";
+
+export { faceDepth, liftOf } from "./angle-view.ts";
 
 export { POND, POND_WATER, hasTree, pondDisc, pondPath, treeCanopy } from "./park-geometry.ts";
 
@@ -97,10 +100,11 @@ export function setLegacyWalls(on: boolean) {
  * covers the faces behind it. Off, the default, the city is drawn straight
  * down. Presentation only: lots, contact and selection are unchanged. */
 let angleView = false;
-export const angled = () => angleView;
+export { angled };
 export function setAngleView(on: boolean) {
   if (on === angleView) return;
   angleView = on;
+  setAngled(on);
   artListeners.forEach((f) => f());
 }
 
@@ -214,7 +218,7 @@ export function paintBuildingMask(c: CanvasRenderingContext2D, px: number, scene
 /** The shadows of what stands, cached for the last city and battle state. */
 let shadows: { map: CityMap; sim: DefendSim | null; version: number; looks: string; mask: Uint8Array } | null = null;
 function cityShadows(map: CityMap, sim: DefendSim | null, looks?: Readonly<Record<number, string>>) {
-  const version = sim ? sim.mapVersion : -1, key = (looks ? Object.entries(looks).join(",") : "") + `|${pixelKey()}|${angleView}`;
+  const version = sim ? sim.mapVersion : -1, key = (looks ? Object.entries(looks).join(",") : "") + `|${pixelKey()}`;
   if (shadows?.map !== map || shadows.sim !== sim || shadows.version !== version || shadows.looks !== key) {
     const standing = (b: Building) => (!sim || sim.intact(b)) && !aloft({ looks }, b);
     const footprint = (b: Building) => spriteFootprint(map, b, b.structureUid !== undefined ? looks?.[b.structureUid] : undefined);
@@ -229,7 +233,7 @@ function cityShadows(map: CityMap, sim: DefendSim | null, looks?: Readonly<Recor
 const footprints = new Map<string, Omit<Footprint, "x0" | "y0"> | null>();
 export function spriteFootprint(map: CityMap, b: Building, look: string | undefined): Footprint | null {
   if (typeof document === "undefined") return null;
-  const r = b.rect, key = `${b.kind}:${r.w}x${r.h}:${look ?? ""}:${pixelKey()}:${angleView ? "angle" : ""}`;
+  const r = b.rect, key = `${b.kind}:${r.w}x${r.h}:${look ?? ""}:${pixelKey()}`;
   let f = footprints.get(key);
   if (f === undefined) {
     const w = (r.w + 2) * ART, h = (r.h + 2) * ART;
@@ -239,7 +243,8 @@ export function spriteFootprint(map: CityMap, b: Building, look: string | undefi
     const c = cv.getContext("2d", { willReadFrequently: true })!;
     c.imageSmoothingEnabled = false;
     c.translate((1 - r.x) * ART, (1 - r.y) * ART);
-    paintStanding(c, ART, map, b, "moss", look === undefined || b.structureUid === undefined ? undefined : { [b.structureUid]: look });
+    // Flat: the shadows fall from the lot, wherever Angle view draws the sprite.
+    paintStanding(c, ART, map, b, "moss", look === undefined || b.structureUid === undefined ? undefined : { [b.structureUid]: look }, true);
     const data = c.getImageData(0, 0, w, h).data, mask = new Uint8Array(w * h);
     for (let k = 0; k < w * h; k++) mask[k] = data[k * 4 + 3] >= 128 ? 1 : 0;
     // Nothing drawn (art still on its way): its lot stands in.
@@ -321,7 +326,8 @@ function paintCityGround(p: Paint) {
       if (t === CellType.OUT || (t === CellType.STRUCT && !map.city[i]) || map.buildings[map.owner[i]]?.fence) continue;
       if (t === CellType.PARK || t === CellType.WATER) paintGrass(p, cx, cy);
       // A wall stone still falling into place (`omit`) leaves its street bare.
-      else if (t !== CellType.WALL || !solid(i) || map.buildings[map.owner[i]]?.woodGate || p.omit?.has(map.owner[i])) paintGravel(p, cx, cy);
+      // In Angle view a gate's passage, drawn lifted, leaves its street showing below.
+      else if (t !== CellType.WALL || !solid(i) || map.buildings[map.owner[i]]?.woodGate || p.omit?.has(map.owner[i]) || (angleView && map.buildings[map.owner[i]]?.kind === "gate")) paintGravel(p, cx, cy);
     }
 }
 
@@ -385,8 +391,25 @@ function paintPixelArt({ c }: Paint, art: HTMLCanvasElement | null) {
   c.restore();
 }
 
+/** Building `b` as it stands or lies, lifted in Angle view while it stands
+ * (`liftOf`), unless `p.flat`. */
 function paintBuilding(p: Paint, b: Building) {
   if (b.hidden) return;
+  const up = p.flat || !standsLifted(p, b) ? 0 : liftPx(b, p.px);
+  if (!up) return paintBuildingAt(p, b);
+  p.c.save();
+  p.c.translate(0, -up);
+  paintBuildingAt(p, b);
+  p.c.restore();
+}
+
+/** Whether `b` stands (a wall stone, or a building not fallen or aloft). */
+function standsLifted(p: Paint, b: Building) {
+  if (b.kind === "wall") return !b.fence && b.cells.length > 0 && p.solid(b.cells[0]);
+  return (!p.sim || p.sim.intact(b)) && !aloft(p, b);
+}
+
+function paintBuildingAt(p: Paint, b: Building) {
   const { c, px, sim, solid } = p;
   const r = b.rect;
   // Everything snaps to whole pixels so outlines stay crisp.
@@ -440,8 +463,8 @@ function paintBuilding(p: Paint, b: Building) {
 /** Paints building `b` whole and undamaged onto `c` at `px` per cell (a
  * magic boat's water drawing it down as it sinks, the shimmer reading its
  * shape), in `looks`' path look. */
-export function paintStanding(c: CanvasRenderingContext2D, px: number, map: CityMap, b: Building, area: AreaId = "moss", looks?: Readonly<Record<number, string>>) {
-  paintBuilding({ c, px, map, sim: null, solid: () => true, area, looks }, b);
+export function paintStanding(c: CanvasRenderingContext2D, px: number, map: CityMap, b: Building, area: AreaId = "moss", looks?: Readonly<Record<number, string>>, flat = false) {
+  paintBuilding({ c, px, map, sim: null, solid: () => true, area, looks, ...(flat ? { flat: true as const } : {}) }, b);
 }
 
 /** Whether `b` is a palace on the Cloudborne path, off its lot. */
@@ -523,7 +546,16 @@ const SPIKE_OUT: Record<Side, readonly [number, number]> = { n: [0, -1], e: [1, 
 /** The wall spikes on every standing stone they line, painted under the
  * stones, their tips reaching out past the wall's face (on the south, past
  * the brick face hanging below the stone). */
-function paintSpikes({ c, px, map, solid }: Paint, outside = false) {
+function paintSpikes(p: Paint, outside = false) {
+  // In Angle view the stakes rise with the stones they line.
+  const up = angleView ? Math.round(p.px * FACE_HANG) : 0;
+  if (!up) return paintSpikeRows(p, outside);
+  p.c.save();
+  p.c.translate(0, -up);
+  paintSpikeRows(p, outside);
+  p.c.restore();
+}
+function paintSpikeRows({ c, px, map, solid }: Paint, outside: boolean) {
   for (const row of map.spikes ?? []) {
     const [dx, dy] = SPIKE_OUT[row.side];
     for (const i of row.cells) {
@@ -644,29 +676,12 @@ function paintWall(p: Paint, b: Building) {
  * face hangs over, in runs along each row: `y` the row, `x0` to `x1`
  * (exclusive) the cells. Whatever is drawn on that ground after the city
  * layer (the forest's floor) must leave the face showing. */
-export function hangingFaces(map: CityMap, sim: DefendSim | null): { y: number; x0: number; x1: number; rows?: number }[] {
+export function hangingFaces(map: CityMap, sim: DefendSim | null): { y: number; x0: number; x1: number }[] {
   if (!wallFaces()) return [];
   const standing = (i: number) => map.wall[i] === 1 && !map.buildings[map.owner[i]]?.fence && (sim ? sim.solid[i] === 1 : map.owner[i] >= 0);
-  const runs: { y: number; x0: number; x1: number; rows?: number }[] = [];
-  // Angle view: a building standing out on the open ground hangs its face
-  // over it too, `rows` art pixels deep into each cell row below its lot
-  // (`paintOpenFaces` paints those again).
-  if (angleView)
-    for (const b of map.buildings) {
-      if (b.kind === "wall" || b.hidden || b.woodGate || (sim && !sim.intact(b))) continue;
-      const r = b.rect;
-      for (let left = faceDepth(b) + 1, y = r.y + r.h; left > 0 && y < CELLS_H; left -= ART, y++) {
-        let start = -1;
-        for (let x = r.x; x <= r.x + r.w; x++) {
-          const open = x < r.x + r.w && cellInBounds(x, y) && map.type[cellIndex(x, y)] === CellType.OUT;
-          if (open && start < 0) start = x;
-          else if (!open && start >= 0) {
-            runs.push({ y, x0: start, x1: x, rows: Math.min(ART, left) });
-            start = -1;
-          }
-        }
-      }
-    }
+  const runs: { y: number; x0: number; x1: number }[] = [];
+  // Angle view lifts the stones instead: their faces end where they stand.
+  if (angleView) return [];
   for (let cy = 1; cy < CELLS_H; cy++) {
     let start = -1;
     for (let cx = 0; cx <= CELLS_W; cx++) {
@@ -801,16 +816,6 @@ function frontOrder(map: CityMap): readonly Building[] {
 /** Cells of room round a lot that a building's art and its face are cut in. */
 const FACE_PAD = 2;
 
-/** How many art pixels building `b`'s south face hangs below its roof in
- * Angle view: towers stand tallest after the keep, houses lowest. */
-export function faceDepth(b: Building): number {
-  if (b.kind === "house") return 5;
-  if (b.kind === "keep") return 11;
-  if (b.kind === "gate" || b.kind === "wallBallista") return Math.round(ART * FACE_HANG) + 1;
-  if (b.kind.endsWith("Tower")) return 9;
-  return 7;
-}
-
 /** Building `b`'s south face hung below its roof (Angle view), drawn before
  * the roof so the roof's own outline stays on top. */
 function paintFace(p: Paint, b: Building) {
@@ -936,18 +941,22 @@ export function facePixels(src: Uint8ClampedArray, w: number, h: number, depth: 
 
 const mix = (a: readonly number[], b: readonly number[], t: number) => a.map((v, i) => v + (b[i] - v) * t);
 
-/** Angle view: the faces of the buildings standing out on the open ground,
- * painted again (at `px` a cell) over whatever covered that ground after the
- * city layer (the forest's floor, the dunes), as `hangingFaces` marks them. */
-export function paintOpenFaces(c: CanvasRenderingContext2D, px: number, map: CityMap, sim: DefendSim | null, area: AreaId, looks?: Readonly<Record<number, string>>, omit?: ReadonlySet<number>) {
+/** Angle view: the wall stones and buildings whose lifted art (`liftOf`)
+ * reaches out over the open ground, painted again (at `px` a cell) over
+ * whatever covered that ground after the city layer (the forest's floor and
+ * grass, the dunes), back row first. */
+export function paintOpenLifts(c: CanvasRenderingContext2D, px: number, map: CityMap, sim: DefendSim | null, area: AreaId, looks?: Readonly<Record<number, string>>, omit?: ReadonlySet<number>) {
   if (!angleView) return;
-  const p: Paint = { c, px, map, sim, solid: () => true, area, looks };
+  const solid = (i: number) => (sim ? sim.solid[i] === 1 : map.owner[i] >= 0 && map.type[i] !== CellType.ROAD);
+  const p: Paint = { c, px, map, sim, solid, area, looks };
+  const open = (x0: number, y0: number, x1: number, y1: number) => {
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (cellInBounds(x, y) && map.type[cellIndex(x, y)] === CellType.OUT) return true;
+    return false;
+  };
   c.imageSmoothingEnabled = false;
   for (const b of frontOrder(map)) {
-    if (b.kind === "wall" || b.hidden || b.woodGate || omit?.has(b.id) || (sim && !sim.intact(b)) || aloft(p, b)) continue;
-    const r = b.rect, y = r.y + r.h;
-    let open = false;
-    for (let x = r.x; x < r.x + r.w && !open; x++) open = cellInBounds(x, y) && map.type[cellIndex(x, y)] === CellType.OUT;
-    if (open) paintFace(p, b);
+    if (b.hidden || b.fence || b.woodGate || omit?.has(b.id) || !standsLifted(p, b)) continue;
+    const r = b.rect, up = Math.ceil(liftOf(b));
+    if (open(r.x - 1, r.y - up, r.x + r.w, r.y - 1) || (b.kind !== "wall" && open(r.x - 1, r.y, r.x + r.w, r.y + r.h))) paintBuilding(p, b);
   }
 }
