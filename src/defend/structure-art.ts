@@ -1,5 +1,5 @@
 import { drawSquareRange } from "./square-range-art.ts";
-import { angled } from "./angle-view.ts";
+import { HALL_FACE, angled } from "./angle-view.ts";
 import { ANGLED_KEEP_H, ANGLED_KEEP_W, angledKeepPixels } from "./keep-angle-art.ts";
 import { sourcePixels } from "./sprite-source.ts";
 import { flagPixels as profilePixels, type Flag } from "../profile/model.ts";
@@ -17,7 +17,7 @@ import { drawSprite, sprite, spriteCanvas } from "./damage-art.ts";
 import { ART_NAMES, artOverride } from "./art-overrides.ts";
 import { onPixelArt } from "./pixel-sprites.ts";
 
-import { artLook, structurePixels, structureRubblePixels } from "./tower-art.ts";
+import { artLook, structurePixels, structureRubblePixels, structureYard } from "./tower-art.ts";
 
 /** Medieval roofing: terracotta tile, old brick, weathered timber, thatch,
  * slate and straw. */
@@ -37,7 +37,9 @@ export function paintStructureArt(c: CanvasRenderingContext2D, kind: StructureKi
   const cw = Math.max(1, Math.round(box.w / box.px)), ch = Math.max(1, Math.round(box.h / box.px));
   if (kind === "keep") return paintKeep(c, { x, y, w, h, px: box.px }, stage, angle);
   const look = artLook(kind, path);
-  const art = sprite(`${kind}:${cw}x${ch}:${stage}:${seed}${look ? `:${look}` : ""}`, cw * ART, ch * ART, () => structurePixels(kind, cw, ch, stage, seed, look));
+  // Angle view draws a yarded hall's roof shorter, its yard running on under it.
+  const drop = angle && structureYard(kind, cw, ch, look) ? HALL_FACE : 0;
+  const art = sprite(`${kind}:${cw}x${ch}:${stage}:${seed}${look ? `:${look}` : ""}${drop ? `:d${drop}` : ""}`, cw * ART, ch * ART, () => structurePixels(kind, cw, ch, stage, seed, look, drop));
   drawSprite(c, art, x, y, w, h);
 }
 

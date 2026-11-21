@@ -4,6 +4,9 @@ import { sourcePixels } from "./sprite-source.ts";
  * the upper left, inside a crisp black outline, with damage stages and
  * rubble from `damage-art.ts`.
  *
+ * Yarded halls (the guilds, dens, lodges and camps) stand on the south of
+ * their lots, their yard fenced behind them to the north (`guild`).
+ *
  * - Melee Guild: a stone hall under a straw thatch, a raised fist on the
  *   ridge, and its yard a roped sparring ring with a punching bag.
  * - Ranged Guild: a stone hall under grey slate, a heap of throwing stones
@@ -251,13 +254,20 @@ export const artLook = (kind: string, path?: string): string =>
 
 /** A structure of `cw × ch` cells at damage `stage` (0 to 3), seeded by its
  * lot, as `(cw·ART) × (ch·ART)` RGBA pixels, in its path's `look` (see
- * `PATH_LOOKS`; "" for the base art). */
-export function structurePixels(kind: PlacedKind, cw: number, ch: number, stage = 0, seed = 0, look = ""): Uint32Array {
+ * `PATH_LOOKS`; "" for the base art). With a `drop` (Angle view, the art
+ * pixels its hall is drawn lifted by), a yarded hall's roof is drawn shorter
+ * and its yard runs on under it by `drop`, so the lifted hall, its face
+ * hung below it, covers just that: see `structureYard`. */
+export function structurePixels(kind: PlacedKind, cw: number, ch: number, stage = 0, seed = 0, look = "", drop = 0): Uint32Array {
   const w = cw * ART, h = ch * ART, out = new Uint32Array(w * h), p = buildingPen(out, w, h);
   // An artist's sprite stands in for the drawn one (`art-overrides.ts`).
   const own = artOverride(ART_NAMES.structure(kind, cw, ch, artLook(kind, look)), w, h);
   if (own) out.set(own);
-  else PAINT[kind](p, artLook(kind, look));
+  else {
+    hallDrop = drop;
+    PAINT[kind](p, artLook(kind, look));
+    hallDrop = 0;
+  }
   p.finish();
   damage(pixels(out,w,h), stage, hash(seed, KINDS.indexOf(kind)), MATERIAL[kind].m);
   if (kind === "darkKeep") fissures(pixels(out, w, h), stage, hash(seed, 0xd4));
@@ -509,19 +519,65 @@ function glyph(p: Pix, x: number, y: number, rows: readonly string[], pal: Recor
   rows.forEach((row, j) => [...row].forEach((ch, i) => { if (ch !== ".") p.set(x + i, y + j, pal[ch]); }));
 }
 
-/** A guild's hall on the north of its lot, under a roof of `roof`, with an
- * emblem centred on it, and its packed-earth yard to the south inside a
- * fence outline; returns the yard's box. */
+/** A guild's hall on the south of its lot, under a roof of `roof`, with an
+ * emblem centred on it, and its packed-earth yard behind it to the north
+ * inside a fence outline (so the hall's own wall is what faces the street);
+ * returns the yard's box. */
 function guild(p: Pix, roof: number, emblem: readonly string[], pal: Record<string, number>) {
   const { x0, y0, x1, y1 } = frame(p.w, p.h);
-  const split = y0 + Math.round((y1 - y0) * 0.6);
-  rect(p, x0, split, x1, y1, OUTLINE);
-  for (let y = split + 1; y < y1; y++)
+  const { split, seen } = yardSplit(y0, y1, 0.6);
+  rect(p, x0, y0, x1, split, OUTLINE);
+  for (let y = y0 + 1; y < split; y++)
     for (let x = x0 + 1; x < x1; x++) p.set(x, y, C.dirt[hash(x, y, 43) % 5 === 0 ? 0 : hash(x, y, 44) % 4 === 0 ? 2 : 1]);
-  hall(p, x0, y0, x1, split, roof);
+  hall(p, x0, split, x1, y1, roof);
   const w = emblem[0].length, h = emblem.length;
-  glyph(p, Math.round((x0 + x1 - w) / 2), Math.round((y0 + split - h) / 2), emblem, pal);
-  return { x0: x0 + 1, y0: split + 1, x1: x1 - 1, y1: y1 - 1 };
+  glyph(p, Math.round((x0 + x1 - w) / 2), Math.round((split + y1 - h) / 2), emblem, pal);
+  return { x0: x0 + 1, y0: y0 + 1, x1: x1 - 1, y1: seen - 1 };
+}
+
+/** Where a yarded lot from `y0` to `y1` parts its yard from its hall, the
+ * hall taking `share` of it, and records it (`yardEnd`). Under a `hallDrop`
+ * the roof is a quarter shorter and the yard runs on under it: `seen` is
+ * where the yard's ground is still seen above the lifted hall. */
+function yardSplit(y0: number, y1: number, share: number) {
+  let split = y1 - Math.round((y1 - y0) * share), seen = split;
+  if (hallDrop) {
+    split = y1 - Math.round((y1 - split) * 0.75);
+    seen = split - hallDrop;
+  }
+  yardEnd = split;
+  return { split, seen };
+}
+
+/** Angle view's lift of the hall being painted, in art pixels (0 seen from above). */
+let hallDrop = 0;
+
+/** The art row where the last yarded building painted (`guild`, the archer
+ * barracks) parts its open yard (above) from its hall, or null. */
+let yardEnd: number | null = null;
+
+const yards = new Map<string, number>();
+/** How many art rows from the top of a `kind` structure's lot (`cw × ch`
+ * cells, in `look`) are open yard, fenced ground with nothing standing:
+ * the yard's own fence and what lies in it, up to and including the line
+ * it shares with the hall. 0 for a building with none, or an artist's
+ * sprite. Shadows fall only from the hall, and Angle view lifts only the
+ * hall (with a `drop`, as `structurePixels` draws it then). */
+export function structureYard(kind: string, cw: number, ch: number, look = "", drop = 0): number {
+  if (!(kind in PAINT)) return 0;
+  const k = kind as PlacedKind, key = `${k}:${cw}x${ch}:${artLook(k, look)}:${drop}`;
+  let rows = yards.get(key);
+  if (rows === undefined) {
+    const w = cw * ART, h = ch * ART;
+    yardEnd = null;
+    hallDrop = drop;
+    if (!artOverride(ART_NAMES.structure(k, cw, ch, artLook(k, look)), w, h)) PAINT[k](buildingPen(new Uint32Array(w * h), w, h), artLook(k, look));
+    hallDrop = 0;
+    rows = yardEnd === null ? 0 : yardEnd + 1;
+    yardEnd = null;
+    yards.set(key, rows);
+  }
+  return rows;
 }
 
 /** A clenched fist, knuckles up, in outline. */
@@ -551,7 +607,7 @@ function paintRangedGuild(p: Pix) {
   const y = guild(p, slate[1], [".000.", "02330", "01230", "01120", ".000."], { 0: OUTLINE, 1: slate[0], 2: slate[1], 3: slate[3] });
   // A heap of throwing stones by the door, and a clay pot on a post to aim at.
   for (const [dx, dy, r] of [[2.5, 2.5, 1.6], [4.6, 3.2, 1.4], [3.4, 4.6, 1.3], [5.8, 1.8, 1.1]] as const)
-    disc(p, y.x0 + dx, y.y0 + dy, r, (x, yy, d, ox, oy) => (d > r - 0.7 ? OUTLINE : slate[1 + Math.min(2, lit(x, yy, ox, oy, d))]));
+    disc(p, y.x0 + dx, y.y1 + 1 - dy, r, (x, yy, d, ox, oy) => (d > r - 0.7 ? OUTLINE : slate[1 + Math.min(2, lit(x, yy, ox, oy, d))]));
   const px = y.x1 - 3.5, py = (y.y0 + y.y1) / 2 + 0.5;
   disc(p, px, py, 2.2, (x, yy, d, dx, dy) => (d > 1.4 ? OUTLINE : [0x7a3a22, 0xa65430, 0xd07a4a][Math.min(2, lit(x, yy, dx, dy, d))]));
   p.set(Math.round(px) - 1, Math.round(py) - 1, 0x2a1810);
@@ -899,12 +955,16 @@ function paintAssassinDen(p: Pix, look: string) {
  * pair of the branch's tokens at its top corners, and, climbing its path,
  * a third at the yard's foot. */
 function paintBranchDen(p: Pix, look: string, token: readonly string[], pal: Record<string, number>, worn: boolean, base: (p: Pix, look: string) => void = paintAssassinDen) {
+  yardEnd = null;
   base(p, look);
   const { x0, y0, x1, y1 } = frame(p.w, p.h);
   const w = token[0].length, h = token.length;
-  glyph(p, x0 + 1, y0 + 1, token, pal);
-  glyph(p, x1 - w, y0 + 1, token, pal);
-  if (worn) glyph(p, Math.round((x0 + x1 - w) / 2), y1 - h, token, pal);
+  // On the hall's top corners; a yarded hall stands south of its yard, the
+  // third token then at the yard's far end.
+  const top = yardEnd === null ? y0 + 1 : yardEnd + 1, foot = yardEnd === null ? y1 - h : y0 + 1;
+  glyph(p, x0 + 1, top, token, pal);
+  glyph(p, x1 - w, top, token, pal);
+  if (worn) glyph(p, Math.round((x0 + x1 - w) / 2), foot, token, pal);
 }
 /** The Blood hall: red candles burning. */
 function paintBloodHall(p: Pix, look: string) {
@@ -1088,11 +1148,11 @@ function pinwheel(p: Pix, cx: number, cy: number, r: number) {
  * statue of the hero, sword raised, on a plinth in the arena's heart. */
 function paintHeroHall(p: Pix, look: string) {
   const whirl = look === "whirlwind", dance = look === "bladeDance", legend = look === "legend";
-  const { x0, y0, x1 } = frame(p.w, p.h);
+  const { x0, x1, y1 } = frame(p.w, p.h);
   const y = whirl ? guild(p, C.cloud[2], ["."], {})
     : legend ? guild(p, C.marble[2], LAUREL, { 0: OUTLINE, 3: C.moss, 5: C.gold[1] })
     : guild(p, dance ? 0x4a141c : C.gold[0], LONGSWORD, { 0: OUTLINE, 2: dance ? C.banner[1] : C.iron[2], 3: C.marble[3], 4: C.plank[1], 5: C.gold[1] });
-  if (whirl) pinwheel(p, (x0 + x1 + 1) / 2, (y0 + y.y0) / 2, 5.2);
+  if (whirl) pinwheel(p, (x0 + x1 + 1) / 2, ((yardEnd ?? y.y1) + y1) / 2, 5.2);
   // The arena: sand inside a ring of stone, lit from the upper left.
   const cx = (y.x0 + y.x1 + 1) / 2, cy = (y.y0 + y.y1 + 1) / 2, r = Math.min(y.x1 - y.x0, y.y1 - y.y0) / 2;
   const sand = [0x9a7c4c, 0xc8a86e, 0xe0c890];
@@ -1121,8 +1181,8 @@ function paintHeroHall(p: Pix, look: string) {
       p.set(dx, dy - 1, C.banner[1]);
       p.set(dx + 1, dy, C.banner[2]);
     }
-    glyph(p, y.x0 + 1, y.y0 + 1, CROSSED, { 0: OUTLINE, 1: C.gold[1], 3: C.marble[3] });
-    glyph(p, y.x1 - 6, y.y0 + 1, CROSSED, { 0: OUTLINE, 1: C.gold[1], 3: C.marble[3] });
+    glyph(p, y.x0 + 1, y.y1 - 6, CROSSED, { 0: OUTLINE, 1: C.gold[1], 3: C.marble[3] });
+    glyph(p, y.x1 - 6, y.y1 - 6, CROSSED, { 0: OUTLINE, 1: C.gold[1], 3: C.marble[3] });
     return;
   }
   if (whirl) {
@@ -1177,15 +1237,15 @@ function paintShadow(p: Pix) {
 function paintArcherBarracks(p: Pix, look: string) {
   const rangers = look === "rangers", skirmishers = look === "skirmishers";
   const { x0, y0, x1, y1 } = frame(p.w, p.h);
-  const split = y0 + Math.round((y1 - y0) * 0.62);
-  // The yard: packed earth inside a fence outline.
-  rect(p, x0, split, x1, y1, OUTLINE);
-  for (let y = split + 1; y < y1; y++)
+  // The hall to the south, its yard behind it: packed earth inside a fence outline.
+  const { split, seen } = yardSplit(y0, y1, 0.62);
+  rect(p, x0, y0, x1, split, OUTLINE);
+  for (let y = y0 + 1; y < split; y++)
     for (let x = x0 + 1; x < x1; x++) p.set(x, y, C.dirt[hash(x, y, 43) % 5 === 0 ? 0 : hash(x, y, 44) % 4 === 0 ? 2 : 1]);
-  for (let x = x0 + 1; x < x1; x += 3) p.set(x, y1 - 1, C.plank[2]);
-  hall(p, x0, y0, x1, split, rangers ? C.moss : skirmishers ? C.tar : C.timber);
-  for (let x = x0 + 2; x < x0 + 7; x++) p.set(x, split + 2, x % 2 ? C.plank[3] : C.plank[1]);
-  const ty = (split + y1) / 2 + 0.5;
+  for (let x = x0 + 1; x < x1; x += 3) p.set(x, y0 + 1, C.plank[2]);
+  hall(p, x0, split, x1, y1, rangers ? C.moss : skirmishers ? C.tar : C.timber);
+  for (let x = x0 + 2; x < x0 + 7; x++) p.set(x, seen - 2, x % 2 ? C.plank[3] : C.plank[1]);
+  const ty = (y0 + seen) / 2 + 0.5;
   if (skirmishers) {
     // Straw dummies on posts scattered over the yard, a trail of scuffed
     // footprints weaving between them.
