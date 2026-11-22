@@ -54,6 +54,7 @@ export class BattleSound {
     cue("fireball", count(sim.fireballs), 0.55);
     cue("fireball", count(sim.flames), 0.35);
     cue("frost", count(sim.frosts), 0.5);
+    cue("frost", count(sim.sigils), 0.3);
     cue("zap", count(sim.bolts), 0.55);
     cue("swish", count(sim.stabs), 0.5);
     cue("thunk", count(sim.ballistaBolts), 0.6);

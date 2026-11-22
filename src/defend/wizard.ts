@@ -39,6 +39,7 @@ import type { DefendSim, Enemy } from "./sim.ts";
 import { dist } from "../exact.ts";
 import { PYRO, RIME, STORM, pathRank } from "../knowledge-paths.ts";
 import { chainBolt } from "./dark-wizards.ts";
+import { iceFireSpeed } from "./sigils.ts";
 
 /** A wizard tower's path ranks (`knowledge-paths.ts`, each 0 unless worn)
  * and what it casts: the Pyre tower only flames (`fire`), the Frost tower
@@ -92,7 +93,7 @@ export class Wizards {
 
   step(sim: DefendSim, dt: number) {
     for (const b of sim.map.buildings) {
-      if (!isWizardTower(b.kind) || !sim.intact(b)) continue;
+      if (!isWizardTower(b.kind) || b.kind === "sigilTower" || !sim.intact(b)) continue;
       const rest = (this.rest.get(b.id) ?? 0) - dt;
       this.rest.set(b.id, Math.max(0, rest));
       if (rest > 0 || sim.flames.some((f) => f.tower === b.id)) continue;
@@ -216,4 +217,4 @@ export function stepFrosts(sim: DefendSim, dt: number) {
 }
 
 /** How fast a chilled (or frozen, or signal-slowed) enemy moves, as a share of its pace. */
-export const chilled = (e: Enemy) => (ENEMIES[e.kind].unyielding ? 1 : e.freeze || e.stagger ? 0 : Math.min(e.chill ? CHILL_SPEED : 1, mageChillSpeed(e)) * (e.slowed ?? 1));
+export const chilled = (e: Enemy) => (ENEMIES[e.kind].unyielding ? 1 : e.freeze || e.stagger ? 0 : Math.min(e.chill ? CHILL_SPEED : 1, mageChillSpeed(e), iceFireSpeed(e)) * (e.slowed ?? 1));

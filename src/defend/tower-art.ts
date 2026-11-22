@@ -93,6 +93,9 @@ const C = {
   /** The Stormcalling wizard tower's thundercloud slate, dark to light. */
   cloud: [0x262c46, 0x3a4466, 0x56628a, 0x7e8cb4],
   bolt: 0xffe45a,
+  /** The Sigil tower's deep arcane slate, dark to light, and its chalk-violet runes. */
+  arcane: [0x22183e, 0x36285e, 0x52408e, 0x7a68c4],
+  sigil: 0xd8ccff,
   /** The Crusaders' lead roof and the Assassins' den's soot-black one. */
   lead: 0x6c7886,
   dusk: 0x3a3246,
@@ -185,6 +188,7 @@ const MATERIAL: Record<PlacedKind, { m: Material; ruin: Pick<Ruin, "stone" | "to
   pyreTower: { m: { tones: C.pale.slice(0, 3), roofed: true }, ruin: { stone: C.pale.slice(0, 3), top: C.kiln.slice(0, 3), beams: true, round: true } },
   frostTower: { m: { tones: C.pale.slice(0, 3), roofed: true }, ruin: { stone: C.pale.slice(0, 3), top: C.ice.slice(0, 3), beams: true, round: true } },
   stormTower: { m: { tones: C.pale.slice(0, 3), roofed: true }, ruin: { stone: C.pale.slice(0, 3), top: C.cloud.slice(0, 3), beams: true, round: true } },
+  sigilTower: { m: { tones: C.pale.slice(0, 3), roofed: true }, ruin: { stone: C.pale.slice(0, 3), top: C.arcane.slice(0, 3), beams: true, round: true } },
   mageGuild: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.wine.slice(0, 3), beams: true } },
   infernoHall: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.kiln.slice(0, 3), beams: true } },
   cinderHall: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.ice.slice(0, 3), beams: true } },
@@ -241,6 +245,7 @@ export const PATH_LOOKS: Partial<Record<PlacedKind, readonly string[]>> = {
   pyreTower: ["pyromancy"],
   frostTower: ["rime"],
   stormTower: ["storm"],
+  sigilTower: ["sigils"],
   mageGuild: ["pyroclasm", "cinders", "conduction"],
   infernoHall: ["pyroclasm"],
   cinderHall: ["cinders"],
@@ -372,7 +377,7 @@ function drawnStructureRubblePixels(kind: PlacedKind, cw: number, ch: number, se
   return rubblePixels(w, h, hash(seed, KINDS.indexOf(kind), 3), { ...frame(w, h), ...MATERIAL[kind].ruin });
 }
 
-export const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall", "assassinDen", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "spearHall", "phalanx", "javelinCamp", "lancerStable", "heroHall", "shadow", "nanoTower", "pyreTower", "frostTower", "stormTower", "chapterHouse", "berserkerLodge", "halberdYard", "bloodHall", "veilHouse", "poisonDen", "brazierTower", "hawkTower", "batteryTower", "mortarTower", "rangerLodge", "skirmishCamp", "infernoHall", "cinderHall", "skyrangerLodge", "minelayerTower", "stormHall", "wispTower", "chronoTower", "repairShop", "mine", "library"];
+export const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall", "assassinDen", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "spearHall", "phalanx", "javelinCamp", "lancerStable", "heroHall", "shadow", "nanoTower", "pyreTower", "frostTower", "stormTower", "chapterHouse", "berserkerLodge", "halberdYard", "bloodHall", "veilHouse", "poisonDen", "brazierTower", "hawkTower", "batteryTower", "mortarTower", "rangerLodge", "skirmishCamp", "infernoHall", "cinderHall", "skyrangerLodge", "minelayerTower", "stormHall", "wispTower", "chronoTower", "repairShop", "mine", "library", "sigilTower"];
 
 const PAINT: Record<PlacedKind, (p: Pix, look: string) => void> = {
   mine: paintMine,
@@ -420,6 +425,7 @@ const PAINT: Record<PlacedKind, (p: Pix, look: string) => void> = {
   pyreTower: paintPyreTower,
   frostTower: paintFrostTower,
   stormTower: paintStormTower,
+  sigilTower: paintSigilTower,
   mageGuild: paintMageGuild,
   infernoHall: paintInfernoHall,
   cinderHall: paintCinderHall,
@@ -1608,10 +1614,11 @@ function paintWizardTower(p: Pix, look: string) {
   // diamond; Stormcalling roofs it in thundercloud slate as a square, its
   // hips and runes crackling with yellow lightning; otherwise eight
   // slate slopes, nearly round.
-  const pyro = look === "pyromancy", rime = look === "rime", storm = look === "storm";
+  // Sigilcraft roofs it round in deep arcane slate, its runes chalk violet.
+  const pyro = look === "pyromancy", rime = look === "rime", storm = look === "storm", sigil = look === "sigils";
   const sides = pyro ? 6 : rime || storm ? 4 : 8, turn = rime ? Math.PI / 4 : 0;
-  const tiles = pyro ? C.kiln : rime ? C.ice : storm ? C.cloud : C.slate;
-  const rune = pyro ? C.ember : rime ? C.ice[3] : storm ? C.bolt : C.rune;
+  const tiles = pyro ? C.kiln : rime ? C.ice : storm ? C.cloud : sigil ? C.arcane : C.slate;
+  const rune = pyro ? C.ember : rime ? C.ice[3] : storm ? C.bolt : sigil ? C.sigil : C.rune;
   // How far out a point is in the roof's own shape: its distance on the
   // round roof, its furthest reach toward a face on a polygon.
   const reach = (d: number, dx: number, dy: number) => {
@@ -1646,7 +1653,7 @@ function paintWizardTower(p: Pix, look: string) {
   // roof is an odd number of pixels across, so the finial is a cross three
   // pixels wide on its middle pixel, never two that sit half a pixel aside.
   const fx = Math.floor(cx), fy = Math.floor(cy);
-  const tip = pyro ? [C.fire[1], C.fire[2], C.fire[3]] : rime ? [C.ice[1], C.ice[2], 0xffffff] : storm ? [C.iron[2], C.bolt, 0xfffbe0] : C.gold;
+  const tip = pyro ? [C.fire[1], C.fire[2], C.fire[3]] : rime ? [C.ice[1], C.ice[2], 0xffffff] : storm ? [C.iron[2], C.bolt, 0xfffbe0] : sigil ? [C.arcane[3], C.sigil, 0xffffff] : C.gold;
   p.set(fx, fy - 1, tip[2]);
   p.set(fx - 1, fy, tip[2]);
   p.set(fx, fy, tip[1]);
@@ -1664,7 +1671,7 @@ function paintBranchTower(p: Pix, look: string, corner: (x: number, y: number, r
   // Climbing its path, the tower's rim glows all the way round.
   if (worn) {
     const cx = (x0 + x1 + 1) / 2, cy = (y0 + y1 + 1) / 2, r = (x1 - x0 + 1) / 2;
-    const glow = look === "pyromancy" || look === "fireArrows" ? C.ember : look === "rime" ? C.ice[3] : look === "sharpshooters" ? C.slime[2] : look === "gunnery" ? C.iron[3] : look === "siegeShot" ? C.fire[2] : C.bolt;
+    const glow = look === "pyromancy" || look === "fireArrows" ? C.ember : look === "rime" ? C.ice[3] : look === "sigils" ? C.sigil : look === "sharpshooters" ? C.slime[2] : look === "gunnery" ? C.iron[3] : look === "siegeShot" ? C.fire[2] : C.bolt;
     disc(p, cx, cy, r - 1, (x, y, d) => (d > r - 2 && (x + y) % 2 === 0 ? glow : null));
   }
 }
@@ -1726,6 +1733,18 @@ function paintStormTower(p: Pix, look: string) {
     p.set(rx, y + 1, C.iron[3]);
     p.set(rx, y, C.bolt);
     p.set(right ? x : x + 2, y, 0xfffbe0);
+  }, !!look);
+}
+
+/** The Sigil tower: a standing stone at each corner, a chalk ring round it. */
+function paintSigilTower(p: Pix, look: string) {
+  paintBranchTower(p, "sigils", (x, y) => {
+    rect(p, x, y, x + 2, y + 2, OUTLINE);
+    p.set(x + 1, y, C.sigil);
+    p.set(x, y + 1, C.arcane[3]);
+    p.set(x + 2, y + 1, C.arcane[3]);
+    p.set(x + 1, y + 2, C.sigil);
+    p.set(x + 1, y + 1, C.pale[2]);
   }, !!look);
 }
 

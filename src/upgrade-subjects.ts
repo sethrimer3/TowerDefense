@@ -66,7 +66,7 @@ const LEGACY_SUBJECTS: Subject[] = [
         id: "watchTower", name: "Watch tower", item: "watchTower", upgrades: ["watchRadius"],
       },
       {
-        id: "wizardTower", name: "Wizard tower", item: "wizardTower", items: ["pyreTower", "frostTower", "stormTower"], upgrades: ["wizardFlame", "wizardIce"],
+        id: "wizardTower", name: "Wizard tower", item: "wizardTower", items: ["pyreTower", "frostTower", "stormTower", "sigilTower"], upgrades: ["wizardFlame", "wizardIce"],
       },
       { id: "darkKeep", name: "Dark wizard keep", item: "darkKeep", upgrades: ["darkKeepCompact", "chainReach", "chainCount"] },
     ],

@@ -66,6 +66,7 @@ import { RiverLife } from "./river-art.ts";
 import { ENEMIES } from "./catalog.ts";
 import { GroundRelief, type ReliefLight } from "./ground-relief.ts";
 import { WizardArt, flameLights } from "./wizard-art.ts";
+import { drawSigilCharge, drawSigils, sigilLights } from "./sigil-art.ts";
 import { drawBlazes, mageLights } from "./mage-art.ts";
 import { stabLights } from "./valkyrie-art.ts";
 import { heroLights } from "./hero-art.ts";
@@ -1061,6 +1062,7 @@ export class DefendRenderer {
     }
     // Chilled enemies twinkle on wall time, independently of simulation ticks.
     this.wizard.drawChill(c, this.px, sim, opts.now);
+    drawSigilCharge(c, this.px, sim, opts.now, opts.reduceMotion);
   }
 
   private paintCombat(c: CanvasRenderingContext2D, sim: DefendSim, torches: Burning | null, opts: DrawOptions) {
@@ -1071,6 +1073,7 @@ export class DefendRenderer {
     drawRime(c, this.px, sim);
     drawLandings(c, this.px, sim);
     this.wizard.drawIce(c, this.px, sim.frosts, sim.time * 1000, flameLights(sim).relief);
+    drawSigils(c, this.px, sim);
     let actors = c;
     if (this.protectCombat) {
       this.actors ??= document.createElement("canvas");
@@ -1290,7 +1293,7 @@ export class DefendRenderer {
         .filter((l) => (l.owner < 0 || intact(l.owner)) && this.lighting.burn(l) > 0)
         .map((l) => ({ x: l.x, y: l.y, r: l.radius * 0.8, k: l.strength * 0.55, color: "#ffc68a" }));
     const moving: ReliefLight[] = [...flames, ...this.wizard.iceLights(sim.frosts, sim.time * 1000)];
-    for (const fx of sim.effects) if (fx.kind === "boom") moving.push({ x: fx.x, y: fx.y, r: fx.r * 2.4, k: 1.4 * (1 - fx.t / 0.6), color: "#ffcf8a" });
+    for (const fx of sim.effects) if (fx.kind === "boom") moving.push({ x: fx.x, y: fx.y, r: fx.r * 2.4, k: 1.4 * (1 - fx.t / 0.6), color: fx.blue ? "#9fd8ff" : "#ffcf8a" });
     const burns = this.burning ?? (() => 1);
     for (const u of [...sim.soldiers.filter((o) => !garrisoned(o)), ...sim.civilians]) {
       const b = burns(u.x, u.y, u.id);
@@ -1652,16 +1655,16 @@ export class DefendRenderer {
   private drawLighting(map: CityMap, sim: DefendSim | null, weather: Weather, opts: DrawOptions) {
     const frame: LightFrame = { px: this.px, now: opts.now, reduceMotion: opts.reduceMotion, intact: standing(map, sim) };
     const empty = { carried: [], relief: [] };
-    const flames = sim ? flameLights(sim) : empty, mages = sim ? mageLights(sim) : empty, stabs = sim ? stabLights(sim) : empty, hero = sim ? heroLights(sim) : empty, dark = sim ? darkLights(sim) : empty, meteors = sim ? meteorLights(sim) : empty, bullets = sim ? bulletLights(sim) : empty;
+    const flames = sim ? flameLights(sim) : empty, mages = sim ? mageLights(sim) : empty, stabs = sim ? stabLights(sim) : empty, hero = sim ? heroLights(sim) : empty, dark = sim ? darkLights(sim) : empty, meteors = sim ? meteorLights(sim) : empty, bullets = sim ? bulletLights(sim) : empty, sigils = sim ? sigilLights(sim) : empty;
     const ambient = ambientFor(weather, opts.night, this.previousArea ? this.previousWeather : null, this.areaMix);
     if (opts.sun) ambient.alpha *= Math.min(1, opts.night * 3);
     this.lighting.drawLight(this.ctx, frame, ambient, {
-      torches: [...(sim ? this.carried(sim) : []), ...this.cityLife.lights(this.lighting.solarTime ?? 0), ...flames.carried, ...mages.carried, ...stabs.carried, ...hero.carried, ...dark.carried, ...meteors.carried, ...bullets.carried],
+      torches: [...(sim ? this.carried(sim) : []), ...this.cityLife.lights(this.lighting.solarTime ?? 0), ...flames.carried, ...mages.carried, ...stabs.carried, ...hero.carried, ...dark.carried, ...meteors.carried, ...bullets.carried, ...sigils.carried],
       solid: sim?.solid ?? this.cityLife.solid,
       version: sim?.mapVersion ?? -1,
     }, opts.sheen !== false);
     this.lighting.drawRelief(this.ctx, this.px, weather.rain ? 0.85 : 0.65);
-    if (sim) this.drawGroundRelief(map, sim, opts, [...flames.relief, ...mages.relief, ...stabs.relief, ...hero.relief, ...dark.relief, ...raisingLights(sim), ...meteors.relief, ...bullets.relief, ...frostLights(sim), ...reinforceLights(sim)]);
+    if (sim) this.drawGroundRelief(map, sim, opts, [...flames.relief, ...mages.relief, ...stabs.relief, ...hero.relief, ...dark.relief, ...raisingLights(sim), ...meteors.relief, ...bullets.relief, ...sigils.relief, ...frostLights(sim), ...reinforceLights(sim)]);
     this.lighting.drawFlames(this.ctx, frame);
   }
 

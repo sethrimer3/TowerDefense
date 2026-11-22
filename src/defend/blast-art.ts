@@ -18,7 +18,9 @@ import { onPixelArt } from "./pixel-sprites.ts";
  * Presentation only: every pixel is hashed from the blast's seed. */
 import { hash01 } from "./grid.ts";
 import { ART } from "./park-art.ts";
-import { bake, blit, FLAME, OUTLINE, SMOKE } from "./pixel-fx.ts";
+import { bake, blit, FLAME as HOT, OUTLINE, SMOKE } from "./pixel-fx.ts";
+/** A Sigil tower's ice-fire, coolest to hottest. */
+const BLUE_FLAME = ["#16306e", "#2a5cc0", "#4a9ae8", "#9fe0ff", "#f0fcff"];
 import type { Effect, Scorch } from "./sim.ts";
 
 type Ctx = CanvasRenderingContext2D;
@@ -37,11 +39,11 @@ const booms = new Map<string, { img: HTMLCanvasElement; ox: number; oy: number }
 export function drawExplosion(c: Ctx, px: number, fx: Effect) {
   const k = Math.min(0.999, fx.t / BOOM_LIFE);
   const R = Math.max(3, Math.round(fx.r * ART)), look = ((fx.seed ?? 0) >>> 0) % LOOKS, frame = Math.floor(k * FRAMES);
-  const key = `${R}:${look}:${frame}`;
+  const key = `${R}:${look}:${frame}${fx.blue ? ":blue" : ""}`;
   let s = booms.get(key);
   if (!s) {
     if (booms.size > 2000) booms.clear();
-    s = bakeBoom(R, look, (frame + 0.5) / FRAMES);
+    s = bakeBoom(R, look, (frame + 0.5) / FRAMES, !!fx.blue);
     booms.set(key, s);
   }
   c.save();
@@ -51,7 +53,8 @@ export function drawExplosion(c: Ctx, px: number, fx: Effect) {
 }
 
 /** One frame of an explosion of radius `R` art pixels, `k` through its life. */
-export function explosionPixels(R: number, look: number, k: number) {
+export function explosionPixels(R: number, look: number, k: number, blue = false) {
+  const FLAME = blue ? BLUE_FLAME : HOT;
   const E = Math.ceil(R * 2.2) + 2, N = 2 * E + 1;
   const grid: (string | null)[] = new Array(N * N).fill(null);
   const at = (x: number, y: number) => (x + E >= 0 && x + E < N && y + E >= 0 && y + E < N ? (y + E) * N + x + E : -1);
@@ -104,11 +107,11 @@ export function explosionPixels(R: number, look: number, k: number) {
       if (i < 0 || (grid[i] && grid[i] !== OUTLINE && far < Rf)) continue;
       grid[i] = n % 4 === 0 ? SMOKE[0] : FLAME[Math.max(1, 4 - Math.floor(k * 5 + hash01(look, 7, n)))];
     }
-  const name=ART_NAMES.effect("explosion",`${R}-${look}-${Math.floor(k*FRAMES)}`);
+  const name=ART_NAMES.effect(blue?"blue-explosion":"explosion",`${R}-${look}-${Math.floor(k*FRAMES)}`);
   return {data:sourcePixels(name,N,N,()=>colorPixels(grid)),w:N,h:N,ox:E,oy:E};
 }
-function bakeBoom(R: number,look: number,k: number) {
-  const p=explosionPixels(R,look,k);
+function bakeBoom(R: number,look: number,k: number,blue=false) {
+  const p=explosionPixels(R,look,k,blue);
   return {img:spriteCanvas(p.data,p.w,p.h),ox:p.ox,oy:p.oy};
 }
 export function explosionPieces(): ArtPiece[] {
@@ -207,7 +210,7 @@ function bakeCracks(art: ScorchArt, heat: number) {
   const { cv, c } = bake(N, N);
   for (const [i, t] of art.pixels) {
     const g = heat * (1.15 - 0.75 * t);
-    c.fillStyle = g > 0.85 ? FLAME[4] : g > 0.66 ? FLAME[3] : g > 0.46 ? FLAME[2] : g > 0.28 ? FLAME[1] : g > 0.12 ? FLAME[0] : "#3a2418";
+    c.fillStyle = g > 0.85 ? HOT[4] : g > 0.66 ? HOT[3] : g > 0.46 ? HOT[2] : g > 0.28 ? HOT[1] : g > 0.12 ? HOT[0] : "#3a2418";
     c.fillRect(i % N, Math.floor(i / N), 1, 1);
   }
   return cv;

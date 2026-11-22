@@ -511,6 +511,17 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   and an **ice wave**, a fan-shaped front of ice shards spreading toward the
   nearest enemy that hits everything it crosses once and chills it (half
   speed for a few seconds). Its Forge raises the Flamethrower and the Ice wave; its paths (Pyromancy, Rime, Stormcalling) change what it casts.
+- **Sigil towers** (`sigils.ts`), the Wizard tower's fourth branch, cast
+  "wirelessly": the tower charges (3.5 s; its roof glows and fireflies
+  gather round it), then a magic circle draws itself on the ground where
+  the nearest ground enemy stood (it never aims at fliers), taking 1.4 s and
+  staying put. When it closes it bursts over everything inside, fliers too,
+  for 2.5 times the flame's damage a second. Sigilcraft stacks the burst:
+  Kindled sigil (I) sets them burning; Greater circle (II) makes it 40%
+  wider and charges 20% faster; Ice-fire (III) turns it blue, half again as
+  hard, and its blue burn slows them by half and isn't put out by ice. The
+  Sigil tower climbs its path but takes no part in the Dark wizard keep's
+  merge.
   Neither draws from the run's random stream; how they look is the
   renderer's (`wizard-art.ts`).
 - **Archer towers** shoot the nearest enemy in range. Paths: Fire arrows (what

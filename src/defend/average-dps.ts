@@ -20,7 +20,7 @@ import {
 import {
   BAYONET, BELT_FEED, BERSERK, BLADE_DANCE, BOW_JAVELIN, CLUSTER, CONDUCTION, CRUSADE, CRYOMANCY, DEADEYE, DUELISTS, FIRE_ARROWS, GRENADIERS, GUNNERY,
   HALBERD, HEADHUNT, HEAVY_LANCE, LONG_SPEARS, MARKSMEN, OIL, OVERDRIVE, PIERCING, PYRO, PYROCLASM, QUICKDRAW, RICOCHET, RIME, SALVO, SET_SPEARS,
-  SHARP_MUSKETS, SIEGE_SHOT, SKIRMISH, SKYRANGER, SPEAR_WALL, STOPPING, STORM, SUPPRESS, THROWING, TRIPOD, VOLLEY, WHIRLWIND, WISP_FIRE, WISP_STORM,
+  SHARP_MUSKETS, SIEGE_SHOT, SIGIL, SKIRMISH, SKYRANGER, SPEAR_WALL, STOPPING, STORM, SUPPRESS, THROWING, TRIPOD, VOLLEY, WHIRLWIND, WISP_FIRE, WISP_STORM,
   WISP_LIGHTNING, type PathId,
 } from "../knowledge-paths.ts";
 import { hawkDamage, hawkReload } from "./hawk-focus.ts";
@@ -188,6 +188,14 @@ export function averageDps(kind: EstimateKind, input: AverageInput): number {
       if (kind === "frostTower") return ice / (WIZARD_REST / 2);
       if (kind === "stormTower") return (bolt + ice) / (2 * WIZARD_REST);
       return (flame + ice) / (burn + 2 * WIZARD_REST);
+    }
+    case "sigilTower": {
+      // A burst over the crowd inside the circle each charge, then the burn
+      // (orange from I, blue from III) for as long as it lasts.
+      const sig = rank("sigils"),
+        hit = flameDps(L("wizardFlame")) * b.towerDamage * SIGIL.damage * (sig >= 3 ? SIGIL.ice.damage : 1),
+        burn = sig >= 3 ? SIGIL.ice.share * SIGIL.ice.seconds : sig ? SIGIL.burn.share * SIGIL.burn.seconds : 0;
+      return (hit * (1 + burn) * inArea(SIGIL.radius[sig])) / SIGIL.charge[sig];
     }
     case "darkKeep": {
       const jump = chainJump(L("chainReach")),

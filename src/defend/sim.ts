@@ -89,6 +89,7 @@ import { stepBlazes, stepFireballs, stepMage, type Blaze, type Fireball } from "
 import { stepStabs, stepValkyrie, type Stab } from "./valkyries.ts";
 import { launchPalaces, stepSkyPalaces, type SkyPalace } from "./sky-palace.ts";
 import { Wizards, stepFlames, stepFrosts, type Flame, type Frost } from "./wizard.ts";
+import { SigilTowers, stepIceFire, stepSigils, type Sigil } from "./sigils.ts";
 import { DarkKeeps, stepBolts, stepDarkWizard, type Bolt } from "./dark-wizards.ts";
 import { WarBanner, bannerInfluence, stepBannerLife } from "./war-banner.ts";
 import { castMeteor, METEOR, stepMeteors, type Impact, type Meteor } from "./meteor.ts";
@@ -152,6 +153,12 @@ export type Enemy = {
   burn?: number;
   burnDps?: number;
   burnOrigin?: DamageOrigin;
+  /** Seconds left alight with a Sigil tower's blue ice-fire (burning and
+   * slowed; ice doesn't put it out), its damage a second, and whose it is;
+   * absent when not. */
+  iceFire?: number;
+  iceFireDps?: number;
+  iceFireOrigin?: DamageOrigin;
   /** The share of its pace a signal fire leaves it while marked; absent otherwise. */
   slowed?: number;
   fortressPart?: { core: number; role: "turret" | "leg" | "armor"; dx: number; dy: number; side?: number; weapon?: "cannon" | "laser" | "plasma" };
@@ -308,7 +315,7 @@ export type Arrow = {
    * one, and where this leg of its flight began; absent otherwise. */
   chain?: { next: number[]; from: Point };
 };
-export type Effect = { kind: "boom" | "dust" | "spark" | "firework" | "steam"; x: number; y: number; t: number; r: number; seed?: number };
+export type Effect = { kind: "boom" | "dust" | "spark" | "firework" | "steam"; x: number; y: number; t: number; r: number; seed?: number; /** A Sigil tower's blue ice-fire burst. */ blue?: true };
 /** A cannon shell in flight: lobbed from the tower to where the target was. */
 export type Shell = {
   chronoReleased?: true;
@@ -485,6 +492,8 @@ export class DefendSim {
   /** Wizard towers' fire and ice. */
   flames: Flame[] = [];
   frosts: Frost[] = [];
+  /** Sigil towers' magic circles drawing themselves on the ground. */
+  sigils: Sigil[] = [];
   /** Fire mages' fireballs in flight, and the ground they set burning. */
   fireballs: Fireball[] = [];
   mageBolts: MageBolt[] = [];
@@ -621,6 +630,8 @@ export class DefendSim {
   private towers = new Towers();
   private barracks = new Barracks();
   private wizards = new Wizards();
+  /** Sigil towers' charge (the renderer reads it for their glow). */
+  readonly sigilTowers = new SigilTowers();
   private darkKeeps = new DarkKeeps();
   private builders: Builders;
   private grid: Enemy[][] = Array.from({ length: CELL_COUNT }, () => []);
@@ -686,7 +697,7 @@ export class DefendSim {
     this.soldiers = this.soldiers.filter(s => s.home !== id);
     this.skyPalaces = this.skyPalaces.filter(p => p.id !== id);
     this.towers.cooldown.delete(id); this.towers.focus.delete(id); this.barracks.training.delete(id);
-    this.wizards.next.delete(id); this.wizards.rest.delete(id);
+    this.wizards.next.delete(id); this.wizards.rest.delete(id); this.sigilTowers.forget(id);
     for(let corner=0;corner<4;corner++)this.darkKeeps.cooldown.delete(id*4+corner);
     this.rallies.delete(id);this.mineAims.delete(id);this.crosshairs.delete(id);this.orders.delete(id);
     this.chrono.delete(id); this.wispOwners.delete(id);
@@ -832,6 +843,8 @@ export class DefendSim {
     this.wizards.step(this, dt);
     stepFlames(this, this.wizards, dt);
     stepFrosts(this, dt);
+    this.sigilTowers.step(this, dt);
+    stepSigils(this, dt);
     this.darkKeeps.step(this, dt);
     this.barracks.step(this, dt);
     stepCityWatch(this, dt);
@@ -939,6 +952,7 @@ export class DefendSim {
         delete e.burnOrigin;
       }
     }
+    stepIceFire(this, dt);
     stepVenom(this, dt);
     stepBleed(this, dt);
     for (const s of this.soldiers)
