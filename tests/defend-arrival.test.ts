@@ -79,3 +79,13 @@ test("a new city tile's pieces fall apart, and its parks grow, then plants, post
   }
   assert.ok(found, "some new city tile made a park");
 });
+
+test("a vanishing building's box takes it in whole", async () => {
+  const { vanishBoxes } = await import("../src/defend/arrival-art.ts");
+  const gone = [{ rect: { x: 10, y: 10, w: 4, h: 4 } }] as unknown as Parameters<typeof vanishBoxes>[1];
+  // A box over just the building's right edge grows to the whole of it, with room round it.
+  const [box] = vanishBoxes([{ x0: 13, y0: 9, x1: 17, y1: 12 }], gone);
+  assert.deepEqual({ x0: box.x0, y0: box.y0, x1: box.x1, y1: box.y1 }, { x0: 8, y0: 8, x1: 17, y1: 16 });
+  // A box that doesn't reach it stays as it is.
+  assert.deepEqual(vanishBoxes([{ x0: 30, y0: 30, x1: 32, y1: 32 }], gone), [{ x0: 30, y0: 30, x1: 32, y1: 32 }]);
+});
