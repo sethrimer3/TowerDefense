@@ -44,7 +44,7 @@ function mix(a: number, b: number, t: number) {
 /** One house's roof, seeded by `seed`, as `(cw·ART) × (ch·ART)` RGBA pixels
  * filling its cells: a one-pixel gap round the edge and the roof inside its
  * outline. The house's shadow is cast with the city's (`shadow-art.ts`). */
-export function roofPixels(cw: number, ch: number, variant: number, seed: number): Uint32Array {
+export function roofPixels(cw: number, ch: number, variant: number, seed: number, gable?: number): Uint32Array {
   // An artist's roof stands in for the drawn one (`art-overrides.ts`).
   const own = artOverride(ART_NAMES.roof(variant % ROOFS.length, cw, ch), cw * ART, ch * ART);
   if (own) return own;
@@ -59,7 +59,10 @@ export function roofPixels(cw: number, ch: number, variant: number, seed: number
   const along = cw >= ch;
   const U = (along ? x1 - x0 : y1 - y0) - 1, V = (along ? y1 - y0 : x1 - x0) - 1;
   const put = (u: number, v: number, c: number) => (along ? set(x0 + 1 + u, y0 + 1 + v, c) : set(x0 + 1 + v, y0 + 1 + u, c));
-  const ridge = Math.floor(V / 2);
+  // Seen at a slant (Angle view, a `gable` wall colour given), a ridge
+  // running east-west rises toward the north, the long south slope facing
+  // the viewer; one running north-south shows its south gable end.
+  const ridge = Math.floor(V * (gable !== undefined && along ? 0.38 : 0.5));
 
   const base = hex(ROOFS[variant % ROOFS.length]);
   const slopes = [shade(base, 1.13), shade(base, 0.86)];
@@ -146,6 +149,20 @@ export function roofPixels(cw: number, ch: number, variant: number, seed: number
       if (v !== ridge && v >= 0 && v < V && u < U) put(u, v, shade(slopes[v < ridge ? 0 : 1], 0.7));
     }
   }
+  if (gable !== undefined && !along) {
+    // The gable end: a triangle of wall under the roof's edge, the bargeboards
+    // dark along it, a window near its peak.
+    const t = Math.min(ridge + 1, Math.max(3, Math.round(V * 0.5)));
+    for (let j = 0; j < t; j++) {
+      const u = U - 1 - j, half = (ridge + 0.5) * (1 - j / t);
+      for (let v = 0; v < V; v++) {
+        const d = Math.abs(v - ridge);
+        if (d < half - 0.9) put(u, v, shade(gable, j === 0 ? 0.62 : v < ridge ? 0.92 : 0.78));
+        else if (d < half + 0.4) put(u, v, shade(base, 0.5));
+      }
+    }
+    if (t >= 4) put(U - t + 1, ridge, HOLE);
+  }
   return out;
 }
 
@@ -179,8 +196,8 @@ export function chimneyFlue(cw: number, ch: number, seed: number): { x: number; 
 /** A house's roof at damage `stage` (0 to 3, `damageStage`): missing
  * tiles and cracks, then holes through to the rafters, then a burning
  * cave-in strewn with fallen tiles. */
-export function houseDamagePixels(cw: number, ch: number, variant: number, seed: number, stage: number): Uint32Array {
-  const out = roofPixels(cw, ch, variant, seed);
+export function houseDamagePixels(cw: number, ch: number, variant: number, seed: number, stage: number, gable?: number): Uint32Array {
+  const out = roofPixels(cw, ch, variant, seed, gable);
   const base = hex(ROOFS[variant % ROOFS.length]);
   damage(pixels(out, cw * ART, ch * ART), stage, hash(seed, 3), { tones: [shade(base, 0.7), base, shade(base, 1.2)], roofed: true });
   return out;
@@ -200,8 +217,8 @@ function drawnHouseRubblePixels(cw: number, ch: number, variant: number, seed: n
 
 /** The roof for a house of `cw × ch` cells, seeded by `seed`, at damage
  * `stage`, as a canvas of art pixels (null outside a browser), cached. */
-export function roofSprite(cw: number, ch: number, variant: number, seed: number, stage = 0): HTMLCanvasElement | null {
-  return sprite(`house:${cw},${ch},${variant},${seed}:${stage}`, cw * ART, ch * ART, () => houseDamagePixels(cw, ch, variant, seed, stage));
+export function roofSprite(cw: number, ch: number, variant: number, seed: number, stage = 0, gable?: number): HTMLCanvasElement | null {
+  return sprite(`house:${cw},${ch},${variant},${seed}:${stage}${gable !== undefined ? `:g${gable}` : ""}`, cw * ART, ch * ART, () => houseDamagePixels(cw, ch, variant, seed, stage, gable));
 }
 
 /** A fallen house's rubble as a canvas of art pixels, cached. */

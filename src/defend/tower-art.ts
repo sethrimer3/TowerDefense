@@ -73,7 +73,7 @@ import { TURRET_INSET, type StructureKind } from "./catalog.ts";
 import { hash, hash01 } from "./grid.ts";
 import { ART } from "./park-art.ts";
 import { ART_NAMES, artOverride } from "./art-overrides.ts";
-import { OUTLINE, STONE, damage, pixels, rubblePixels, shade, type Material, type Pix, type Ruin } from "./damage-art.ts";
+import { OUTLINE, STONE, damage, pixels, rubblePixels, rgba, shade, type Material, type Pix, type Ruin } from "./damage-art.ts";
 
 export type PlacedKind = Exclude<StructureKind, "keep">;
 
@@ -258,21 +258,113 @@ export const artLook = (kind: string, path?: string): string =>
  * pixels its hall is drawn lifted by), a yarded hall's roof is drawn shorter
  * and its yard runs on under it by `drop`, so the lifted hall, its face
  * hung below it, covers just that: see `structureYard`. */
-export function structurePixels(kind: PlacedKind, cw: number, ch: number, stage = 0, seed = 0, look = "", drop = 0): Uint32Array {
-  const w = cw * ART, h = ch * ART, out = new Uint32Array(w * h), p = buildingPen(out, w, h);
+export function structurePixels(kind: PlacedKind, cw: number, ch: number, stage = 0, seed = 0, look = "", drop = 0, depth = 0): Uint32Array {
+  const w = cw * ART, h = ch * ART, full = h + depth, out = new Uint32Array(w * full), p = buildingPen(out, w, full);
+  // Painters work in the lot's own frame; an angled wall hangs below it.
+  p.h = h;
   // An artist's sprite stands in for the drawn one (`art-overrides.ts`).
   const own = artOverride(ART_NAMES.structure(kind, cw, ch, artLook(kind, look)), w, h);
   if (own) out.set(own);
   else {
     hallDrop = drop;
+    wallDepth = depth;
     PAINT[kind](p, artLook(kind, look));
     hallDrop = 0;
+    wallDepth = 0;
   }
   p.finish();
-  damage(pixels(out,w,h), stage, hash(seed, KINDS.indexOf(kind)), MATERIAL[kind].m);
-  if (kind === "darkKeep") fissures(pixels(out, w, h), stage, hash(seed, 0xd4));
+  // Whatever drew no wall of its own hangs one from its lowest pixels.
+  if (depth && !out.subarray(w * h).some((v) => v >>> 24 >= 128)) hangWall(out, w, h, depth, MATERIAL[kind].m.tones, hash(seed, 0x5a), kind);
+  damage(pixels(out, w, full), stage, hash(seed, KINDS.indexOf(kind)), MATERIAL[kind].m);
+  if (kind === "darkKeep") fissures(pixels(out, w, full), stage, hash(seed, 0xd4));
   return out;
 }
+
+/** Angle view's south wall depth, in art pixels, of the structure being
+ * painted (0 seen from above): `hall`, `gable` and `squareTower` then draw
+ * their roofs seen at a slant and their walls below the lot's frame. */
+let wallDepth = 0;
+
+const SLIT = 0x1c1712, DOOR_DARK = 0x3a2616;
+
+/** A south wall `rows` deep from row `top`, `x0` to `x1`, seen at a slant:
+ * the eaves' shadow along its top, stone in courses lit from the left with
+ * quoins at its corners (or timber boards between posts, or marble), a
+ * plinth, narrow windows spaced along it and, with `door`, an arched oak
+ * door in the middle. */
+function frontWall(p: Pix, x0: number, x1: number, top: number, rows: number, mat: "stone" | "timber" | "marble" | "pale", door = true, slits = 5) {
+  const len = x1 - x0 + 1, mid = (x0 + x1) / 2;
+  const tones = mat === "timber" ? C.plank : mat === "marble" ? C.marble.slice(1, 5) : mat === "pale" ? C.pale : C.stone;
+  const dw = !door ? 0 : len >= 12 ? 3 : len >= 7 ? 2 : 0, dh = Math.min(rows - 1, 4);
+  const dx0 = Math.round(mid - dw / 2 + 0.01), dx1 = dx0 + dw - 1;
+  for (let k = 0; k < rows; k++)
+    for (let x = x0; x <= x1; x++) {
+      const i = x - x0;
+      let c: number;
+      const lit = i < len * 0.3 ? 2 : i > len * 0.75 ? 0 : 1;
+      if (mat === "timber") {
+        const post = i === 0 || i === len - 1 || (len > 9 && i % 6 === 0);
+        c = post || k === 0 ? C.timber : (x + (k > rows / 2 ? 1 : 0)) % 3 === 0 ? tones[0] : tones[1 + Math.min(2, lit)];
+      } else {
+        const course = Math.floor((k - 1) / 2), joint = k > 0 && (k - 1) % 2 === 1 ? false : (x + (course & 1) * 2) % 4 === 0;
+        c = joint ? tones[Math.max(0, lit - 1)] : tones[1 + lit];
+        // Quoins at the corners, long and short in turn.
+        if (i === 0 || i === len - 1) c = course & 1 ? tones[3] : tones[1];
+        if (k === rows - 1) c = tones[0];
+      }
+      // The south face lies out of the sun's full glare.
+      c = shade(c, k === 0 ? 0.52 : 0.84);
+      if (dw && x >= dx0 && x <= dx1 && k >= rows - dh) {
+        const arch = k === rows - dh && dw >= 2 && (x === dx0 || x === dx1);
+        c = arch ? c : k === rows - dh ? SLIT : x === dx0 + Math.floor(dw / 2) && dw === 3 ? DOOR_DARK : C.plank[(x - dx0) % 2 ? 1 : 2];
+      } else if (slits && rows >= 5 && k >= 2 && k <= 3 && i >= 2 && i <= len - 3 && (i - 2) % slits === 0 && (!dw || x < dx0 - 1 || x > dx1 + 1)) {
+        c = SLIT;
+      } else if (slits && rows >= 5 && k === 4 && i >= 2 && i <= len - 3 && (i - 2) % slits === 0 && (!dw || x < dx0 - 1 || x > dx1 + 1) && mat !== "timber") {
+        c = tones[3];
+      }
+      p.set(x, top + k, c);
+    }
+}
+
+/** A wall hung from the lowest pixel of each column of the art above row
+ * `h` (`w` wide), `depth` rows down, a row left for the outline between:
+ * for structures whose painters draw none (round towers, palaces, camps).
+ * Neighbouring columns ending level make one wall, shaded like a drum (lit
+ * on the left), coursed, its windows spaced along it, a door in the middle
+ * of a wide one. Pure. */
+function hangWall(out: Uint32Array, w: number, h: number, depth: number, tones: readonly number[], seed: number, kind: string) {
+  const foot = new Int32Array(w).fill(-1);
+  for (let x = 0; x < w; x++)
+    for (let y = h - 1; y >= 0; y--)
+      if (out[y * w + x] >>> 24 >= 128) { foot[x] = y; break; }
+  const [dark, mid, light] = tones;
+  const tower = kind.endsWith("Tower");
+  for (let x0 = 0; x0 < w; ) {
+    if (foot[x0] < 0) { x0++; continue; }
+    let x1 = x0 + 1;
+    while (x1 < w && foot[x1] >= 0 && Math.abs(foot[x1] - foot[x1 - 1]) <= 1) x1++;
+    const len = x1 - x0, centre = x0 + (len - 1) / 2;
+    for (let x = x0; x < x1; x++) {
+      const i = x - x0, t = len > 1 ? i / (len - 1) : 0.5;
+      for (let k = 0; k < depth - 1; k++) {
+        const y = foot[x] + 2 + k;
+        if (y >= h + depth) break;
+        let c = t < 0.28 ? light : t > 0.72 ? dark : mid;
+        if (t > 0.88) c = shade(dark, 0.85);
+        const course = Math.floor(k / 2);
+        if (k % 2 === 1 && (x + (course & 1) * 2) % 4 === 0) c = shade(c, 0.86);
+        if (k === 0) c = shade(c, 0.62);
+        if (k === depth - 2) c = shade(c, 0.8);
+        const door = len >= (tower ? 6 : 9) && Math.abs(x - centre) < (len >= 12 ? 1.5 : 1) && k >= depth - 5 && k < depth - 1;
+        if (door) c = k === depth - 5 ? SLIT : C.plank[(x & 1) + 1];
+        else if (len >= 5 && k >= 2 && k <= 3 && i >= 2 && i <= len - 3 && (i - 2 + (seed & 1)) % 5 === 0 && Math.abs(x - centre) > 2) c = SLIT;
+        out[y * w + x] = rgba(c);
+      }
+    }
+    x0 = x1;
+  }
+}
+
 
 /** What a fallen structure leaves, as `(cw·ART) × (ch·ART)` RGBA pixels. */
 function drawnStructureRubblePixels(kind: PlacedKind, cw: number, ch: number, seed = 0): Uint32Array {
@@ -406,6 +498,7 @@ function squareTower(p: Pix, crenels: boolean) {
         p.set(x, y, crenel ? C.stone[0] : ring === 2 ? C.stone[tone - 1] : C.stone[tone]);
       }
     }
+  if (wallDepth) frontWall(p, x0 + 1, x1 - 1, y1 + 1, wallDepth - 1, "stone", false, 4);
   return { x0: x0 + 4, y0: y0 + 4, x1: x1 - 4, y1: y1 - 4 };
 }
 
@@ -423,7 +516,9 @@ function planks(p: Pix, { x0, y0, x1, y1 }: { x0: number; y0: number; x1: number
  * sunny one lighter) in staggered courses of tiles, the ridge in outline. */
 function gable(p: Pix, x0: number, y0: number, x1: number, y1: number, base: number) {
   const along = x1 - x0 >= y1 - y0;
-  const U = along ? x1 - x0 + 1 : y1 - y0 + 1, V = along ? y1 - y0 + 1 : x1 - x0 + 1, ridge = Math.floor(V / 2);
+  // Seen at a slant (Angle view), a ridge running east-west rises toward
+  // the north, the long south slope facing the viewer.
+  const U = along ? x1 - x0 + 1 : y1 - y0 + 1, V = along ? y1 - y0 + 1 : x1 - x0 + 1, ridge = Math.floor(V * (wallDepth && along ? 0.36 : 0.5));
   for (let v = 0; v < V; v++)
     for (let u = 0; u < U; u++) {
       const x = along ? x0 + u : x0 + v, y = along ? y0 + v : y0 + u;
@@ -441,16 +536,33 @@ function gable(p: Pix, x0: number, y0: number, x1: number, y1: number, base: num
       if (v === 0 || v === V - 1) c = shade(c, 0.9);
       p.set(x, y, c);
     }
+  // A ridge running north-south shows its south gable end: a triangle of
+  // wall under the roof's edge, a little round window near its peak.
+  if (wallDepth && !along) {
+    const rx = x0 + ridge, t = Math.min(ridge + 1, Math.max(3, Math.round(V * 0.45)));
+    for (let j = 0; j < t; j++) {
+      const y = y1 - j, half = (ridge + 0.5) * (1 - j / t);
+      for (let x = x0; x <= x1; x++) {
+        const d = Math.abs(x + 0.5 - (rx + 0.5));
+        if (d < half - 0.9) p.set(x, y, j === 0 ? C.stone[1] : x < rx ? C.stone[3] : C.stone[2]);
+        else if (d < half + 0.4) p.set(x, y, shade(base, 0.55));
+      }
+    }
+    if (t >= 4) p.set(rx, y1 - t + 2, SLIT);
+  }
   return { along, ridge: (along ? y0 : x0) + ridge };
 }
 
 /** Stone walls round the hall, two pixels thick and lit to the upper left,
  * then the roof inside; returns the roof's ridge. */
-function hall(p: Pix, x0: number, y0: number, x1: number, y1: number, roof: number) {
+function hall(p: Pix, x0: number, y0: number, x1: number, y1: number, roof: number, wall: "stone" | "timber" | "marble" | "pale" = "stone") {
   for (let y = y0 + 1; y < y1; y++)
     for (let x = x0 + 1; x < x1; x++) p.set(x, y, x === x0 + 1 || y === y0 + 1 ? C.stone[3] : x === x1 - 1 || y === y1 - 1 ? C.stone[1] : C.stone[2]);
   rect(p, x0 + 2, y0 + 2, x1 - 2, y1 - 2, OUTLINE);
-  return gable(p, x0 + 3, y0 + 3, x1 - 3, y1 - 3, roof);
+  const g = gable(p, x0 + 3, y0 + 3, x1 - 3, y1 - 3, roof);
+  // Seen at a slant, its south wall hangs below, a row left for the outline.
+  if (wallDepth) frontWall(p, x0 + 1, x1 - 1, y1 + 1, wallDepth - 1, wall);
+  return g;
 }
 
 /** The Assassins' den's emblem on the ridge: a dagger, point up. */
@@ -1243,7 +1355,7 @@ function paintArcherBarracks(p: Pix, look: string) {
   for (let y = y0 + 1; y < split; y++)
     for (let x = x0 + 1; x < x1; x++) p.set(x, y, C.dirt[hash(x, y, 43) % 5 === 0 ? 0 : hash(x, y, 44) % 4 === 0 ? 2 : 1]);
   for (let x = x0 + 1; x < x1; x += 3) p.set(x, y0 + 1, C.plank[2]);
-  hall(p, x0, split, x1, y1, rangers ? C.moss : skirmishers ? C.tar : C.timber);
+  hall(p, x0, split, x1, y1, rangers ? C.moss : skirmishers ? C.tar : C.timber, "timber");
   for (let x = x0 + 2; x < x0 + 7; x++) p.set(x, seen - 2, x % 2 ? C.plank[3] : C.plank[1]);
   const ty = (y0 + seen) / 2 + 0.5;
   if (skirmishers) {
