@@ -15,6 +15,7 @@ import { watchReach, type DefendSim } from "./sim.ts";
 import { nanoRange } from "./nanobots.ts";
 import { archerTowerRange, cannonTowerRange, keepArrowRange, keepOilReach } from "./towers.ts";
 import { wizardReach } from "./wizard.ts";
+import { sigilReach } from "./sigils.ts";
 import { deployCircle, type Rally } from "./deployment.ts";
 import { drawRallyFlag } from "./structure-art.ts";
 
@@ -38,6 +39,7 @@ export function reachOf(b: Building, armed: Armed): Circle[] {
     case "cannonTower": case "batteryTower": case "mortarTower": case "minelayerTower": return at(cannonTowerRange(armed, b));
     case "nanoTower": return at(nanoRange()*rangeScale(armed,b));
     case "wizardTower": case "pyreTower": case "frostTower": case "stormTower": return at(wizardReach(armed, b));
+    case "sigilTower": return at(sigilReach(armed, b));
     case "watchTower": return at(watchReach(armed, b));
     case "wallBallista": return at(wallBallistaRange(armed)*rangeScale(armed,b));
     case "keep": {

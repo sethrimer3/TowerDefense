@@ -274,6 +274,17 @@ export class WizardArt {
           dot(fx, y0 - lick, 1, 1 + lick);
         }
       }
+      // A Sigil tower's ice-fire: the same tongues, burning blue.
+      if (e.iceFire) {
+        c.globalAlpha = 1;
+        for (let k = 0; k < 3; k++) {
+          const fx = x0 + Math.round(((k + 0.5) * n) / 3) - 1, lick = Math.floor(now / 90 + e.id * 5 + k * 7) % 3;
+          c.fillStyle = ICE[2];
+          dot(fx, y0 - 1 - lick, 2, 2 + lick);
+          c.fillStyle = ICE[4];
+          dot(fx, y0 - lick, 1, 1 + lick);
+        }
+      }
       if (!e.chill && !e.freeze && !e.mageChills?.length) continue;
       c.fillStyle = ICE[3];
       c.globalAlpha = 0.55;

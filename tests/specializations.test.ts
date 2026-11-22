@@ -7,7 +7,7 @@ import { test } from "node:test";
 import { openSight } from "./open-sight.ts";
 import assert from "node:assert/strict";
 import { defaults, decode, SAVE_VERSION } from "../src/save.ts";
-import { ATTUNED, allocated, buildingTree, foundNodes, hasTree, targetKind, respecBuilding, undoTo, undoRefund, undoUpgrade, nextSteps, placedBattlePaths, specialtyLabel, specialtyOf, spikeKey, stepName, upgradeBuilding, upgradedFrom, rootOf, type UpgradeStep } from "../src/specializations.ts";
+import { ATTUNED, recipe, allocated, buildingTree, foundNodes, hasTree, targetKind, respecBuilding, undoTo, undoRefund, undoUpgrade, nextSteps, placedBattlePaths, specialtyLabel, specialtyOf, spikeKey, stepName, upgradeBuilding, upgradedFrom, rootOf, type UpgradeStep } from "../src/specializations.ts";
 import { learnPath, pathById, type PathId } from "../src/knowledge-paths.ts";
 import { bonuses } from "../src/progression.ts";
 import { placeStructure, removeStructure, moveStructure, moveSpikes, placeCityTile, placeSpikes, removeSpikes, defaultLayout, fitLayout } from "../src/defend/layout.ts";
@@ -72,7 +72,7 @@ test("the shop's three basic buildings branch into attuned buildings, each with 
   assert.deepEqual(to("barracks"), ["Chapterhouse", "Berserker lodge", "Halberd yard"]);
   assert.deepEqual(to("chapterHouse"), ["Crusaders I"]);
   assert.deepEqual(to("assassinDen"), ["Blood hall", "Veil house", "Poison den"]);
-  assert.deepEqual(to("wizardTower"), ["Pyre tower", "Frost tower", "Storm tower"]);
+  assert.deepEqual(to("wizardTower"), ["Pyre tower", "Frost tower", "Storm tower", "Sigil tower"], "and a fourth, outside the merge");
   assert.deepEqual(to("pyreTower"), ["Pyromancy I"], "attuned to its branch, it climbs it");
   assert.deepEqual(to("sniperLodge"), ["Revolutionary", "Marksmen I", "Ricochet I", "Suppressing fire I", "Deadeye I", "Piercing rounds I"], "an ultimate keeps its own");
   assert.deepEqual(nextSteps("stormTower", { path: "storm", rank: 2 }).map(stepName), ["Stormcalling III"]);
@@ -81,10 +81,10 @@ test("the shop's three basic buildings branch into attuned buildings, each with 
   assert.deepEqual(nextSteps("lancerStable", { path: "wingedLancers", rank: 3 }).map((s) => s.type === "merge" && s.to), ["valkyriePalace"]);
   assert.deepEqual(nextSteps("archerTower", { path: "fireArrows", rank: 3 }), [{type:"merge",to:"chronoTower",cost:0}], "all three completed Archer attunements merge into their ultimate");
   assert.deepEqual(to("wallSpikes"), ["Blasting stakes I", "Spring stakes I", "Rimed stakes I"]);
-  // Every attuned building has three branches of three ranks (or, while a
-  // third is still to come, two).
+  // Every attuned building merges three branches of three ranks (or, while a
+  // third is still to come, two); an extra branch (the Sigil tower) stands outside the merge.
   for (const a of ATTUNED) {
-    assert.ok(a.branches.length === 3 || (a.branches.length === 2 && ["archerTower", "cannonTower", "archerBarracks", "mageGuild"].includes(a.kind)), a.kind);
+    assert.ok(recipe(a).length === 3 || (a.branches.length === 2 && ["archerTower", "cannonTower", "archerBarracks", "mageGuild"].includes(a.kind)), a.kind);
     for (const b of a.branches) assert.equal(pathById(b.path).ranks.length, 3, b.path);
   }
   assert.equal(rootOf("darkKeep"), "watchTower");
@@ -113,7 +113,7 @@ test("each building is upgraded on its own, paying Knowledge rank by rank", () =
   assert.equal(bonuses(s).structurePaths![a].pyreTower!.rank, 3);
   assert.equal(bonuses(s).structurePaths![b], undefined);
   assert.equal(specialtyLabel(specialtyOf(s.defend.layout, { uid: a })), "Pyromancy III");
-  assert.deepEqual(treeGraph("wizardTower").filter((n) => n.state === "next").map((n) => n.id), ["k:pyreTower", "k:frostTower", "k:stormTower"]);
+  assert.deepEqual(treeGraph("wizardTower").filter((n) => n.state === "next").map((n) => n.id), ["k:pyreTower", "k:frostTower", "k:stormTower", "k:sigilTower"]);
   assert.match(treeCardHtml(s, "wizardTower", undefined, "k:stormTower"), /Storm tower[\s\S]*data-ug-buy="k:stormTower"/);
   s.knowledge = 0;
   assert.match(treeCardHtml(s, "wizardTower", undefined, "k:stormTower"), /data-ug-buy="k:stormTower" disabled/, "unaffordable upgrades show, locked");
@@ -302,7 +302,7 @@ test("the tree puts other buildings beside and below, branches above, and counts
   assert.equal(plain.find((o) => o.id === "k:watchTower")!.closed, undefined, "nothing closed off yet");
   const wizard = buildingTree("stormTower", { path: "storm", rank: 1 });
   assert.equal(wizard.find((o) => o.id === "k:watchTower")!.closed!.length, 2, "it passed over the archer and cannon towers");
-  assert.equal(wizard.find((o) => o.id === "k:wizardTower")!.closed!.length, 2, "the Pyre and Frost towers");
+  assert.equal(wizard.find((o) => o.id === "k:wizardTower")!.closed!.length, 3, "the Pyre, Frost and Sigil towers");
   assert.ok(wizard.filter((o) => o.path).every((o) => !o.side), "branches carry on up");
   assert.ok(wizard.find((o) => o.id === "k:darkKeep"), "the ultimate waits at the top");
 });

@@ -6,7 +6,7 @@ import { cloneLayout, type PlacedKind } from "./defend/layout.ts";
 import type { Save } from "./save.ts";
 import { studyPathCost } from "./economy.ts";
 
-export type PathTopic = "pyreTower" | "frostTower" | "stormTower" | "wizardTower" | "chapterHouse" | "berserkerLodge" | "halberdYard" | "barracks" | "heroHall" | "valkyriePalace" | "assassinDen" | "bloodHall" | "veilHouse" | "poisonDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "musketHall" | "gunHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "sniperLodge" | "archerTower" | "brazierTower" | "hawkTower" | "wispTower" | "cannonTower" | "batteryTower" | "mortarTower" | "minelayerTower" | "archerBarracks" | "rangerLodge" | "skirmishCamp" | "skyrangerLodge" | "watchTower" | "mageGuild" | "infernoHall" | "cinderHall" | "stormHall" | "bait" | "spikes" | SpellId;
+export type PathTopic = "pyreTower" | "frostTower" | "stormTower" | "sigilTower" | "wizardTower" | "chapterHouse" | "berserkerLodge" | "halberdYard" | "barracks" | "heroHall" | "valkyriePalace" | "assassinDen" | "bloodHall" | "veilHouse" | "poisonDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "musketHall" | "gunHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "sniperLodge" | "archerTower" | "brazierTower" | "hawkTower" | "wispTower" | "cannonTower" | "batteryTower" | "mortarTower" | "minelayerTower" | "archerBarracks" | "rangerLodge" | "skirmishCamp" | "skyrangerLodge" | "watchTower" | "mageGuild" | "infernoHall" | "cinderHall" | "stormHall" | "bait" | "spikes" | SpellId;
 /** Strike spells: cast from the battle's Skills palette rather than built,
  * so a spell has no cards; it casts with the one path `save.spellPaths`
  * names, at its furthest researched rank. */
@@ -14,7 +14,7 @@ export type SpellId = "necromancy" | "meteor" | "frostNova" | "reinforcements";
 export const SPELLS: SpellId[] = ["necromancy", "meteor", "frostNova", "reinforcements"];
 export const isSpell = (topic: string): topic is SpellId => (SPELLS as string[]).includes(topic);
 export type PathId =
-  | "pyromancy" | "rime" | "storm" | "crusaders" | "berserkers" | "halberdiers" | "cloudborne"
+  | "pyromancy" | "rime" | "storm" | "sigils" | "crusaders" | "berserkers" | "halberdiers" | "cloudborne"
   | "whirlwind" | "bladeDance" | "legend"
   | "bloodletters" | "shadowcloak" | "venom" | "headhunters"
   | "longSpears" | "setSpears" | "testudo" | "spearWall" | "barbed" | "throwingArms" | "heavyLance" | "wingedLancers"
@@ -67,6 +67,20 @@ export const RIME = { chill: 1.5, damage: 1.6, reach: 1.5, freeze: 1.2 };
  * flame (the tower's own at rank 0), striking up to `links[rank]` enemies `jump[rank]` cells apart for `damage` times the
  * flame's damage a second, half again at III. */
 export const STORM = { links: [2, 3, 5, 7], jump: [2, 2.5, 3, 3.5], damage: 1.2, surge: 1.5 };
+/** Sigilcraft, the Sigil tower's path. The tower charges for `charge[rank]`
+ * seconds, then draws a magic circle on the ground where the nearest
+ * ground enemy stood (fliers aren't aimed at), taking `draw` seconds; when
+ * it closes, everything within `radius[rank]` cells takes `damage` times the
+ * wizard's flame damage a second, fliers too. From I it sets them burning
+ * (`burn`: for `seconds`, `share` of the blast a second); II widens and
+ * quickens it; III makes it blue ice-fire (`ice`): the blast `damage` times
+ * harder, and a blue burn that slows to `slow` of their pace, which ice
+ * doesn't put out. It reaches `reach` cells beyond the flame. */
+export const SIGIL = {
+  charge: [3.5, 3.5, 2.8, 2.8], draw: 1.4, radius: [2, 2, 2.75, 2.75], damage: 2.5, reach: 1,
+  burn: { seconds: 3, share: 0.25 },
+  ice: { damage: 1.5, seconds: 4, share: 0.3, slow: 0.5 },
+};
 /** Crusaders, the Chapterhouse's path: heavier (HP by rank, the
  * Chapterhouse's own at rank 0, slower), healing from II, harder hitting at III. */
 export const CRUSADE = { hp: [1.25, 1.5, 1.5, 2.2], speed: 0.85, heal: 3, damage: 1.5 };
@@ -389,6 +403,14 @@ export const PATHS: KnowledgePath[] = [
       { name: "Thunderhead", icon: "thunderhead", cost: studyPathCost(5, 2), text: "Bolts leap through 7 enemies and strike half again as hard" },
     ],
     legacyCrown: { from: "wizardTower", item: "darkKeep", name: "Dark wizard keep", cost: 150000, text: "This Wizard tower becomes a Dark wizard keep" },
+  },
+  {
+    id: "sigils", topic: "sigilTower", name: "Sigilcraft", motto: "Circles drawn from afar, then fire", hue: "storm",
+    ranks: [
+      { name: "Kindled sigil", icon: "embers", cost: studyPathCost(5, 0), text: "Its blast sets enemies burning for 3 seconds" },
+      { name: "Greater circle", icon: "stars", cost: studyPathCost(5, 1), text: "Its circle is 40% wider and charges 20% faster" },
+      { name: "Ice-fire", icon: "shards", cost: studyPathCost(5, 2), text: "Blue fire: the blast hits 50% harder and its burn slows enemies by half" },
+    ],
   },
   {
     id: "crusaders", topic: "chapterHouse", name: "Crusaders", motto: "Immovable, armoured, enduring", hue: "steel",
@@ -962,6 +984,7 @@ export const UNSPECIALIZED: Record<PathTopic, string> = {
   pyreTower: "Flames only",
   frostTower: "Ice only, twice as often",
   stormTower: "Lightning through 2 enemies, alternating with ice",
+  sigilTower: "A magic circle drawn where a ground enemy stood, then a blast that hits fliers too",
   barracks: "Balanced swordsmen",
   chapterHouse: "Crusaders: a quarter more HP, a little slower",
   berserkerLodge: "Berserkers: strokes 15% faster",

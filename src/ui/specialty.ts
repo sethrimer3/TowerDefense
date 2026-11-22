@@ -20,7 +20,7 @@ import { SHADOW_BLEED, SHADOW_EDGE, SHADOW_KNIVES, SHADOW_PATHS, SHADOW_PIERCE, 
 import { NANO_BLAST, NANO_CLOUD, NANO_PATHS, NANO_REPLICATE, nanoAllocated, nanoRank, respecNano, undoNano, upgradeNano, type NanoPathId, type NanoRanks } from "../nanobot-upgrades.ts";
 import { CHAIN, CRIT_CHANCE, CRIT_DAMAGE, DETONATOR, REVOLUTIONARY_PATHS, SQUAD, respecRevolutionary, revolutionaryAllocated, revolutionaryRank, undoRevolutionary, upgradeRevolutionary, type RevolutionaryPathId, type RevolutionaryRanks } from "../revolutionary-upgrades.ts";
 import { BALLISTA_PATHS, FIRE_BOLTS, HEAVY_BOLTS, WINDLASS, ballistaAllocated, ballistaRank, respecBallistas, undoBallistas, upgradeBallistas, type BallistaPathId, type BallistaRanks } from "../ballista-upgrades.ts";
-import { pathById, type PathId, WHIRLWIND, BLADE_DANCE, LEGEND, FIRE_ARROWS, SHARP, WISP_STORM, WISP_FIRE, WISP_LIGHTNING, GUNNERY, SIEGE_SHOT, MINELAYER, CRUSADE, BLOODLETTERS, SHADOWCLOAK, VENOM, HEADHUNT, GRENADIERS, VOLLEY, BAYONET, SHARP_MUSKETS, BELT_FEED, LONG_SPEARS, SET_SPEARS, TESTUDO, SPEAR_WALL, BARBED, THROWING, HEAVY_LANCE, WINGED, TRIPOD, QUICKDRAW, DUELISTS, GUN_SHIELD, OVERDRIVE, STOPPING, DEADEYE, PIERCING, CLUSTER, SALVO, MARKSMEN, RICOCHET, SUPPRESS, BERSERK, HALBERD, BOW_JAVELIN, SKYRANGER, SKIRMISH, FORTIFY, PYRO, RIME, STORM, PYROCLASM, CRYOMANCY, CONDUCTION, SPOTTERS, SIGNAL } from "../knowledge-paths.ts";
+import { pathById, type PathId, SIGIL, WHIRLWIND, BLADE_DANCE, LEGEND, FIRE_ARROWS, SHARP, WISP_STORM, WISP_FIRE, WISP_LIGHTNING, GUNNERY, SIEGE_SHOT, MINELAYER, CRUSADE, BLOODLETTERS, SHADOWCLOAK, VENOM, HEADHUNT, GRENADIERS, VOLLEY, BAYONET, SHARP_MUSKETS, BELT_FEED, LONG_SPEARS, SET_SPEARS, TESTUDO, SPEAR_WALL, BARBED, THROWING, HEAVY_LANCE, WINGED, TRIPOD, QUICKDRAW, DUELISTS, GUN_SHIELD, OVERDRIVE, STOPPING, DEADEYE, PIERCING, CLUSTER, SALVO, MARKSMEN, RICOCHET, SUPPRESS, BERSERK, HALBERD, BOW_JAVELIN, SKYRANGER, SKIRMISH, FORTIFY, PYRO, RIME, STORM, PYROCLASM, CRYOMANCY, CONDUCTION, SPOTTERS, SIGNAL } from "../knowledge-paths.ts";
 import { bonuses } from "../progression.ts";
 import { denOf } from "../defend/assassins.ts";
 import { deployRangeOf } from "../defend/deployment.ts";
@@ -123,6 +123,11 @@ export function kindStats(save: Save, kind: PaletteItem, path?: PathId, rank = 0
   }
   if (isWizardTower(kind)) {
     const pyro = at("pyromancy"), rime = at("rime"), storm = at("storm");
+    if (kind === "sigilTower") {
+      const sig = at("sigils"), hit = flameDps(l.wizardFlame) * b.towerDamage * SIGIL.damage * (sig >= 3 ? SIGIL.ice.damage : 1);
+      const burn = sig >= 3 ? ` · blue fire ${n(hit * SIGIL.ice.share)}/s for ${SIGIL.ice.seconds}s, ${SIGIL.ice.slow * 100}% speed` : sig ? ` · burns ${n(hit * SIGIL.burn.share)}/s for ${SIGIL.burn.seconds}s` : "";
+      return `${n(hit)} blast damage · ${SIGIL.radius[sig]} blast radius · ${SIGIL.charge[sig]}s charge · ${n(flameRange(l.wizardFlame) + SIGIL.reach)} range${burn}`;
+    }
     if (kind === "stormTower") return `${n(flameDps(l.wizardFlame) * b.towerDamage * STORM.damage * (storm >= 3 ? STORM.surge : 1))} bolt damage · ${STORM.links[storm]} targets · ${n(flameRange(l.wizardFlame))} bolt range · alternating with ice`;
     const fire = `${n(flameDps(l.wizardFlame) * b.towerDamage * PYRO.damage[pyro])} fire damage/s · ${n(flameRange(l.wizardFlame) + (pyro >= 2 ? PYRO.reach : 0))} fire range`;
     const ice = `${n(iceDamage(l.wizardIce) * b.towerDamage * (rime >= 2 ? RIME.damage : 1))} ice damage · ${ICE_RANGE + (rime >= 2 ? RIME.reach : 0)} ice range · ${n(iceChill(l.wizardIce) * (rime ? RIME.chill : 1))}s chill`;
@@ -220,7 +225,7 @@ export function buildingSheet(save: Save, kind: PaletteItem | "wallSpikes", wear
     const hp = def.maxHp * (kind.endsWith("Tower") ? b.towerHp : b.buildingHp);
     sheet.stats.push(`${Number(hp.toFixed(1))} building HP`);
   }
-  if(kind in STRUCTURES && (isArcherTower(kind as PaletteItem)||isCannonTower(kind as PaletteItem)||["wizardTower","pyreTower","frostTower","stormTower","watchTower","wallBallista","nanoTower"].includes(kind)))sheet.stats.push("Attack range is a square, measured from the centre to each edge");
+  if(kind in STRUCTURES && (isArcherTower(kind as PaletteItem)||isCannonTower(kind as PaletteItem)||["wizardTower","pyreTower","frostTower","stormTower","sigilTower","watchTower","wallBallista","nanoTower"].includes(kind)))sheet.stats.push("Attack range is a square, measured from the centre to each edge");
   const deploy = kind === "wallSpikes" ? 0 : deployRangeOf(kind as BuildingKind, bonuses(save));
   return deploy ? { ...sheet, stats: [...sheet.stats, `deploys within a square ${Number(deploy.toFixed(1))} cells each way`] } : sheet;
 }

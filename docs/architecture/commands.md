@@ -41,6 +41,7 @@ node tests/defend-spears.mjs # The spearmen line's halls on each path, the Melee
 node --experimental-transform-types --import ./tests/pin-random.ts --test tests/defend-hero.test.ts # The Hero: a Barracks become one, its slash-slash-spin combo, Whirlwind, Blade dance and Legend
 node tests/defend-hero.mjs # The Barracks' tree offering the Hero, its paths, the halls in each look and the heroes cutting through a crowd, desktop and touch (needs dev server)
 node tests/melee-capes.mjs # All melee families' capes, path/tier gallery, motion/settings/opacity/merged outlines and bounded crowd work (needs dev server)
+node tests/sigil-tower.mjs # The Sigil tower: the Wizard tower's fourth branch in its tree (desktop and phone), then charging, its circle drawing and its burst at ranks 0, I and III; screenshots to test-results/ (needs dev server)
 node tests/archer-attunements.mjs # Three Archer Barracks attunements, carrying/sky rain, legacy art and desktop/phone tree purchases (needs dev server)
 node tests/melee-facing.mjs # All melee families' walking/combat/idle directions, procedural views, toggles and Simple/merged outlines (needs dev server)
 node --experimental-transform-types --import ./tests/pin-random.ts --test tests/defend-shadow.test.ts # The Shadow: three Assassins' dens merged, its knives' loops, compounding, armor piercing, bleeding and its shared tree

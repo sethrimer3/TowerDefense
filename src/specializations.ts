@@ -50,7 +50,11 @@ export type Wear = { path: PathId; rank: number };
 /** One branch of an attuned building: a path climbed rank by rank. With
  * `via`, an attunement comes first, turning the building into another kind
  * for `via.cost`, which then climbs the path. */
-export type Branch = { path: PathId; via?: { kind: PlacedKind; cost: number } };
+export type Branch = { path: PathId; via?: { kind: PlacedKind; cost: number }; extra?: true };
+/** The branches whose maxed buildings merge into the line's ultimate: all
+ * but an `extra` one (the Wizard tower's fourth, the Sigil tower, climbs
+ * its path but takes no part in the Dark wizard keep). */
+export const recipe = (a: Attuned) => a.branches.filter((b) => !b.extra);
 /** An attuned building: what it grows from and costs, its three branches,
  * and the ultimate three of it, each maxed on a different branch, merge
  * into (none yet: still to come). */
@@ -67,6 +71,7 @@ export const ATTUNED: Attuned[] = [
     { path: "pyromancy", via: { kind: "pyreTower", cost: 6 } },
     { path: "rime", via: { kind: "frostTower", cost: 6 } },
     { path: "storm", via: { kind: "stormTower", cost: 8 } },
+    { path: "sigils", via: { kind: "sigilTower", cost: 8 }, extra: true },
   ] },
   { kind: "barracks", from: "meleeGuild", cost: 4, ultimate: "heroHall", branches: [
     { path: "crusaders", via: { kind: "chapterHouse", cost: 3 } },
@@ -183,7 +188,8 @@ export function nextSteps(kind: PlacedKind | "wallSpikes", wear?: Wear): Upgrade
     const p = pathById(wear.path), next = p.ranks[wear.rank];
     if (next) return [{ type: "path", path: p.id, rank: wear.rank + 1, cost: next.cost }];
     const a = place.tier === "attuned" || place.tier === "via" ? place.a : undefined;
-    return a?.ultimate && a.branches.every(b => topRank(b.path) > 0) ? [{ type: "merge", to: a.ultimate, cost: MERGE_COST }] : [];
+    const merges = a && recipe(a).some((b) => b.path === wear.path);
+    return a?.ultimate && merges && recipe(a).every(b => topRank(b.path) > 0) ? [{ type: "merge", to: a.ultimate, cost: MERGE_COST }] : [];
   }
   if (place.tier === "attuned")
     return place.a.branches.map((b): UpgradeStep =>
@@ -256,8 +262,8 @@ export type Partner = { branch: Branch; kind: PlacedKind; found?: { kept: true }
  * itself). Empty unless it is maxed on a branch of a line with an ultimate. */
 export function mergePartners(d: DefendSave, kind: PaletteKind, wear: Wear | undefined, except?: number): Partner[] {
   const a = attunedOf(kind), mine = a ? branchOf(a, kind, wear) : -1;
-  if (!a?.ultimate || a.branches.some(b => topRank(b.path) === 0) || mine < 0 || !wear || wear.rank < topRank(wear.path)) return [];
-  return a.branches.filter((_, i) => i !== mine).map((branch): Partner => {
+  if (!a?.ultimate || recipe(a).some(b => topRank(b.path) === 0) || mine < 0 || a.branches[mine].extra || !wear || wear.rank < topRank(wear.path)) return [];
+  return recipe(a).filter((b) => b !== a.branches[mine]).map((branch): Partner => {
     const k = branchKind(a, branch), top = topRank(branch.path);
     if (d.kept.some((o) => o.kind === k && o.path === branch.path && o.rank === top)) return { branch, kind: k, found: { kept: true } };
     const s = d.layout.structures.find((o) => o.uid !== except && o.kind === k && o.path === branch.path && o.rank === top);
@@ -387,7 +393,7 @@ function lineageCost(kind: PlacedKind | "wallSpikes"): number {
   const p = placeOf(kind);
   if (p.tier === "attuned") return p.a.cost;
   if (p.tier === "via") return p.a.cost + p.a.branches[p.branch].via!.cost;
-  if (p.tier === "ultimate") return p.a.branches.reduce((n, b) => n + p.a.cost + (b.via?.cost ?? 0) + pathCost(b.path), MERGE_COST);
+  if (p.tier === "ultimate") return recipe(p.a).reduce((n, b) => n + p.a.cost + (b.via?.cost ?? 0) + pathCost(b.path), MERGE_COST);
   if (p.tier === "beyond") return lineageCost(p.from) + p.cost;
   return 0;
 }
@@ -414,7 +420,8 @@ export function undoTo(kind: PaletteKind, wear: Wear | undefined, id: string): U
   if (!n || n.state !== "owned" || !n.parent || n.merged) return undefined;
   if (n.step?.type === "merge") {
     const a = attunedOf(n.kind!)!, at = (b: Branch) => ({ kind: branchKind(a, b), wear: { path: b.path, rank: topRank(b.path) } });
-    return { ...at(a.branches[MIDDLE]), apart: a.branches.filter((_, i) => i !== MIDDLE).map(at) };
+    const merged = recipe(a);
+    return { ...at(merged[MIDDLE]), apart: merged.filter((_, i) => i !== MIDDLE).map(at) };
   }
   const to = tree.find((o) => o.id === n.parent)!;
   if (!to.path) return { kind: to.kind! };
@@ -601,7 +608,7 @@ export function buildingTree(kind: PlacedKind | "wallSpikes", wear?: Wear): Tree
   };
   /** The line's ultimate over `top`, the end of the branch it is bought from. */
   const crown = (a: Attuned, top: string, state: TreeNode["state"]) => {
-    if (a.ultimate) nodes.push({ id: kid(a.ultimate), parent: top, state: a.branches.some(b => topRank(b.path) === 0) ? "locked" : state, kind: a.ultimate, cost: MERGE_COST, step: { type: "merge", to: a.ultimate, cost: MERGE_COST }, ...beyond(a.ultimate) });
+    if (a.ultimate) nodes.push({ id: kid(a.ultimate), parent: top, state: recipe(a).some(b => topRank(b.path) === 0) ? "locked" : state, kind: a.ultimate, cost: MERGE_COST, step: { type: "merge", to: a.ultimate, cost: MERGE_COST }, ...beyond(a.ultimate) });
     else nodes.push({ id: `u:${a.kind}`, parent: top, state: "locked", cost: 0, soon: a.kind });
   };
   /** The basic building and the attuned one it became, owned, the other
@@ -637,7 +644,8 @@ export function buildingTree(kind: PlacedKind | "wallSpikes", wear?: Wear): Tree
     if (open.length > 1) Object.assign(attuned, { closed: open.filter((o) => o.i !== mine), took: open[mine] });
     const have = wear?.path === b.path ? wear.rank : 0;
     const top = climb(pathById(b.path), kid(a.kind), have, b.via, place.tier === "via");
-    crown(a, top, have >= topRank(b.path) ? "next" : "locked");
+    // An extra branch tops out on its own path: it takes no part in the merge.
+    if (!b.extra) crown(a, top, have >= topRank(b.path) ? "next" : "locked");
     return nodes;
   }
   if (place.tier === "ultimate" || (place.tier === "beyond" && mergedFrom(place.from))) {
@@ -647,7 +655,7 @@ export function buildingTree(kind: PlacedKind | "wallSpikes", wear?: Wear): Tree
     const a = attunedOf(chain[0])!;
     roots(a, true);
     let top = kid(a.kind);
-    a.branches.forEach((b, i) => {
+    recipe(a).forEach((b, i) => {
       const end = climb(pathById(b.path), kid(a.kind), topRank(b.path), b.via, !!b.via, true);
       if (i === MIDDLE) top = end;
     });
