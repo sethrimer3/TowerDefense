@@ -1324,20 +1324,28 @@ export class DefendRenderer {
     const omit = this.arrival?.omit.size ? this.arrival.omit : undefined;
     let k = this.cam.s >= 4 ? 4 : this.cam.s >= 2.5 ? 3 : this.cam.s >= 1.4 ? 2 : 1;
     while (k > 1 && W * H * k * k > 18e6) k--;
+    // Painted at a whole number of pixels an art pixel, so every sprite and
+    // ground image is drawn up by a whole factor to whole pixels: a repaint
+    // through a box's clip then samples exactly as a whole repaint does
+    // (at a fractional scale, the browser may sample a clipped draw a pixel
+    // off, shifting what lies inside the box against what lies outside it).
+    let m = Math.max(1, Math.round((this.px * k) / ART));
+    while (m > 1 && CELLS_W * CELLS_H * (ART * m) ** 2 > 18e6) m--;
+    const P = ART * m;
+    k = P / this.px;
     this.layerScale = k;
     // Every building's damage stage is painted into the layer too.
     const maskKey = `${this.area}:${pixelKey()}:${sim ? damageKey(sim) : -1}:${looks ? Object.entries(looks).join(",") : ""}`;
-    const key = `${W}:${k}:${this.worldLighting}:${maskKey}`;
+    const key = `${W}:${P}:${this.worldLighting}:${maskKey}`;
     if (map === this.map && key === this.layerKey && (!this.previousArea || key === this.previousKey)) return;
     // Only some buildings changed (a damage stage, a fall, a rebuilt
     // section): repaint just round them, not the whole city and its
     // lighting masks (a hitch of a tenth of a second or more on a big city,
     // many times a second while a worm tears through it and masons rebuild).
-    const frame = `${W}:${k}:${this.worldLighting}:${this.area}:${pixelKey()}`;
+    const frame = `${W}:${P}:${this.worldLighting}:${this.area}:${pixelKey()}`;
     const base = `${frame}:${looks ? Object.entries(looks).join(",") : ""}`;
     const damaging = map === this.map && sim && sim === this.stagedSim && base === this.baseKey;
     const damage = damaging ? this.damageBoxes(map, sim) : null;
-    const P = this.px * k;
     // Through an area's fade, the outgoing area's layer too.
     if (this.previousArea && (key !== this.previousKey || !this.layerKey)) {
       if (damage && this.previousBase === base && this.previousLayer) {
@@ -1346,8 +1354,8 @@ export class DefendRenderer {
           repaintBox(c, P, box, (c) => paintCityLayer(c, P, { map, sim, area, lights: this.lighting.lights, stones: this.lighting.roadStones, looks, omitSunShadows: this.worldLighting, within: box, omit }));
       } else {
         this.previousLayer ??= document.createElement("canvas");
-        this.previousLayer.width = W * k;
-        this.previousLayer.height = H * k;
+        this.previousLayer.width = CELLS_W * P;
+        this.previousLayer.height = CELLS_H * P;
         this.lighting.setMap(map);
         paintCityLayer(this.previousLayer.getContext("2d")!, P, { map, sim, area: this.previousArea, lights: this.lighting.lights, stones: this.lighting.roadStones, looks, omitSunShadows: this.worldLighting, omit });
       }
@@ -1377,9 +1385,9 @@ export class DefendRenderer {
     this.map = map;
     this.layerKey = key;
     this.lighting.setMap(map);
-    this.layer.width = W * k;
-    this.layer.height = H * k;
-    paintCityLayer(this.lctx, this.px * k, { map, sim, area: this.area, lights: this.lighting.lights, stones: this.lighting.roadStones, looks, omitSunShadows: this.worldLighting, omit });
+    this.layer.width = CELLS_W * P;
+    this.layer.height = CELLS_H * P;
+    paintCityLayer(this.lctx, P, { map, sim, area: this.area, lights: this.lighting.lights, stones: this.lighting.roadStones, looks, omitSunShadows: this.worldLighting, omit });
     // Native-resolution occlusion masks do not depend on camera zoom, board
     // pixel size or whether sunlight is composited outside the city layer.
     if (map !== this.maskMap || maskKey !== this.maskKey) {

@@ -5,10 +5,10 @@
  * renderer leaves the falling buildings out of the city layer until the
  * last has landed (`omit`), and hands the trees, ducks and fences their
  * falls (`tree`, `duck`, `fences`). */
-import { CELLS_W, hash, hash01 } from "./grid.ts";
+import { CELLS_H, CELLS_W, hash, hash01 } from "./grid.ts";
 import { CellType, type Building, type CityMap } from "./citygen.ts";
 import { ART } from "./art-scale.ts";
-import { changeBoxes } from "./map-change.ts";
+import { changeBoxes, mergeBoxes } from "./map-change.ts";
 import { paintStanding } from "./city-layer.ts";
 import { parkArt } from "./park-art.ts";
 import { drawSprite } from "./damage-art.ts";
@@ -111,7 +111,9 @@ export class ArrivalArt {
     const gone = from.buildings.filter((b) => going.has(b.id));
     const trees = parkArt(from).trees.filter((t) => changed[Math.floor(t.cy) * CELLS_W + Math.floor(t.cx)]);
     const fences = parkFences(from).filter((s) => changed[Math.floor((s.y1 + s.y2) / 2) * CELLS_W + Math.floor((s.x1 + s.x2) / 2)]);
-    for (const box of changeBoxes(changed, MARGIN)) {
+    // Each box takes in the whole of every building going through it, so
+    // none dissolves cut off at a box's edge, half drawn over the city.
+    for (const box of vanishBoxes(changeBoxes(changed, MARGIN), gone)) {
       const w = box.x1 - box.x0, h = box.y1 - box.y0;
       const canvas = document.createElement("canvas");
       canvas.width = Math.ceil(w * P);
@@ -228,6 +230,25 @@ export class ArrivalArt {
     paintStanding(c, P, this.to, b, this.area, this.looks);
     return canvas;
   }
+}
+
+/** `boxes` grown to take in the whole of each of the `gone` buildings
+ * (`MARGIN` cells round its lot) that reaches into them, merged where they
+ * then overlap. Pure. */
+export function vanishBoxes(boxes: readonly CellBox[], gone: readonly Building[]): CellBox[] {
+  let out = boxes.map((b) => ({ ...b }));
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const box of out)
+      for (const { rect: r } of gone) {
+        if (r.x + r.w <= box.x0 || r.x >= box.x1 || r.y + r.h <= box.y0 || r.y >= box.y1) continue;
+        const x0 = Math.max(0, Math.min(box.x0, r.x - MARGIN)), y0 = Math.max(0, Math.min(box.y0, r.y - MARGIN));
+        const x1 = Math.min(CELLS_W, Math.max(box.x1, r.x + r.w + MARGIN)), y1 = Math.min(CELLS_H, Math.max(box.y1, r.y + r.h + MARGIN));
+        if (x0 !== box.x0 || y0 !== box.y0 || x1 !== box.x1 || y1 !== box.y1) Object.assign(box, { x0, y0, x1, y1 }), (grew = true);
+      }
+    if (grew) out = mergeBoxes(out);
+  }
+  return out;
 }
 
 /** Clears the art pixels of `v` whose dither threshold `step` has passed. */
