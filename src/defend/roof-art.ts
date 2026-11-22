@@ -162,6 +162,23 @@ export function roofPixels(cw: number, ch: number, variant: number, seed: number
       }
     }
     if (t >= 4) put(U - t + 1, ridge, HOLE);
+    // The north end rises to the ridge too, its eaves lower: the roof's top
+    // comes to a peak, the street showing past its slopes.
+    const bx = along ? 0 : 1;
+    for (let j = 0; j < t; j++) {
+      const half = (ridge + 0.5) * ((j + 1) / (t + 1));
+      for (let v = 0; v < V; v++) {
+        const d = Math.abs(v - ridge);
+        if (d > half + 0.4) {
+          const x = x0 + 1 + v, y = y0 + 1 + j;
+          out[y * W + x] = 0;
+          // The roof's own one-pixel border round the lot goes with it.
+          if (j === 0) out[(y - 1) * W + x] = 0;
+          if (bx && v === 0) out[y * W + x - 1] = 0;
+          if (bx && v === V - 1) out[y * W + x + 1] = 0;
+        } else if (d > half - 0.6 && v !== ridge) put(j, v, shade(base, 0.5));
+      }
+    }
   }
   return out;
 }
