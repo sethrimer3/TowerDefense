@@ -28,7 +28,7 @@ import { hasForest } from "./forest.ts";
 import { hasWallArt, wallCapSprite, wallFaceSprite, wallRubbleTones, wallRubbleSource } from "./area-wall-art.ts";
 import { drawPixel, drawRoof, pixelKey, type PixelSprite } from "./pixel-sprites.ts";
 import { HALL_FACE, angled, faceDepth, liftOf, liftPx, setAngled } from "./angle-view.ts";
-import { structureYard } from "./tower-art.ts";
+import { KINDS, structureYard } from "./tower-art.ts";
 
 export { faceDepth, liftOf } from "./angle-view.ts";
 
@@ -457,7 +457,8 @@ function paintBuildingAt(p: Paint, b: Building) {
     return;
   }
   // The keep at full size has its own slanted art (`keep-angle-art.ts`).
-  const ownAngle = b.kind === "keep" && r.w >= 3;
+  // So have the placed structures (`structurePixels`' depth).
+  const ownAngle = (b.kind === "keep" && r.w >= 3) || (KINDS as readonly string[]).includes(b.kind);
   if (angleView && !p.flat && !ownAngle && !b.woodGate && (!sim || sim.intact(b)) && !aloft(p, b)) paintFace(p, b);
   if (b.kind === "gate") {
     const side = b.gate!.side, a = gateArtRect(b);
@@ -489,7 +490,8 @@ function paintBuildingAt(p: Paint, b: Building) {
   }
   // Pixel Art's roofs on undamaged houses; a damaged one keeps its own, showing the damage.
   if (b.kind === "house" && !stageOf(sim, b) && drawRoof(c, b.variant, box, px)) return;
-  if (b.kind === "house") return paintArt(p, roofSprite(r.w, r.h, b.variant, roofSeed(r.x, r.y, r.w, r.h), stageOf(sim, b)), box);
+  // Angle view's roofs lean toward the viewer, a gable end in the house's own wall.
+  if (b.kind === "house") return paintArt(p, roofSprite(r.w, r.h, b.variant, roofSeed(r.x, r.y, r.w, r.h), stageOf(sim, b), angleView && !p.flat ? houseGable(r) : undefined), box);
   paintStructureArt(c, b.kind, box, stageOf(sim, b), lotSeed(b), b.structureUid !== undefined ? p.looks?.[b.structureUid] : undefined, angleView && !p.flat);
 }
 
@@ -1001,6 +1003,12 @@ const STONE_WALL: Rgb = [138, 130, 116], BRICK: Rgb = [148, 78, 54], BOARDS: Rgb
 const DOORS: readonly Rgb[] = [DOOR, [60, 82, 52], [58, 70, 98], [112, 44, 36], [70, 48, 30]];
 const SHUTTERS: readonly Rgb[] = [[66, 92, 60], [62, 78, 110], [128, 52, 40], [96, 70, 44]];
 const FLOWERS: readonly Rgb[] = [[200, 60, 60], [230, 190, 80], [190, 110, 200]];
+
+/** The colour of the gable end of the house on lot `r` in Angle view: its walls'. */
+function houseGable(r: { x: number; y: number }) {
+  const w = houseLook(hash(r.x, r.y, 419)).wall;
+  return (Math.round(w[0]) << 16) | (Math.round(w[1]) << 8) | Math.round(w[2]);
+}
 
 export function houseLook(seed: number): HouseLook {
   const h = (n: number) => hash(seed, n, 421);

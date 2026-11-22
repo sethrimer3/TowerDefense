@@ -101,3 +101,34 @@ test("houses' walls vary from lot to lot", async () => {
   const a = facePixels(src, 20, 16, 5, "house", 1)!, faces = Array.from({ length: 12 }, (_, i) => facePixels(src, 20, 16, 5, "house", 1000 + i)!);
   assert.ok(faces.some((f) => f.some((v, i) => v !== a[i])));
 });
+
+test("every placed structure has its own art seen at a slant, a wall hung below its lot", async () => {
+  const { structurePixels, structureYard, KINDS } = await import("../src/defend/tower-art.ts");
+  const { kindFaceDepth, HALL_FACE } = await import("../src/defend/angle-view.ts");
+  const { footprint } = await import("../src/defend/catalog.ts");
+  for (const kind of KINDS) {
+    const f = footprint(kind, false), w = f.w * ART, h = f.h * ART, d = kindFaceDepth(kind);
+    const drop = structureYard(kind, f.w, f.h) ? HALL_FACE : 0;
+    const flat = structurePixels(kind, f.w, f.h, 0, 3), slant = structurePixels(kind, f.w, f.h, 0, 3, "", drop, d);
+    assert.equal(slant.length, w * (h + d), kind);
+    assert.ok(slant.subarray(w * h).some((v) => v >>> 24 === 255), `${kind} hangs a wall`);
+    assert.notDeepEqual(slant.subarray(0, w * h), flat, `${kind} differs from above`);
+    // Damage only repaints the slanted art too.
+    const hurt = structurePixels(kind, f.w, f.h, 2, 3, "", drop, d);
+    assert.deepEqual(hurt.map((v) => (v >>> 24 >= 128 ? 1 : 0)).reduce((a, b) => a + b, 0) > 0, true);
+  }
+});
+
+test("houses' roofs lean toward the viewer in Angle view", async () => {
+  const { roofPixels } = await import("../src/defend/roof-art.ts");
+  // East-west ridge: the ridge row moves north.
+  const ew = roofPixels(3, 2, 0, 5), ewA = roofPixels(3, 2, 0, 5, 0xbeac88);
+  assert.notDeepEqual(ew, ewA);
+  // North-south ridge: a gable end in the wall's colour near the foot.
+  const ns = roofPixels(2, 3, 0, 5, 0xbeac88), W = 2 * ART, H = 3 * ART;
+  const rgb = (v: number) => [v & 255, (v >> 8) & 255, (v >> 16) & 255];
+  const near = (v: number) => { const [r, g, b] = rgb(v); return Math.abs(r - 0xbe * 0.92) < 12 || Math.abs(r - 0xbe * 0.78) < 12 ? g > 100 && b > 80 : false; };
+  let gable = 0;
+  for (let y = H - 8; y < H; y++) for (let x = 0; x < W; x++) if (near(ns[y * W + x])) gable++;
+  assert.ok(gable >= 3, `gable pixels ${gable}`);
+});

@@ -1,5 +1,5 @@
 import { drawSquareRange } from "./square-range-art.ts";
-import { HALL_FACE, angled } from "./angle-view.ts";
+import { HALL_FACE, angled, kindFaceDepth } from "./angle-view.ts";
 import { ANGLED_KEEP_H, ANGLED_KEEP_W, angledKeepPixels } from "./keep-angle-art.ts";
 import { sourcePixels } from "./sprite-source.ts";
 import { flagPixels as profilePixels, type Flag } from "../profile/model.ts";
@@ -37,10 +37,14 @@ export function paintStructureArt(c: CanvasRenderingContext2D, kind: StructureKi
   const cw = Math.max(1, Math.round(box.w / box.px)), ch = Math.max(1, Math.round(box.h / box.px));
   if (kind === "keep") return paintKeep(c, { x, y, w, h, px: box.px }, stage, angle);
   const look = artLook(kind, path);
-  // Angle view draws a yarded hall's roof shorter, its yard running on under it.
+  // Angle view has its own art, seen at a slant: roofs leaning toward the
+  // viewer, gable ends and south walls with their doors and windows hung
+  // below the lot (drawn lifted by as much), a yarded hall's roof shorter,
+  // its yard running on under it.
+  const depth = angle ? kindFaceDepth(kind) : 0;
   const drop = angle && structureYard(kind, cw, ch, look) ? HALL_FACE : 0;
-  const art = sprite(`${kind}:${cw}x${ch}:${stage}:${seed}${look ? `:${look}` : ""}${drop ? `:d${drop}` : ""}`, cw * ART, ch * ART, () => structurePixels(kind, cw, ch, stage, seed, look, drop));
-  drawSprite(c, art, x, y, w, h);
+  const art = sprite(`${kind}:${cw}x${ch}:${stage}:${seed}${look ? `:${look}` : ""}${angle ? `:a${depth}:${drop}` : ""}`, cw * ART, ch * ART + depth, () => structurePixels(kind, cw, ch, stage, seed, look, drop, depth));
+  drawSprite(c, art, x, y, w, depth ? Math.round(box.y + box.h + (depth * box.px) / ART) - y : h);
 }
 
 /** A fallen structure's rubble over its cells (`box`, canvas pixels). */

@@ -14,10 +14,15 @@ export function setAngled(value: boolean) {
 /** How many art pixels building `b`'s south face hangs below its roof in
  * Angle view: towers stand tallest after the keep, houses lowest. */
 export function faceDepth(b: Building): number {
-  if (b.kind === "house") return 5;
-  if (b.kind === "keep") return 11;
-  if (b.kind === "gate" || b.kind === "wallBallista") return Math.round(ART * WALL_FACE_HANG);
-  if (b.kind.endsWith("Tower")) return 9;
+  return kindFaceDepth(b.kind);
+}
+
+/** `faceDepth` by kind alone. */
+export function kindFaceDepth(kind: string): number {
+  if (kind === "house") return 5;
+  if (kind === "keep") return 11;
+  if (kind === "gate" || kind === "wallBallista") return Math.round(ART * WALL_FACE_HANG);
+  if (kind.endsWith("Tower")) return 9;
   return HALL_FACE;
 }
 
