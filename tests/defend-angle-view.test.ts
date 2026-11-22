@@ -132,3 +132,20 @@ test("houses' roofs lean toward the viewer in Angle view", async () => {
   for (let y = H - 8; y < H; y++) for (let x = 0; x < W; x++) if (near(ns[y * W + x])) gable++;
   assert.ok(gable >= 3, `gable pixels ${gable}`);
 });
+
+test("angled halls peak at the north and their roofs overhang the walls", async () => {
+  const { structurePixels } = await import("../src/defend/tower-art.ts");
+  const { footprint } = await import("../src/defend/catalog.ts");
+  const { kindFaceDepth } = await import("../src/defend/angle-view.ts");
+  // The barracks' ridge runs north-south: its north corners are open past
+  // the slopes, where seen from above the hall's wall tops stand.
+  const f = footprint("barracks", false), W = f.w * ART, d = kindFaceDepth("barracks");
+  const flat = structurePixels("barracks", f.w, f.h, 0, 3);
+  const slant = structurePixels("barracks", f.w, f.h, 0, 3, "", 0, d);
+  assert.ok(opaque(flat, W, 2, 2));
+  assert.ok(!opaque(slant, W, 2, 2) && !opaque(slant, W, W - 3, 2));
+  assert.ok(opaque(slant, W, W >> 1, 2));
+  // Mid-hall, the roof reaches the wall's line (no wall top beside it).
+  const mid = (f.h * ART) >> 1;
+  assert.notEqual(slant[mid * W + 2], flat[mid * W + 2]);
+});

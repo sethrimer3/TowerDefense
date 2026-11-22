@@ -504,8 +504,12 @@ function squareTower(p: Pix, crenels: boolean) {
         p.set(x, y, crenel ? C.stone[0] : ring === 2 ? C.stone[tone - 1] : C.stone[tone]);
       }
     }
-  if (wallDepth) frontWall(p, x0 + 1, x1 - 1, y1 + 1, wallDepth - 1, "stone", false, 4);
-  return { x0: x0 + 4, y0: y0 + 4, x1: x1 - 4, y1: y1 - 4 };
+  if (!wallDepth) return { x0: x0 + 4, y0: y0 + 4, x1: x1 - 4, y1: y1 - 4 };
+  frontWall(p, x0 + 1, x1 - 1, y1 + 1, wallDepth - 1, "stone", false, 4);
+  // Seen at a slant, the north parapet's inner face shows inside the top,
+  // in shadow, coursed.
+  for (let x = x0 + 4; x <= x1 - 4; x++) p.set(x, y0 + 4, shade((x & 3) === 0 ? C.stone[0] : C.stone[1], 0.8));
+  return { x0: x0 + 4, y0: y0 + 5, x1: x1 - 4, y1: y1 - 4 };
 }
 
 /** Plank flooring over a box, boards running across, with seams. */
@@ -533,13 +537,18 @@ function gable(p: Pix, x0: number, y0: number, x1: number, y1: number, base: num
         continue;
       }
       const side = v < ridge ? 0 : 1, d = side ? v - ridge - 1 : ridge - 1 - v;
-      const course = d >> 1, off = (course * 2 + side) % 3;
+      // Seen at a slant, the far slope of a ridge running east-west is
+      // foreshortened: its courses a row each, the near one's two.
+      const squash = wallDepth && along && !side;
+      const course = squash ? d : d >> 1, off = (course * 2 + side) % 3;
       let c = shade(base, side ? 0.86 : 1.13);
       const t = hash(course, side, Math.floor((u + off) / 3), 41) % 9;
       c = shade(c, t < 2 ? 0.9 : t > 7 ? 1.08 : 1);
-      if (d & 1) c = shade(c, 0.8);
+      if (squash ? d === ridge - 1 : d & 1) c = shade(c, 0.8);
       else if ((u + off) % 3 === 2) c = shade(c, 0.86);
       if (v === 0 || v === V - 1) c = shade(c, 0.9);
+      // The near eaves' edge, a board seen end-on.
+      if (wallDepth && along && v === V - 1) c = shade(base, 0.6);
       p.set(x, y, c);
     }
   // A ridge running north-south shows its south gable end: a triangle of
@@ -555,12 +564,13 @@ function gable(p: Pix, x0: number, y0: number, x1: number, y1: number, base: num
       }
     }
     if (t >= 4) p.set(rx, y1 - t + 2, SLIT);
-    // The north end rises to a peak too, the wall's top showing past it.
+    // The north end rises to a peak too: the ridge stands higher than the
+    // eaves, so past the slopes' edges the sky (the ground behind) shows.
     for (let j = 0; j < t; j++) {
       const y = y0 + j, half = (ridge + 0.5) * ((j + 1) / (t + 1));
       for (let x = x0; x <= x1; x++) {
         const d = Math.abs(x - rx);
-        if (d > half + 0.4) p.set(x, y, j === 0 ? C.stone[1] : C.stone[2]);
+        if (d > half + 0.4) p.out[y * p.w + x] = 0;
         else if (d > half - 0.6 && x !== rx) p.set(x, y, shade(base, 0.55));
       }
     }
@@ -571,13 +581,17 @@ function gable(p: Pix, x0: number, y0: number, x1: number, y1: number, base: num
 /** Stone walls round the hall, two pixels thick and lit to the upper left,
  * then the roof inside; returns the roof's ridge. */
 function hall(p: Pix, x0: number, y0: number, x1: number, y1: number, roof: number, wall: "stone" | "timber" | "marble" | "pale" = "stone") {
+  // Seen at a slant, the roof overhangs the walls' tops, hiding them, and
+  // the south wall hangs below, a row left for the outline.
+  if (wallDepth) {
+    const g = gable(p, x0 + 1, y0 + 1, x1 - 1, y1 - 1, roof);
+    frontWall(p, x0 + 1, x1 - 1, y1 + 1, wallDepth - 1, wall);
+    return g;
+  }
   for (let y = y0 + 1; y < y1; y++)
     for (let x = x0 + 1; x < x1; x++) p.set(x, y, x === x0 + 1 || y === y0 + 1 ? C.stone[3] : x === x1 - 1 || y === y1 - 1 ? C.stone[1] : C.stone[2]);
   rect(p, x0 + 2, y0 + 2, x1 - 2, y1 - 2, OUTLINE);
-  const g = gable(p, x0 + 3, y0 + 3, x1 - 3, y1 - 3, roof);
-  // Seen at a slant, its south wall hangs below, a row left for the outline.
-  if (wallDepth) frontWall(p, x0 + 1, x1 - 1, y1 + 1, wallDepth - 1, wall);
-  return g;
+  return gable(p, x0 + 3, y0 + 3, x1 - 3, y1 - 3, roof);
 }
 
 /** The Assassins' den's emblem on the ridge: a dagger, point up. */
@@ -656,10 +670,24 @@ function guild(p: Pix, roof: number, emblem: readonly string[], pal: Record<stri
   rect(p, x0, y0, x1, split, OUTLINE);
   for (let y = y0 + 1; y < split; y++)
     for (let x = x0 + 1; x < x1; x++) p.set(x, y, C.dirt[hash(x, y, 43) % 5 === 0 ? 0 : hash(x, y, 44) % 4 === 0 ? 2 : 1]);
+  yardFence(p, x0 + 1, x1 - 1, y0 + 1);
   hall(p, x0, split, x1, y1, roof);
   const w = emblem[0].length, h = emblem.length;
   glyph(p, Math.round((x0 + x1 - w) / 2), Math.round((split + y1 - h) / 2), emblem, pal);
   return { x0: x0 + 1, y0: y0 + 1, x1: x1 - 1, y1: seen - 1 };
+}
+
+/** Seen at a slant (Angle view), the inner face of a yard's north fence,
+ * from `x0` to `x1` with its top at row `y`: boards between posts, the
+ * yard's earth in its shadow at the foot. Nothing seen from above. */
+function yardFence(p: Pix, x0: number, x1: number, y: number) {
+  if (!wallDepth) return;
+  for (let x = x0; x <= x1; x++) {
+    const post = (x - x0) % 4 === 0 || x === x1;
+    p.set(x, y, post ? C.timber : C.plank[2]);
+    p.set(x, y + 1, post ? shade(C.timber, 0.8) : C.plank[1]);
+    p.set(x, y + 2, shade(C.dirt[0], 0.8));
+  }
 }
 
 /** Where a yarded lot from `y0` to `y1` parts its yard from its hall, the
@@ -1088,7 +1116,8 @@ function paintBranchDen(p: Pix, look: string, token: readonly string[], pal: Rec
   const w = token[0].length, h = token.length;
   // On the hall's top corners; a yarded hall stands south of its yard, the
   // third token then at the yard's far end.
-  const top = yardEnd === null ? y0 + 1 : yardEnd + 1, foot = yardEnd === null ? y1 - h : y0 + 1;
+  // (Under Angle view's peaked north end, a hall's pair sit below the peak.)
+  const top = yardEnd !== null ? yardEnd + 1 : wallDepth ? y0 + 2 + Math.round((x1 - x0) * 0.45) : y0 + 1, foot = yardEnd === null ? y1 - h : y0 + 1;
   glyph(p, x0 + 1, top, token, pal);
   glyph(p, x1 - w, top, token, pal);
   if (worn) glyph(p, Math.round((x0 + x1 - w) / 2), foot, token, pal);
@@ -1370,6 +1399,7 @@ function paintArcherBarracks(p: Pix, look: string) {
   for (let y = y0 + 1; y < split; y++)
     for (let x = x0 + 1; x < x1; x++) p.set(x, y, C.dirt[hash(x, y, 43) % 5 === 0 ? 0 : hash(x, y, 44) % 4 === 0 ? 2 : 1]);
   for (let x = x0 + 1; x < x1; x += 3) p.set(x, y0 + 1, C.plank[2]);
+  yardFence(p, x0 + 1, x1 - 1, y0 + 1);
   hall(p, x0, split, x1, y1, rangers ? C.moss : skirmishers ? C.tar : C.timber, "timber");
   for (let x = x0 + 2; x < x0 + 7; x++) p.set(x, seen - 2, x % 2 ? C.plank[3] : C.plank[1]);
   const ty = (y0 + seen) / 2 + 0.5;
@@ -1769,7 +1799,9 @@ function paintMageGuild(p: Pix, look: string) {
   hall(p, x0, y0, x1, y1, pyro ? C.scorch : cinders ? C.char[2] : C.wine[1]);
   // Ember runes glowing on the four slopes, each a lit pixel and its dimmer
   // tail.
-  for (const [rx, ry, tx] of [[x0 + 6, y0 + 6, 1], [x1 - 6, y0 + 6, -1], [x0 + 6, y1 - 6, 1], [x1 - 6, y1 - 6, -1]]) {
+  // (Under Angle view's peaked north end, the upper pair sit lower.)
+  const ny = y0 + (wallDepth ? 11 : 6);
+  for (const [rx, ry, tx] of [[x0 + 6, ny, 1], [x1 - 6, ny, -1], [x0 + 6, y1 - 6, 1], [x1 - 6, y1 - 6, -1]]) {
     p.set(rx, ry, C.ember);
     p.set(rx + tx, ry + 1, C.fire[0]);
   }
