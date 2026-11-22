@@ -304,7 +304,7 @@ function frontWall(p: Pix, x0: number, x1: number, top: number, rows: number, ma
       const lit = i < len * 0.3 ? 2 : i > len * 0.75 ? 0 : 1;
       if (mat === "timber") {
         const post = i === 0 || i === len - 1 || (len > 9 && i % 6 === 0);
-        c = post || k === 0 ? C.timber : (x + (k > rows / 2 ? 1 : 0)) % 3 === 0 ? tones[0] : tones[1 + Math.min(2, lit)];
+        c = post || k === 0 ? C.timber : k % 2 ? tones[1 + Math.min(2, lit)] : shade(tones[1 + Math.min(2, lit)], 0.82);
       } else {
         const course = Math.floor((k - 1) / 2), joint = k > 0 && (k - 1) % 2 === 1 ? false : (x + (course & 1) * 2) % 4 === 0;
         c = joint ? tones[Math.max(0, lit - 1)] : tones[1 + lit];
@@ -316,7 +316,7 @@ function frontWall(p: Pix, x0: number, x1: number, top: number, rows: number, ma
       c = shade(c, k === 0 ? 0.52 : 0.84);
       if (dw && x >= dx0 && x <= dx1 && k >= rows - dh) {
         const arch = k === rows - dh && dw >= 2 && (x === dx0 || x === dx1);
-        c = arch ? c : k === rows - dh ? SLIT : x === dx0 + Math.floor(dw / 2) && dw === 3 ? DOOR_DARK : C.plank[(x - dx0) % 2 ? 1 : 2];
+        c = arch ? c : k === rows - dh ? SLIT : x === dx0 + Math.floor(dw / 2) && dw === 3 ? DOOR_DARK : mat === "timber" ? ((x - dx0) % 2 ? 0x4a321e : 0x5e4026) : C.plank[(x - dx0) % 2 ? 1 : 2];
       } else if (slits && rows >= 5 && k >= 2 && k <= 3 && i >= 2 && i <= len - 3 && (i - 2) % slits === 0 && (!dw || x < dx0 - 1 || x > dx1 + 1)) {
         c = SLIT;
       } else if (slits && rows >= 5 && k === 4 && i >= 2 && i <= len - 3 && (i - 2) % slits === 0 && (!dw || x < dx0 - 1 || x > dx1 + 1) && mat !== "timber") {
@@ -549,6 +549,15 @@ function gable(p: Pix, x0: number, y0: number, x1: number, y1: number, base: num
       }
     }
     if (t >= 4) p.set(rx, y1 - t + 2, SLIT);
+    // The north end rises to a peak too, the wall's top showing past it.
+    for (let j = 0; j < t; j++) {
+      const y = y0 + j, half = (ridge + 0.5) * ((j + 1) / (t + 1));
+      for (let x = x0; x <= x1; x++) {
+        const d = Math.abs(x - rx);
+        if (d > half + 0.4) p.set(x, y, j === 0 ? C.stone[1] : C.stone[2]);
+        else if (d > half - 0.6 && x !== rx) p.set(x, y, shade(base, 0.55));
+      }
+    }
   }
   return { along, ridge: (along ? y0 : x0) + ridge };
 }
@@ -2080,18 +2089,72 @@ export function structureRubblePixels(kind: PlacedKind, cw: number, ch: number, 
   return sourcePixels(ART_NAMES.rubble(ART_NAMES.structure(kind,cw,ch)),cw*ART,ch*ART,()=>drawnStructureRubblePixels(kind,cw,ch,seed));
 }
 
-/** A long timber workshop with plank stacks, an open door and a hammer sign. */
+/** The masons' repair shop: a timber workshop under grey slate, a stone
+ * chimney and a skylight, and to the east an open lean-to under a plank
+ * roof, dressed stone stacked under it by the workbench; a hammer sign hangs
+ * over the door. Seen at a slant (Angle view), the workshop's boarded front
+ * shows its door, windows and sign, and the lean-to's open front its posts,
+ * the bench with a block on it and the stacked stone. */
 function paintRepairShop(p: Pix) {
-  rect(p, 2, 2, p.w - 3, p.h - 3, C.plank[1]);
-  rect(p, 3, 3, p.w - 4, p.h - 6, C.plank[3]);
-  for (let y = 4; y < p.h - 6; y += 3) rect(p, 3, y, p.w - 4, y, C.plank[2]);
-  rect(p, 3, 3, p.w - 4, 3, C.straw[2]);
-  rect(p, 3, p.h - 6, p.w - 4, p.h - 6, C.plank[0]);
-  rect(p, p.w - 10, p.h - 5, p.w - 7, p.h - 3, C.plank[0]);
-  for (let y = p.h - 5; y < p.h - 2; y += 2) rect(p, 4, y, 11, y, C.straw[1]);
-  const x = Math.floor(p.w / 2), y = Math.floor(p.h / 2);
-  rect(p, x, y - 1, x + 1, y + 3, C.plank[0]);
-  rect(p, x - 2, y - 2, x + 3, y, C.iron[3]);
+  const { x0, y0, x1, y1 } = frame(p.w, p.h);
+  const sx = x0 + Math.round((x1 - x0) * 0.64);
+  const SLATE = 0x5d636c;
+  // The workshop: timber walls lit to the upper left round a slate roof.
+  for (let y = y0; y <= y1; y++)
+    for (let x = x0; x <= sx; x++) p.set(x, y, x === x0 || y === y0 ? C.plank[3] : x === sx || y === y1 ? C.plank[0] : C.plank[1]);
+  const g = gable(p, x0 + 1, y0 + 1, sx - 1, y1 - 1, SLATE);
+  // A stone chimney astride the ridge at the west end, soot at its mouth.
+  const cy = g.along ? g.ridge - 1 : y0 + 2, cx = x0 + 3;
+  for (let dy = 0; dy < 3; dy++)
+    for (let dx = 0; dx < 3; dx++) p.set(cx + dx, cy + dy, dx === 0 || dy === 0 ? C.stone[3] : dx === 2 || dy === 2 ? C.stone[1] : 0x2a221c);
+  // A skylight of four panes on the sunny slope.
+  const kx = Math.round((x0 + sx) / 2) + 1, ky = g.along ? y0 + 2 : y0 + 4;
+  for (let dx = 0; dx < 4; dx++) { p.set(kx + dx, ky, dx % 2 ? C.ice[2] : C.ice[3]); p.set(kx + dx, ky + 1, dx % 2 ? C.ice[1] : C.ice[2]); }
+  // The lean-to: a plank roof sloping down to the south over its rafters.
+  for (let y = y0; y <= y1 - 3; y++)
+    for (let x = sx + 1; x <= x1; x++) {
+      const t = (y - y0) / Math.max(1, y1 - 3 - y0), rafter = (x - sx) % 3 === 0;
+      let c = C.plank[t < 0.3 ? 3 : t < 0.7 ? 2 : 1];
+      if (rafter) c = shade(c, 0.78);
+      if (x === x1 || y === y1 - 3) c = C.plank[0];
+      p.set(x, y, c);
+    }
+  // Under its open front: the bench and dressed stone, in shade.
+  for (let y = y1 - 2; y <= y1; y++) for (let x = sx + 1; x <= x1; x++) p.set(x, y, 0x3a2e22);
+  for (let x = sx + 2; x <= sx + 5; x++) p.set(x, y1 - 1, C.plank[2]);
+  p.set(sx + 3, y1 - 2, C.stone[3]); p.set(sx + 4, y1 - 2, C.stone[2]);
+  for (const bx of [x1 - 4, x1 - 2]) { p.set(bx, y1 - 1, C.stone[3]); p.set(bx + 1, y1 - 1, C.stone[2]); p.set(bx, y1, C.stone[2]); p.set(bx + 1, y1, C.stone[1]); }
+  p.set(x1 - 3, y1 - 2, C.stone[3]); p.set(x1 - 2, y1 - 2, C.stone[2]);
+  if (!wallDepth) {
+    // The hammer sign over the door, on its bracket.
+    const hx = sx - 6, hy = y1 - 2;
+    for (let dx = 0; dx < 4; dx++) { p.set(hx + dx, hy, C.plank[3]); p.set(hx + dx, hy + 1, C.plank[2]); }
+    p.set(hx + 1, hy, C.iron[3]); p.set(hx + 2, hy, C.iron[3]); p.set(hx + 2, hy + 1, C.plank[0]);
+    return;
+  }
+  // Seen at a slant: the workshop's boarded front, door and windows, the
+  // sign, a row left above them for the outline.
+  const top = y1 + 2, rows = wallDepth - 1;
+  frontWall(p, x0, sx, top, rows, "timber", true, 4);
+  const sgx = x0 + Math.round((sx - x0) / 2) + 3;
+  if (rows >= 4) {
+    for (let dx = 0; dx < 4; dx++) { p.set(sgx + dx, top + 1, C.plank[3]); p.set(sgx + dx, top + 2, C.plank[2]); }
+    p.set(sgx + 1, top + 1, C.iron[3]); p.set(sgx + 2, top + 1, C.iron[3]); p.set(sgx + 2, top + 2, C.plank[0]);
+  }
+  // The lean-to's open front: posts, the dark inside, the bench and its
+  // block, and stone stacked by the post.
+  for (let k = 0; k < rows; k++)
+    for (let x = sx + 1; x <= x1; x++) {
+      const post = x === sx + 1 || x === x1 || x === Math.round((sx + x1) / 2) + 1;
+      p.set(x, top + k, k === 0 ? shade(C.plank[0], 0.8) : post ? C.timber : k === rows - 1 ? 0x4a3a2a : 0x2e241a);
+    }
+  const bench = top + rows - 3;
+  for (let x = sx + 2; x <= sx + 5; x++) p.set(x, bench, C.plank[3]);
+  p.set(sx + 2, bench + 1, C.plank[0]); p.set(sx + 5, bench + 1, C.plank[0]);
+  p.set(sx + 3, bench - 1, C.stone[3]); p.set(sx + 4, bench - 1, C.stone[2]);
+  for (const [bx, by] of [[x1 - 4, top + rows - 2], [x1 - 2, top + rows - 2], [x1 - 3, top + rows - 4]] as const) {
+    p.set(bx, by, C.stone[3]); p.set(bx + 1, by, C.stone[2]); p.set(bx, by + 1, C.stone[2]); p.set(bx + 1, by + 1, C.stone[1]);
+  }
 }
 
 // ── The Realm's economy buildings, each filling its whole city tile ──────────
