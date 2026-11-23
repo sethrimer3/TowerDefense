@@ -90,6 +90,9 @@ export type Save = {
   /** The shop: when the next ad is ready (wall-clock ms), and whether the
    * game was bought, which grants the ad's idle time without the ad. */
   shop: ShopSave;
+  /** The latest game time (ms) the game has seen (`trusted-time.ts`): its
+   * clock starts here and never runs back behind it. 0: none yet. */
+  clockSeen: number;
   settings: Settings;
 };
 
@@ -118,6 +121,7 @@ export function defaults(): Save {
     tutorial: [],
     idleBank: { mine: 0, library: 0 },
     shop: { adReadyAt: 0, owned: false },
+    clockSeen: 0,
     settings: defaultSettings(),
   };
   return save;
@@ -204,6 +208,7 @@ export function decode(raw: string | null): Save {
   d.tutorial = Array.isArray(s.tutorial) ? decodeTutorial(s.tutorial) : pastLessons(d);
   d.idleBank = { mine: num(s.idleBank?.mine, 0, 0, MAX_BANK_MS), library: num(s.idleBank?.library, 0, 0, MAX_BANK_MS) };
   d.shop = { adReadyAt: num(s.shop?.adReadyAt, 0), owned: s.shop?.owned === true };
+  d.clockSeen = num(s.clockSeen, 0, 0);
   return d;
 }
 

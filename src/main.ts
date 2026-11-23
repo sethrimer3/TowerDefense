@@ -6,6 +6,7 @@ import { ProfileEditor } from "./profile/editor.ts";
 import { loadArtOverrides } from "./defend/art-overrides.ts";
 import { defaults, load, persist, type Save } from "./save.ts";
 import { countdown, MAX_AWAY_MS } from "./away.ts";
+import { DRIFT_MS, fetchTrustedTime, GameClock, MAX_RETRY_MS, RETRY_MS, startTime } from "./trusted-time.ts";
 import { DefendPage } from "./defend/ui.ts";
 import { spendMetals } from "./metals.ts";
 import { bonuses, busySmiths, payWave, settleTraining, skillRank, skillTotal, whole } from "./progression.ts";
@@ -36,7 +37,7 @@ import { METALS, type Weather as MineWeather } from "./mine/sim.ts";
 import { LibraryPage } from "./library/ui.ts";
 import { stream } from "./random.ts";
 import { popIdle } from "./ui/idle-pop.ts";
-import { appStore } from "./play-store.ts";
+import { appStore, isNativeApp } from "./play-store.ts";
 import { bindShop, refreshShop, shopPageHtml, type ShopHost } from "./ui/shop.ts";
 import { landscape } from "./ui/landscape.ts";
 import { AD_IDLE_MS, adReady, adWatched, bankIdle, drawIdle, IDLE_SITES, idleLabel, POP_FROM_MS, type IdleSite } from "./idle-bank.ts";
@@ -86,7 +87,13 @@ let game: Game = "defendSiege";
  * in portrait with the setting; never in the Ambush game. */
 const splitTabs = () => game !== "ambush" && (landscape() || save.settings.extraTabs);
 let split: boolean | null = null;
-const clock = () => Date.now();
+/** Time since the Mine and the Library were last saved. */
+const lastSaved = Math.max(save.mine?.savedAt ?? 0, save.library?.savedAt ?? 0);
+/** The game's clock: held at the last time seen until a server vouches for
+ * the time (`trusted-time.ts`), so the device clock pays no idle time. */
+const gameClock = new GameClock(startTime(save.clockSeen, lastSaved, Date.now()),
+  { mono: () => performance.now(), device: () => Date.now() }, save.clockSeen === 0 && lastSaved === 0);
+const clock = () => gameClock.now();
 const dayClock = new DayClock(save.dayClock);
 useDayClock(dayClock, () => save.settings);
 const modal = el("modal") as HTMLDialogElement;
@@ -307,17 +314,48 @@ const libraryPage = new LibraryPage(el("library-world"), {
 let mineDirty = false;
 /** The mine's smiths, by name. */
 const smithNames = () => minePage.sim.miners.filter((m) => m.job === "smith").map((m) => m.name);
-/** Time since the Mine and the Library were last saved: the time away. */
-const lastSaved = Math.max(save.mine?.savedAt ?? 0, save.library?.savedAt ?? 0);
-let awayMs = lastSaved > 0 ? Math.max(0, clock() - lastSaved) : 0;
+/** Time away not yet shown as a golden figure: it is paid once a server
+ * confirms the time (`timePassed`). */
+let awayMs = 0;
 libraryPage.load(save.library, clock());
 minePage.load(save.mine, clock());
 /** The Mine's or the Library's page. */
 const sitePage = (site: IdleSite) => site === "mine" ? minePage : libraryPage;
 const siteButton = (site: IdleSite) => document.querySelector<HTMLButtonElement>(`nav [data-tab="${site}"]`)!;
-// Time away while the Mine or the Library stood out of the realm is kept
-// for it, to be paid when it is placed again.
-for (const site of IDLE_SITES) if (!realmActive(save, site)) bankIdle(save.idleBank, site, awayMs);
+/** A server confirmed that `ms` more time has passed than the game's clock
+ * counted (it was closed, asleep, or had not yet asked): the Mine and the
+ * Library in the realm spend it as they catch up to the clock; one out of
+ * the realm keeps it in its bank, to be paid when it is placed again. */
+function timePassed(ms: number) {
+  if (ms < 1000) return;
+  for (const site of IDLE_SITES) if (!realmActive(save, site)) bankIdle(save.idleBank, site, ms);
+  awayMs += ms;
+  if (greeted && save.profile) greetIdle();
+  store();
+}
+/** Whether a server is being asked the time, when it may be asked next, and
+ * the wait after a failed ask (doubling up to `MAX_RETRY_MS`). */
+let askingTime = false, nextAsk = 0, retryMs = RETRY_MS;
+/** Asks a server the time (no more than every `RETRY_MS` unless `now`) and
+ * pays the time it confirms. Offline, the claim waits for a later ask. */
+async function askTime(now = false) {
+  if (askingTime || (!now && performance.now() < nextAsk)) return;
+  askingTime = true;
+  const server = await fetchTrustedTime(isNativeApp());
+  askingTime = false;
+  if (Number.isFinite(server)) {
+    retryMs = RETRY_MS;
+    nextAsk = performance.now() + RETRY_MS;
+    timePassed(gameClock.trust(server));
+  } else {
+    nextAsk = performance.now() + retryMs;
+    retryMs = Math.min(MAX_RETRY_MS, retryMs * 2);
+  }
+}
+void askTime(true);
+// Back from the background or back online: ask how long it has been.
+document.addEventListener("visibilitychange", () => { if (!document.hidden) void askTime(true); });
+window.addEventListener("online", () => void askTime(true));
 
 /** Pays `ms` of idle time to the Mine and the Library: each one in the
  * realm spends it (anything past its own cap is banked), the others bank
@@ -340,10 +378,12 @@ function grantIdle(ms: number, from: Element) {
  * gold from the Mine's and the Library's tabs (or from Tiles, if neither
  * stands in the realm and the time went to the bank). */
 function greetIdle() {
-  if (awayMs < POP_FROM_MS) return;
-  const label = idleLabel(Math.min(awayMs, MAX_AWAY_MS));
+  const ms = awayMs;
+  awayMs = 0;
+  if (ms < POP_FROM_MS || game === "ambush") return;
+  const label = idleLabel(Math.min(ms, MAX_AWAY_MS));
   const paid = IDLE_SITES.filter((site) => realmActive(save, site));
-  if (paid.length === 0) popIdle(document.querySelector('nav [data-tab="tiles"]')!, idleLabel(awayMs), reduced());
+  if (paid.length === 0) popIdle(document.querySelector('nav [data-tab="tiles"]')!, idleLabel(ms), reduced());
   paid.forEach((site, i) => popIdle(siteButton(site), label, reduced(), i));
 }
 /** Keeps idle time for a workshop taken out of the realm, and pays a
@@ -398,6 +438,7 @@ function store() {
   if(equipmentLayout!==save.defend.layout){syncEquipment(save.equipment,save.defend.layout,equipmentLayout);equipmentLayout=save.defend.layout;}
   refreshRealmAccess();
   save.dayClock = dayClock.elapsed;
+  save.clockSeen = clock();
   save.mine = minePage.snapshot(clock());
   save.library = libraryPage.snapshot(clock());
   mineDirty = false;
@@ -643,6 +684,8 @@ function frame(time: number) {
   hear(save.settings.ambienceOff ? QUIET : tab === "defend" ? defendPage.ambience() : tab === "mine" ? minePage.ambience() : tab === "library" ? libraryPage.ambience() : QUIET);
   if (time - lastTick >= 1000) {
     lastTick = time;
+    // Not yet confirmed, or the device slept or its clock moved: ask again.
+    if (!gameClock.verified || gameClock.drift() > DRIFT_MS) void askTime();
     adNotice();
     const smiths = new Set(realmActive(save,"mine") ? smithNames() : []);
     const trained = settleTraining(save, clock(), smiths) > 0;

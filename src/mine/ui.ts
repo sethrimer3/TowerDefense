@@ -536,7 +536,7 @@ export class MinePage {
   /** Moves the crew to a new prospect: a fresh world. */
   private newProspect() {
     const target = this.renderer?.target ? this.sim.miners.indexOf(this.renderer.target) : -1;
-    this.sim = this.sim.prospectNext(this.host.newSeed(), Date.now());
+    this.sim = this.sim.prospectNext(this.host.newSeed(), this.last);
     const pay = this.sim.collect();
     if (metalSum(pay) > 0) this.host.earn(pay);
     if (this.renderer) {
