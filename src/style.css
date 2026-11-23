@@ -2586,7 +2586,7 @@ nav button[data-mode] > .tab-label { min-height: 2.4em; }
 .siege-squads button[aria-pressed="true"] { outline:2px solid var(--gold);outline-offset:-4px; }
 .siege-squads button[data-ordered="true"] { box-shadow:inset 0 -3px var(--squad); }
 
-/* The board's Angle view and Crisp pixels checkboxes, bottom right over the board. */
+/* The board's orthogonal outline, Angle view and Crisp pixels checkboxes, bottom right over the board. */
 .defend-crisp {
   position: absolute;
   right: 8px;

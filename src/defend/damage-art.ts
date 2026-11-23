@@ -10,6 +10,7 @@
  * building covers exactly what it covered whole. Presentation only: pure,
  * and seeded by hashing, never from a random stream. */
 import { hash, hash01 } from "./grid.ts";
+import { orthogonal } from "./outline-corners.ts";
 
 export const OUTLINE = 0x0b0907;
 export const HOLE = 0x15110e;
@@ -380,7 +381,7 @@ export function bare(px: Uint32Array, w: number, h: number): Uint32Array {
  * belongs to the renderer, never the logical footprint. Fractional widths use
  * a finer lattice (units normally use UnitContours instead). */
 export type Outline = { ink?: number; width?: number; joins?: readonly ("n"|"e"|"s"|"w")[] };
-export function outlinePixels(px: Uint32Array, w: number, h: number, ink = OUTLINE, width = 1, joins: Outline["joins"] = []) {
+export function outlinePixels(px: Uint32Array, w: number, h: number, ink = OUTLINE, width = 1, joins: Outline["joins"] = [], orth = false) {
   if (px.length !== w * h || width < 0 || !Number.isFinite(width)) throw new Error("Invalid sprite dimensions or outline width");
   const scale = Number.isInteger(width) ? 1 : 2;
   if (!Number.isInteger(width * scale)) throw new Error("Outline widths must be whole or half art pixels");
@@ -388,10 +389,12 @@ export function outlinePixels(px: Uint32Array, w: number, h: number, ink = OUTLI
   const data = new Uint32Array(W * H), line = rgba(ink);
   // Stamp the ring from opaque body pixels, then copy the original body on
   // top. Faint shadows/auras are retained but never grow a black silhouette.
+  // Orthogonal rings reach `pad` out counted edge to edge (no corners).
+  const reach = (d: number) => d < 0 ? -d : d >= scale ? d - scale + 1 : 0;
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     if (px[y * w + x] >>> 24 < 128) continue;
     for (let dy = -pad; dy < scale + pad; dy++) for (let dx = -pad; dx < scale + pad; dx++)
-      data[(y * scale + pad + dy) * W + x * scale + pad + dx] = line;
+      if (!orth || reach(dx) + reach(dy) <= pad) data[(y * scale + pad + dy) * W + x * scale + pad + dx] = line;
   }
   for(let y=0;y<H;y++)for(let x=0;x<W;x++)if((joins.includes("w")&&x<pad)||(joins.includes("e")&&x>=pad+w*scale)||(joins.includes("n")&&y<pad)||(joins.includes("s")&&y>=pad+h*scale))data[y*W+x]=0;
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
@@ -439,7 +442,7 @@ function upload(px: Uint32Array, w: number, h: number, cv = document.createEleme
  * overlays, shadows and units (whose union gets UnitContours). */
 export function spriteCanvas(px: Uint32Array, w: number, h: number, cv = document.createElement("canvas"), outline: Outline | false = {}) {
   if (outline === false || outline.width === 0) { spriteInfo.delete(cv); return upload(px, w, h, cv); }
-  const width = outline.width ?? 1, art = outlinePixels(px, w, h, outline.ink ?? OUTLINE, width, outline.joins);
+  const width = outline.width ?? 1, art = outlinePixels(px, w, h, outline.ink ?? OUTLINE, width, outline.joins, orthogonal("buildings"));
   const previous=spriteInfo.get(cv);
   const body = upload(px, w, h,previous?.body);
   const ring = art.data.slice();
@@ -456,7 +459,7 @@ export function spriteCanvas(px: Uint32Array, w: number, h: number, cv = documen
 /** Cache includes outline style; make always returns outline-free art. */
 export function sprite(key: string, w: number, h: number, make: () => Uint32Array, outline: Outline | false = {}): HTMLCanvasElement | null {
   if (typeof document === "undefined") return null;
-  key += outline === false ? ":body" : `:outline:${outline.ink ?? OUTLINE}:${outline.width ?? 1}:${outline.joins?.join("") ?? ""}`;
+  key += outline === false ? ":body" : `:outline:${outline.ink ?? OUTLINE}:${outline.width ?? 1}:${outline.joins?.join("") ?? ""}${orthogonal("buildings") ? ":o" : ""}`;
   let cv = cache.get(key);
   if (!cv) {
     if (cache.size > 4000) cache.clear();

@@ -82,3 +82,15 @@ test("path looks: every building path has its own sprite, distinct from the base
     }
   }
 });
+
+test("orthogonal outlines leave out the ring's diagonal corners", () => {
+  const body = new Uint32Array([0xff3366aa]);
+  const square = outlinePixels(body, 1, 1).data, ortho = outlinePixels(body, 1, 1, undefined, 1, [], true).data;
+  assert.equal(square.filter(v => v && v !== body[0]).length, 8);
+  assert.deepEqual([...ortho].map(v => v === 0 ? 0 : v === body[0] ? 2 : 1), [0, 1, 0, 1, 2, 1, 0, 1, 0]);
+  // Half-art-pixel rings: each body pixel is two by two, the corners stay out.
+  const half = outlinePixels(body, 1, 1, undefined, 0.5, [], true);
+  assert.equal(half.w, 4);
+  assert.equal(half.data[0], 0);
+  assert.notEqual(half.data[1], 0);
+});

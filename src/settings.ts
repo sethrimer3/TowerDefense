@@ -99,6 +99,13 @@ export const SETTINGS = {
   /** The castle, its walls and everything inside them seen at a slant from
    * the south, south faces showing (`setAngleView` in `city-layer.ts`);
    * off, straight down. Also the board's own checkbox. */
+  /** Outlines without their diagonal corner pixels, edge to edge only:
+   * buildings' rings, troops', other enemies' and the Blight's portal
+   * contours (`outline-corners.ts`). Also the board's own checkboxes. */
+  orthoBuildings: { kind: "toggle", default: false, page: { id: "ortho-buildings", label: "Orthogonal building outlines" } },
+  orthoTroops: { kind: "toggle", default: false, page: { id: "ortho-troops", label: "Orthogonal infantry outlines" } },
+  orthoEnemies: { kind: "toggle", default: false, page: { id: "ortho-enemies", label: "Orthogonal enemy outlines" } },
+  orthoBlight: { kind: "toggle", default: false, page: { id: "ortho-blight", label: "Orthogonal Blight outlines" } },
   angleView: { kind: "toggle", default: false, page: { id: "angle-view", label: "Angle view" } },
   /** Alembic, the game's own pixel font, for every word on the page; off, Cinzel. */
   pixelFont: { kind: "toggle", default: true, page: { id: "pixel-font", label: "Use Custom Font" } },
