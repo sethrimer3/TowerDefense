@@ -119,10 +119,12 @@ export function renderSettingsPage(ctx: AppContext) {
       `<button class="wide" id="dev-idle-day">${t("settings.idleDay")}</button>` +
       `<button class="wide" id="dev-waves">${t("settings.unlockWaves", {count: UNLOCK_WAVES})}</button>` +
       `<p class="hint" id="dev-waves-reach">${t("settings.waveHint", {wave: waveReach(ctx.save().defend)})}</p>`) : "") +
+    `<button class="wide" id="choose-game">${t("settings.chooseGame")}</button>` +
     `<button class="wide" id="replay-tutorial">${t("settings.replayTutorial")}</button>` +
     `<button class="wide danger" id="erase">${t("settings.erase")}</button>`;
   bindSections();
   el("language").onclick = () => languageMenu(ctx);
+  el("choose-game").onclick = () => ctx.chooseGame();
   el("developer-mode").onchange = (event) => {
     settings.developerMode = (event.target as HTMLInputElement).checked;
     if (!settings.developerMode) for (const key of ALL_DEV) settings[key] = false;

@@ -18,7 +18,7 @@ try {
     await page.locator('#profile-editor button[type="submit"]').click();
     const button = page.locator('nav [data-tab="defend"]');
     await button.waitFor();
-    for (const [mode, next] of [['defend', 'Ambush'], ['ambush', 'Siege'], ['siege', 'Defend']]) {
+    for (const [mode, next] of [['defend', 'Siege'], ['siege', 'Defend']]) {
       const name = mode[0].toUpperCase() + mode.slice(1);
       assert.equal(await button.innerText(), `${name} --> ${next}`);
       assert.equal(await page.locator('section.page.active').getAttribute('id'), mode);
@@ -30,14 +30,14 @@ try {
       assert.equal(layers,2);
       await page.waitForFunction(() => document.querySelectorAll('.combat-icon-layer').length === 1);
     }
-    assert.equal(await button.innerText(), 'Defend --> Ambush');
+    assert.equal(await button.innerText(), 'Defend --> Siege');
     // Rapid activations leave one icon and the correct page.
-    await button.evaluate(b => { b.click(); b.click(); b.click(); b.click(); });
-    assert.equal(await button.innerText(), 'Ambush --> Siege');
+    await button.evaluate(b => { b.click(); b.click(); b.click(); b.click(); b.click(); });
+    assert.equal(await button.innerText(), 'Siege --> Defend');
     await page.waitForFunction(() => document.querySelectorAll('.combat-icon-layer').length === 1);
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await button.click();
-    assert.equal(await button.innerText(), 'Siege --> Defend');
+    assert.equal(await button.innerText(), 'Defend --> Siege');
     assert.equal(await button.locator('.combat-icon-layer').count(), 1);
     assert.equal(await button.locator('img.ui-sprite').count(), 1);
     assert.match(await button.locator('img.ui-sprite').getAttribute('src'), /^data:image\/png/);
@@ -45,9 +45,9 @@ try {
     // The existing save decoder still loads the city after a mode switch.
     await page.reload();
     await button.waitFor();
-    assert.equal(await button.innerText(), 'Defend --> Ambush');
+    assert.equal(await button.innerText(), 'Defend --> Siege');
     assert.deepEqual(errors, []);
     await page.close();
   }
-  console.log('Combat tab cycling, return navigation, rapid clicks, reduced motion and reload pass at desktop/phone widths.');
+  console.log('Combat tab cycling between Defend and Siege, return navigation, rapid clicks, reduced motion and reload pass at desktop/phone widths.');
 } finally { await browser.close(); }

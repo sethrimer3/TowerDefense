@@ -4,8 +4,11 @@ The domain glossary: the words the game, its code and its docs use. Terms only, 
 
 ## Language
 
+**Game**:
+One of the two games chosen on the start screen: Defend+Siege (the realm and its Defend and Siege combat modes) or Ambush, played on its own. Both keep their progress in the one save.
+
 **Combat mode**:
-One of Defend, Ambush or Siege, selected through the shared combat tab.
+One of Defend, Ambush or Siege. Defend and Siege share the Defend+Siege game's combat tab; Ambush is its own game.
 
 **Ambush**:
 A fixed-level tower-defense mode: enemies follow a track, while towers and infantry buildings stand beside it.

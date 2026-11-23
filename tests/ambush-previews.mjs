@@ -22,8 +22,7 @@ try {
         }),
       );
     });
-    await page.goto(process.env.TEST_URL || "http://127.0.0.1:5173/");
-    await page.locator('nav [data-tab="defend"]').click();
+    await page.goto(new URL("?game=ambush", process.env.TEST_URL || "http://127.0.0.1:5173/").href);
     await page.waitForFunction(() => document.querySelector('#ambush [data-preview="0"]')?.dataset.ready === "true");
     assert.ok((await page.locator("#ambush canvas[data-preview]:not([data-ready])").count()) > 0, "Offscreen previews stay lazy.");
     for (let zone = 0; zone < 10; zone++) {

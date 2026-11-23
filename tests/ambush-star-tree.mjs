@@ -19,9 +19,8 @@ try {
         }),
       ),
     );
-    await page.goto(process.env.TEST_URL || "http://127.0.0.1:5173/");
-    await page.waitForFunction(() => document.querySelector('nav [data-tab="defend"]')?.dataset.mode === "defend");
-    await page.locator('nav [data-tab="defend"]').click();
+    await page.goto(new URL("?game=ambush", process.env.TEST_URL || "http://127.0.0.1:5173/").href);
+    await page.waitForFunction(() => document.querySelector('nav [data-tab="defend"]')?.dataset.mode === "ambush");
     await page.locator("[data-star-tree]").click();
     const tree = page.locator(".ambush-star-dialog");
     assert.ok(await tree.isVisible());

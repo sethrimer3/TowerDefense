@@ -68,6 +68,7 @@ node tests/tiles-marks.mjs # Tiles tab upgrade marks, spread-by-default copies, 
 node tests/tiles-shop.mjs # Second tap on Tiles opens the Shop, the priced list, wave-locked rows after open ones, the words rising from a refused Buy, desktop and phone (needs dev server)
 node tests/upgrade-work.mjs # Timed Study/Forge purchases, shared staff, refunds, reload completion and mobile fit
 node tests/hold-repeat.mjs # Accelerating purchase holds, mouse/touch, cancellation and Mine/Library persistence (needs dev server)
+node tests/game-select.mjs # Start screen: Defend+Siege and Ambush as separate games, Settings → Choose game, ?game= skipping it, desktop/phone (needs dev server)
 node tests/tab-icons.mjs # Selected procedural combat/Settings icons, review studies, live navigation and visual-setting refresh on desktop/phone (needs dev server)
 node tests/defend-necromancy.mjs # Necromancy palette, aim, cast, risen art, cooldown and Study setup (needs dev server)
 node tests/defend-meteor.mjs # Meteor strike palette, aim, fall, landing, cooldown and Study setup (needs dev server)
