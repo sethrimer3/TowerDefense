@@ -5,7 +5,7 @@ import { MODE_ICON_SIZE, modeIconPixels } from "../src/ui/mode-icons.ts";
 const N = MODE_ICON_SIZE;
 
 test("mode icons are opaque pixel art inside a black outline", () => {
-  for (const mode of ["defend", "ambush", "siege", "settings"] as const) {
+  for (const mode of ["defend", "ambush", "siege", "settings", "shop"] as const) {
     const px = modeIconPixels(mode);
     assert.equal(px.length, N * N);
     const filled = px.filter(v => v !== 0);
@@ -25,7 +25,7 @@ test("mode icons are opaque pixel art inside a black outline", () => {
 });
 
 test("mode icons differ and are stable", () => {
-  const modes = (["defend", "ambush", "siege", "settings"] as const).map(m => modeIconPixels(m).join());
+  const modes = (["defend", "ambush", "siege", "settings", "shop"] as const).map(m => modeIconPixels(m).join());
   assert.equal(new Set(modes).size, modes.length);
   assert.deepEqual(modeIconPixels("siege"), modeIconPixels("siege"));
 });

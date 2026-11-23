@@ -5,10 +5,11 @@ import { DEV_OPTIONS, SETTINGS, type GridColor, type SettingKey } from "../setti
 import type { AppContext } from "./app.ts";
 import { el } from "./dom.ts";
 import { LANGUAGES, isLanguage, t } from "../i18n/index.ts";
+import { bindShop, shopHtml } from "./shop.ts";
 
 /** The settings on the page, in order; each control comes from its row in SETTINGS. */
 /** Gameplay settings, under their own heading first. */
-const GAMEPLAY = ["showEmpty", "ringMenu"] as const satisfies readonly SettingKey[];
+const GAMEPLAY = ["showEmpty", "ringMenu", "extraTabs"] as const satisfies readonly SettingKey[];
 const CONTROLS = ["dragRally", "dragCrosshair", "raiseDrag", "magnifier", "tripleTapFlag"] as const satisfies readonly SettingKey[];
 const PAGE = ["pixelArt", "legacyGraphics", "legacyWalls", "dayNightCycle", "fasterSunCatchup", "reduceMotion", "effectsOff", "simpleEnemies", "simpleTroops", "mergedOutlines", "sceneryOutlines", "stillAir", "pixelPortals", "orthoBuildings", "orthoTroops", "orthoEnemies", "orthoBlight", "angleView", "crispZoom", "hdSand", "ultraGraphics", "highlightBuildings", "tileGrid", "soundOff", "ambienceOff", "pixelFont"] as const satisfies readonly SettingKey[];
 /** The dev options, under ALL ON. */
@@ -105,6 +106,7 @@ export function renderSettingsPage(ctx: AppContext) {
   const settings = ctx.save().settings, allOn = ALL_DEV.every((k) => settings[k]);
   el("settings").innerHTML =
     `<div class="page-title"><small>${t("settings.tagline")}</small><h2>${t("nav.settings")}</h2></div>` +
+    (ctx.shopInSettings() ? shopHtml(ctx.save(), ctx.clock()) : "") +
     `<div class="setting language-setting"><span>${t("settings.language")}</span><button id="language" class="language-current" aria-haspopup="dialog" aria-label="${t("settings.chooseLanguage")}">${LANGUAGES.find(l => l.code === settings.language)!.name} ▾</button></div>` +
     section("gameplay", t("settings.gameplay"), GAMEPLAY.map((key) => control(key, ctx)).join("")) +
     section("controls", t("settings.controls"), menuSizingControls(ctx) + CONTROLS.map((key) => control(key,ctx)).join("")) +
@@ -123,6 +125,7 @@ export function renderSettingsPage(ctx: AppContext) {
     `<button class="wide" id="replay-tutorial">${t("settings.replayTutorial")}</button>` +
     `<button class="wide danger" id="erase">${t("settings.erase")}</button>`;
   bindSections();
+  bindShop(el("settings"), ctx.shop);
   el("language").onclick = () => languageMenu(ctx);
   el("choose-game").onclick = () => ctx.chooseGame();
   el("developer-mode").onchange = (event) => {

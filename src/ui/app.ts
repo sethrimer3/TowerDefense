@@ -2,6 +2,7 @@ import type { Save } from "../save.ts";
 import type { Tab } from "./dom.ts";
 import type { TileTree } from "../tiles.ts";
 import type { Language } from "../i18n/languages.ts";
+import type { ShopHost } from "./shop.ts";
 
 /** What pages need from the app around them. */
 export interface AppContext {
@@ -37,6 +38,10 @@ export interface AppContext {
   chooseGame(): void;
   /** Forgets which tutorial lessons were read, so each shows again. */
   replayTutorial(): void;
+  /** Whether the Shop heads the Settings page (portrait without its own tab). */
+  shopInSettings(): boolean;
+  /** What the Shop's panels act on. */
+  readonly shop: ShopHost;
   /** Replaces the save with a fresh one. */
   eraseAll(): void;
 }

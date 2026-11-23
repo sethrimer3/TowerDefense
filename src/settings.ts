@@ -134,6 +134,12 @@ export const SETTINGS = {
   /** Dev: the battle's night lighting (darkness, torchlight, outline shine) left out, to measure what it costs. */
   devNoLighting: { kind: "toggle", default: false, page: { id: "dev-no-lighting", label: "Battle lighting off" } },
   language: { kind: "choice", default: "en", choices: LANGUAGE_CHOICES, page: { id: "language", label: "Language" } },
+  /** Portrait: Siege and the Shop as tabs of their own (the buttons shrink to
+   * fit seven); off, the Defend tab cycles to Siege and the Shop heads the
+   * Settings page. Landscape always shows both tabs. */
+  extraTabs: { kind: "toggle", default: false, page: { id: "extra-tabs", label: "Siege and Shop tabs" } },
+  /** A red dot on the Shop (or Settings) tab while an ad is ready. */
+  adNotify: { kind: "toggle", default: true, page: { id: "ad-notify", label: "Notify me when ad is ready" } },
 } as const satisfies Record<string, Setting>;
 
 export type SettingKey = keyof typeof SETTINGS;

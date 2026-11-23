@@ -117,8 +117,7 @@ nav button.selected,
 .defend-go,
 button.training-cost:not(:disabled),
 .defend-card button:not(:disabled),
-.mine-hire:not(:disabled),
-.away-collect {
+.mine-hire:not(:disabled) {
   border-color: #6e4c1c;
   color: #ffe1a0;
   background:
@@ -1060,132 +1059,6 @@ dialog p {
 dialog::backdrop {
   background: radial-gradient(ellipse at 50% 40%, #1a0f06c0, #050302ee);
   backdrop-filter: blur(3px);
-}
-
-/* ── Welcome back: the time away's ledger, its figures in wells cut into
-   oak boards nailed to the parchment ── */
-dialog.welcome {
-  width: min(92vw, 440px);
-}
-.away-time {
-  margin: 0 0 14px;
-}
-.away-time b {
-  color: #3a200c;
-}
-.away-ledger {
-  display: grid;
-  gap: 10px;
-  text-align: left;
-}
-.away-row {
-  position: relative;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  gap: 2px 12px;
-  padding: 11px 14px;
-  border: 2px solid #150f0a;
-  border-radius: 3px;
-  color: #e6d6b4;
-  background:
-    var(--nails),
-    linear-gradient(#ffffff0c, transparent 40%, #00000050),
-    linear-gradient(#00000060, #00000060),
-    var(--wood),
-    #3a2616;
-  box-shadow:
-    inset 0 1px 0 #ffd9a020,
-    0 2px 0 #000,
-    0 4px 10px #00000060;
-}
-.away-row h3 {
-  margin: 0;
-  font-size: 13px;
-  letter-spacing: 1px;
-  color: #f0d9a8;
-  text-shadow: 0 1px 0 #000;
-}
-dialog .away-row p {
-  grid-column: 1;
-  margin: 0;
-  font-size: 11px;
-  line-height: 1.5;
-  color: #a8987a;
-}
-.away-gain {
-  grid-column: 2;
-  grid-row: 1 / span 2;
-  min-width: 92px;
-  padding: 7px 10px;
-  border: 1px solid #3a2c1c;
-  border-radius: 3px;
-  background: #0d0b09;
-  box-shadow: inset 0 2px 4px #000, 0 1px 0 #ffd9a014;
-  text-align: center;
-  font-size: 18px;
-  color: #e6c8ff;
-  text-shadow: 0 1px 0 #000, 0 0 8px #b07aff70;
-}
-.away-gain small {
-  display: block;
-  font-size: 8px;
-  letter-spacing: 2px;
-  color: #a8987a;
-  text-transform: uppercase;
-}
-.away-metals {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin: 8px 0 4px;
-  padding: 0;
-  list-style: none;
-}
-.away-metals li {
-  display: grid;
-  justify-items: center;
-  gap: 3px;
-  padding: 7px 4px 6px;
-  border: 1px solid #3a2c1c;
-  border-radius: 3px;
-  background: #0d0b09;
-  box-shadow: inset 0 2px 4px #000, 0 1px 0 #ffd9a014;
-}
-.away-metals b {
-  font-size: 17px;
-  text-shadow: 0 1px 0 #000;
-}
-.away-metals small {
-  font-size: 8px;
-  letter-spacing: 2px;
-  color: #a8987a;
-  text-transform: uppercase;
-}
-.away-bar {
-  width: 16px;
-  height: 8px;
-  border: 1px solid #000;
-  border-radius: 2px;
-  box-shadow: inset 0 1px 0 #ffffff80, 0 1px 0 #000;
-}
-.away-bar.copper { background: linear-gradient(#f0a272, #9a4e26); }
-.away-bar.silver { background: linear-gradient(#f4f6fa, #8e98a8); }
-.away-bar.gold { background: linear-gradient(#ffe7a0, #b07a1c); }
-dialog .away-row .away-note {
-  grid-column: 1 / -1;
-  font-style: italic;
-}
-.away-loss {
-  color: #ff9f86;
-  font-style: normal;
-}
-.away-collect {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
 }
 
 @media (max-width: 480px) {
@@ -2819,3 +2692,75 @@ canvas.skill-icon, .ug-node canvas.skill-icon { width: 30px; height: 30px; image
   .game-choice { min-height: 140px; }
   .game-choice-icons img { width: 52px; height: 52px; }
 }
+
+/* ── Idle time, the Shop and its notice (ui/idle-pop.ts, ui/shop.ts) ───── */
+/* The golden "+24m": Alembic's em is ten pixels, so a 30px figure is drawn
+ * three screen pixels a font pixel, and the black outline is four shadows
+ * of one font pixel, edge to edge only (no corner pixels). */
+.idle-pop {
+  --pp: 3px;
+  position: fixed;
+  z-index: 60;
+  pointer-events: none;
+  font-family: var(--font);
+  font-size: calc(var(--pp) * 10);
+  font-weight: normal;
+  line-height: 1;
+  white-space: nowrap;
+  color: #ffd24a;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  text-shadow: var(--pp) 0 #000, calc(-1 * var(--pp)) 0 #000, 0 var(--pp) #000, 0 calc(-1 * var(--pp)) #000;
+}
+@media (max-width: 480px), (max-height: 520px) { .idle-pop { --pp: 2px; } }
+/* The ad's reward, a small golden figure in the same outline. */
+.shop-gain {
+  color: #ffd24a;
+  font-weight: normal;
+  text-shadow: 1px 0 #000, -1px 0 #000, 0 1px #000, 0 -1px #000;
+}
+
+/* The red dot on the Shop's (or Settings') tab while an ad is ready: a
+ * pixel square in black, edge to edge. */
+nav button > .tab-dot {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 8px;
+  height: 8px;
+  background: #e8372c;
+  box-shadow: inset -2px -2px #9c1c14, inset 2px 2px #ff7a66, 2px 0 #000, -2px 0 #000, 0 2px #000, 0 -2px #000;
+  pointer-events: none;
+}
+nav button > .tab-dot[hidden] { display: none; }
+
+.shop-panel { display: grid; gap: 8px; margin: 4px 0 14px; }
+.shop-panel > button.wide { margin: 0; min-height: 48px; font-size: 14px; }
+.shop-panel > .shop-ad.ready {
+  color: var(--brass-hi);
+  box-shadow: inset 0 0 0 2px var(--brass), inset 0 0 18px #ff9a3c40, 0 3px 0 #000000c0;
+}
+.shop-panel > .shop-ad .shop-gain { font-size: 17px; margin-left: 4px; }
+
+/* The stand-in ad: a parchment card counting down. */
+dialog.ad-dialog { text-align: center; }
+dialog.ad-dialog .shop-gain { font-size: 1.1em; }
+dialog.ad-dialog .ad-count { font-family: var(--font); font-size: 40px; line-height: 1; margin: 10px 0; color: var(--ink); }
+dialog.ad-dialog .ad-bar { height: 10px; border: 2px solid var(--ink); background: #00000020; }
+dialog.ad-dialog .ad-bar > i { display: block; height: 100%; width: 0; background: var(--brass); }
+
+/* Portrait with Siege and the Shop as tabs: seven narrower buttons. */
+:root:not(.landscape) .shell.seven-tabs > nav { gap: 3px; }
+:root:not(.landscape) .shell.seven-tabs > nav button { font-size: 8px; padding: 6px 0; gap: 3px; }
+:root:not(.landscape) .shell.seven-tabs > nav button > span img,
+:root:not(.landscape) .shell.seven-tabs > nav button > .combat-tab-icon,
+:root:not(.landscape) .shell.seven-tabs > nav button > span > .tab-icon,
+:root:not(.landscape) .shell.seven-tabs > nav button canvas.ui-sprite { width: 30px; height: 30px; }
+@media (max-width: 380px) {
+  :root:not(.landscape) .shell.seven-tabs > nav button { font-size: 7px; }
+  :root:not(.landscape) .shell.seven-tabs > nav button > span img,
+  :root:not(.landscape) .shell.seven-tabs > nav button > .combat-tab-icon,
+  :root:not(.landscape) .shell.seven-tabs > nav button > span > .tab-icon,
+  :root:not(.landscape) .shell.seven-tabs > nav button canvas.ui-sprite { width: 24px; height: 24px; }
+}
+#shop .shop-panel { max-width: 520px; margin-inline: auto; }
