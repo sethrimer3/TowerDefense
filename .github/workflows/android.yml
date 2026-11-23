@@ -1,0 +1,81 @@
+name: Android app
+# Builds the Play Store bundle (.aab) from the same web build as Pages.
+# Pull requests only check that it builds. On main, the bundle is signed when
+# the upload key secrets exist, kept as a run artifact, and sent to Play's
+# internal testing track when PLAY_SERVICE_ACCOUNT_JSON exists. See
+# docs/architecture/android.md.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - android/**
+      - capacitor.config.ts
+      - package.json
+      - package-lock.json
+      - src/play-store*.ts
+      - .github/workflows/android.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    env:
+      # Real IDs live in the repository's Actions variables; unset, the app
+      # shows Google's test ads.
+      VITE_ADMOB_REWARDED_ID: ${{ vars.ADMOB_REWARDED_ID }}
+      VITE_PLAY_PRODUCT_ID: ${{ vars.PLAY_PRODUCT_ID }}
+      ADMOB_APP_ID: ${{ vars.ADMOB_APP_ID }}
+      # Each run gets a higher version code than the last, as Play requires.
+      ANDROID_VERSION_CODE: ${{ github.run_number }}
+      ANDROID_VERSION_NAME: 1.0.${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: npm run build
+      - run: npx cap sync android
+      - name: Restore the upload key
+        if: github.event_name != 'pull_request'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          PLAY_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+            echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/upload.jks" >> "$GITHUB_ENV"
+            if [ -n "$PLAY_JSON" ]; then echo "PLAY_UPLOAD=yes" >> "$GITHUB_ENV"; fi
+          fi
+      - name: Build the bundle
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew bundleRelease --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tower-defense-${{ github.run_number }}.aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
+      - name: Upload to Play internal testing
+        if: env.PLAY_UPLOAD == 'yes'
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: io.github.sethrimer3.towerdefense
+          releaseFiles: android/app/build/outputs/bundle/release/app-release.aab
+          track: internal
+          # "draft" until the app's first release is out of draft in Play
+          # Console; then set the PLAY_RELEASE_STATUS variable to "completed".
+          status: ${{ vars.PLAY_RELEASE_STATUS || 'draft' }}

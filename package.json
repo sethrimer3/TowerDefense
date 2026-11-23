@@ -17,8 +17,15 @@
     "export-sprites": "node tools/export-sprites.mjs"
   },
   "devDependencies": {
+    "@capacitor/cli": "8.6.0",
+    "@playwright/test": "^1.55.1",
     "typescript": "~5.9.3",
-    "vite": "^7.1.7",
-    "@playwright/test": "^1.55.1"
+    "vite": "^7.1.7"
+  },
+  "dependencies": {
+    "@capacitor-community/admob": "8.3.0",
+    "@capacitor/android": "8.6.0",
+    "@capacitor/core": "8.6.0",
+    "@capgo/native-purchases": "8.9.6"
   }
 }

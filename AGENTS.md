@@ -23,13 +23,14 @@ npm run test:stress-ui   # Full battle page, HUD and frame overlay (needs dev se
 npm run test:render-cache # Original-vs-cached pixels, invalidation and memory bounds (needs dev server)
 npm run export-sprites # Every redrawable sprite as a 1:1 PNG with no outline, to art/export/ with manifest.json (needs dev server)
 npm run font           # Rebuild the Alembic pixel font from scripts/pixel-font/glyphs.txt
+npx cap sync android   # After npm run build: copy dist/ and plugins into android/ (Android app, see docs/architecture/android.md)
 ```
 
 - Every Node test process preloads `tests/pin-random.ts`, which swaps `Math.random` for a fixed-seed stream before any module loads and pins the random streams' start-up seeds by name (`globalThis.__pinnedSeeds`, read by `src/random.ts` and `src/defend/grid.ts`), so a failure always reproduces. Run single files with the same `--import`. `tests/test-size.ts` (`FULL`, `ciOnly`) sizes slow property checks: CI sets `CI` and runs them in full.
 - `test:pointer` defaults to installed Microsoft Edge (the stress and render-cache scripts to installed Chrome); set `PLAYWRIGHT_CHANNEL=chrome`, or `PLAYWRIGHT_EXECUTABLE=/path/to/chrome` (in the cloud container: `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`), which every browser script accepts. It hits the dev server at `http://127.0.0.1:5173/` (or `TEST_URL`) and seeds state by writing the `towerdefense.v1` save into localStorage. Its hashes depend on the page layout and machine: when a change moves the page, record it with `UPDATE_GOLDEN=1` on the unchanged code first, then compare. Output goes to `test-results/` (git-ignored).
 - Source imports use explicit `.ts` extensions (`allowImportingTsExtensions`), required so Node can run them directly. Keep this in new imports.
 - `tsconfig` only includes `src/`; tests are not type-checked by `npm run build`.
-- CI (`.github/workflows/static.yml`) runs `npm test` and `npm run build` on push to `main`, then deploys `dist/` to GitHub Pages (the repository's Pages source must be **GitHub Actions**). Vite `base: "./"` keeps asset paths relative, so the build works under `/TowerDefense/`; asset URLs must not be root-absolute.
+- CI (`.github/workflows/static.yml`) runs `npm test` and `npm run build` on push to `main`, then deploys `dist/` to GitHub Pages (the repository's Pages source must be **GitHub Actions**). `.github/workflows/android.yml` builds the Play Store bundle from the same build on every push to `main`. Vite `base: "./"` keeps asset paths relative, so the build works under `/TowerDefense/`; asset URLs must not be root-absolute.
 
 Per-feature browser checks and tools are listed in `docs/architecture/commands.md`; each topic doc names its own.
 
@@ -48,6 +49,7 @@ The detailed module-by-module reference lives in `docs/architecture/`. Read only
 | `docs/architecture/siege.md` | Raid battle, native castles, DPS estimates, calibration, mana, entry/matches, ranks, identities, sky, colours, flags, victory, troop orders |
 | `docs/architecture/economy.md` | Mine, Library, lab, metals, Knowledge, timed upgrade work, progression, Realm workshops, economy tiles/trees, shared day clock, window sunlight |
 | `docs/architecture/shell-ui.md` | Startup, shell and currency bar, settings, localization, rooms and Tiles, sound, profile, tab icons, viewport, scroll arrows, saves |
+| `docs/architecture/android.md` | The Capacitor Android app, AdMob rewarded ads, Play Billing, the Android CI workflow and signing (account setup in `docs/android-release.md`) |
 | `docs/architecture/commands.md` | Every per-feature browser check (`tests/*.mjs`), focused Node tests, benchmarks and tools |
 
 Other references: `docs/DEFEND.md` (game design), `docs/design/`, `docs/upgrades/`, `docs/art/`, the `*_PERFORMANCE.md` notes in `docs/`, and `CONTEXT.md` (glossary).

@@ -14,6 +14,7 @@ export const CORE = [
  ["shop.buy","Buy the game","Comprar el juego","Acheter le jeu","Spiel kaufen","Comprar o jogo","Acquista il gioco","ゲームを購入","게임 구매","购买游戏"],
  ["shop.owned","Game owned","Juego comprado","Jeu acheté","Spiel gekauft","Jogo adquirido","Gioco acquistato","購入済み","구매 완료","已购买"],
  ["shop.ad","Advertisement","Anuncio","Publicité","Werbung","Anúncio","Pubblicità","広告","광고","广告"],
+ ["shop.privacy","Privacy options","Opciones de privacidad","Options de confidentialité","Datenschutzoptionen","Opções de privacidade","Opzioni privacy","プライバシー設定","개인정보 설정","隐私选项"],
  ["shop.idle","Idle time","Tiempo inactivo","Temps d'absence","Abwesenheitszeit","Tempo ausente","Tempo di assenza","放置時間","방치 시간","离线时间"],
  ["nav.settings","Settings","Ajustes","Paramètres","Einstellungen","Configurações","Impostazioni","設定","설정","设置"],
  ["game.title","Tower Defense","Tower Defense","Tower Defense","Tower Defense","Tower Defense","Tower Defense","Tower Defense","Tower Defense","Tower Defense"],

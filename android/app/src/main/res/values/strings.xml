@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Tower Defense</string>
+    <string name="title_activity_main">Tower Defense</string>
+    <string name="package_name">io.github.sethrimer3.towerdefense</string>
+    <string name="custom_url_scheme">io.github.sethrimer3.towerdefense</string>
+</resources>
