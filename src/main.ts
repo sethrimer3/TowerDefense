@@ -25,6 +25,7 @@ import { paintIcon, type IconItem } from "./defend/structure-art.ts";
 import { onPixelArt, setPixelArt } from "./defend/pixel-sprites.ts";
 import { setSceneryOutlines, setStillAir } from "./defend/scenery-looks.ts";
 import { setAngleView, setLegacyWalls } from "./defend/city-layer.ts";
+import { ORTHO_PARTS, setOrthogonal, type OutlinePart } from "./defend/outline-corners.ts";
 import { renderSettingsPage } from "./ui/settings-page.ts";
 import type { Weather } from "./defend/weather.ts";
 import { play, soundEnabledBy } from "./sound.ts";
@@ -47,12 +48,16 @@ import { Tutorial } from "./ui/tutorial.ts";
 // Wires the pages together: builds the shell, loads the save, and routes
 // navigation, the currency bar and the frame loop between the pages.
 
+/** Each outline part's setting (`outline-corners.ts`). */
+const ORTHO_SETTING = { buildings: "orthoBuildings", troops: "orthoTroops", enemies: "orthoEnemies", blight: "orthoBlight" } as const satisfies Record<OutlinePart, string>;
+function applyOrthogonal() { for (const part of ORTHO_PARTS) setOrthogonal(part, save.settings[ORTHO_SETTING[part]]); }
 let save: Save = load();
 let equipmentLayout = save.defend.layout;
 setLanguage(save.settings.language);
 fitViewport();
 setLegacyWalls(save.settings.legacyWalls);
 setAngleView(save.settings.angleView);
+applyOrthogonal();
 installSeal();
 buildShell(document.querySelector<HTMLDivElement>("#app")!, save.settings.legacyGraphics);
 installScrollArrows();
@@ -185,6 +190,8 @@ const defendPage = new DefendPage(el("defend"), {
   setCrispZoom: (value) => { save.settings.crispZoom = value; store(); },
   angleView: () => save.settings.angleView,
   setAngleView: (value) => { save.settings.angleView = value; setAngleView(value); store(); },
+  orthogonal: (part) => save.settings[ORTHO_SETTING[part]],
+  setOrthogonal: (part, value) => { save.settings[ORTHO_SETTING[part]] = value; setOrthogonal(part, value); store(); },
   showEmpty: () => save.settings.showEmpty,
   dragRally: () => save.settings.dragRally,
   menuSizing: () => save.settings.menuSizing,
@@ -335,6 +342,7 @@ function refreshCurrencies() {
   setPixelArt(save.settings.pixelArt);
   setLegacyWalls(save.settings.legacyWalls);
   setAngleView(save.settings.angleView);
+  applyOrthogonal();
   setSceneryOutlines(save.settings.sceneryOutlines);
   setStillAir(save.settings.stillAir);
   const show = (id: string, n: number) => {

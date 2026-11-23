@@ -4,6 +4,7 @@
 import { UNIT_CONTOUR_ART_PIXELS, PORTAL_CONTOUR_WIDTH, PORTAL_UNIT_INK } from "./art-scale.ts";
 import { paintPortal } from "./portal-noise.ts";
 import { cellPieces } from "./paint-box.ts";
+import { inkPart, orthogonal } from "./outline-corners.ts";
 
 type Ctx = CanvasRenderingContext2D;
 type Stroke = { path: Path2D; width: number; cap: CanvasLineCap; join: CanvasLineJoin; miter: number; radius?: number; filled?: boolean };
@@ -15,7 +16,8 @@ type Held = Box | null;
 /** Which `CELL`-pixel squares of the screen a channel's paint may reach. */
 type Cells = { on: Uint8Array; cols: number; rows: number; any: boolean };
 const CELL = 64;
-type Channel = { held: Held; cells?: Cells; pixels: Path2D[]; pixelRows: Map<string, PixelRow>; pixelBounds: Bounds | null; radius: number; unbounded: boolean; mergePixels: boolean; bounds: Bounds | null; faded: boolean; rectangles: Path2D; expanded: Path2D; path: Path2D; strokes: Map<string, Stroke>; canvas: HTMLCanvasElement; c: Ctx };
+/** `ortho`: the contour reaches out edge to edge only, no corners (`outline-corners.ts`). */
+type Channel = { ortho: boolean; held: Held; cells?: Cells; pixels: Path2D[]; pixelRows: Map<string, PixelRow>; pixelBounds: Bounds | null; radius: number; unbounded: boolean; mergePixels: boolean; bounds: Bounds | null; faded: boolean; rectangles: Path2D; expanded: Path2D; path: Path2D; strokes: Map<string, Stroke>; canvas: HTMLCanvasElement; c: Ctx };
 export class UnitContours {
   private channels = new Map<string, Channel>();
   private ink: string | undefined;
@@ -50,7 +52,7 @@ export class UnitContours {
     this.matrix = c.getTransform(); this.scale = Math.hypot(this.matrix.a, this.matrix.b);
     this.innerChannel = null; this.pixelMode = false; this.radius = width * this.scale; this.ink = undefined; this.pen = new Path2D(); this.penBounds = null; this.penUnbounded = false; this.penRects.length = 0; this.rectOnly = true;
     for (const [ink, channel] of this.channels) {
-      channel.pixels = [new Path2D(), new Path2D(), new Path2D()]; channel.pixelRows.clear(); channel.pixelBounds = null; channel.radius = this.radiusOf(ink); channel.unbounded = false; channel.path = new Path2D(); channel.rectangles = new Path2D(); channel.expanded = new Path2D(); channel.strokes.clear(); channel.faded = false; channel.mergePixels = false; channel.bounds = null;
+      channel.pixels = [new Path2D(), new Path2D(), new Path2D()]; channel.pixelRows.clear(); channel.pixelBounds = null; channel.radius = this.radiusOf(ink); channel.ortho = orthogonal(inkPart(ink)); channel.unbounded = false; channel.path = new Path2D(); channel.rectangles = new Path2D(); channel.expanded = new Path2D(); channel.strokes.clear(); channel.faded = false; channel.mergePixels = false; channel.bounds = null;
       if (channel.cells?.any) { channel.cells.on.fill(0); channel.cells.any = false; }
       if (channel.canvas.width !== c.canvas.width || channel.canvas.height !== c.canvas.height) {
         channel.canvas.width = c.canvas.width; channel.canvas.height = c.canvas.height; channel.held = null;
@@ -66,7 +68,7 @@ export class UnitContours {
     let channel = this.channels.get(this.ink);
     if (!channel) {
       const canvas = document.createElement('canvas'), c = canvas.getContext('2d')!;
-      this.channels.set(this.ink, (channel = { held: null, pixels: [new Path2D(), new Path2D(), new Path2D()], pixelRows: new Map(), pixelBounds: null, radius: this.radiusOf(this.ink), unbounded: false, mergePixels: false, bounds: null, faded: false, rectangles: new Path2D(), expanded: new Path2D(), path: new Path2D(), strokes: new Map(), canvas, c }));
+      this.channels.set(this.ink, (channel = { ortho: orthogonal(inkPart(this.ink)), held: null, pixels: [new Path2D(), new Path2D(), new Path2D()], pixelRows: new Map(), pixelBounds: null, radius: this.radiusOf(this.ink), unbounded: false, mergePixels: false, bounds: null, faded: false, rectangles: new Path2D(), expanded: new Path2D(), path: new Path2D(), strokes: new Map(), canvas, c }));
     }
     return channel;
   }
@@ -135,7 +137,8 @@ export class UnitContours {
         const b = channel.pixelBounds;
         if (b) { b.x0 = Math.min(b.x0, left); b.y0 = Math.min(b.y0, top); b.x1 = Math.max(b.x1, left + width); b.y1 = Math.max(b.y1, top + height); }
         else channel.pixelBounds = { x0: left, y0: top, x1: left + width, y1: top + height };
-      } else channel.expanded.rect(left - r, top - r, width + 2 * r, height + 2 * r);
+      } else if (channel.ortho) { channel.expanded.rect(left - r, top, width + 2 * r, height); channel.expanded.rect(left, top - r, width, height + 2 * r); }
+      else channel.expanded.rect(left - r, top - r, width + 2 * r, height + 2 * r);
       this.mark(channel, left, top, left + width, top + height);
       const box = channel.bounds;
       if (box) { box.x0 = Math.min(box.x0, left); box.y0 = Math.min(box.y0, top); box.x1 = Math.max(box.x1, left + width); box.y1 = Math.max(box.y1, top + height); }
@@ -213,8 +216,10 @@ export class UnitContours {
           let left = Infinity, right = -Infinity;
           const emit = () => {
             path.rect(left, row.y - pad, right - left, row.h + 2 * pad);
-            if (band === 0) channel.expanded.rect(left, row.y - pad, right - left, row.h + 2 * pad);
+            if (band === 0) channel.expanded.rect(left, row.y - (channel.ortho ? 0 : pad), right - left, row.h + (channel.ortho ? 0 : 2 * pad));
           };
+          // Orthogonal: each span reaches up and down only over its own width.
+          if (band === 0 && channel.ortho) for (const [x0, x1] of row.spans) channel.expanded.rect(x0, row.y - pad, x1 - x0, row.h + 2 * pad);
           for (const [x0, x1] of row.spans) {
             if (x0 - pad > right) { if (right > left) emit(); left = x0 - pad; }
             right = Math.max(right, x1 + pad);
@@ -234,11 +239,24 @@ export class UnitContours {
       c.save(); c.beginPath(); c.rect(box.x, box.y, box.w, box.h); c.clip();
       c.globalCompositeOperation = 'source-over'; c.strokeStyle = ink; c.fillStyle = ink;
       c.fill(channel.expanded);
-      c.lineWidth = 2 * channel.radius; c.lineJoin = 'miter'; c.lineCap = 'butt'; c.miterLimit = 10;
-      c.stroke(path);
-      for (const stroke of strokes.values()) {
-        c.lineWidth = stroke.width + 2 * (stroke.radius ?? channel.radius); c.lineCap = stroke.cap; c.lineJoin = stroke.join; c.miterLimit = stroke.miter;
-        c.stroke(stroke.path);
+      if (channel.ortho) {
+        // Four copies of the bodies, each moved out by the contour's width
+        // along one axis: a ring with no corners.
+        const shifted = (r: number, paint: () => void) => { for (const [dx, dy] of [[-r, 0], [r, 0], [0, -r], [0, r]]) { c.setTransform(1, 0, 0, 1, dx, dy); paint(); } c.setTransform(1, 0, 0, 1, 0, 0); };
+        shifted(channel.radius, () => c.fill(path));
+        for (const stroke of strokes.values()) {
+          const r = stroke.radius ?? channel.radius;
+          if (stroke.filled) { shifted(r, () => c.fill(stroke.path)); continue; }
+          c.lineWidth = stroke.width; c.lineCap = stroke.cap; c.lineJoin = stroke.join; c.miterLimit = stroke.miter;
+          shifted(r, () => c.stroke(stroke.path));
+        }
+      } else {
+        c.lineWidth = 2 * channel.radius; c.lineJoin = 'miter'; c.lineCap = 'butt'; c.miterLimit = 10;
+        c.stroke(path);
+        for (const stroke of strokes.values()) {
+          c.lineWidth = stroke.width + 2 * (stroke.radius ?? channel.radius); c.lineCap = stroke.cap; c.lineJoin = stroke.join; c.miterLimit = stroke.miter;
+          c.stroke(stroke.path);
+        }
       }
       c.globalCompositeOperation = 'destination-out';
       // Geometry is opaque even when a cloak fades: its own interior and

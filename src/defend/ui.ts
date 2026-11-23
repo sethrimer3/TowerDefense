@@ -86,6 +86,10 @@ import { ZONE_STORIES, zoneStory, type ZoneStory } from "./zone-stories.ts";
 import { StoryScroll } from "../ui/story-scroll.ts";
 import type { Box, Tutorial } from "../ui/tutorial.ts";
 import { inspectable, type Armed } from "./inspect.ts";
+import type { OutlinePart } from "./outline-corners.ts";
+
+/** The board's orthogonal outline checkboxes, above Angle view. */
+const ORTHO_BOXES: readonly [OutlinePart, string][] = [["buildings", "Ortho buildings"], ["troops", "Ortho infantry"], ["enemies", "Ortho enemies"], ["blight", "Ortho Blight"]];
 
 export type DefendHost = {
   save(): DefendSave;
@@ -142,6 +146,9 @@ export type DefendHost = {
    * Settings page's Angle view, also the board's own checkbox). */
   angleView?(): boolean;
   setAngleView?(value: boolean): void;
+  /** Orthogonal outlines per part (Settings, also the board's checkboxes). */
+  orthogonal?(part: OutlinePart): boolean;
+  setOrthogonal?(part: OutlinePart, value: boolean): void;
   /** Whether the palette lists items the player has none of. */
   showEmpty?(): boolean;
   /** Whether dragged items ride above the pointer. */
@@ -483,7 +490,7 @@ export class DefendPage {
             <div class="defend-specialty" id="defend-specialty" role="dialog" aria-label="Specialization" hidden></div>
             <div class="defend-banner" id="defend-banner" role="dialog" aria-label="The keep has fallen" hidden></div>
             <div class="defend-message" id="defend-message" aria-live="polite"></div>
-            <div class="defend-crisp"><label><input type="checkbox" id="defend-angle"> Angle view</label><label><input type="checkbox" id="defend-crisp"> Crisp pixels</label></div></div>
+            <div class="defend-crisp">${ORTHO_BOXES.map(([part, label]) => `<label><input type="checkbox" data-ortho="${part}"> ${label}</label>`).join("")}<label><input type="checkbox" id="defend-angle"> Angle view</label><label><input type="checkbox" id="defend-crisp"> Crisp pixels</label></div></div>
         </div>
       </div>
       <dialog class="defend-journal-dialog" aria-labelledby="defend-journal-title"></dialog>
@@ -507,6 +514,14 @@ export class DefendPage {
       this.host.setAngleView?.(angle.checked);
       this.draw();
     };
+    this.root.querySelectorAll<HTMLInputElement>("[data-ortho]").forEach((box) => {
+      const part = box.dataset.ortho as OutlinePart;
+      box.checked = !!this.host.orthogonal?.(part);
+      box.onchange = () => {
+        this.host.setOrthogonal?.(part, box.checked);
+        this.draw();
+      };
+    });
     const canvas = this.renderer.canvas;
     canvas.addEventListener("pointermove", (e) => {
       if (!this.spellBar) return;
@@ -1321,6 +1336,10 @@ export class DefendPage {
     if (box && box.checked !== crisp) box.checked = crisp;
     const angle = this.root.querySelector<HTMLInputElement>("#defend-angle");
     if (angle && angle.checked !== !!this.host.angleView?.()) angle.checked = !!this.host.angleView?.();
+    this.root.querySelectorAll<HTMLInputElement>("[data-ortho]").forEach((box) => {
+      const on = !!this.host.orthogonal?.(box.dataset.ortho as OutlinePart);
+      if (box.checked !== on) box.checked = on;
+    });
     if (fit) this.fitView();
     if (!this.renderer.canvas.width) return;
     const map = this.sim ? this.sim.map : this.currentMap();

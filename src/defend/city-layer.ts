@@ -28,6 +28,7 @@ import { hasForest } from "./forest.ts";
 import { hasWallArt, wallCapSprite, wallFaceSprite, wallRubbleTones, wallRubbleSource } from "./area-wall-art.ts";
 import { drawPixel, drawRoof, pixelKey, type PixelSprite } from "./pixel-sprites.ts";
 import { HALL_FACE, angled, faceDepth, liftOf, liftPx, setAngled } from "./angle-view.ts";
+import { orthogonal } from "./outline-corners.ts";
 import { KINDS, structureYard } from "./tower-art.ts";
 
 export { faceDepth, liftOf } from "./angle-view.ts";
@@ -878,7 +879,7 @@ const MASONRY = [128, 120, 106];
 function faceSprite(p: Paint, b: Building): HTMLCanvasElement | null {
   if (typeof document === "undefined") return null;
   const r = b.rect, look = b.structureUid !== undefined ? p.looks?.[b.structureUid] : undefined;
-  const key = `${b.kind}:${r.x},${r.y},${r.w}x${r.h}:${b.variant}:${b.gate?.side ?? ""}:${b.woodGate ? 1 : 0}:${look ?? ""}:${p.area}:${pixelKey()}`;
+  const key = `${b.kind}:${r.x},${r.y},${r.w}x${r.h}:${b.variant}:${b.gate?.side ?? ""}:${b.woodGate ? 1 : 0}:${look ?? ""}:${p.area}:${pixelKey()}:${+orthogonal("buildings")}`;
   let cv = faces.get(key);
   if (cv !== undefined) return cv;
   const W = (r.w + 2 * FACE_PAD) * ART, H = (r.h + 2 * FACE_PAD) * ART;

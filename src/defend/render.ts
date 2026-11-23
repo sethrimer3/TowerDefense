@@ -31,6 +31,7 @@ import { enemySize } from "./catalog.ts";
  * planted war banner, the magic boats' water (flood-art.ts) over the ground, the wizards' fire, the building grid and drag overlay (edit-overlay.ts), then
  * rain in screen space. */
 import { onPixelArt, pixelArtOn, pixelKey } from "./pixel-sprites.ts";
+import { cornersKey } from "./outline-corners.ts";
 import { CELL_COUNT, CELLS_H, CELLS_W, boardSize, cellInBounds, cellIndex, hash01, type TilePos } from "./grid.ts";
 import { changeBoxes, changedCells, mergeBoxes, noteEdit } from "./map-change.ts";
 import type { CityMap } from "./citygen.ts";
@@ -1034,7 +1035,7 @@ export class DefendRenderer {
     else {
       // Combat art advances on the fixed simulation clock. Keep screen pixels
       // (including artPen's camera snapping), never rescale a cached frame.
-      const key = `${sim.time}:${sim.mapVersion}:${sim.effects.length}:${sim.scorches.length}:${sim.enemies.length}:${sim.soldiers.length}:${sim.civilians.length}:${this.px}:${c.canvas.width}:${c.canvas.height}:${this.cam.s}:${this.cam.x}:${this.cam.y}:${!!torches}:${opts.healthbars === true}:${!!opts.simpleEnemies}:${!!opts.simpleTroops}:${!!opts.mergedOutlines}:${opts.reduceMotion}:${this.protectCombat}:${pixelKey()}${opts.sides ? ":" + sim.soldiers.map(u => `${u.id}=${opts.sides!.ink(u.id) ?? ""}`).join(",") : ""}`;
+      const key = `${sim.time}:${sim.mapVersion}:${sim.effects.length}:${sim.scorches.length}:${sim.enemies.length}:${sim.soldiers.length}:${sim.civilians.length}:${this.px}:${c.canvas.width}:${c.canvas.height}:${this.cam.s}:${this.cam.x}:${this.cam.y}:${!!torches}:${opts.healthbars === true}:${!!opts.simpleEnemies}:${!!opts.simpleTroops}:${!!opts.mergedOutlines}:${opts.reduceMotion}:${this.protectCombat}:${pixelKey()}:${cornersKey()}${opts.sides ? ":" + sim.soldiers.map(u => `${u.id}=${opts.sides!.ink(u.id) ?? ""}`).join(",") : ""}`;
       // Below the simulation's 30 Hz every frame repaints the cache: the extra
       // screen-sized clear and copy only add to the frame, so paint straight
       // onto the board until a frame comes round that the cache would have kept.
