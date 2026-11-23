@@ -262,6 +262,9 @@ The mine's metal, as Smithy points: every ten bars the smiths work make a point.
 **Time away**:
 The time since the game was last saved, up to a day, banked for each of the Mine and Library. On returning, both automatically fast-forward their work, earning gains as they go. Remaining idle time survives closing the game. On entering Defend, the idle time received rises in gold from the Mine's and the Library's tabs.
 
+**Game clock**:
+The time idle play, timed work and the ad cooldown run on: it starts at the latest time the game saw and moves forward only as the page runs or a server confirms the time, so the device's own clock cannot pay idle time.
+
 **Idle bank**:
 Idle time the Mine or the Library earned while it was not in the realm, kept (up to a week) and paid once it is placed again.
 
