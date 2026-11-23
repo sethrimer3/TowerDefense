@@ -36,6 +36,7 @@ import { METALS, type Weather as MineWeather } from "./mine/sim.ts";
 import { LibraryPage } from "./library/ui.ts";
 import { stream } from "./random.ts";
 import { popIdle } from "./ui/idle-pop.ts";
+import { appStore } from "./play-store.ts";
 import { bindShop, refreshShop, shopPageHtml, type ShopHost } from "./ui/shop.ts";
 import { landscape } from "./ui/landscape.ts";
 import { AD_IDLE_MS, adReady, adWatched, bankIdle, drawIdle, IDLE_SITES, idleLabel, POP_FROM_MS, type IdleSite } from "./idle-bank.ts";
@@ -101,8 +102,10 @@ const shopHost: ShopHost = {
     update();
     refreshShop(document, save, clock());
   },
-  // A stand-in until a store is wired in: owning the game is a flag.
-  buy: () => {
+  // In the app Play sells it; in a browser owning the game is a flag.
+  buy: async () => {
+    const store = appStore();
+    if (store && !(await (await store).buy())) return;
     save.shop.owned = true;
     play("coin");
     update();
@@ -110,6 +113,14 @@ const shopHost: ShopHost = {
   },
   update: () => update(),
 };
+// In the Android app Play decides whether the game is owned: this restores
+// it on a new phone and takes back a refunded purchase.
+appStore()?.then(async (store) => {
+  const owned = await store.owned();
+  if (owned !== null) save.shop.owned = owned;
+  update();
+  refreshShop(document, save, clock());
+}).catch(() => {});
 const ctx: AppContext = {
   save: () => save,
   modal,
