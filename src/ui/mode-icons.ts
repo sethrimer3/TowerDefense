@@ -204,10 +204,10 @@ export function modeIconPixels(mode: ModeIcon): Uint32Array {
 /** The icon as an `<img>` for a tab button. */
 export const modeIconImg = (mode: ModeIcon) => `<img class="ui-sprite" src="${modeIconUrl(mode)}" alt="" aria-hidden="true">`;
 
-const urls = new Map<ModeIcon, string>();
+const urls = new Map<string, string>();
 /** The icon as a data URL, `scale` screen pixels an art pixel, made once. */
 export function modeIconUrl(mode: ModeIcon, scale = 2): string {
-  const cached = urls.get(mode);
+  const key = `${mode}@${scale}`, cached = urls.get(key);
   if (cached) return cached;
   const px = modeIconPixels(mode);
   const canvas = document.createElement("canvas");
@@ -220,6 +220,6 @@ export function modeIconUrl(mode: ModeIcon, scale = 2): string {
     c.fillRect((i % N) * scale, Math.floor(i / N) * scale, scale, scale);
   }
   const url = canvas.toDataURL();
-  urls.set(mode, url);
+  urls.set(key, url);
   return url;
 }

@@ -22,9 +22,8 @@ try {
         }),
       );
     });
-    await page.goto(process.env.TEST_URL || "http://127.0.0.1:5173/");
-    const tab = page.locator('nav [data-tab="defend"]');
-    await tab.click();
+    await page.goto(new URL("?game=ambush", process.env.TEST_URL || "http://127.0.0.1:5173/").href);
+    await page.locator("#ambush .ambush-level-card").first().waitFor();
     assert.equal(await page.locator("#ambush .ambush-level-card").count(), 30);
     assert.ok((await page.locator("#ambush .ambush-zone h2").first().innerText()).includes("2/9 stars"));
     assert.equal(await page.locator("#ambush .ambush-zone").count(), 10);

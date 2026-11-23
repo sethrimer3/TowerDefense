@@ -110,7 +110,7 @@ try {
     await checkIcon('defend');
     await checkIcon('settings');
     await combat.click(); // Return to Defend without cycling.
-    for (const mode of ['defend', 'ambush', 'siege']) {
+    for (const mode of ['defend', 'siege']) {
       await page.waitForFunction(mode => document.querySelector('nav [data-tab="defend"]').dataset.mode === mode && document.querySelectorAll('.combat-icon-layer').length === 1, mode);
       await checkIcon(mode);
       await page.locator('nav').screenshot({ path: `test-results/tab-icons-${mode}-nav-${width}.png` });
@@ -126,7 +126,7 @@ try {
     await combat.click(); // Return to Defend without cycling.
     await combat.evaluate(button => { for (let i = 0; i < 4; i++) button.click(); });
     await page.waitForFunction(() => document.querySelectorAll('.combat-icon-layer').length === 1);
-    await checkIcon('ambush');
+    await checkIcon('defend');
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await combat.click();
     assert.equal(await combat.locator('.combat-icon-layer').count(), 1, 'Legacy graphics respects Reduce Motion');
@@ -137,10 +137,7 @@ try {
     await checkIcon('settings');
     await page.locator('nav [data-tab="settings"]').click();
     assert.equal(await page.locator('#legacy-graphics').isChecked(), true, 'Choice survives reload');
-    await combat.click();
-    await combat.click(); // Ambush.
-    await page.waitForFunction(() => document.querySelectorAll('.combat-icon-layer').length === 1);
-    await checkIcon('ambush');
+    await combat.click(); // Return to Defend without cycling.
     await combat.click(); // Siege.
     await page.waitForFunction(() => document.querySelectorAll('.combat-icon-layer').length === 1);
     await checkIcon('siege');
@@ -149,7 +146,7 @@ try {
     await checkCurrent('siege');
     assert.equal(await combat.getAttribute('data-mode'), 'siege', 'Changing artwork preserves the current mode');
     await combat.click(); // Return to Siege without cycling.
-    for (const mode of ['defend', 'ambush', 'siege']) {
+    for (const mode of ['defend', 'siege']) {
       await combat.click();
       await page.waitForFunction(() => document.querySelectorAll('.combat-icon-layer').length === 1);
       await checkCurrent(mode);

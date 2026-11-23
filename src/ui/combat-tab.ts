@@ -4,9 +4,13 @@ import { modeIconImg } from "./mode-icons.ts";
 
 export const COMBAT_MODES = ["defend", "ambush", "siege"] as const;
 export type CombatMode = typeof COMBAT_MODES[number];
-export const nextCombatMode = (mode: CombatMode): CombatMode => COMBAT_MODES[(COMBAT_MODES.indexOf(mode) + 1) % COMBAT_MODES.length];
+/** The modes the Defend+Siege game's combat tab cycles through. Ambush is its
+ * own game (`game-select.ts`): its tab shows Ambush alone and never cycles. */
+export const CYCLED_MODES = ["defend", "siege"] as const satisfies readonly CombatMode[];
+const cycles = (mode: CombatMode): mode is typeof CYCLED_MODES[number] => (CYCLED_MODES as readonly CombatMode[]).includes(mode);
+export const nextCombatMode = (mode: CombatMode): CombatMode => cycles(mode) ? CYCLED_MODES[(CYCLED_MODES.indexOf(mode) + 1) % CYCLED_MODES.length] : mode;
 export const combatLabel = (mode: CombatMode, active: boolean) =>
-  `${t(`nav.${mode}`)}${active ? ` --> ${t(`nav.${nextCombatMode(mode)}`)}` : ""}`;
+  `${t(`nav.${mode}`)}${active && cycles(mode) ? ` --> ${t(`nav.${nextCombatMode(mode)}`)}` : ""}`;
 
 /** Current art by default; the chosen legacy set is an explicit preference. */
 export function combatIcon(mode: CombatMode, legacy = false) {

@@ -44,6 +44,7 @@ import { installSeal } from "./ui/seal-art.ts";
 import { EssenceGlob } from "./ui/currency-icons.ts";
 import { installScrollArrows } from "./ui/scroll-arrows.ts";
 import { Tutorial } from "./ui/tutorial.ts";
+import { GameSelect, gameFromAddress, type Game } from "./ui/game-select.ts";
 
 // Wires the pages together: builds the shell, loads the save, and routes
 // navigation, the currency bar and the frame loop between the pages.
@@ -75,6 +76,8 @@ onPixelArt(() => {
 });
 let tab: Tab = "defend";
 let combatMode: CombatMode = "defend";
+/** Which game is being played: the start screen chooses (`game-select.ts`). */
+let game: Game = "defendSiege";
 const clock = () => Date.now();
 const dayClock = new DayClock(save.dayClock);
 useDayClock(dayClock, () => save.settings);
@@ -91,7 +94,7 @@ const ctx: AppContext = {
   researched: () => libraryPage.sim.researched(),
   openChamber,
   openTree: (target) => {
-    if (!defendPage.canOpenTree()) return false;
+    if (game === "ambush" || !defendPage.canOpenTree()) return false;
     combatMode = "defend";
     navigate("defend");
     defendPage.openTree(target);
@@ -109,6 +112,7 @@ const ctx: AppContext = {
     renderSettingsPage(ctx);
   },
   addIdle,
+  chooseGame: () => gameSelect.show(),
   replayTutorial: () => {
     save.tutorial = [];
     store();
@@ -367,6 +371,27 @@ function refreshRealmAccess() {
     button.title=unlocked?'':`Place the ${id==='mine'?'Mine':'Library'} tile in your city to unlock this tab.`;
   }
 }
+/** The start screen; picking a game opens it on its first page. */
+const gameSelect = new GameSelect(pick => playGame(pick));
+/** Whether the frame loop runs, and whether Defend+Siege has greeted the player yet. */
+let looping = false, greeted = false;
+/** Opens `next`: Ambush alone (its tab and Settings), or the realm with Defend
+ * and Siege on the combat tab and the Mine, Library and Tiles beside it. */
+function playGame(next: Game) {
+  game = next;
+  const ambush = next === "ambush";
+  document.querySelector(".shell")!.classList.toggle("ambush-game", ambush);
+  for (const id of ["mine", "library", "tiles"] as const)
+    document.querySelector<HTMLButtonElement>(`nav [data-tab="${id}"]`)!.hidden = ambush;
+  combatMode = ambush ? "ambush" : "defend";
+  navigate("defend");
+  if (!looping) { looping = true; requestAnimationFrame(frame); }
+  if (!ambush && !greeted) {
+    greeted = true;
+    if (save.profile) welcome.show();
+    else chooseProfile();
+  }
+}
 /** Saves and refreshes the currency bar. */
 function update() {
   store();
@@ -562,7 +587,7 @@ export async function warmUp() {
 export function startGame() {
   // The artist's sprites, if any are saved under `art/sprites/`.
   void import("./defend/art-files.ts").then(({ artFiles }) => loadArtOverrides(artFiles()));
-  if (save.profile) welcome.show();
-  else chooseProfile();
-  requestAnimationFrame(frame);
+  const asked = gameFromAddress(location.search, navigator.webdriver === true);
+  if (asked) playGame(asked);
+  else gameSelect.show();
 }

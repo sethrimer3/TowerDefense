@@ -8,6 +8,8 @@ export const CORE = [
  ["nav.library","Library","Biblioteca","Bibliothèque","Bibliothek","Biblioteca","Biblioteca","図書館","도서관","图书馆"],
  ["nav.tiles","Tiles","Losetas","Tuiles","Bauteile","Peças","Tessere","タイル","타일","地块"],
  ["nav.settings","Settings","Ajustes","Paramètres","Einstellungen","Configurações","Impostazioni","設定","설정","设置"],
+ ["game.title","Tower Defense","Tower Defense","Tower Defense","Tower Defense","Tower Defense","Tower Defense","Tower Defense","Tower Defense","Tower Defense"],
+ ["game.defendSiege","Defend+Siege","Defender+Asedio","Défense+Siège","Verteidigen+Belagerung","Defender+Cerco","Difendi+Assedio","防衛+攻城","방어+공성","防守+围攻"],
  ["nav.label","Main navigation","Navegación principal","Navigation principale","Hauptnavigation","Navegação principal","Navigazione principale","メインメニュー","주 메뉴","主导航"],
  ["currency.copper","COPPER","COBRE","CUIVRE","KUPFER","COBRE","RAME","銅","구리","铜"],
  ["currency.silver","SILVER","PLATA","ARGENT","SILBER","PRATA","ARGENTO","銀","은","银"],
