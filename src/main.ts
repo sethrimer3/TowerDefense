@@ -5,7 +5,7 @@ import { DayClock, useDayClock, sunSpeed } from "./daylight.ts";
 import { ProfileEditor } from "./profile/editor.ts";
 import { loadArtOverrides } from "./defend/art-overrides.ts";
 import { defaults, load, persist, type Save } from "./save.ts";
-import { countdown } from "./away.ts";
+import { countdown, MAX_AWAY_MS } from "./away.ts";
 import { DefendPage } from "./defend/ui.ts";
 import { spendMetals } from "./metals.ts";
 import { bonuses, busySmiths, payWave, settleTraining, skillRank, skillTotal, whole } from "./progression.ts";
@@ -35,7 +35,10 @@ import { MinePage } from "./mine/ui.ts";
 import { METALS, type Weather as MineWeather } from "./mine/sim.ts";
 import { LibraryPage } from "./library/ui.ts";
 import { stream } from "./random.ts";
-import { WelcomeBack } from "./ui/welcome.ts";
+import { popIdle } from "./ui/idle-pop.ts";
+import { bindShop, refreshShop, shopPageHtml, type ShopHost } from "./ui/shop.ts";
+import { landscape } from "./ui/landscape.ts";
+import { AD_IDLE_MS, adReady, adWatched, bankIdle, drawIdle, IDLE_SITES, idleLabel, POP_FROM_MS, type IdleSite } from "./idle-bank.ts";
 import { unlockAllTowers } from "./defend/progress.ts";
 import { ROSES, setRose, type Rose } from "./ui/hall-art.ts";
 import { fitViewport } from "./ui/viewport.ts";
@@ -78,10 +81,35 @@ let tab: Tab = "defend";
 let combatMode: CombatMode = "defend";
 /** Which game is being played: the start screen chooses (`game-select.ts`). */
 let game: Game = "defendSiege";
+/** Whether Siege and the Shop have tabs of their own: always in landscape,
+ * in portrait with the setting; never in the Ambush game. */
+const splitTabs = () => game !== "ambush" && (landscape() || save.settings.extraTabs);
+let split: boolean | null = null;
 const clock = () => Date.now();
 const dayClock = new DayClock(save.dayClock);
 useDayClock(dayClock, () => save.settings);
 const modal = el("modal") as HTMLDialogElement;
+/** What the Shop's panels act on (`ui/shop.ts`). */
+const shopHost: ShopHost = {
+  save: () => save,
+  clock,
+  modal,
+  rewardAd: (from) => {
+    adWatched(save.shop, clock());
+    grantIdle(AD_IDLE_MS, from);
+    play("coin");
+    update();
+    refreshShop(document, save, clock());
+  },
+  // A stand-in until a store is wired in: owning the game is a flag.
+  buy: () => {
+    save.shop.owned = true;
+    play("coin");
+    update();
+    refreshShop(document, save, clock());
+  },
+  update: () => update(),
+};
 const ctx: AppContext = {
   save: () => save,
   modal,
@@ -113,6 +141,8 @@ const ctx: AppContext = {
   },
   addIdle,
   chooseGame: () => gameSelect.show(),
+  shopInSettings: () => game !== "ambush" && !splitTabs(),
+  shop: shopHost,
   replayTutorial: () => {
     save.tutorial = [];
     store();
@@ -271,37 +301,75 @@ const lastSaved = Math.max(save.mine?.savedAt ?? 0, save.library?.savedAt ?? 0);
 let awayMs = lastSaved > 0 ? Math.max(0, clock() - lastSaved) : 0;
 libraryPage.load(save.library, clock());
 minePage.load(save.mine, clock());
-const welcome = new WelcomeBack(modal, () => ({
-  ms: awayMs,
-  knowledge: libraryPage.awayKnowledge,
-  shelves: libraryPage.sim.built,
-  librarians: libraryPage.sim.librarians.length,
-  library: libraryPage.away,
-  mine: minePage.away,
-  crew: minePage.sim.miners.length,
-  owedMs: minePage.owedMs,
-}));
+/** The Mine's or the Library's page. */
+const sitePage = (site: IdleSite) => site === "mine" ? minePage : libraryPage;
+const siteButton = (site: IdleSite) => document.querySelector<HTMLButtonElement>(`nav [data-tab="${site}"]`)!;
+// Time away while the Mine or the Library stood out of the realm is kept
+// for it, to be paid when it is placed again.
+for (const site of IDLE_SITES) if (!realmActive(save, site)) bankIdle(save.idleBank, site, awayMs);
+
+/** Pays `ms` of idle time to the Mine and the Library: each one in the
+ * realm spends it (anything past its own cap is banked), the others bank
+ * it all. The golden figure rises from each paid tab, or from `from` when
+ * neither stands in the realm. */
+function grantIdle(ms: number, from: Element) {
+  const paid: IdleSite[] = [];
+  for (const site of IDLE_SITES) {
+    if (!realmActive(save, site)) { bankIdle(save.idleBank, site, ms); continue; }
+    const page = sitePage(site), give = Math.min(ms, Math.max(0, MAX_AWAY_MS - page.owedMs));
+    page.addAway(give);
+    bankIdle(save.idleBank, site, ms - give);
+    paid.push(site);
+  }
+  const label = idleLabel(ms);
+  if (paid.length === 0) popIdle(from, label, reduced());
+  paid.forEach((site, i) => popIdle(siteButton(site), label, reduced(), i));
+}
+/** On entering Defend+Siege: the idle time earned while away, rising in
+ * gold from the Mine's and the Library's tabs (or from Tiles, if neither
+ * stands in the realm and the time went to the bank). */
+function greetIdle() {
+  if (awayMs < POP_FROM_MS) return;
+  const label = idleLabel(Math.min(awayMs, MAX_AWAY_MS));
+  const paid = IDLE_SITES.filter((site) => realmActive(save, site));
+  if (paid.length === 0) popIdle(document.querySelector('nav [data-tab="tiles"]')!, idleLabel(awayMs), reduced());
+  paid.forEach((site, i) => popIdle(siteButton(site), label, reduced(), i));
+}
+/** Keeps idle time for a workshop taken out of the realm, and pays a
+ * workshop back in the realm from its bank, each frame. */
+function settleBank() {
+  for (const site of IDLE_SITES) {
+    const page = sitePage(site);
+    if (!realmActive(save, site)) {
+      if (page.owedMs >= 1000) bankIdle(save.idleBank, site, page.owedMs);
+      continue;
+    }
+    if (save.idleBank[site] < 1000) continue;
+    const take = drawIdle(save.idleBank, site, page.owedMs);
+    if (take === 0) continue;
+    page.addAway(take);
+    if (take >= POP_FROM_MS) popIdle(siteButton(site), idleLabel(take), reduced());
+    mineDirty = true;
+  }
+}
 
 const profileEditor = new ProfileEditor();
 function chooseProfile() {
   const first = !save.profile;
   profileEditor.open(save.profile, profile => { save.profile = profile; update(); }, () => {
     renderPage();
-    if (first) welcome.show();
+    if (first) greetIdle();
   });
 }
 
-/** Dev: bank idle time for both simulations. Their gains appear as they
- * fast-forward; the welcome screen keeps the running account. */
+/** Dev: idle time for both simulations, as if the game had been closed
+ * that long. Their gains appear as they fast-forward. */
 function addIdle(ms: number) {
-  awayMs = ms;
-  minePage.addAway(ms);
-  libraryPage.addAway(ms);
+  grantIdle(ms, document.querySelector('nav [data-tab="settings"]')!);
   if (save.trainingClock) save.trainingClock -= ms;
   if (save.researchJob) save.researchClock -= ms;
   if (save.forgeJob) save.forgeClock -= ms;
   update();
-  welcome.show(true);
 }
 
 soundEnabledBy(() => !save.settings.soundOff);
@@ -384,11 +452,12 @@ function playGame(next: Game) {
   for (const id of ["mine", "library", "tiles"] as const)
     document.querySelector<HTMLButtonElement>(`nav [data-tab="${id}"]`)!.hidden = ambush;
   combatMode = ambush ? "ambush" : "defend";
+  layoutTabs();
   navigate("defend");
   if (!looping) { looping = true; requestAnimationFrame(frame); }
   if (!ambush && !greeted) {
     greeted = true;
-    if (save.profile) welcome.show();
+    if (save.profile) greetIdle();
     else chooseProfile();
   }
 }
@@ -396,12 +465,15 @@ function playGame(next: Game) {
 function update() {
   store();
   refreshCurrencies();
-  combatTab.render(combatMode, tab === "defend");
+  layoutTabs();
+  combatTab.render(split ? "defend" : combatMode, !split && tab === "defend");
   if (shownLegacyGraphics !== save.settings.legacyGraphics) {
     shownLegacyGraphics = save.settings.legacyGraphics;
-    const icon = document.querySelector<HTMLElement>('nav [data-tab="settings"] > span')!;
-    icon.innerHTML = shownLegacyGraphics ? tabIconHtml("settings") : TAB_ICONS.settings;
-    if (shownLegacyGraphics) paintTabIcon(icon.querySelector("canvas")!, "settings");
+    for (const id of ["siege", "settings"] as const) {
+      const icon = document.querySelector<HTMLElement>(`nav [data-tab="${id}"] > span`)!;
+      icon.innerHTML = shownLegacyGraphics ? tabIconHtml(id) : TAB_ICONS[id];
+      if (shownLegacyGraphics) paintTabIcon(icon.querySelector("canvas")!, id);
+    }
   }
 }
 function renderPage() {
@@ -413,6 +485,10 @@ function renderPage() {
   if (tab === "mine" && mineDown.below) smithy.render();
   if (tab === "library" && libraryDown.below) study.render();
   if (tab === "tiles") tilesPage.render();
+  if (tab === "shop") {
+    el("shop").innerHTML = shopPageHtml(save, clock());
+    bindShop(el("shop"), shopHost);
+  }
   if (tab === "settings") renderSettingsPage(ctx);
 }
 /** The currency sign hangs over these tabs only. */
@@ -426,14 +502,40 @@ function navigate(id: Tab) {
   tab = id;
   document.querySelector(".shell")!.classList.toggle("show-currencies", signTab(id));
   document.querySelectorAll(".page").forEach((p) => p.classList.toggle("active", p.id === (id === "defend" ? combatMode : id)));
-  document.querySelectorAll<HTMLElement>("[data-tab]").forEach((b) => {
-    b.classList.toggle("selected", b.dataset.tab === id);
-    b.setAttribute("aria-current", b.dataset.tab === id ? "page" : "false");
-  });
+  markSelected();
   renderPage();
   update();
 }
+/** Lights the tab that is showing: Siege's own, when it has one. */
+function markSelected() {
+  const shown = split && tab === "defend" && combatMode === "siege" ? "siege" : tab;
+  document.querySelectorAll<HTMLElement>("[data-tab]").forEach((b) => {
+    b.classList.toggle("selected", b.dataset.tab === shown);
+    b.setAttribute("aria-current", b.dataset.tab === shown ? "page" : "false");
+  });
+}
+/** Shows or hides the Siege and Shop tabs as the layout and setting say;
+ * with them, the Defend tab no longer cycles to Siege and the Shop leaves
+ * the Settings page. */
+function layoutTabs() {
+  const next = splitTabs();
+  if (next === split) return;
+  split = next;
+  for (const id of ["siege", "shop"] as const)
+    document.querySelector<HTMLButtonElement>(`nav [data-tab="${id}"]`)!.hidden = !split;
+  document.querySelector(".shell")!.classList.toggle("seven-tabs", split);
+  if (!split && tab === "shop") { navigate("settings"); return; }
+  markSelected();
+  combatTab.render(split ? "defend" : combatMode, !split && tab === "defend");
+  if (tab === "settings") renderSettingsPage(ctx);
+}
+window.addEventListener("resize", layoutTabs);
 document.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((b) => (b.onclick = () => {
+  // With tabs of their own, Defend and Siege each go straight to their page.
+  if (split && (b.dataset.tab === "defend" || b.dataset.tab === "siege")) {
+    combatMode = b.dataset.tab === "siege" ? "siege" : "defend";
+    return navigate("defend");
+  }
   if (b.dataset.tab === "defend" && tab === "defend") combatMode = nextCombatMode(combatMode);
   // A second tap on Tiles turns to the Shop (and another back to the collection).
   if (b.dataset.tab === "tiles" && tab === "tiles") return tilesPage.toggleShop();
@@ -451,6 +553,25 @@ const idleTabs = (["mine", "library"] as const).map((id) => {
   button.prepend(span);
   return { id, span };
 });
+/** The red dot on the Shop's tab (or Settings', where the Shop is then)
+ * while an ad is ready and the player asked to be told. */
+const adDots = (["shop", "settings"] as const).map((id) => {
+  const button = document.querySelector<HTMLElement>(`nav [data-tab="${id}"]`)!;
+  const dot = document.createElement("i");
+  dot.className = "tab-dot";
+  dot.hidden = true;
+  dot.setAttribute("aria-hidden", "true");
+  button.append(dot);
+  return { id, dot };
+});
+function adNotice() {
+  const ready = game !== "ambush" && save.settings.adNotify && adReady(save.shop, clock());
+  for (const { id, dot } of adDots) {
+    const hide = !ready || id !== (split ? "shop" : "settings");
+    if (dot.hidden !== hide) dot.hidden = hide;
+  }
+  if (tab === "shop" || tab === "settings") refreshShop(el(tab), save, clock());
+}
 function idleTimers() {
   const left = Math.max(minePage.owedMs, libraryPage.owedMs), text = left >= 1000 ? countdown(left) : "";
   for (const { id, span } of idleTabs) {
@@ -483,6 +604,7 @@ function teach() {
 let lastTick = 0, lastMineSave = 0;
 function frame(time: number) {
   dayClock.advance(time, !document.hidden, save.settings.dayNightCycle, sunSpeed(save.settings.fasterSunCatchup, minePage.owedMs, libraryPage.owedMs));
+  settleBank();
   minePage.advance(clock(), libraryPage.owedMs);
   libraryPage.advance(clock(), minePage.owedMs);
   idleTimers();
@@ -506,11 +628,11 @@ function frame(time: number) {
     lastMineSave = time;
     store();
   }
-  welcome.refresh();
   teach();
   hear(save.settings.ambienceOff ? QUIET : tab === "defend" ? defendPage.ambience() : tab === "mine" ? minePage.ambience() : tab === "library" ? libraryPage.ambience() : QUIET);
   if (time - lastTick >= 1000) {
     lastTick = time;
+    adNotice();
     const smiths = new Set(realmActive(save,"mine") ? smithNames() : []);
     const trained = settleTraining(save, clock(), smiths) > 0;
     const forged = settleForge(save, clock(), smiths);

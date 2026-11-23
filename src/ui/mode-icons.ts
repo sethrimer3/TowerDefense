@@ -23,6 +23,8 @@ const SPRIG: Material = { tones: [0xa9d877, 0xa9d877, 0xa9d877], flat: true };
 const DUST: Material = { tones: [0xcfc3a6, 0xcfc3a6, 0xcfc3a6], flat: true };
 const EYES: Material = { tones: [0xf2d36b, 0xf2d36b, 0xf2d36b], flat: true };
 const BRASS: Material = { tones: [0xf0d58a, 0xc99a3e, 0x8a6220] };
+const LEATHER: Material = { tones: [0xb07a4a, 0x7e4f2c, 0x4e2f19] };
+const DARK_BRASS: Material = { tones: [0x8a6220, 0x8a6220, 0x8a6220], flat: true };
 const MORTAR: Material = { tones: [0x4a453e, 0x4a453e, 0x4a453e], flat: true };
 const INK: Material = { tones: [OUTLINE, OUTLINE, OUTLINE], flat: true };
 const FIELD: Material = { tones: [0x4f78b8, 0x2f5592, 0x1d3463] };
@@ -182,7 +184,27 @@ function settings(g: Grid) {
   g.disc(18, 6, 0.8, null);
 }
 
-const DRAW = { defend, ambush, siege, settings };
+/** The Shop: a leather purse tied at the neck, gold coins spilling past it. */
+function shop(g: Grid) {
+  // The purse: a round belly under a gathered neck.
+  g.disc(11, 15, 7, LEATHER);
+  g.rect(8, 6, 6, 3, LEATHER);
+  g.rect(7, 4, 2, 2, LEATHER);
+  g.rect(13, 4, 2, 2, LEATHER);
+  g.rect(10, 5, 2, 1, LEATHER);
+  // The cord round the neck, its ends hanging.
+  g.rect(7, 9, 8, 1, STRING);
+  g.line(14, 10, 16, 12, STRING);
+  // A brass clasp on the belly.
+  g.rect(10, 14, 3, 2, BRASS);
+  // Coins stacked and fallen at the purse's side.
+  for (const y of [21, 19, 17]) g.rect(17, y, 6, 2, BRASS);
+  g.disc(4, 21, 2, BRASS);
+  g.set(4, 21, DARK_BRASS);
+  for (const y of [21, 19, 17]) g.set(19, y + 1, DARK_BRASS);
+}
+
+const DRAW = { defend, ambush, siege, settings, shop };
 export type ModeIcon = keyof typeof DRAW;
 
 /** The icon as `N × N` RGB pixels, 0 where empty. */

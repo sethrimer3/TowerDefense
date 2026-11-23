@@ -13,13 +13,17 @@ export const uiSprite = (name: UiSprite, className = "ui-sprite") =>
   `<img class="${className}" src="${UI_ASSET_BASE}assets/ui/${name}.png" alt="" aria-hidden="true">`;
 
 /** The Tiles tab's icon is a city tile, painted by the board's own art once
- * the shell is built; Defend's and Settings' are drawn in code when asked for. */
+ * the shell is built; Defend's, Siege's, the Shop's and Settings' are drawn
+ * in code when asked for. Siege and the Shop show as tabs of their own in
+ * landscape, or in portrait with the `extraTabs` setting (`main.ts`). */
 export const TAB_ICONS = {
   get defend() { return modeIconImg("defend"); },
+  get siege() { return modeIconImg("siege"); },
   mine: uiSprite("mine"),
   library: uiSprite("library"),
   tiles: `<canvas class="ui-sprite" width="48" height="48" data-icon="cityTile"></canvas>`,
+  get shop() { return modeIconImg("shop"); },
   get settings() { return modeIconImg("settings"); },
 };
 export type Tab = keyof typeof TAB_ICONS;
-export const TAB_NAMES: Record<Tab, string> = { defend: "Defend", mine: "Mine", library: "Library", tiles: "Tiles", settings: "Settings" };
+export const TAB_NAMES: Record<Tab, string> = { defend: "Defend", siege: "Siege", mine: "Mine", library: "Library", tiles: "Tiles", shop: "Shop", settings: "Settings" };

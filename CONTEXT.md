@@ -259,8 +259,14 @@ The Mine's rarest spendable metal, displayed with an ingot and named Gold. Every
 **Copper** and **silver**:
 The mine's metal, as Smithy points: every ten bars the smiths work make a point. Spent on Smithy upgrades, tiles, bombs, Mine hires and buildings, and Library shelves, staff and lab expansions. (They were once battle coins, and before that iron and steel bars.)
 
-**Time away** (welcome back):
-The time since the game was last saved, up to a day, banked for each of the Mine and Library. On returning, both automatically fast-forward their work, earning gains as they go. Remaining idle time survives closing the game, and the welcome-back screen shows the running gains.
+**Time away**:
+The time since the game was last saved, up to a day, banked for each of the Mine and Library. On returning, both automatically fast-forward their work, earning gains as they go. Remaining idle time survives closing the game. On entering Defend, the idle time received rises in gold from the Mine's and the Library's tabs.
+
+**Idle bank**:
+Idle time the Mine or the Library earned while it was not in the realm, kept (up to a week) and paid once it is placed again.
+
+**Ad** (Shop):
+Watched in the Shop for an hour of idle time for the Mine and the Library, once every fifteen minutes. Buying the game claims it without watching.
 
 **Knowledge**:
 Earned by the Library, an hour's worth being its built bookshelves times its professors (idle too); spent on the skill trees. Once called Valor.

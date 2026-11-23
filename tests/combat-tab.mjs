@@ -5,7 +5,8 @@ const browser = await chromium.launch(process.env.PLAYWRIGHT_EXECUTABLE
   ? { executablePath: process.env.PLAYWRIGHT_EXECUTABLE, headless: true }
   : { channel: process.env.PLAYWRIGHT_CHANNEL || 'chrome', headless: true });
 try {
-  for (const width of [1280, 390, 360]) {
+  // Portrait: the Defend tab cycles to Siege (landscape gives Siege its own tab, below).
+  for (const width of [390, 360]) {
     const page = await browser.newPage({ viewport: { width, height: 900 } });
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
@@ -47,6 +48,27 @@ try {
     await button.waitFor();
     assert.equal(await button.innerText(), 'Defend --> Siege');
     assert.deepEqual(errors, []);
+    await page.close();
+  }
+  // Landscape: Siege and the Shop are tabs of their own; Defend never cycles.
+  {
+    const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    await page.goto(process.env.TEST_URL || 'http://127.0.0.1:5173/');
+    await page.locator('#profile-editor[open]').waitFor();
+    await page.locator('#profile-editor input').fill('Test Warden');
+    await page.locator('#profile-editor [data-action="stamp"]').click();
+    await page.locator('#profile-editor button[type="submit"]').click();
+    const defend = page.locator('nav [data-tab="defend"]');
+    assert.equal(await defend.innerText(), 'Defend');
+    await page.locator('nav [data-tab="siege"]').click();
+    assert.equal(await page.locator('section.page.active').getAttribute('id'), 'siege');
+    assert.match(await page.locator('nav [data-tab="siege"]').getAttribute('class'), /selected/);
+    await defend.click();
+    assert.equal(await page.locator('section.page.active').getAttribute('id'), 'defend');
+    await defend.click();
+    assert.equal(await page.locator('section.page.active').getAttribute('id'), 'defend');
+    await page.locator('nav [data-tab="shop"]').click();
+    assert.equal(await page.locator('#shop .shop-panel').count(), 1);
     await page.close();
   }
   console.log('Combat tab cycling between Defend and Siege, return navigation, rapid clicks, reduced motion and reload pass at desktop/phone widths.');

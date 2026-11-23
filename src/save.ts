@@ -18,6 +18,7 @@ import { decodeLibrarySave, type LibrarySave } from "./library/sim.ts";
 import { decodeResearchJob, type ResearchJob } from "./research-jobs.ts";
 import { decodeForgeJob, type ForgeJob } from "./forge-jobs.ts";
 import { decodeTutorial, type LessonId } from "./ui/tutorial.ts";
+import { MAX_BANK_MS, type IdleBank, type ShopSave } from "./idle-bank.ts";
 
 import { decodeFound, migrateCards, migrateGunLine, migrateResearch, migrateTopicPaths, migrateTrees, refundRetiredAssassins } from "./specializations.ts";
 
@@ -83,6 +84,12 @@ export type Save = {
   dayClock?: number;
   /** The first-time tutorial's lessons this player has read (`ui/tutorial.ts`). */
   tutorial: LessonId[];
+  /** Idle time (ms) the Mine and the Library earned while not in the realm,
+   * paid out once each stands in the city again (`idle-bank.ts`). */
+  idleBank: IdleBank;
+  /** The shop: when the next ad is ready (wall-clock ms), and whether the
+   * game was bought, which grants the ad's idle time without the ad. */
+  shop: ShopSave;
   settings: Settings;
 };
 
@@ -109,6 +116,8 @@ export function defaults(): Save {
     mine: null,
     library: null,
     tutorial: [],
+    idleBank: { mine: 0, library: 0 },
+    shop: { adReadyAt: 0, owned: false },
     settings: defaultSettings(),
   };
   return save;
@@ -193,6 +202,8 @@ export function decode(raw: string | null): Save {
   d.forgeClock = num(s.forgeClock, 0);
   refundRetired(d);
   d.tutorial = Array.isArray(s.tutorial) ? decodeTutorial(s.tutorial) : pastLessons(d);
+  d.idleBank = { mine: num(s.idleBank?.mine, 0, 0, MAX_BANK_MS), library: num(s.idleBank?.library, 0, 0, MAX_BANK_MS) };
+  d.shop = { adReadyAt: num(s.shop?.adReadyAt, 0), owned: s.shop?.owned === true };
   return d;
 }
 
