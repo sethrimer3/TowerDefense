@@ -4,7 +4,6 @@ const row = <K extends string>(key: K, english: string) =>
   [key, english, english, english, english, english, english, english, english, english] as const satisfies TranslationRow;
 export const AMBUSH_TEXT = [
   row("ambush.levelSelect", "Level select"),
-  row("ambush.levelColumn", "Level {level}"),
   row("ambush.stars", "{stars}/{total} stars"),
   row("ambush.branch", "Branch"),
   row("ambush.chooseBranch", "Choose a branch"),

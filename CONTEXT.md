@@ -41,7 +41,10 @@ An assault mode: infantry trained by the player's buildings raid enemy castles a
 The marker at the board edge showing where an Ambush level’s enemies arrive.
 
 **Level select**:
-The Ambush screen of thirty levels, arranged in three columns and ten zone rows, showing their best stars and unlocks.
+The Ambush screen of thirty levels, drawn as the world map.
+
+**World map**:
+The Ambush level select: a painted treasure map of the zones end to end, each holding its levels, joined by a dotted way that reaches each level once the one before has a star.
 
 **Star rating**:
 An Ambush level's best result, from zero to three stars. Improving a best result adds only the difference to the earned total.

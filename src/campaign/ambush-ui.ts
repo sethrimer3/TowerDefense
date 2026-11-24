@@ -1,17 +1,18 @@
 /** Level selection owns navigation; active battles still use the native campaign page. */
 import { AmbushStarTree } from "./ambush-star-tree.ts";
 import { ambushPool } from "../ambush-upgrades.ts";
-import { observePreviews } from "./previews.ts";
-import { AREAS, areaStyle } from "../defend/areas.ts";
+import { iconImg } from "./ambush-icons.ts";
+import { WorldMapView } from "./world-map-view.ts";
+import { visibleLevels } from "./world-map.ts";
 import { type CampaignHost } from "./host.ts";
 import { AmbushBattlePage } from "./ambush-battle-ui.ts";
-import { AMBUSH_LEVELS, levelUnlocked, totalStars } from "./levels.ts";
+import { levelUnlocked, totalStars } from "./levels.ts";
 import { t } from "../i18n/index.ts";
 export class AmbushPage {
   private battle?: AmbushBattlePage;
   private running = false;
   private tree?: AmbushStarTree;
-  private previews?: () => void;
+  private map?: WorldMapView;
   constructor(
     private root: HTMLElement,
     private host: CampaignHost,
@@ -30,6 +31,8 @@ export class AmbushPage {
   }
   pause() {
     this.battle?.pause();
+    this.map?.destroy();
+    this.map = undefined;
     this.tree?.destroy();
     this.tree = undefined;
   }
@@ -39,27 +42,13 @@ export class AmbushPage {
   private select() {
     this.tree?.destroy();
     this.tree = undefined;
-    this.previews?.();
+    this.map?.destroy();
     this.running = false;
     this.battle?.pause();
     this.root.classList.remove("native-campaign");
     this.root.classList.add("ambush-select");
     const progress = this.host.save().campaigns.ambush;
-    this.root.innerHTML = `<div class="ambush-select-head"><strong data-i18n="ambush.levelSelect">${t("ambush.levelSelect")}</strong><span>${t("ambush.stars", { stars: totalStars(progress), total: 90 })}</span><button data-star-tree>${t("ambush.starTree")} (${ambushPool(progress)} ★)</button></div>
-   <div class="ambush-level-columns">${["I", "II", "III"].map((level) => `<span>${t("ambush.levelColumn", { level })}</span>`).join("")}</div>
-   ${AREAS.map(
-     (area) =>
-       `<section class="ambush-zone" style="${areaStyle(area)}"><h2>${area.name} <small>${t("ambush.stars", { stars: AMBUSH_LEVELS.filter((l) => l.area === area.id).reduce((n, l) => n + (progress.stars[l.id] ?? 0), 0), total: 9 })}</small></h2><div class="ambush-level-cards">${AMBUSH_LEVELS.filter(
-         (l) => l.area === area.id,
-       )
-         .map((l) => {
-           const index = AMBUSH_LEVELS.indexOf(l),
-             stars = progress.stars[l.id] ?? 0,
-             open = levelUnlocked(progress, index);
-           return `<button class="ambush-level-card" data-level="${index}" ${open ? "" : "disabled"} aria-label="${l.name}, ${t("ambush.stars", { stars, total: 3 })}${open ? "" : `, ${t("ambush.locked")}`}"><div class="ambush-level-preview" aria-hidden="true"><canvas data-preview="${index}"></canvas></div><strong>${l.name}</strong><span class="ambush-card-stars" data-stars="${stars}" aria-hidden="true">${"★".repeat(stars)}${"☆".repeat(3 - stars)}</span></button>`;
-         })
-         .join("")}</div></section>`,
-   ).join("")}`;
+    this.root.innerHTML = `<div class="ambush-select-head"><span class="ambush-total" aria-label="${t("ambush.stars", { stars: totalStars(progress), total: 90 })}">${iconImg("star", 2)} ${totalStars(progress)}/90</span><button data-star-tree>${t("ambush.starTree")} (${ambushPool(progress)} ★)</button></div><div class="ambush-map"></div>`;
     this.root.querySelector<HTMLButtonElement>("[data-star-tree]")!.onclick = () => {
       this.tree?.destroy();
       this.tree = new AmbushStarTree(
@@ -72,14 +61,24 @@ export class AmbushPage {
         () => this.host.save().settings.reduceMotion,
       );
     };
-    this.previews = observePreviews(this.root);
-    this.root.querySelectorAll<HTMLButtonElement>("[data-level]").forEach((b) => (b.onclick = () => this.open(Number(b.dataset.level))));
+    this.map = new WorldMapView(this.root.querySelector<HTMLElement>(".ambush-map")!, progress, {
+      reduceMotion: () => this.host.save().settings.reduceMotion || matchMedia("(prefers-reduced-motion: reduce)").matches,
+      open: (index) => this.open(index),
+      seen: () => {
+        const count = visibleLevels(progress).length;
+        if (progress.seen !== count) {
+          progress.seen = count;
+          this.host.store();
+        }
+      },
+    });
   }
   private open(index: number) {
     if (!levelUnlocked(this.host.save().campaigns.ambush, index)) return;
     this.tree?.destroy();
     this.tree = undefined;
-    this.previews?.();
+    this.map?.destroy();
+    this.map = undefined;
     this.root.classList.remove("ambush-select");
     this.running = true;
     if (this.battle) this.battle.selectLevel(index);
