@@ -6,14 +6,14 @@ import { dist } from "../exact.ts";
 export type LevelPoint = { x: number; y: number };
 export type AmbushLevel = { id: string; area: AreaId; zone: number; index: number; name: string; seed: number };
 export type Stars = 0 | 1 | 2 | 3;
-export type AmbushProgress = { stars: Partial<Record<string, Stars>>; autoSend?: true; ranks?: AmbushRanks; attempts?: Partial<Record<string, number>> };
+export type AmbushProgress = { stars: Partial<Record<string, Stars>>; autoSend?: true; ranks?: AmbushRanks; attempts?: Partial<Record<string, number>>; seen?: number };
 const names = [
   ["Old Road", "Mossy Ford", "Ruin Gate"],
   ["Sandway", "Sunken Well", "Amber Pass"],
   ["Gravel Road", "Crystal Crossing", "Cavern Gate"],
   ["Cinder Road", "Slag Crossing", "Forge Gate"],
-  ["Spore Trail", "Mushroom Grove", "Hollow Gate"],
   ["Ice Road", "Frost Crossing", "Vault Gate"],
+  ["Spore Trail", "Mushroom Grove", "Hollow Gate"],
   ["Shard Trail", "Prism Crossing", "Geode Gate"],
   ["Ash Road", "Grave Crossing", "Crypt Gate"],
   ["Star Road", "Comet Crossing", "Sanctuary Gate"],
@@ -44,7 +44,7 @@ export function recordStars(progress: AmbushProgress, level: AmbushLevel, stars:
 export function decodeAmbush(raw: unknown): AmbushProgress {
   const out: AmbushProgress = { stars: {} };
   if (!raw || typeof raw !== "object") return out;
-  const value = raw as { stars?: Record<string, unknown>; cleared?: number; autoSend?: unknown; ranks?: unknown; attempts?: Record<string, unknown> };
+  const value = raw as { stars?: Record<string, unknown>; cleared?: number; autoSend?: unknown; ranks?: unknown; attempts?: Record<string, unknown>; seen?: unknown };
   if (value.stars && typeof value.stars === "object") {
     for (const level of AMBUSH_LEVELS) {
       const n = value.stars[level.id];
@@ -60,6 +60,8 @@ export function decodeAmbush(raw: unknown): AmbushProgress {
     const n = value.attempts?.[level.id];
     if (Number.isSafeInteger(n) && Number(n) > 0 && Number(n) <= 1e9) (out.attempts ??= {})[level.id] = Number(n);
   }
+  // How many levels the world map has already shown, so it draws the way only to new ones.
+  if (Number.isInteger(value.seen) && Number(value.seen) >= 1 && Number(value.seen) <= AMBUSH_LEVELS.length) out.seen = Number(value.seen);
   return out;
 }
 export function pointAlong(points: readonly LevelPoint[], fraction: number): LevelPoint {
