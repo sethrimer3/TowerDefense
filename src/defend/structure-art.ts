@@ -1,5 +1,5 @@
 import { drawSquareRange } from "./square-range-art.ts";
-import { HALL_FACE, angled, kindFaceDepth } from "./angle-view.ts";
+import { FENCE_RISE, HALL_FACE, angled, kindFaceDepth } from "./angle-view.ts";
 import { ANGLED_KEEP_H, ANGLED_KEEP_W, angledKeepPixels } from "./keep-angle-art.ts";
 import { sourcePixels } from "./sprite-source.ts";
 import { flagPixels as profilePixels, type Flag } from "../profile/model.ts";
@@ -67,8 +67,12 @@ function paintYard(c: CanvasRenderingContext2D, kind: StructureKind, box: ArtBox
   // Posts only at the fence's two corners, at the ends of its north rail.
   const north = parts.fence.find((f) => f.y1 === f.y2);
   const corners = north ? [{ x: ox + north.x1, y: oy + north.y1 }, { x: ox + north.x2, y: oy + north.y2 }] : [];
+  // At a slant the side rails run on under the hall (past the clip by
+  // more than their raised south end), so they pass behind its roof
+  // rather than stopping short of it.
+  const under = angle ? (FENCE_RISE + 4) / ART : 0;
   const fence = (pick: (f: YardParts["fence"][number]) => boolean) =>
-    drawFenceSections(c, box.px, parts.fence.filter(pick).map((f) => ({ x1: ox + f.x1, y1: oy + f.y1, x2: ox + f.x2, y2: oy + f.y2, broken: false })), false, undefined, angle, corners);
+    drawFenceSections(c, box.px, parts.fence.filter(pick).map((f) => ({ x1: ox + f.x1, y1: oy + f.y1, x2: ox + f.x2, y2: oy + f.y2 + (f.x1 === f.x2 ? under : 0), broken: false })), false, undefined, angle, corners);
   const rise = angle ? PROP_RISE : 0;
   const props = () =>
     parts.props.forEach((prop, i) => {
