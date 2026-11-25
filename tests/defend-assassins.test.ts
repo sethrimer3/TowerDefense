@@ -19,7 +19,7 @@ import { generateCity } from "../src/defend/citygen.ts";
 import { Barracks, stepSwordsman } from "../src/defend/troops.ts";
 import { ASSASSIN_UNIT, type PaletteItem } from "../src/defend/catalog.ts";
 import { kindStats } from "../src/ui/specialty.ts";
-import { PATH_LOOKS, structurePixels } from "../src/defend/tower-art.ts";
+import { PATH_LOOKS, structurePixels, structureYardParts, type PlacedKind } from "../src/defend/tower-art.ts";
 
 type S = ReturnType<typeof defaults>;
 
@@ -206,8 +206,10 @@ test("Headhunters go for the toughest prey they can reach, with a bounty of its 
 
 test("each path has its own look on the board", () => {
   assert.deepEqual(PATH_LOOKS.assassinDen, ["bloodletters", "shadowcloak", "venom", "headhunters"]);
-  const art = ["", ...PATH_LOOKS.assassinDen!].map((look) => structurePixels("assassinDen", 3, 3, 0, 1, look).join());
-  for (const k of ["bloodHall", "veilHouse", "poisonDen"] as const) art.push(...["", PATH_LOOKS[k]![0]].map((look) => structurePixels(k, 4, 4, 0, 1, look).join()));
+  // What stands in a yard is drawn apart (`structureYardParts`) and counts too.
+  const whole = (k: PlacedKind, n: number, look: string) => structurePixels(k, n, n, 0, 1, look).join() + "|" + (structureYardParts(k, n, n, look)?.props.map((p) => `${p.x},${p.y}:${p.pixels.join()}`).join(";") ?? "");
+  const art = ["", ...PATH_LOOKS.assassinDen!].map((look) => whole("assassinDen", 3, look));
+  for (const k of ["bloodHall", "veilHouse", "poisonDen"] as const) art.push(...["", PATH_LOOKS[k]![0]].map((look) => whole(k, 4, look)));
   assert.equal(new Set(art).size, art.length);
   for (const p of ["bloodletters", "shadowcloak", "venom"] as const) assert.equal(pathById(p).topic, DENS[p]);
   assert.equal(pathById("headhunters").topic, "assassinDen", "the spare stays the den's");

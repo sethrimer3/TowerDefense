@@ -17,7 +17,9 @@ import { drawSprite, sprite, spriteCanvas } from "./damage-art.ts";
 import { ART_NAMES, artOverride } from "./art-overrides.ts";
 import { onPixelArt } from "./pixel-sprites.ts";
 
-import { artLook, structurePixels, structureRubblePixels, structureYard } from "./tower-art.ts";
+import { artLook, standingProp, structurePixels, structureRubblePixels, structureYard, structureYardParts, type YardParts } from "./tower-art.ts";
+import { drawFenceSections } from "./fences.ts";
+import type { PlacedKind } from "./layout.ts";
 
 /** Medieval roofing: terracotta tile, old brick, weathered timber, thatch,
  * slate and straw. */
@@ -45,6 +47,43 @@ export function paintStructureArt(c: CanvasRenderingContext2D, kind: StructureKi
   const drop = angle && structureYard(kind, cw, ch, look) ? HALL_FACE : 0;
   const art = sprite(`${kind}:${cw}x${ch}:${stage}:${seed}${look ? `:${look}` : ""}${angle ? `:a${depth}:${drop}` : ""}`, cw * ART, ch * ART + depth, () => structurePixels(kind, cw, ch, stage, seed, look, drop, depth));
   drawSprite(c, art, x, y, w, depth ? Math.round(box.y + box.h + (depth * box.px) / ART) - y : h);
+  paintYard(c, kind, box, cw, ch, look, angle, drop, depth);
+}
+
+/** Angle view: how many art pixels a yard's props stand up. */
+const PROP_RISE = 3;
+
+/** A yarded structure's fence and what stands in its yard, drawn over its
+ * art (`structureYardParts`), only over the yard's rows so the hall stays
+ * in front; seen at a slant (`angle`) they stand up. */
+function paintYard(c: CanvasRenderingContext2D, kind: StructureKind, box: ArtBox, cw: number, ch: number, look: string, angle: boolean, drop: number, depth: number) {
+  const parts = structureYardParts(kind as PlacedKind, cw, ch, look, drop, depth);
+  if (!parts) return;
+  const k = box.px / ART, ox = box.x / box.px, oy = box.y / box.px;
+  c.save();
+  c.beginPath();
+  c.rect(-1e6, -1e6, 2e6, 1e6 + Math.round(box.y + parts.rows * k));
+  c.clip();
+  const fence = (pick: (f: YardParts["fence"][number]) => boolean) =>
+    drawFenceSections(c, box.px, parts.fence.filter(pick).map((f) => ({ x1: ox + f.x1, y1: oy + f.y1, x2: ox + f.x2, y2: oy + f.y2, broken: false })), false, undefined, angle);
+  const rise = angle ? PROP_RISE : 0;
+  const props = () =>
+    parts.props.forEach((prop, i) => {
+      const art = sprite(`yard:${kind}:${cw}x${ch}:${look}:${drop}:${i}:${rise}`, prop.w, prop.h + rise, () => (rise ? standingProp(prop, rise) : prop.pixels));
+      const X = Math.round(box.x + prop.x * k), Y = Math.round(box.y + (prop.y - rise) * k);
+      drawSprite(c, art, X, Y, Math.round(box.x + (prop.x + prop.w) * k) - X, Math.round(box.y + (prop.y + prop.h) * k) - Y);
+    });
+  // From above the fence stands over what's in the yard; at a slant the
+  // north fence is behind it and the sides beside it.
+  if (angle) {
+    fence((f) => f.y1 === f.y2);
+    props();
+    fence((f) => f.x1 === f.x2);
+  } else {
+    props();
+    fence(() => true);
+  }
+  c.restore();
 }
 
 /** A fallen structure's rubble over its cells (`box`, canvas pixels). */

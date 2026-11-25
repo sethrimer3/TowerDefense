@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { outlinePixels, damageStage, wallDamagePixels, wallRubblePixels } from "../src/defend/damage-art.ts";
 import { STRUCTURES } from "../src/defend/catalog.ts";
 import { PATHS, isSpell } from "../src/knowledge-paths.ts";
-import { PATH_LOOKS, artLook, structurePixels, structureRubblePixels, type PlacedKind } from "../src/defend/tower-art.ts";
+import { PATH_LOOKS, artLook, structurePixels, structureRubblePixels, structureYardParts, type PlacedKind } from "../src/defend/tower-art.ts";
 import { houseDamagePixels, houseRubblePixels } from "../src/defend/roof-art.ts";
 import { ART } from "../src/defend/park-art.ts";
 
@@ -71,11 +71,14 @@ test("path looks: every building path has its own sprite, distinct from the base
   }
   for (const [kind, looks] of Object.entries(PATH_LOOKS) as [PlacedKind, string[]][]) {
     const { w, h } = STRUCTURES[kind];
-    const seen = [structurePixels(kind, w, h, 0, 41)];
+    // A yarded building's look counts what stands in its yard too, drawn
+    // apart (`structureYardParts`).
+    const whole = (look?: string) => [...structurePixels(kind, w, h, 0, 41, look)].join() + "|" + (structureYardParts(kind, w, h, look)?.props.map((p) => `${p.x},${p.y}:${[...p.pixels].join()}`).join(";") ?? "");
+    const seen = [whole()];
     for (const look of looks) {
       const art = structurePixels(kind, w, h, 0, 41, look);
-      for (const other of seen) assert.notDeepEqual(art, other, `${kind} ${look} differs`);
-      seen.push(art);
+      for (const other of seen) assert.notEqual(whole(look), other, `${kind} ${look} differs`);
+      seen.push(whole(look));
       for (let s = 0; s < 4; s++) assert.equal(structurePixels(kind, w, h, s, 41, look).length, w * ART * h * ART);
       // Inside the crisp outline: the frame's corner pixel stays empty.
       assert.equal(art[0] >>> 24, 0, `${kind} ${look} keeps its border clear`);

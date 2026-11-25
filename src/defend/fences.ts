@@ -247,7 +247,7 @@ const STOUT = { rail: 4, post: 5, tones: { rail: ["#6e4a2a", "#8a6038", "#a37446
 /** Standing fence sections (an Ambush outpost's fence cells, a park's
  * ring), all of them at once so the posts know where the fence stops; with
  * `fall`, pieces going up as `Fences.draw` says. */
-export function drawFenceSections(c: CanvasRenderingContext2D, px: number, sections: FenceSection[], shadow = false, fall?: FenceFall) {
+export function drawFenceSections(c: CanvasRenderingContext2D, px: number, sections: FenceSection[], shadow = false, fall?: FenceFall, slant = angled()) {
   const intact = sections.filter((s) => !s.broken);
   const a = px / 8, snap = (v: number) => Math.round(v * a);
   // Fills art pixels [u0, u1) × [v0, v1), measured from cell point (x, y).
@@ -267,9 +267,8 @@ export function drawFenceSections(c: CanvasRenderingContext2D, px: number, secti
       if (flat) fill(x, y, -half + 2, half, len + half + 2, half + 2, "rgba(6,10,5,0.36)");
       else fill(x, y, half, -half + 2, half + 2, len + half + 2, "rgba(6,10,5,0.36)");
     }
-  // Seen at a slant (Angle view) they stand up, drawn from the back forward
-  // so nearer pieces cover farther ones.
-  const slant = angled();
+  // Seen at a slant (`slant`, Angle view) they stand up, drawn from the
+  // back forward so nearer pieces cover farther ones.
   const rails = slant ? [...intact].sort((p, q) => Math.max(p.y1, p.y2) - Math.max(q.y1, q.y2)) : intact;
   for (const s of rails) {
     const f = fall ? fall.rail(s.x1, s.y1, s.x2, s.y2) : null;
