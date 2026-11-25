@@ -721,9 +721,12 @@ export function structureYardParts(kind: PlacedKind, cw: number, ch: number, loo
 
 /** The fence round a yard's earth `box` (art pixels) on a lot `w` wide:
  * its rails along the lot's edges, down both sides to the hall, cut at
- * every cell line so its posts stand every other cell. */
+ * every cell line so its posts stand every other cell. Its posts' outer
+ * edges sit flush with the hall's outline (`frame`: columns 1 to w − 3,
+ * from row 1), a post reaching two pixels west or north of its line and
+ * three east. */
 function yardFenceSections(box: YardBox, w: number): YardParts["fence"] {
-  const W = 2 / ART, E = (w - 2) / ART, N = 2 / ART, S = (box.y1 + 1) / ART;
+  const W = 3 / ART, E = (w - 5) / ART, N = 3 / ART, S = (box.y1 + 1) / ART;
   const cut = (a: number, b: number) => {
     const at = [a];
     for (let k = Math.floor(a) + 1; k < b; k++) at.push(k);
