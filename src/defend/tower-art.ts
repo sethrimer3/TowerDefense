@@ -269,6 +269,7 @@ export function structurePixels(kind: PlacedKind, cw: number, ch: number, stage 
   p.h = h;
   // An artist's sprite stands in for the drawn one (`art-overrides.ts`).
   const own = artOverride(ART_NAMES.structure(kind, cw, ch, artLook(kind, look)), w, h);
+  yardBox = null;
   if (own) out.set(own);
   else {
     hallDrop = drop;
@@ -278,6 +279,10 @@ export function structurePixels(kind: PlacedKind, cw: number, ch: number, stage 
     wallDepth = 0;
   }
   p.finish();
+  // A yard's fence and what stands in it are sprites of their own
+  // (`structureYardParts`), its earth left in their place.
+  const box = takeYardBox();
+  if (box) yardParts.set(partsKey(kind, cw, ch, look, drop), { rows: box.y1 + 1, fence: yardFenceSections(box, w), props: liftProps(out, w, box) });
   // Whatever drew no wall of its own hangs one from its lowest pixels.
   if (depth && !out.subarray(w * h).some((v) => v >>> 24 >= 128)) hangWall(out, w, h, depth, MATERIAL[kind].m.tones, hash(seed, 0x5a), kind);
   damage(pixels(out, w, full), stage, hash(seed, KINDS.indexOf(kind)), MATERIAL[kind].m);
@@ -667,27 +672,155 @@ function glyph(p: Pix, x: number, y: number, rows: readonly string[], pal: Recor
 function guild(p: Pix, roof: number, emblem: readonly string[], pal: Record<string, number>) {
   const { x0, y0, x1, y1 } = frame(p.w, p.h);
   const { split, seen } = yardSplit(y0, y1, 0.6);
-  rect(p, x0, y0, x1, split, OUTLINE);
-  for (let y = y0 + 1; y < split; y++)
-    for (let x = x0 + 1; x < x1; x++) p.set(x, y, C.dirt[hash(x, y, 43) % 5 === 0 ? 0 : hash(x, y, 44) % 4 === 0 ? 2 : 1]);
-  yardFence(p, x0 + 1, x1 - 1, y0 + 1);
+  yardGround(p, x0, y0, x1, split);
   hall(p, x0, split, x1, y1, roof);
   const w = emblem[0].length, h = emblem.length;
   glyph(p, Math.round((x0 + x1 - w) / 2), Math.round((split + y1 - h) / 2), emblem, pal);
   return { x0: x0 + 1, y0: y0 + 1, x1: x1 - 1, y1: seen - 1 };
 }
 
-/** Seen at a slant (Angle view), the inner face of a yard's north fence,
- * from `x0` to `x1` with its top at row `y`: boards between posts, the
- * yard's earth in its shadow at the foot. Nothing seen from above. */
-function yardFence(p: Pix, x0: number, x1: number, y: number) {
-  if (!wallDepth) return;
-  for (let x = x0; x <= x1; x++) {
-    const post = (x - x0) % 4 === 0 || x === x1;
-    p.set(x, y, post ? C.timber : C.plank[2]);
-    p.set(x, y + 1, post ? shade(C.timber, 0.8) : C.plank[1]);
-    p.set(x, y + 2, shade(C.dirt[0], 0.8));
-  }
+/** Packed earth over a yard from (`x0`, `y0`) to (`x1`, `split`) inside
+ * its outline, a line parting it from the hall at `split`, and records the
+ * box (`yardBox`). Its fence is no part of the art: `structureYardParts`
+ * gives it, drawn like every wooden fence (`drawFenceSections`). */
+function yardGround(p: Pix, x0: number, y0: number, x1: number, split: number) {
+  for (let x = x0; x <= x1; x++) p.set(x, split, OUTLINE);
+  for (let y = y0 + 1; y < split; y++) for (let x = x0 + 1; x < x1; x++) p.set(x, y, yardDirt(x, y));
+  yardBox = { x0: x0 + 1, y0: y0 + 1, x1: x1 - 1, y1: split - 1, earth: yardDirt };
+}
+
+/** Lays the last yard (`yardBox`) in new ground, `earth` at each art pixel,
+ * so what stands on it is still told from it. */
+function regroundYard(p: Pix, earth: (x: number, y: number) => number) {
+  if (!yardBox) return;
+  yardBox.earth = earth;
+  for (let y = yardBox.y0; y <= yardBox.y1; y++) for (let x = yardBox.x0; x <= yardBox.x1; x++) p.set(x, y, earth(x, y));
+}
+
+type YardBox = { x0: number; y0: number; x1: number; y1: number; earth: (x: number, y: number) => number };
+
+/** A yarded structure's yard as drawn apart from its art: how many art
+ * rows from the lot's top it covers, its wooden fence (`FenceSection`s in
+ * cells from the lot's top left: west, north and east, meeting the hall),
+ * and the things standing in it (each its own sprite, art pixels from the
+ * lot's top left). */
+export type YardParts = { rows: number; fence: { x1: number; y1: number; x2: number; y2: number }[]; props: YardProp[] };
+export type YardProp = { x: number; y: number; w: number; h: number; pixels: Uint32Array };
+
+const yardParts = new Map<string, YardParts>();
+const partsKey = (kind: PlacedKind, cw: number, ch: number, look: string, drop: number) => `${kind}:${cw}x${ch}:${artLook(kind, look)}:${drop}`;
+
+/** `kind`'s yard drawn apart (`YardParts`) at `cw × ch` cells in `look`, as
+ * `structurePixels` draws it with `drop` and `depth`; null for a building
+ * with none, or an artist's sprite. */
+export function structureYardParts(kind: PlacedKind, cw: number, ch: number, look = "", drop = 0, depth = 0): YardParts | null {
+  const key = partsKey(kind, cw, ch, look, drop);
+  if (!yardParts.has(key) && structureYard(kind, cw, ch, look, drop)) structurePixels(kind, cw, ch, 0, 0, look, drop, depth);
+  return yardParts.get(key) ?? null;
+}
+
+/** The fence round a yard's earth `box` (art pixels) on a lot `w` wide:
+ * its rails along the lot's edges, down both sides to the hall, cut at
+ * every cell line so its posts stand every other cell. */
+function yardFenceSections(box: YardBox, w: number): YardParts["fence"] {
+  const W = 2 / ART, E = (w - 2) / ART, N = 2 / ART, S = (box.y1 + 1) / ART;
+  const cut = (a: number, b: number) => {
+    const at = [a];
+    for (let k = Math.floor(a) + 1; k < b; k++) at.push(k);
+    at.push(b);
+    return at.slice(1).map((v, i) => [at[i], v] as const);
+  };
+  return [
+    ...cut(N, S).map(([a, b]) => ({ x1: W, y1: a, x2: W, y2: b })),
+    ...cut(W, E).map(([a, b]) => ({ x1: a, y1: N, x2: b, y2: N })),
+    ...cut(N, S).map(([a, b]) => ({ x1: E, y1: a, x2: E, y2: b })),
+  ];
+}
+
+/** Takes what stands in a yard out of `out` (`w` wide) as sprites of their
+ * own: every patch of the yard's area (`box` and the pixel round it) that
+ * isn't its earth, apart from scuffs in the earth's own colours, each
+ * patch's outline left to the sprite's own; the earth (or nothing, off it)
+ * is left in its place. */
+function liftProps(out: Uint32Array, w: number, box: YardBox): YardProp[] {
+  const x0 = box.x0 - 1, y0 = box.y0 - 1, x1 = box.x1 + 1, y1 = box.y1;
+  const inside = (x: number, y: number) => x >= x0 && x <= x1 && y >= y0 && y <= y1;
+  const earth = (x: number, y: number) => (x >= box.x0 && x <= box.x1 && y >= box.y0 ? rgba(box.earth(x, y)) : 0);
+  const dirt = new Set<number>();
+  for (let y = box.y0; y <= box.y1; y++) for (let x = box.x0; x <= box.x1; x++) dirt.add(earth(x, y));
+  const marked = (x: number, y: number) => inside(x, y) && out[y * w + x] >>> 24 >= 128 && out[y * w + x] !== earth(x, y);
+  const seen = new Uint8Array(out.length), props: YardProp[] = [], ink = rgba(OUTLINE);
+  for (let sy = y0; sy <= y1; sy++)
+    for (let sx = x0; sx <= x1; sx++) {
+      if (seen[sy * w + sx] || !marked(sx, sy)) continue;
+      const cells: number[] = [sy * w + sx];
+      seen[sy * w + sx] = 1;
+      for (let k = 0; k < cells.length; k++) {
+        const x = cells[k] % w, y = (cells[k] - x) / w;
+        for (let dy = -1; dy <= 1; dy++)
+          for (let dx = -1; dx <= 1; dx++) {
+            const i = (y + dy) * w + x + dx;
+            if ((dx || dy) && !seen[i] && marked(x + dx, y + dy)) seen[i] = 1, cells.push(i);
+          }
+      }
+      if (cells.every((i) => dirt.has(out[i]))) continue;
+      // Its own outline pixels round its edge go; the sprite draws one.
+      const keep = new Set(cells);
+      for (let changed = true; changed; ) {
+        changed = false;
+        for (const i of keep) {
+          if (out[i] !== ink) continue;
+          const x = i % w;
+          if (![i - 1, i + 1, i - w, i + w].every((n) => keep.has(n) && (Math.abs((n % w) - x) <= 1))) keep.delete(i), (changed = true);
+        }
+      }
+      let ax = Infinity, ay = Infinity, bx = -1, by = -1;
+      for (const i of keep) {
+        const x = i % w, y = (i - x) / w;
+        ax = Math.min(ax, x), ay = Math.min(ay, y), bx = Math.max(bx, x), by = Math.max(by, y);
+      }
+      if (keep.size) {
+        const pw = bx - ax + 1, ph = by - ay + 1, pixels = new Uint32Array(pw * ph);
+        for (const i of keep) {
+          const x = i % w, y = (i - x) / w;
+          pixels[(y - ay) * pw + x - ax] = out[i];
+        }
+        props.push({ x: ax, y: ay, w: pw, h: ph, pixels });
+      }
+      for (const i of cells) out[i] = earth(i % w, Math.floor(i / w));
+    }
+  return props;
+}
+
+/** A yard prop seen at a slant (Angle view): its art as from above, `rise`
+ * rows of it hung below each column's foot in shade. Pure. */
+export function standingProp(prop: YardProp, rise: number): Uint32Array {
+  const { w, h, pixels } = prop, out = new Uint32Array(w * (h + rise));
+  out.set(pixels);
+  for (let x = 0; x < w; x++)
+    for (let y = 0; y < h; y++) {
+      const v = pixels[y * w + x];
+      if (v >>> 24 < 128 || (y + 1 < h && pixels[(y + 1) * w + x] >>> 24 >= 128)) continue;
+      const rgb = ((v & 0xff) << 16) | (v & 0xff00) | ((v >>> 16) & 0xff);
+      for (let d = 1; d <= rise; d++) {
+        const i = (y + d) * w + x;
+        if (out[i]) break;
+        out[i] = rgba(shade(rgb, d === 1 ? 0.5 : 0.7));
+      }
+    }
+  return out;
+}
+
+/** A yard's earth at art pixel (x, y). */
+const yardDirt = (x: number, y: number) => C.dirt[hash(x, y, 43) % 5 === 0 ? 0 : hash(x, y, 44) % 4 === 0 ? 2 : 1];
+
+/** The earth of the yard last painted (`yardGround`), or null. */
+let yardBox: YardBox | null = null;
+/** `yardBox`, cleared. */
+function takeYardBox() {
+  const box = yardBox;
+  yardBox = null;
+  return box;
 }
 
 /** Where a yarded lot from `y0` to `y1` parts its yard from its hall, the
@@ -1374,8 +1507,7 @@ const SHADE_FACE = ["..000..", ".01110.", "0122210", "0244420", "0214120", "0122
  * in a ring round a pool of darkness, wisps rising off it. */
 function paintShadow(p: Pix) {
   const y = guild(p, C.flag[1], SHADE_FACE, { 0: OUTLINE, 1: C.flag[2], 2: C.dusk, 4: 0xd8e4ff });
-  for (let yy = y.y0; yy <= y.y1; yy++)
-    for (let x = y.x0; x <= y.x1; x++) p.set(x, yy, C.char[hash(x, yy, 71) % 6 === 0 ? 0 : hash(x, yy, 72) % 5 === 0 ? 2 : 1]);
+  regroundYard(p, (x, yy) => C.char[hash(x, yy, 71) % 6 === 0 ? 0 : hash(x, yy, 72) % 5 === 0 ? 2 : 1]);
   const cx = (y.x0 + y.x1 + 1) / 2, cy = (y.y0 + y.y1 + 1) / 2, r = Math.min(y.x1 - y.x0, y.y1 - y.y0) / 2;
   // The pool: black at its heart, a violet sheen at its lit edge.
   disc(p, cx, cy, r * 0.55, (x, yy, d, dx, dy) => (d > r * 0.55 - 0.8 ? OUTLINE : lit(x, yy, dx, dy, d) > 1 ? C.slate[1] : d < r * 0.3 ? 0x07060a : C.flag[0]));
@@ -1395,11 +1527,7 @@ function paintArcherBarracks(p: Pix, look: string) {
   const { x0, y0, x1, y1 } = frame(p.w, p.h);
   // The hall to the south, its yard behind it: packed earth inside a fence outline.
   const { split, seen } = yardSplit(y0, y1, 0.62);
-  rect(p, x0, y0, x1, split, OUTLINE);
-  for (let y = y0 + 1; y < split; y++)
-    for (let x = x0 + 1; x < x1; x++) p.set(x, y, C.dirt[hash(x, y, 43) % 5 === 0 ? 0 : hash(x, y, 44) % 4 === 0 ? 2 : 1]);
-  for (let x = x0 + 1; x < x1; x += 3) p.set(x, y0 + 1, C.plank[2]);
-  yardFence(p, x0 + 1, x1 - 1, y0 + 1);
+  yardGround(p, x0, y0, x1, split);
   hall(p, x0, split, x1, y1, rangers ? C.moss : skirmishers ? C.tar : C.timber, "timber");
   for (let x = x0 + 2; x < x0 + 7; x++) p.set(x, seen - 2, x % 2 ? C.plank[3] : C.plank[1]);
   const ty = (y0 + seen) / 2 + 0.5;

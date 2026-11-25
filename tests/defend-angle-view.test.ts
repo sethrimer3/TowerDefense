@@ -162,3 +162,34 @@ test("a wooden gate seen at a slant hangs faces below its posts and leaves", asy
   const solid = (a: Uint32Array, y0: number, y1: number) => { let n = 0; for (let i = y0 * W; i < y1 * W; i++) if (a[i] >>> 24 >= 128) n++; return n; };
   assert.ok(solid(slant, 0, H + R) > solid(flat, 0, H));
 });
+
+test("a yard's fence and what stands in it are drawn apart from its building", async () => {
+  const { structurePixels, structureYard, structureYardParts, standingProp, KINDS } = await import("../src/defend/tower-art.ts");
+  const { footprint } = await import("../src/defend/catalog.ts");
+  let yarded = 0;
+  for (const kind of KINDS) {
+    const f = footprint(kind, false);
+    if (!structureYard(kind, f.w, f.h)) continue;
+    yarded++;
+    const parts = structureYardParts(kind, f.w, f.h)!;
+    assert.ok(parts, kind);
+    // A fence down both sides and along the north, ending at the hall.
+    const sides = parts.fence.filter((s) => s.x1 === s.x2), north = parts.fence.filter((s) => s.y1 === s.y2);
+    assert.ok(sides.length >= 2 && north.length >= 1, kind);
+    assert.ok(sides.every((s) => Math.max(s.y1, s.y2) <= parts.rows / ART + 1e-9), kind);
+    // What was lifted out is gone from the art.
+    const w = f.w * ART, art = structurePixels(kind, f.w, f.h, 0, 3);
+    for (const p of parts.props) {
+      assert.ok(p.pixels.some((v) => v >>> 24 >= 128), kind);
+      for (let y = 0; y < p.h; y++)
+        for (let x = 0; x < p.w; x++) {
+          const v = p.pixels[y * p.w + x];
+          if (v >>> 24 >= 128) assert.notEqual(art[(p.y + y) * w + p.x + x], v, `${kind} still holds its prop`);
+        }
+      // Seen at a slant, a prop stands up.
+      assert.equal(standingProp(p, 3).length, p.w * (p.h + 3));
+    }
+  }
+  assert.ok(yarded >= 10);
+  assert.equal(structureYardParts("archerTower", 2, 2), null);
+});
