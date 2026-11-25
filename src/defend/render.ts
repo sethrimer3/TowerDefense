@@ -42,7 +42,7 @@ import { Rain, Snow, ambientFor, type Weather } from "./weather.ts";
 import { areaFade, areaForWave, type AreaId } from "./areas.ts";
 import { gateArtRect } from "./wood-gate-art.ts";
 import { angled, liftPx } from "./angle-view.ts";
-import { FACE_HANG, buildingState, damageKey, gateSpriteOf, shapeOf, hangingFaces, onCityArtLoaded, paintBuildingMask, paintOpenLifts, paintCityLayer, paintFences, paintSpikePoints, paintStanding, stageOf } from "./city-layer.ts";
+import { FACE_HANG, buildingState, damageKey, gateSpriteOf, woodGateLift, shapeOf, hangingFaces, onCityArtLoaded, paintBuildingMask, paintOpenLifts, paintCityLayer, paintFences, paintSpikePoints, paintStanding, stageOf } from "./city-layer.ts";
 import { GATE_FRAMES } from "./gate-art.ts";
 import { peopleAt } from "./gates.ts";
 import type { GateRanks } from "../gate-upgrades.ts";
@@ -898,11 +898,14 @@ export class DefendRenderer {
       });
     }
     // Angle view: what stands lifted over the open ground, over its floor and grass.
+    // An outpost's wooden fences stand on the forest's grass (in Angle
+    // view under what rises over them from the lots south of them).
+    const fenced = this.forestShare() > 0;
+    if (fenced && angled()) paintFences(ctx, this.px, map, sim, true);
     if (covered) paintOpenLifts(ctx, this.px, map, sim, this.area, opts.looks, this.arrival?.omit);
     drawBallistas(ctx, this.px, omit?.size ? { ...map, buildings: map.buildings.filter((b) => !omit.has(b.id)) } : map, sim, sim ? sim.bonuses.gate : opts.gate);
-    // An outpost's wooden fences stand on the forest's grass, and the gates
-    // swing over it.
-    if (this.forestShare() > 0) paintFences(ctx, this.px, map, sim, true);
+    if (fenced && !angled()) paintFences(ctx, this.px, map, sim, true);
+    // The gates swing over the grass.
     this.drawGates(map, sim, opts, dt);
     // Park fences sit on the ground layer, under the lighting and units.
     this.fences.sync(map);
@@ -955,7 +958,8 @@ export class DefendRenderer {
       const frame = Math.round(open * (GATE_FRAMES - 1));
       if (!frame && !b.woodGate) continue;
       const r = gateArtRect(b), px = this.px;
-      const x = Math.round(r.x * px), y = Math.round(r.y * px) - liftPx(b, px);
+      // A wooden gate's art stands taller in Angle view, its faces hung below.
+      const up = liftPx(b, px) + woodGateLift(b, px), x = Math.round(r.x * px), y = Math.round(r.y * px) - up;
       const art = gateSpriteOf(b, frame, stageOf(sim, b));
       if (art) this.ctx.drawImage(art, x, y, Math.round((r.x + r.w) * px) - x, Math.round((r.y + r.h) * px) - liftPx(b, px) - y);
     }

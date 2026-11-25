@@ -27,7 +27,7 @@ import { AREAS, areaArtId, type AreaId } from "./areas.ts";
 import { hasForest } from "./forest.ts";
 import { hasWallArt, wallCapSprite, wallFaceSprite, wallRubbleTones, wallRubbleSource } from "./area-wall-art.ts";
 import { drawPixel, drawRoof, pixelKey, type PixelSprite } from "./pixel-sprites.ts";
-import { HALL_FACE, angled, faceDepth, liftOf, liftPx, setAngled } from "./angle-view.ts";
+import { HALL_FACE, angled, faceDepth, liftOf, liftPx, setAngled, woodGateRise } from "./angle-view.ts";
 import { orthogonal } from "./outline-corners.ts";
 import { KINDS, structureYard } from "./tower-art.ts";
 
@@ -469,7 +469,10 @@ function paintBuildingAt(p: Paint, b: Building) {
       paintArt(p, b.woodGate ? woodGateRubbleSprite(side, lotSeed(b)) : gateRubbleSprite(side, lotSeed(b)), art);
       return paintRebuilding(p, b);
     }
-    return paintArt(p, gateSpriteOf(b, b.woodGate && sim ? -1 : 0, stageOf(sim, b)), art);
+    // Seen at a slant, a wooden gate's art stands taller, its faces hung
+    // below its posts and leaves (`woodGatePixels`' rise).
+    if (b.woodGate) art.y -= woodGateLift(b, px);
+    return paintArt(p, gateSpriteOf(b, b.woodGate && sim ? -1 : 0, stageOf(sim, b)), b.woodGate ? { ...art, h: art.h + woodGateLift(b, px) } : art);
   }
   if (b.kind === "wallBallista") {
     if (sim && !sim.intact(b)) {
@@ -648,9 +651,12 @@ export const gateSprite = (side: Side, frame: number, stage: number, seed: numbe
 export const gateSpriteOf = (b: Building, frame: number, stage: number) =>
   b.woodGate ? woodGateSprite(b.gate!.side, frame, stage, lotSeed(b)) : gateSprite(b.gate!.side, frame, stage, lotSeed(b));
 const woodGateSprite = (side: Side, frame: number, stage: number, seed: number) => {
-  const across = side === "e" || side === "w", u = WOOD_GATE.long * ART, v = WOOD_GATE.deep * ART;
-  return sprite(`woodGate:${side}:${frame}:${stage}:${seed}`, across ? v : u, across ? u : v, () => woodGatePixels(side, frame, stage, seed));
+  const across = side === "e" || side === "w", u = WOOD_GATE.long * ART, v = WOOD_GATE.deep * ART, rise = woodGateRise();
+  return sprite(`woodGate:${side}:${frame}:${stage}:${seed}:${rise}`, across ? v : u, (across ? u : v) + rise, () => woodGatePixels(side, frame, stage, seed, rise));
 };
+/** How far up a wooden gate's art is drawn in Angle view, in whole pixels
+ * at `px` a cell: the rows its faces add below. */
+export const woodGateLift = (b: Building, px: number) => (b.woodGate ? Math.round((woodGateRise() * px) / ART) : 0);
 const woodGateRubbleSprite = (side: Side, seed: number) => {
   const across = side === "e" || side === "w", u = WOOD_GATE.long * ART, v = WOOD_GATE.deep * ART;
   return sprite(`woodGate:${side}:rubble:${seed}`, across ? v : u, across ? u : v, () => woodGateRubblePixels(side, seed));

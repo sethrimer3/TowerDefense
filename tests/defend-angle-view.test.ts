@@ -149,3 +149,16 @@ test("angled halls peak at the north and their roofs overhang the walls", async 
   const mid = (f.h * ART) >> 1;
   assert.notEqual(slant[mid * W + 2], flat[mid * W + 2]);
 });
+
+test("a wooden gate seen at a slant hangs faces below its posts and leaves", async () => {
+  const { woodGatePixels, WOOD_GATE } = await import("../src/defend/wood-gate-art.ts");
+  const { FENCE_POST_RISE } = await import("../src/defend/angle-view.ts");
+  const W = WOOD_GATE.long * ART, H = WOOD_GATE.deep * ART, R = FENCE_POST_RISE;
+  const flat = woodGatePixels("n", 0), slant = woodGatePixels("n", 0, 0, 0, R);
+  assert.equal(slant.length, W * (H + R));
+  // Its tops stay where they were; below them, faces where it had none.
+  const top = (a: Uint32Array) => a.findIndex((v) => v >>> 24 >= 128);
+  assert.equal(top(slant), top(flat));
+  const solid = (a: Uint32Array, y0: number, y1: number) => { let n = 0; for (let i = y0 * W; i < y1 * W; i++) if (a[i] >>> 24 >= 128) n++; return n; };
+  assert.ok(solid(slant, 0, H + R) > solid(flat, 0, H));
+});

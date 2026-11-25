@@ -21,7 +21,7 @@ export const WOOD_GATE = { long: 4, deep: 3 };
 /** Art pixels along the fence and across it, and the fence line's middle. */
 const U = WOOD_GATE.long * ART, V = WOOD_GATE.deep * ART, MID = V / 2;
 
-const NONE = 0, LINE = 1, POST = 2, CAP = 3, PLANK = 4, SEAM = 5, BRACE = 6, IRON = 7;
+const NONE = 0, LINE = 1, POST = 2, CAP = 3, PLANK = 4, SEAM = 5, BRACE = 6, IRON = 7, POST_FACE = 8, PLANK_FACE = 9;
 
 const TONE = {
   post: [0x4a2f19, 0x5e3d22, 0x76502e],
@@ -40,7 +40,7 @@ const POST_W = WOOD_POST, POST_D = 6, LEAF = 4;
  * as RGBA pixels the size of its art box; at `frame` -1, its posts alone
  * (the city layer's, the renderer drawing the leaves over the open way
  * each frame, so a shut pair never shows under an open one). */
-export function woodGatePixels(side: Side, frame = 0, stage = 0, seed = 0): Uint32Array {
+export function woodGatePixels(side: Side, frame = 0, stage = 0, seed = 0, rise = 0): Uint32Array {
   const m = new Uint8Array(U * V);
   const set = (u: number, v: number, k: number) => {
     if (u >= 0 && v >= 0 && u < U && v < V) m[v * U + u] = k;
@@ -59,6 +59,27 @@ export function woodGatePixels(side: Side, frame = 0, stage = 0, seed = 0): Uint
   for (let v = 0; v < V; v++) for (let u = 0; u < U; u++) {
     const [x, y] = at(u, v);
     screen[y * w + x] = m[v * U + u];
+  }
+  if (rise) {
+    // Seen at a slant (Angle view): `rise` more rows below, where each
+    // column's posts and leaves hang their south faces, a dark line at the
+    // top, behind whatever stands in front.
+    const H = h + rise, tall = new Uint8Array(w * H);
+    tall.set(screen);
+    for (let x = 0; x < w; x++)
+      for (let y = 0; y < h; y++) {
+        const k = screen[y * w + x];
+        if (k === NONE || (y + 1 < h && screen[(y + 1) * w + x] !== NONE)) continue;
+        const post = k === POST || k === CAP || (k === LINE && screen[(y - 1) * w + x] === POST);
+        for (let d = 1; d <= rise && y + d < H; d++) {
+          const i = (y + d) * w + x;
+          if (tall[i] !== NONE) break;
+          tall[i] = d === 1 ? SEAM : d === rise ? LINE : post ? POST_FACE : PLANK_FACE;
+        }
+      }
+    const out = colour(tall, w, H, seed);
+    damage(pixels(out, w, H), stage, hash(seed, 0x70d), { tones: TONE.plank, roofed: false });
+    return out;
   }
   const out = artOverride(ART_NAMES.woodGate(side, frame), w, h) ?? colour(screen, w, h, seed);
   damage(pixels(out, w, h), stage, hash(seed, 0x70d), { tones: TONE.plank, roofed: false });
@@ -125,6 +146,8 @@ function colour(m: Uint8Array, w: number, h: number, seed: number): Uint32Array 
         case SEAM: c = TONE.seam; break;
         case BRACE: c = TONE.brace[lit === 2 ? 1 : 0]; break;
         case IRON: c = TONE.iron[lit]; break;
+        case POST_FACE: c = TONE.post[x % 5 === 0 ? 1 : 0]; break;
+        case PLANK_FACE: c = x % 3 === 0 ? TONE.seam : TONE.plank[0]; break;
         default: c = OUTLINE;
       }
       out[y * w + x] = rgba(c);
