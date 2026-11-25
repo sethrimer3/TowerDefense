@@ -26,6 +26,14 @@ export function kindFaceDepth(kind: string): number {
   return HALL_FACE;
 }
 
+/** How many art pixels a wooden fence's rail stands above the ground in
+ * Angle view, and its posts and a wooden gate's: their tops drawn that much
+ * higher, their south faces below. */
+export const FENCE_RISE = 4, FENCE_POST_RISE = 6;
+
+/** A wooden gate's rise in Angle view, in art pixels (0 with it off). */
+export const woodGateRise = () => (on ? FENCE_POST_RISE : 0);
+
 /** How many art pixels a hall's south face hangs (any structure not a tower). */
 export const HALL_FACE = 7;
 

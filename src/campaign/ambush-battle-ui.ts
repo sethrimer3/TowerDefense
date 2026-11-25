@@ -19,7 +19,7 @@ import { iconImg, iconUrl } from "./ambush-icons.ts";
 import { levelUnlocked } from "./levels.ts";
 import { drawFlierWarning } from "./flier-warning.ts";
 import { DefendRenderer } from "../defend/render.ts";
-import { spriteFootprint } from "../defend/city-layer.ts";
+import { setAngleView, spriteFootprint } from "../defend/city-layer.ts";
 import { BoardPointers, eventCell, type BoardAim } from "../defend/board-pointers.ts";
 import { bannerFor, climbsTowers, deployCircle, rallyAim, type Rally } from "../defend/deployment.ts";
 import { shootsFlat } from "../defend/gun-sight.ts";
@@ -215,9 +215,16 @@ export class AmbushBattlePage {
           <button class="ambush-mini" data-action="show" ${this.sideOpen ? "hidden" : ""} aria-label="${t("ambush.buildings")}">
             <span class="ambush-mini-hp"><b id="ambush-mini-label"></b><span id="ambush-mini-health"></span></span>
             <span class="ambush-mini-gold">${iconImg("coin")}<b id="ambush-mini-gold"></b></span>
-          </button>${result}</div>
+          </button>${result}
+          <div class="defend-crisp"><label><input type="checkbox" data-action="angle" ${this.host.save().settings.angleView ? "checked" : ""}> ${t("setting.angleView")}</label></div></div>
       </div>`;
     this.root.querySelector(".campaign-board")!.prepend(this.canvas);
+    const angle = this.root.querySelector<HTMLInputElement>('[data-action="angle"]')!;
+    angle.onchange = () => {
+      this.host.save().settings.angleView = angle.checked;
+      setAngleView(angle.checked);
+      this.host.store();
+    };
     this.root.querySelector("#ambush-health")!.append(this.health.canvas);
     this.root.querySelector("#ambush-mini-health")!.append(this.miniHealth.canvas);
     const button = (action: string) => this.root.querySelector<HTMLButtonElement>('[data-action="' + action + '"]')!;

@@ -12,6 +12,10 @@ import { CellType, type CityMap } from "./citygen.ts";
 import { ENEMIES } from "./catalog.ts";
 import type { DefendSim, Effect } from "./sim.ts";
 import type { Drop, Fall } from "./arrival.ts";
+import { FENCE_POST_RISE, FENCE_RISE, angled } from "./angle-view.ts";
+
+/** Angle view: how high a park's thin fence stands, in cells. */
+const PARK_FENCE_RISE = 0.22;
 
 /** One cell-long section of fence, in cell coordinates. */
 export type FenceSection = { x1: number; y1: number; x2: number; y2: number; broken: boolean };
@@ -279,6 +283,11 @@ export function drawFenceSections(c: CanvasRenderingContext2D, px: number, secti
       if (flat) fill(x, y, -half + 2, half, len + half + 2, half + 2, "rgba(6,10,5,0.36)");
       else fill(x, y, half, -half + 2, half + 2, len + half + 2, "rgba(6,10,5,0.36)");
     }
+  if (angled()) {
+    drawAngledSections(intact, fill);
+    c.restore();
+    return;
+  }
   // The rails: outlined, lit along the top (or the left), shaded below.
   for (const s of intact) {
     const flat = s.y1 === s.y2, x = Math.min(s.x1, s.x2), y = Math.min(s.y1, s.y2), len = (flat ? Math.abs(s.x2 - s.x1) : Math.abs(s.y2 - s.y1)) * 8;
@@ -309,12 +318,73 @@ export function drawFenceSections(c: CanvasRenderingContext2D, px: number, secti
   }
   c.restore();
 }
+/** Where a stout fence's posts stand: at every corner, at every other
+ * cell and wherever the fence stops. */
+function postPoints(intact: FenceSection[]) {
+  const ends = new Map<string, { x: number; y: number; n: number }>();
+  for (const s of intact)
+    for (const [x, y] of [[s.x1, s.y1], [s.x2, s.y2]]) {
+      const k = `${x * 2},${y * 2}`, e = ends.get(k);
+      if (e) e.n++;
+      else ends.set(k, { x, y, n: 1 });
+    }
+  return [...ends.values()].filter(({ x, y, n }) => (x % 1 !== 0 && y % 1 !== 0) || n === 1 || (x % 1 === 0 ? x : y) % 2 === 0);
+}
+
+type Fill = (x: number, y: number, u0: number, v0: number, u1: number, v1: number, colour: string) => void;
+
+/** Stout fence sections seen at a slant (Angle view): each rail raised
+ * `FENCE_RISE` art pixels, an east–west one showing its boarded south face
+ * below its top, a north–south one its top run north and its south end;
+ * the posts raised higher, capped, their faces lit on the left. Drawn from
+ * the back forward so nearer pieces cover farther ones. */
+function drawAngledSections(intact: FenceSection[], fill: Fill) {
+  const { rail, post, tones } = STOUT, half = rail / 2, H = FENCE_RISE;
+  const rails = [...intact].sort((a, b) => Math.max(a.y1, a.y2) - Math.max(b.y1, b.y2));
+  for (const s of rails) {
+    const flat = s.y1 === s.y2, x = Math.min(s.x1, s.x2), y = Math.min(s.y1, s.y2), len = (flat ? Math.abs(s.x2 - s.x1) : Math.abs(s.y2 - s.y1)) * 8;
+    if (flat) {
+      // Top edge `T`: the rail's top (two rows), then its face, boarded.
+      const T = -half - H, row = (v0: number, v1: number, colour: string) => fill(x, y, -half, v0, len + half, v1, colour);
+      row(T, half, OUTLINE);
+      fill(x, y, -half + 1, T + 1, len + half - 1, T + 2, tones.rail[2]);
+      fill(x, y, -half + 1, T + 2, len + half - 1, T + 3, tones.rail[1]);
+      fill(x, y, -half + 1, T + 3, len + half - 1, half - 1, tones.post[1]);
+      fill(x, y, -half + 1, T + 3, len + half - 1, T + 4, tones.post[0]);
+      for (let l = 2; l < len; l += 3) fill(x, y, l, T + 4, l + 1, half - 1, tones.post[0]);
+    } else {
+      // Its top runs from `H` north of its north end; its south end's face
+      // shows below it.
+      const l0 = -half - H, l1 = len + half, face = l1 - H - 1;
+      fill(x, y, -half, l0, half, l1, OUTLINE);
+      fill(x, y, -half + 1, l0 + 1, -half + 2, face, tones.rail[2]);
+      fill(x, y, -half + 2, l0 + 1, half - 1, face, tones.rail[1]);
+      for (let l = l0 + 4; l < face; l += 4) fill(x, y, -half + 2, l, half - 1, l + 1, tones.rail[0]);
+      fill(x, y, -half + 1, face, half - 1, l1 - 1, tones.post[1]);
+      fill(x, y, -half + 1, face, half - 1, face + 1, tones.post[0]);
+    }
+  }
+  const P = FENCE_POST_RISE, p0 = -Math.floor(post / 2), p1 = p0 + post, T = p0 - P;
+  for (const { x, y } of postPoints(intact).sort((a, b) => a.y - b.y)) {
+    fill(x, y, p0, T, p1, p1, OUTLINE);
+    // The cap, lit to the upper left.
+    fill(x, y, p0 + 1, T + 1, p1 - 1, T + post - 1, tones.cap);
+    fill(x, y, p0 + 1, T + 1, p1 - 1, T + 2, tones.post[2]);
+    // The face below it, in shade.
+    fill(x, y, p0 + 1, T + post - 1, p1 - 1, p1 - 1, tones.post[1]);
+    fill(x, y, p0 + 1, T + post - 1, p0 + 2, p1 - 1, tones.post[2]);
+    fill(x, y, p1 - 2, T + post - 1, p1 - 1, p1 - 1, tones.post[0]);
+    fill(x, y, p0 + 1, T + post - 1, p1 - 1, T + post, OUTLINE);
+  }
+}
+
 /** Rails: a dark outline with a lighter wooden core, filled on whole
  * device pixels about the same centres as the posts so every side is even
  * and meets its corners exactly. */
 function drawRails(c: CanvasRenderingContext2D, px: number, sections: FenceSection[]) {
   const dark = Math.max(1, Math.round(px * 0.13)),
-    light = Math.max(1, Math.round(px * 0.06));
+    light = Math.max(1, Math.round(px * 0.06)),
+    rise = angled() ? Math.round(px * PARK_FENCE_RISE) : 0;
   for (const [w, color] of [
     [dark, OUTLINE],
     [light, "#9a7648"],
@@ -326,8 +396,9 @@ function drawRails(c: CanvasRenderingContext2D, px: number, sections: FenceSecti
         b0 = Math.round(Math.min(s.y1, s.y2) * px),
         b1 = Math.round(Math.max(s.y1, s.y2) * px);
       const off = Math.floor(w / 2);
-      if (s.y1 === s.y2) c.fillRect(a0, b0 - off, a1 - a0, w);
-      else c.fillRect(a0 - off, b0, w, b1 - b0);
+      // Seen at a slant, the rail runs at its posts' height.
+      if (s.y1 === s.y2) c.fillRect(a0, b0 - off - rise, a1 - a0, w);
+      else c.fillRect(a0 - off, b0 - rise, w, b1 - b0);
     }
   }
 }
@@ -335,7 +406,8 @@ function drawRails(c: CanvasRenderingContext2D, px: number, sections: FenceSecti
 /** Posts at each end of an intact section (one where sections meet). */
 function drawPosts(c: CanvasRenderingContext2D, px: number, sections: FenceSection[], fall?: (x: number, y: number) => Fall) {
   const post = Math.max(2, Math.round(px * 0.2)),
-    off = Math.floor(post / 2);
+    off = Math.floor(post / 2),
+    rise = angled() ? Math.round(px * PARK_FENCE_RISE) : 0;
   const done = new Set<number>();
   for (const s of sections)
     for (const [x, y] of [
@@ -350,10 +422,15 @@ function drawPosts(c: CanvasRenderingContext2D, px: number, sections: FenceSecti
       const f = fall ? fall(x, y) : null;
       if (f === false) continue;
       const one = () => {
+        // Seen at a slant, a post stands up from its foot, `rise` tall.
         c.fillStyle = OUTLINE;
-        c.fillRect(X, Y, post, post);
+        c.fillRect(X, Y - rise, post, post + rise);
         c.fillStyle = "#7a5a34";
-        c.fillRect(X + 1, Y + 1, Math.max(1, post - 2), Math.max(1, post - 2));
+        c.fillRect(X + 1, Y + 1 - rise, Math.max(1, post - 2), Math.max(1, post - 2 + rise));
+        if (rise) {
+          c.fillStyle = "#5e4428";
+          c.fillRect(X + 1, Y + post - 1 - rise, Math.max(1, post - 2), rise);
+        }
       };
       if (f) dropped(c, px, x, y, f, one);
       else one();
