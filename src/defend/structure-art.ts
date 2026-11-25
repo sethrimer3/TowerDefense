@@ -64,8 +64,11 @@ function paintYard(c: CanvasRenderingContext2D, kind: StructureKind, box: ArtBox
   c.beginPath();
   c.rect(-1e6, -1e6, 2e6, 1e6 + Math.round(box.y + parts.rows * k));
   c.clip();
+  // Posts only at the fence's two corners, at the ends of its north rail.
+  const north = parts.fence.find((f) => f.y1 === f.y2);
+  const corners = north ? [{ x: ox + north.x1, y: oy + north.y1 }, { x: ox + north.x2, y: oy + north.y2 }] : [];
   const fence = (pick: (f: YardParts["fence"][number]) => boolean) =>
-    drawFenceSections(c, box.px, parts.fence.filter(pick).map((f) => ({ x1: ox + f.x1, y1: oy + f.y1, x2: ox + f.x2, y2: oy + f.y2, broken: false })), false, undefined, angle);
+    drawFenceSections(c, box.px, parts.fence.filter(pick).map((f) => ({ x1: ox + f.x1, y1: oy + f.y1, x2: ox + f.x2, y2: oy + f.y2, broken: false })), false, undefined, angle, corners);
   const rise = angle ? PROP_RISE : 0;
   const props = () =>
     parts.props.forEach((prop, i) => {

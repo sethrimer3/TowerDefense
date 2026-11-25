@@ -246,8 +246,9 @@ const STOUT = { rail: 4, post: 5, tones: { rail: ["#6e4a2a", "#8a6038", "#a37446
 
 /** Standing fence sections (an Ambush outpost's fence cells, a park's
  * ring), all of them at once so the posts know where the fence stops; with
- * `fall`, pieces going up as `Fences.draw` says. */
-export function drawFenceSections(c: CanvasRenderingContext2D, px: number, sections: FenceSection[], shadow = false, fall?: FenceFall, slant = angled()) {
+ * `fall`, pieces going up as `Fences.draw` says; with `at`, posts there
+ * only (a yard's corners). */
+export function drawFenceSections(c: CanvasRenderingContext2D, px: number, sections: FenceSection[], shadow = false, fall?: FenceFall, slant = angled(), at?: { x: number; y: number }[]) {
   const intact = sections.filter((s) => !s.broken);
   const a = px / 8, snap = (v: number) => Math.round(v * a);
   // Fills art pixels [u0, u1) × [v0, v1), measured from cell point (x, y).
@@ -277,7 +278,7 @@ export function drawFenceSections(c: CanvasRenderingContext2D, px: number, secti
     if (f) dropped(c, px, (s.x1 + s.x2) / 2, (s.y1 + s.y2) / 2, f, one);
     else one();
   }
-  const posts = postPoints(intact);
+  const posts = at ? [...at] : postPoints(intact);
   if (slant) posts.sort((p, q) => p.y - q.y);
   for (const { x, y } of posts) {
     const f = fall ? fall.post(x, y) : null;
