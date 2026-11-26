@@ -38,7 +38,7 @@ import { ROAD_FRINGE, paintRoads } from "./trail-art.ts";
 import { BANK, FOAM, GLINT, LILY, REED, SAND, WATER, bayer } from "./water-palette.ts";
 import { Birds, roosting } from "./forest-birds.ts";
 import { paintRiver, riverBed, riverCanvas, riverShape, type RiverShape } from "./river-art.ts";
-import { GRASS } from "./ground-art.ts";
+import { GRASS, groundArt } from "./ground-art.ts";
 import { FLAME, SMOKE, artPen } from "./pixel-fx.ts";
 import { ENEMIES } from "./catalog.ts";
 import { isMelee } from "./melee-facing.ts";
@@ -385,7 +385,7 @@ export function forestChanges(a: ForestPlan, b: ForestPlan): Box[] | null {
   differ(a.rocks, b.rocks, (r) => `${r.x},${r.y},${r.size},${r.seed}`, (r) => add(r.x, r.y, r.size + 1.5));
   differ(a.pads, b.pads, (p) => `${p.x},${p.y},${p.r},${p.seed}`, (p) => add(p.x, p.y, p.r * 1.3 + 1.5));
   const wear = (p: ForestPlan, i: number) => p.roads?.wear[i] ?? 0;
-  for (let i = 0; i < CELL_COUNT; i++) if (a.open[i] !== b.open[i] || wear(a, i) !== wear(b, i)) add((i % CELLS_W) + 0.5, Math.floor(i / CELLS_W) + 0.5, 3);
+  for (let i = 0; i < CELL_COUNT; i++) if (a.open[i] !== b.open[i] || a.verge[i] !== b.verge[i] || wear(a, i) !== wear(b, i)) add((i % CELLS_W) + 0.5, Math.floor(i / CELLS_W) + 0.5, 3);
   return mergeBoxes(boxes);
 }
 
@@ -419,10 +419,13 @@ function mergeBoxes(boxes: readonly Box[]): Box[] | null {
   return out;
 }
 
-export function paintFloor(out: Uint32Array, plan: ForestPlan, damage: ForestDamage | null, box: Box, river: ForestRiver | null = null, covered?: Uint8Array, blight?: BlightTrail, sun?: Sun) {
+export function paintFloor(out: Uint32Array, plan: ForestPlan, damage: ForestDamage | null, box: Box, river: ForestRiver | null = null, covered?: Uint8Array, blight?: BlightTrail, sun?: Sun, ground?: { bare: Uint8Array; turf: Uint8Array }) {
   clip = { x0: Math.max(0, box.x0), y0: Math.max(0, box.y0), x1: Math.min(W, box.x1), y1: Math.min(H, box.y1) };
   for (let Y = clip.y0; Y < clip.y1; Y++) out.fill(0, Y * W + clip.x0, Y * W + clip.x1);
   lawnIn(out, plan.open);
+  // The grass creeping over a road's edge (`ground-art.ts`) is the forest's
+  // lawn too, so no line shows where the road's cells begin.
+  if (ground) vergeIn(out, plan.verge, ground.turf);
   if (plan.roads) paintRoads(out, plan.roads, plan.open, clip);
   for (const p of plan.pads) if (nearClip(p.x, p.y, p.r * 1.3 + 0.2)) blob(out, p.x, p.y, p.r, p.seed, DIRT, false);
   for (const c of damage?.clearings ?? []) if (nearClip(c.x, c.y, c.r * 1.3 + 0.2)) blob(out, c.x, c.y, c.r, c.seed, c.burnt ? CHAR : DIRT, false, plan.open);
@@ -450,6 +453,12 @@ export function paintFloor(out: Uint32Array, plan: ForestPlan, damage: ForestDam
   if (covered)
     for (let Y = clip.y0; Y < clip.y1; Y++)
       for (let X = clip.x0, i = Y * W + X; X < clip.x1; X++, i++) if (covered[i]) out[i] = 0;
+  // Where a road's dirt bites into the open ground (`ground-art.ts`), the
+  // floor is left clear for the city layer's dirt, so the road's edge
+  // wanders across the cells' boundary instead of running straight along it.
+  if (ground)
+    for (let Y = clip.y0; Y < clip.y1; Y++)
+      for (let X = clip.x0, i = Y * W + X; X < clip.x1; X++, i++) if (ground.bare[i] && plan.open[cellIndex(Math.floor(X / ART), Math.floor(Y / ART))]) out[i] = 0;
   // What is still grass, before the trees' shadows fall on it.
   for (let Y = clip.y0; Y < clip.y1; Y++)
     for (let X = clip.x0, i = Y * W + X; X < clip.x1; X++, i++) turf[i] = out[i] !== 0 && out[i] === lawn[i] ? 1 : 0;
@@ -481,6 +490,18 @@ function lawnIn(out: Uint32Array, open: Uint8Array) {
       if (!open[cellIndex(cx, cy)]) continue;
       lawnCell(cx, cy, (X, Y, c) => {
         if (inClip(X, Y)) out[Y * W + X] = lawn[Y * W + X] = c;
+      });
+    }
+}
+
+/** The lawn over the `turf` pixels of each `verge` cell in the clip. */
+function vergeIn(out: Uint32Array, verge: Uint8Array, turf: Uint8Array) {
+  for (let cy = Math.floor(clip.y0 / ART); cy * ART < clip.y1; cy++)
+    for (let cx = Math.floor(clip.x0 / ART); cx * ART < clip.x1; cx++) {
+      if (!verge[cellIndex(cx, cy)]) continue;
+      lawnCell(cx, cy, (X, Y, c) => {
+        const i = Y * W + X;
+        if (inClip(X, Y) && turf[i]) out[i] = lawn[i] = c;
       });
     }
 }
@@ -1387,7 +1408,7 @@ export class ForestArt {
     this.floorStale = [];
     if (boxes.length) this.floorVersion++;
     for (const box of boxes) {
-      paintFloor(this.floor.px, this.plan, this.damage, box, this.river, this.covered, blight, this.sun);
+      paintFloor(this.floor.px, this.plan, this.damage, box, this.river, this.covered, blight, this.sun, this.map ? groundArt(this.map, true) : undefined);
       const x0 = Math.max(0, box.x0), y0 = Math.max(0, box.y0);
       this.floor.cv.getContext("2d")!.putImageData(this.floor.img, 0, 0, x0, y0, Math.min(W, box.x1) - x0, Math.min(H, box.y1) - y0);
     }

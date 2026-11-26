@@ -76,13 +76,28 @@ function noise(x: number, y: number, scale: number, salt: number) {
 }
 
 /** What a bake reads a cell as: grass, street dirt, or neither (a kerb). */
-type Ground = { grass: (i: number) => boolean; dirt: (i: number) => boolean };
+type Ground = {
+  grass: (i: number) => boolean;
+  dirt: (i: number) => boolean;
+  /** Dirt the forest's open ground meets (`roadside`). */
+  road: (i: number) => boolean;
+  /** Where grass gives way to dirt at art pixel (x, y), against grass cell `i`. */
+  edge: (i: number, x: number, y: number) => number;
+};
 
 /** Grass: the parks and their ponds, and with `grassy` the open ground and
  * the wooden fences standing on it. Street dirt: the streets, and the lots
  * of the player's structures, the houses and the wooden gates, so a sprite
  * smaller than its lot stands on the street around it rather than on a
  * square of its own. */
+/** Whether cell `i` is a road's dirt as the forest's open ground meets it:
+ * a street, a house or structure lot in a city, or a wooden gate (not a
+ * structure standing out on the open ground, which has no lot). */
+function roadside(map: CityMap, i: number) {
+  const t = map.type[i];
+  return t === CellType.ROAD || t === CellType.HOUSE || (t === CellType.STRUCT && !!map.city[i]) || (t === CellType.WALL && !!map.buildings[map.owner[i]]?.woodGate);
+}
+
 function ground(map: CityMap, grassy: boolean): Ground {
   const fence = (i: number) => map.type[i] === CellType.WALL && !!map.buildings[map.owner[i]]?.fence;
   return {
@@ -94,6 +109,8 @@ function ground(map: CityMap, grassy: boolean): Ground {
       const t = map.type[i];
       return t === CellType.ROAD || t === CellType.STRUCT || t === CellType.HOUSE || (t === CellType.WALL && !!map.buildings[map.owner[i]]?.woodGate);
     },
+    road: (i) => roadside(map, i),
+    edge: (i, x, y) => (grassy && map.type[i] === CellType.OUT ? wildEdge(x, y) : edge(x, y)),
   };
 }
 
@@ -175,6 +192,12 @@ function paintCells(map: CityMap, grassy: boolean, px: Uint32Array, bare: Uint8A
       if (t === CellType.STRUCT && !map.city[i]) continue;
       if (g.dirt(i)) paintStreet(g, px, turf, cx, cy);
       else if (t === CellType.PARK) paintBare(g, px, bare, cx, cy);
+      // The forest's open ground beside a road: the dirt bites into it as
+      // into a park (the forest floor leaves those pixels clear, `bare`),
+      // and the rest is laid with turf under the floor's edge, so a pixel
+      // of misregistration between the two shows grass, not the dark
+      // flagstones beneath.
+      else if (grassy && t === CellType.OUT && nextToRoad(g, cx, cy)) paintBare(g, px, bare, cx, cy, true);
     }
   // Where the edge turns steeply, a bare park pixel can still touch turf
   // across the cells' boundary: the park keeps its grass there.
@@ -195,6 +218,13 @@ function paintCells(map: CityMap, grassy: boolean, px: Uint32Array, bare: Uint8A
 const edge = (x: number, y: number) =>
   0.4 + noise(x, y, 7, 401) * 3.2 + noise(x, y, 2.5, 402) * 1.4 - Math.max(0, noise(x, y, 5, 430) - 0.5) * 11 - noise(x, y, 2, 431) * 0.8;
 
+/** As `edge`, where a road meets the forest's open ground: a wider
+ * meander either way across the cells' boundary (the grass over the dirt
+ * where positive, the dirt into the grass where negative), long swells
+ * with a ragged fringe on top, so a country road never runs ruler straight. */
+const wildEdge = (x: number, y: number) =>
+  0.6 + (noise(x, y, 13, 440) - 0.5) * 7 + (noise(x, y, 5, 441) - 0.5) * 3.4 + (noise(x, y, 1.8, 442) - 0.5) * 1.6;
+
 /** Worn grass is dithered over this many art pixels on the dirt side of
  * the edge. */
 const WORN_BAND = 1.3;
@@ -205,7 +235,7 @@ function paintStreet(g: Ground, px: Uint32Array, turf: Uint8Array, cx: number, c
     for (let i = 0; i < ART; i++) {
       const x = cx * ART + i, y = cy * ART + j, mx = x + 0.5, my = y + 0.5;
       const park = nearest(cx, cy, mx, my, g.grass);
-      const e = park.d - edge(x, y);
+      const e = park.d - g.edge(cellIndex(park.cx, park.cy), x, y);
       const k = y * W + x;
       if (e < 0) {
         // Turf: the park's own patch green, flecked dark and light.
@@ -245,17 +275,38 @@ function dirt(g: Ground, cx: number, cy: number, mx: number, my: number, x: numb
   return DIRT[shade];
 }
 
+/** Whether any of the eight cells round (cx, cy) is a road's dirt. */
+function nextToRoad(g: Ground, cx: number, cy: number) {
+  for (let dy = -1; dy <= 1; dy++)
+    for (let dx = -1; dx <= 1; dx++)
+      if ((dx || dy) && cellInBounds(cx + dx, cy + dy) && g.road(cellIndex(cx + dx, cy + dy))) return true;
+  return false;
+}
+
+/** How far turf is laid under the forest floor past a road's cells, in art
+ * pixels (`paintBare`'s `under`). */
+const UNDERLAY = 3;
+
 /** Bare patches where the dirt of a street beside park cell (cx, cy) bites
- * into its edge: wherever `edge` falls inside the park. */
-function paintBare(g: Ground, px: Uint32Array, bare: Uint8Array, cx: number, cy: number) {
+ * into its edge: wherever `edge` falls inside the park. With `under` (the
+ * forest's open ground), the unbitten pixels next to the road are laid with
+ * turf too, neither bare nor turf in the masks: only the forest floor's
+ * edge covers them. */
+function paintBare(g: Ground, px: Uint32Array, bare: Uint8Array, cx: number, cy: number, under = false) {
   for (let j = 0; j < ART; j++)
     for (let i = 0; i < ART; i++) {
       const x = cx * ART + i, y = cy * ART + j;
-      const road = nearest(cx, cy, x + 0.5, y + 0.5, g.dirt).d;
+      const road = nearest(cx, cy, x + 0.5, y + 0.5, under ? g.road : g.dirt).d;
       if (road > ART) continue;
       // How far past the edge, on its dirt side (negative: still grass).
-      const e = -edge(x, y) - road;
-      if (e < 0) continue;
+      const e = -g.edge(cellIndex(cx, cy), x, y) - road;
+      if (e < 0) {
+        if (under && road < UNDERLAY) {
+          const h = hash01(x, y, 410);
+          px[y * W + x] = rgba(h < 0.12 ? TURF.dark : h > 0.92 ? TURF.light : grassPatch(cx, cy) === GRASS.patch[0] ? TURF.patch[0] : TURF.patch[1]);
+        }
+        continue;
+      }
       const k = y * W + x;
       bare[k] = 1;
       px[k] = rgba(e < WORN_BAND && ((x + y) & 1) === 0 ? WORN[hash(x, y, 432) & 1] : DIRT[hash01(x, y, 433) < 0.15 ? 1 : 2]);

@@ -97,7 +97,7 @@ export function forestBlades(plan: ForestPlan, prior?: { plan: ForestPlan; blade
   for (let cy = 0; cy < CELLS_H; cy++)
     for (let cx = 0; cx < CELLS_W; cx++) {
       const k = cellIndex(cx, cy);
-      if (!plan.open[k] || (redo && !redo[k])) continue;
+      if (!(plan.open[k] || plan.verge[k]) || (redo && !redo[k])) continue;
       const nearK = near[k] ?? NONE, crownsK = crowns[k] ?? NONE;
       const list = planCell(cx, cy, (x, y) => {
         if (nearK.some((d) => (x - d.x) ** 2 + (y - d.y) ** 2 < d.r * d.r)) return -2;
