@@ -23,6 +23,7 @@ import { isArcherTower, isCannonTower, isMageHall, isWizardTower } from "./catal
 import { FIELD_H, FIELD_W, LightField, RES, poolSamples, type PoolSamples } from "./light-field.ts";
 import { cellPieces } from "./paint-box.ts";
 import { FLAME, artPen, fireTongues } from "./pixel-fx.ts";
+import { angled } from "./angle-view.ts";
 
 export type LightKind = "lantern" | "archerTower" | "cannonTower" | "watchTower" | "wizardTower" | "mageGuild" | "door";
 export type Light = {
@@ -39,6 +40,9 @@ export type Light = {
   inside: boolean;
   /** Corner pillars that block the light (cells): x, y, radius. */
   pillars: [number, number, number][];
+  /** On a north face, behind its building at a slant: Angle view shows
+   * its light but not its flame. */
+  back?: boolean;
 };
 
 const SWAY = LIGHTING_CONFIG.glow.swayOffset;
@@ -66,7 +70,7 @@ export function cityLights(map: CityMap): Light[] {
       const reach = .75 + (dy === 1 ? WALL_FACE_HANG : 0);
       const lx = b.rect.x + .5 + dx * reach, ly = b.rect.y + .5 + dy * reach;
       if (lights.some(l => Math.hypot(l.x-lx,l.y-ly) < 3)) continue;
-      add({kind:"lantern",x:lx,y:ly,radius:5.5,strength:.9,owner:b.id,inside:false,pillars:[]});
+      add({kind:"lantern",x:lx,y:ly,radius:5.5,strength:.9,owner:b.id,inside:false,pillars:[],...(dy === -1 ? {back:true} : {})});
       break;
     }
   }
@@ -126,7 +130,7 @@ function keepBraziers(b: Building): NewLight[] {
     [r.x + r.w + 0.3, r.y - 0.3],
     [r.x - 0.3, r.y + r.h + 0.3],
     [r.x + r.w + 0.3, r.y + r.h + 0.3],
-  ].map(([cx, cy]) => ({ kind: "door" as const, x: cx, y: cy, radius: 4.5, strength: 0.9, owner: b.id, inside: false, pillars: [] }));
+  ].map(([cx, cy], i) => ({ kind: "door" as const, x: cx, y: cy, radius: 4.5, strength: 0.9, owner: b.id, inside: false, pillars: [], ...(i < 2 ? { back: true } : {}) }));
 }
 
 /** Street lanterns hung on house walls, spread along the roads (in a
@@ -150,9 +154,12 @@ function streetLanterns(map: CityMap, taken: { x: number; y: number }[]): NewLig
   return out;
 }
 
-/** The first house beside road cell (cx, cy): its direction and id. */
+/** The first house beside road cell (cx, cy) with a wall facing it, east,
+ * west or south (a north wall is the roof's edge from above and behind
+ * the house at a slant): its direction and id. */
 function lanternMount(map: CityMap, cx: number, cy: number): [number, number, number] | null {
   for (const [dx, dy] of ORTHO) {
+    if (dy === 1) continue;
     const nx = cx + dx,
       ny = cy + dy;
     if (!cellInBounds(nx, ny)) continue;
@@ -162,15 +169,16 @@ function lanternMount(map: CityMap, cx: number, cy: number): [number, number, nu
   return null;
 }
 
+/** Where a troop building's door lamp hangs: over its south door on a
+ * road, else on a side wall by a road, low on it; none on its north side
+ * (its roof's edge from above, behind it at a slant). */
 function doorPoint(map: CityMap, r: Rect): { x: number; y: number } | null {
-  for (let x = r.x; x < r.x + r.w; x++)
-    for (const [y, dy] of [
-      [r.y + r.h, 1],
-      [r.y - 1, -1],
-    ]) {
-      if (y < 0 || y >= CELLS_H) continue;
-      if (map.type[cellIndex(x, y)] === CellType.ROAD) return { x: r.x + r.w / 2, y: dy > 0 ? r.y + r.h + 0.25 : r.y - 0.25 };
-    }
+  const road = (x: number, y: number) => cellInBounds(x, y) && map.type[cellIndex(x, y)] === CellType.ROAD;
+  for (let x = r.x; x < r.x + r.w; x++) if (road(x, r.y + r.h)) return { x: r.x + r.w / 2, y: r.y + r.h + 0.25 };
+  for (let y = r.y + r.h - 1; y >= r.y; y--) {
+    if (road(r.x - 1, y)) return { x: r.x - 0.25, y: y + 0.6 };
+    if (road(r.x + r.w, y)) return { x: r.x + r.w + 0.25, y: y + 0.6 };
+  }
   return null;
 }
 
@@ -896,7 +904,8 @@ export class DefendLighting {
   /** Flames: lantern hoods, tower braziers — a hot flickering core. */
   drawFlames(c: CanvasRenderingContext2D, { px, now, reduceMotion, intact }: LightFrame) {
     this.flameSprite ??= makeFlameSprite();
-    const lit = this.lights.filter((l) => this.active(l, intact));
+    const slant = angled(), lit = this.lights.filter((l) => this.active(l, intact) && !(l.back && slant));
+    const rise = (l: Light) => (slant && !l.inside ? -WALL_RISE : 0);
     c.save();
     c.globalCompositeOperation = "lighter";
     for (const l of lit) {
@@ -905,7 +914,7 @@ export class DefendLighting {
       const b = this.burn(l);
       const r = px * (l.kind === "lantern" || l.kind === "door" ? 0.9 : 1.4) * f * (0.4 + 0.6 * b);
       c.globalAlpha = Math.min(1, 0.7 * f * b);
-      c.drawImage(this.flameSprite, (l.x + sway.x) * px - r, (l.y + sway.y) * px - r, r * 2, r * 2);
+      c.drawImage(this.flameSprite, (l.x + sway.x) * px - r, (l.y + rise(l) + sway.y) * px - r, r * 2, r * 2);
     }
     c.restore();
     // The fire itself, burning as the Obsidian Palace's torches do, in
@@ -915,11 +924,15 @@ export class DefendLighting {
       const sway = getTorchSway({ x: l.id * 7, y: l.id * 13 }, now, reduceMotion), b = this.burn(l);
       const small = l.kind === "lantern" || l.kind === "door";
       c.globalAlpha = Math.min(1, b);
-      fireTongues(c, dot, TORCH_FIRE, Math.round((l.x + sway.x) * TORCH_FIRE_ART), Math.round((l.y + sway.y * 0.5) * TORCH_FIRE_ART) + 1, l.id * 7919 + 17, t, (small ? 0.7 : 1) * (0.4 + 0.6 * b) * sway.stretch);
+      fireTongues(c, dot, TORCH_FIRE, Math.round((l.x + sway.x) * TORCH_FIRE_ART), Math.round((l.y + rise(l) + sway.y * 0.5) * TORCH_FIRE_ART) + 1, l.id * 7919 + 17, t, (small ? 0.7 : 1) * (0.4 + 0.6 * b) * sway.stretch);
     }
     c.globalAlpha = 1;
   }
 }
+
+/** How far (cells) Angle view raises a flame hung on a wall (a lantern,
+ * a door lamp, a brazier), up with the raised building onto its wall. */
+const WALL_RISE = 0.4;
 
 /** The city torches' fire: art pixels a cell (twice as fine as the board's
  * art), and its colours, hottest first. */
