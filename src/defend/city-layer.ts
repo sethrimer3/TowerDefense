@@ -10,7 +10,7 @@ import { CELL_COUNT, CELLS_H, CELLS_W, SPAWN_ROW, SUB, TILES_H, TILES_W, cellInB
 import { CellType, type Building, type CityMap } from "./citygen.ts";
 import type { Light, Stone } from "./lighting.ts";
 import type { DefendSim } from "./sim.ts";
-import { drawFenceSections } from "./fences.ts";
+import { type FenceSection, drawFenceSections } from "./fences.ts";
 import { ROAD, keepStage, paintKeepRubble, paintStructureArt, paintStructureRubble } from "./structure-art.ts";
 import { houseRubbleSprite, roofSeed, roofSprite } from "./roof-art.ts";
 import { ART, openAt, parkArt } from "./park-art.ts";
@@ -1081,21 +1081,36 @@ function houseWall(l: HouseLook, i: number, k: number, len: number, rows: number
 }
 
 /** Angle view: the wall stones and buildings whose lifted art (`liftOf`)
- * reaches out over the open ground, painted again (at `px` a cell) over
+ * reaches out over the open ground or a wooden fence (or, given `rails`,
+ * over any of them: the parks' fences, drawn after), painted again (at `px` a cell) over
  * whatever covered that ground after the city layer (the forest's floor and
  * grass, the dunes), back row first. */
-export function paintOpenLifts(c: CanvasRenderingContext2D, px: number, map: CityMap, sim: DefendSim | null, area: AreaId, looks?: Readonly<Record<number, string>>, omit?: ReadonlySet<number>) {
+export function paintOpenLifts(c: CanvasRenderingContext2D, px: number, map: CityMap, sim: DefendSim | null, area: AreaId, looks?: Readonly<Record<number, string>>, omit?: ReadonlySet<number>, rails?: readonly FenceSection[]) {
   if (!angleView) return;
   const solid = (i: number) => (sim ? sim.solid[i] === 1 : map.owner[i] >= 0 && map.type[i] !== CellType.ROAD);
   const p: Paint = { c, px, map, sim, solid, area, looks };
+  // Wooden fences are painted over the city layer too (`paintFences`,
+  // before this), so a lift reaching over a fence's cells is painted again.
+  const fenced = new Set<number>();
+  for (const b of map.buildings) if (b.fence && !b.hidden) for (const i of b.cells) fenced.add(i);
   const open = (x0: number, y0: number, x1: number, y1: number) => {
-    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (cellInBounds(x, y) && map.type[cellIndex(x, y)] === CellType.OUT) return true;
+    for (let y = y0; y <= y1; y++)
+      for (let x = x0; x <= x1; x++) {
+        if (!cellInBounds(x, y)) continue;
+        const i = cellIndex(x, y);
+        if (map.type[i] === CellType.OUT || fenced.has(i)) return true;
+      }
     return false;
   };
   c.imageSmoothingEnabled = false;
   for (const b of frontOrder(map)) {
     if (b.hidden || b.fence || b.woodGate || omit?.has(b.id) || !standsLifted(p, b)) continue;
     const r = b.rect, up = Math.ceil(liftOf(b));
+    if (rails) {
+      // Only the buildings whose lift rises over one of `rails` (parks' fences).
+      if (rails.some((f) => Math.max(f.x1, f.x2) > r.x && Math.min(f.x1, f.x2) < r.x + r.w && Math.max(f.y1, f.y2) >= r.y - liftOf(b) && Math.min(f.y1, f.y2) <= r.y)) paintBuilding(p, b);
+      continue;
+    }
     if (open(r.x - 1, r.y - up, r.x + r.w, r.y - 1) || (b.kind !== "wall" && open(r.x - 1, r.y, r.x + r.w, r.y + r.h))) paintBuilding(p, b);
   }
 }

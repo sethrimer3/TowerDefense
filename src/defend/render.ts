@@ -911,6 +911,8 @@ export class DefendRenderer {
     this.fences.sync(map);
     if (sim) this.fences.update(sim);
     this.fences.draw(ctx, this.px, this.arrival?.fences(opts.now));
+    // Angle view: what rises over a park's fence from the lots south of it stands in front of it.
+    if (angled() && this.fences.sections.length) paintOpenLifts(ctx, this.px, map, sim, this.area, opts.looks, this.arrival?.omit, this.fences.sections.filter((s) => !s.broken));
     // A new park's bare earth, where its grass hasn't grown yet.
     this.arrival?.drawCover(ctx, this.px, opts.now);
     if (this.worldLighting && opts.sun) this.sunlight.draw(ctx, this.px, map, sim, opts.sun, opts.looks);
