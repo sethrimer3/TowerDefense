@@ -289,7 +289,7 @@ export class AmbushBattlePage {
     const roster = this.root.querySelector<HTMLElement>(".campaign-roster")!;
     roster.innerHTML = AMBUSH_PALETTE.map(
       (kind) =>
-        `<button class="defend-item" data-kind="${kind}"><canvas width="48" height="48"></canvas><span>${STRUCTURES[kind].name}</span><small>${iconImg("coin", 1)}${this.sim.price(kind)}</small></button>`,
+        `<button class="defend-item" data-kind="${kind}"><canvas width="48" height="48"></canvas><span>${STRUCTURES[kind].name}</span><small>${iconImg("coin", 2)}${this.sim.price(kind)}</small></button>`,
     ).join("");
     roster.querySelectorAll<HTMLButtonElement>("[data-kind]").forEach((b) => {
       const kind = b.dataset.kind as PlacedKind;
