@@ -45,8 +45,9 @@ export type Pad = { x: number; y: number; r: number; seed: number };
 /** A lake: the union of its discs (cells). */
 export type Lake = { discs: { x: number; y: number; r: number }[]; seed: number };
 /** The plan: `open` is 1 on each open-ground cell, which alone the forest
- * covers. */
-export type ForestPlan = { trees: ForestTree[]; rocks: Rock[]; pads: Pad[]; lakes: Lake[]; boulders: Boulder[]; open: Uint8Array; roads: TrailPlan | null };
+ * covers; `verge` on each road cell beside it, where its grass creeps over
+ * the road's edge. */
+export type ForestPlan = { trees: ForestTree[]; rocks: Rock[]; pads: Pad[]; lakes: Lake[]; boulders: Boulder[]; open: Uint8Array; verge: Uint8Array; roads: TrailPlan | null };
 
 /** A canopy radius for each kind, size and variant, in cells. */
 export function canopyRadius(kind: TreeKind, variant: number, size: TreeSize = 0) {
@@ -346,7 +347,19 @@ function plan_(map: CityMap): ForestPlan {
   // Drawn back to front, so a canopy lower on the board stands over the one behind.
   trees.sort((a, b) => a.y - b.y || a.x - b.x);
   trees.forEach((t, i) => (t.id = i));
-  return { trees, rocks, pads, lakes, boulders, open, roads };
+  // The roads' dirt beside the open ground, whose edge the forest's grass
+  // creeps over (`ground-art.ts`): its floor and blades grow there too.
+  const verge = new Uint8Array(open.length);
+  for (let cy = 0; cy < CELLS_H; cy++)
+    for (let cx = 0; cx < CELLS_W; cx++) {
+      const i = cellIndex(cx, cy);
+      // Only the bare road: a lot, a gate or a bridge's deck is painted over it.
+      if (map.type[i] !== CellType.ROAD || map.bridges?.[i]) continue;
+      for (let dy = -1; dy <= 1 && !verge[i]; dy++)
+        for (let dx = -1; dx <= 1; dx++)
+          if (cellInBounds(cx + dx, cy + dy) && open[cellIndex(cx + dx, cy + dy)] && map.type[cellIndex(cx + dx, cy + dy)] === CellType.OUT) { verge[i] = 1; break; }
+    }
+  return { trees, rocks, pads, lakes, boulders, open, verge, roads };
 }
 
 /** How a tree came down: struck apart by an attack (a stump left, cleanly
