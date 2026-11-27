@@ -7,6 +7,7 @@ import { ENEMIES } from "./catalog.ts";
 import { ART } from "./art-scale.ts";
 import { isBlightWorm } from "./blight-worm-tuning.ts";
 import { blightDrawnPixels } from "./blight-size.ts";
+import { isBlightSlime, slimeHop } from "./blight-slime.ts";
 import type { Enemy } from "./sim.ts";
 
 export const BLIGHT_GAIT = {
@@ -43,6 +44,7 @@ const snap = (v: number, n: number) => (Math.round(v * ART - n / 2) + n / 2) / A
  * enemies (and any call without a time) get their body position. The
  * returned object is reused: read it before the next call for this enemy. */
 export function gaitPosition(e: Enemy, time: number | undefined): { x: number; y: number } {
+  if (time !== undefined && isBlightSlime(e.kind)) return slimeHop(e, time);
   if (time === undefined || !lurches(e)) return e;
   const n = blightDrawnPixels(e.kind)!;
   const period = gaitPeriod(e);

@@ -54,6 +54,9 @@ export const WORM_WAVES: Readonly<Record<number, readonly (readonly [EnemyKind, 
   39: [["smallBlightWorm", 2], ["mediumBlightWorm", 15]],
 };
 
+/** Crystal Caves' Blight Slimes: few at first, since only blasts hurt them much. */
+export const SLIME_WAVES: Readonly<Record<number, number>> = { 41: 4, 43: 6, 45: 8, 47: 10, 49: 12 };
+
 const PLACEHOLDER_WAVE: readonly EnemyKind[] = ["significantDarkling"];
 
 /** Absolute waves only; later area cycles and Ambush keep their legacy rosters. */
@@ -72,10 +75,11 @@ const AUTHORED_WAVES: Readonly<Partial<Record<number, readonly EnemyKind[]>>> = 
   20: ["blightWorm"],
   ...Object.fromEntries(Object.entries(WORM_WAVES).map(([wave, roster]) => [wave, mix(roster)])),
   40: ["blightWorm", "blightWorm", "blightWorm"],
-  // Crystal Caves: Lesser Dark Blades on 42–48's even waves, Dark Blades
-  // on 50 and 55; every other wave holds a
-  // single Significant Darkling as a placeholder until it is authored.
+  // Crystal Caves: Blight Slimes on 41–49's odd waves, Lesser Dark Blades
+  // on 42–48's even waves, Dark Blades on 50 and 55; every other wave holds
+  // a single Significant Darkling as a placeholder until it is authored.
   ...Object.fromEntries(Array.from({ length: 20 }, (_, i) => [41 + i, PLACEHOLDER_WAVE])),
+  ...Object.fromEntries(Object.entries(SLIME_WAVES).map(([wave, count]) => [wave, Array<EnemyKind>(count).fill("blightSlime")])),
   42: [...Array<EnemyKind>(3).fill("lesserDarkBlade")],
   44: [...Array<EnemyKind>(3).fill("lesserDarkBlade")],
   46: [...Array<EnemyKind>(4).fill("lesserDarkBlade")],
