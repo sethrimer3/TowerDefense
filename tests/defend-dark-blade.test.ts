@@ -16,11 +16,11 @@ function fixture() {
   return sim;
 }
 
-test("Crystal Caves waves: one Dark Blade on 50, three on 55, one placeholder Blight elsewhere", () => {
+test("Crystal Caves waves: one Dark Blade on 50, three on 55, Blight Slimes on 41-49's odd waves, one placeholder Blight elsewhere", () => {
   assert.deepEqual(buildWave(50, () => { throw Error("authored wave rolled"); }), ["darkBlade"]);
   assert.deepEqual(buildWave(55, () => { throw Error("authored wave rolled"); }), ["darkBlade", "darkBlade", "darkBlade"]);
   for (let wave = 41; wave <= 60; wave++) {
-    if (wave === 50 || wave === 55) continue;
+    if (wave === 50 || wave === 55 || (wave < 50 && wave % 2 === 1)) continue;
     if (wave <= 48 && wave % 2 === 0) {
       const q = buildWave(wave, () => { throw Error("authored wave rolled"); });
       assert.ok(q.length >= 3 && q.every(k => k === "lesserDarkBlade"), `wave ${wave}`);

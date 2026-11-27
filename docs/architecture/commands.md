@@ -12,6 +12,7 @@ node tests/nadir.mjs # Nadir floor (veins, rifts, pyramids, stairs, trapdoors, e
 node tests/palace.mjs # Obsidian Palace (half-laid floor veined with gold, throne, carpet, colonnade, torches, monoliths, blocks, shards) building, in battle, close-ups, the zoomed-out cave and the board's edge by day, sunset and night, desktop and phone, to test-results
 node tests/astral.mjs # Astral Sanctuary island (meadow, sky holes, stones, dials, crystals, islets) building, in battle, close-ups, the zoomed-out sky, the board's edge by day, sunset and night, desktop and phone, and the island grown round a keep moved to a corner, to test-results/ (needs dev server)
 node tests/dark-blade.mjs # Dark Blade idle/wind-up/cut/recovery frames, its tear closing and journal portrait, to test-results/dark-blade.png (needs dev server)
+node tests/blight-slime.mjs # Blight Slime hop frames (take-off, arc, landing squash and splat), a hop in place, a crowd, the death splat and journal portrait, to test-results/blight-slime.png (needs dev server)
 node tests/blight-performance.mjs # Paired Blight worm lookup, portal raster area and packed contour benchmark (needs dev server; PLAYWRIGHT_EXECUTABLE supported)
 node tests/scenery-performance.mjs # Frozen-reference forest/lighting pixels, cache invalidation, allocation bounds and paired timings (needs dev server)
 node --experimental-transform-types --import ./tests/pin-random.ts tests/simulation-performance.ts # Paired simulation-only moving hordes, worm contacts and cleanup; no dev server

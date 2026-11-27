@@ -6,6 +6,8 @@ import { isBlightFlier } from "./blight-fliers.ts";
 import { drawBlightFlier } from "./blight-flier-art.ts";
 import { drawDarkBlade, drawTears } from "./dark-blade-art.ts";
 import { isDarkBlade } from "./dark-blade.ts";
+import { isBlightSlime } from "./blight-slime.ts";
+import { drawBlightSlime, drawSlimeSplat } from "./blight-slime-art.ts";
 import { drawWormShadow, wormBodyVisible } from "./blight-worm-art.ts";
 import { basicUnitSprite } from "./basic-unit-art.ts";
 import { blightDrawnPixels } from "./blight-size.ts";
@@ -687,6 +689,7 @@ export function drawEnemyArt(b: Brush, e: Enemy, sim: DefendSim, under = b, redu
   if (def.blightFortress) return drawBlightFortress(b, e, sim.time, reduceMotion);
   if (isBlightFlier(e.kind)) return drawBlightFlier(b, e, sim.time, reduceMotion, under);
   if (isDarkBlade(e.kind)) return drawDarkBlade(b, e, sim.time, reduceMotion);
+  if (isBlightSlime(e.kind)) return drawBlightSlime(b, e, sim.time, reduceMotion, under);
   if (def.darkPixels) {
     // No sprite lookup, rims, shading, torch, or animated decoration.
     const d = b.px / ART * blightDrawnPixels(e.kind)!;
@@ -787,6 +790,7 @@ function drawEffect(b: Brush, fx: Effect) {
   if (fx.kind === "boom") return drawExplosion(c, px, fx);
   if (fx.kind === "firework") return drawFirework(b, fx);
   if (fx.kind === "steam") return drawSteam(b, fx, k);
+  if (fx.kind === "splat") return drawSlimeSplat(b, fx, k);
   if (fx.kind === "dust" && fx.seed !== undefined) {
     for (let n = 0; n < 22; n++) {
       const a = n * 2.4, spread = fx.r * (.25 + k * .85) * (.5 + hash01(fx.seed, n) * .5);

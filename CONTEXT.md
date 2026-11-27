@@ -822,6 +822,9 @@ A Blight knight: a black pentagon body pointed the way it faces, a black cloak t
 **Lesser Dark Blade**:
 A smaller Dark Blade with a square body and a short sword. It cuts far more often but for much less damage, leaving small, short-lived tears. A few come on each even Crystal Caves wave from 42 to 48.
 
+**Blight Slime**:
+A living glob of Blight Essence that bounds along in hops and splats where it lands and where it dies. Blades and arrows do a tenth of their damage to it; blasts do five times theirs. Crystal Caves' odd waves from 41 to 49 bring 4 to 12.
+
 **Tear** (in space):
 The ragged, burning-lipped crescent a Dark Blade's cut leaves on the board. It slowly closes and does no damage.
 
