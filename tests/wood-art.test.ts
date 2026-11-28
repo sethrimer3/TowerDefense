@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { drawWood, woodSeed, WOOD_PALETTE } from "../src/ui/wood-art.ts";
+import { drawBoard, drawWood, woodSeed, WOOD_PALETTE } from "../src/ui/wood-art.ts";
 import { woodSelectors } from "../src/ui/wood-painter.ts";
 
 test("a board of any size is the same for the same seed, in palette shades", () => {
@@ -28,4 +28,11 @@ test("only rules that use var(--wood) are painted, without pseudo-elements", () 
     { selectorText: ".card", cssText: ".card { background: var(--stone); }" },
   ]);
   assert.deepEqual(got, ["nav button"]);
+});
+
+test("a panel taller than wide gets the board turned, grain running up and down", () => {
+  const w = 30, h = 200, seed = woodSeed("t");
+  const tall = drawBoard(w, h, seed), wide = drawWood(h, w, seed);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) assert.equal(tall[y * w + x], wide[x * h + y]);
+  assert.deepEqual(drawBoard(h, w, seed), wide);
 });

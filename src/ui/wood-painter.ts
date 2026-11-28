@@ -1,13 +1,13 @@
 // Paints every oak panel and button a board of its own size from
 // `wood-art.ts`, so a tall column or a wide bar shows one continuous plank
-// rather than a tile repeating. Each element whose style uses `var(--wood)`
+// rather than a tile repeating, its grain along the longer side. Each element whose style uses `var(--wood)`
 // gets `--wood` set on it: its own image first, then theme.css's tile and the
 // older noise-grained wood underneath, which show while it is painted and if
 // it ever fails. Pseudo-elements keep the tile. Boards are seeded by size, so
 // a redraw of the same element paints the same grain. Off under the Pixel-art
 // wood setting off (`.classic-wood`), and in a page without a canvas.
 
-import { drawWood, woodSeed, WOOD_PALETTE, WOOD_SCALE } from "./wood-art.ts";
+import { drawBoard, woodSeed, WOOD_PALETTE, WOOD_SCALE } from "./wood-art.ts";
 
 /** Boards kept for reuse, by size. */
 const CACHE_LIMIT = 160;
@@ -28,7 +28,7 @@ function boardUrl(w: number, h: number, scale: number): string {
     cache.set(key, hit);
     return hit;
   }
-  const px = drawWood(w, h, woodSeed(key));
+  const px = drawBoard(w, h, woodSeed(key));
   const canvas = document.createElement("canvas");
   canvas.width = w * scale;
   canvas.height = h * scale;

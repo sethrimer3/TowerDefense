@@ -135,3 +135,16 @@ export function drawWood(w: number, h: number, seed: number, wrap = false): Uint
   }
   return px;
 }
+
+/**
+ * A board for a panel `w` × `h` art pixels: grain running along its longer
+ * side, so a panel taller than it is wide gets the board turned a quarter
+ * turn, its grain and knots running up and down.
+ */
+export function drawBoard(w: number, h: number, seed: number): Uint8Array {
+  if (h <= w) return drawWood(w, h, seed);
+  const flat = drawWood(h, w, seed);
+  const px = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) px[y * w + x] = flat[x * h + y];
+  return px;
+}
