@@ -462,6 +462,7 @@ function refreshCurrencies() {
   const dev = save.settings.devMode;
   document.documentElement.classList.toggle("reduce-motion", save.settings.reduceMotion);
   document.documentElement.classList.toggle("pixel-font", save.settings.pixelFont);
+  document.documentElement.classList.toggle("classic-wood", !save.settings.pixelWood);
   document.documentElement.classList.toggle("legacy-graphics", save.settings.legacyGraphics);
   setPixelArt(save.settings.pixelArt);
   setLegacyWalls(save.settings.legacyWalls);

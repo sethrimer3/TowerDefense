@@ -58,6 +58,7 @@ export const SETTINGS_TEXT = [
  ["setting.pixelArt","Pixel Art","Arte píxel","Pixel art","Pixelgrafik","Pixel Art","Pixel art","ピクセルアート","픽셀 아트","像素画"],
  ["setting.legacyGraphics","Show legacy graphics","Mostrar gráficos clásicos","Afficher les graphismes classiques","Klassische Grafik anzeigen","Mostrar gráficos clássicos","Mostra grafica classica","従来のグラフィックを表示","이전 그래픽 표시","显示经典画面"],
  ["setting.pixelFont","Use Custom Font","Usar fuente personalizada","Utiliser la police personnalisée","Eigene Schrift verwenden","Usar fonte personalizada","Usa carattere personalizzato","カスタムフォントを使用","사용자 지정 글꼴 사용","使用自定义字体"],
+ ["setting.pixelWood","Pixel-art wood","Madera pixelada","Bois en pixel art","Pixel-Holz","Madeira em pixel art","Legno in pixel art","ピクセルアートの木目","픽셀 아트 나무","像素风木纹"],
  ["setting.developerMode","Developer mode","Modo desarrollador","Mode développeur","Entwicklermodus","Modo desenvolvedor","Modalità sviluppatore","開発者モード","개발자 모드","开发者模式"],
  ["setting.devMode","Unlimited money","Dinero ilimitado","Argent illimité","Unbegrenztes Geld","Dinheiro ilimitado","Denaro illimitato","資源無制限","무제한 자원","无限资源"],
  ["setting.devTowers","All towers unlocked","Todas las torres desbloqueadas","Toutes les tours débloquées","Alle Türme freigeschaltet","Todas as torres desbloqueadas","Tutte le torri sbloccate","すべての塔を解放","모든 탑 잠금 해제","解锁全部防御塔"],

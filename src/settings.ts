@@ -109,6 +109,8 @@ export const SETTINGS = {
   angleView: { kind: "toggle", default: false, page: { id: "angle-view", label: "Angle view" } },
   /** Alembic, the game's own pixel font, for every word on the page; off, Cinzel. */
   pixelFont: { kind: "toggle", default: true, page: { id: "pixel-font", label: "Use Custom Font" } },
+  /** Buttons and panels in pixel-art oak; off, the older noise-grained wood. */
+  pixelWood: { kind: "toggle", default: true, page: { id: "pixel-wood", label: "Pixel-art wood" } },
   /** Master switch for developer controls, including the enemy tester. */
   developerMode: { kind: "toggle", default: false, page: { id: "developer-mode", label: "Developer mode" } },
   /** Dev: unlimited money. Every currency shows ∞, and every purchase

@@ -11,7 +11,7 @@ import { bindShop, shopHtml } from "./shop.ts";
 /** Gameplay settings, under their own heading first. */
 const GAMEPLAY = ["showEmpty", "ringMenu", "extraTabs"] as const satisfies readonly SettingKey[];
 const CONTROLS = ["dragRally", "dragCrosshair", "raiseDrag", "magnifier", "tripleTapFlag"] as const satisfies readonly SettingKey[];
-const PAGE = ["pixelArt", "legacyGraphics", "legacyWalls", "dayNightCycle", "fasterSunCatchup", "reduceMotion", "effectsOff", "simpleEnemies", "simpleTroops", "mergedOutlines", "sceneryOutlines", "stillAir", "pixelPortals", "orthoBuildings", "orthoTroops", "orthoEnemies", "orthoBlight", "angleView", "crispZoom", "hdSand", "ultraGraphics", "highlightBuildings", "tileGrid", "soundOff", "ambienceOff", "pixelFont"] as const satisfies readonly SettingKey[];
+const PAGE = ["pixelArt", "legacyGraphics", "legacyWalls", "dayNightCycle", "fasterSunCatchup", "reduceMotion", "effectsOff", "simpleEnemies", "simpleTroops", "mergedOutlines", "sceneryOutlines", "stillAir", "pixelPortals", "orthoBuildings", "orthoTroops", "orthoEnemies", "orthoBlight", "angleView", "crispZoom", "hdSand", "ultraGraphics", "highlightBuildings", "tileGrid", "soundOff", "ambienceOff", "pixelFont", "pixelWood"] as const satisfies readonly SettingKey[];
 /** The dev options, under ALL ON. */
 const DEV = ["devMode", "devTowers", "devJournal", "instantResearch", "devFrameTimes", "devNoLighting"] as const satisfies readonly SettingKey[];
 /** All research unlocked: the Smithy's rows and each skill tree. */
