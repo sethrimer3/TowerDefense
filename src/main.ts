@@ -16,6 +16,7 @@ import type { AppContext } from "./ui/app.ts";
 import { el, TAB_ICONS, type Tab } from "./ui/dom.ts";
 import { paintTabIcon, tabIconHtml } from "./ui/tab-icons.ts";
 import { buildShell } from "./ui/shell.ts";
+import { installWoodPainter } from "./ui/wood-painter.ts";
 import { AmbushPage } from "./campaign/ambush-ui.ts";
 import { SiegePage } from "./campaign/siege-ui.ts";
 import { CombatTab, nextCombatMode, type CombatMode } from "./ui/combat-tab.ts";
@@ -67,6 +68,7 @@ applyOrthogonal();
 installSeal();
 buildShell(document.querySelector<HTMLDivElement>("#app")!, save.settings.legacyGraphics);
 installScrollArrows();
+installWoodPainter();
 let shownLegacyGraphics = save.settings.legacyGraphics;
 document.querySelectorAll<HTMLCanvasElement>("nav canvas[data-icon]").forEach((c) => paintIcon(c, "cityTile"));
 // Refresh icons after the visual setting changes, once a frame at most.
