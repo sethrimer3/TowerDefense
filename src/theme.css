@@ -17,7 +17,10 @@
   --brass: #b98a3e;
   --brass-hi: #f0cf86;
   --ember: #ff9a3c;
-  --wood: url("../assets/theme/wood.svg") 0 0 / 320px 80px;
+  /* Pixel-art oak (scripts/pixel-wood/build.ts), two screen pixels to an art
+     pixel, over the older noise-grained wood, which shows if it fails to load
+     and alone with the Pixel-art wood setting off (.classic-wood). */
+  --wood: url("../assets/theme/wood-pixel.svg") 0 0 / 384px 96px, url("../assets/theme/wood.svg") 0 0 / 320px 80px;
   --stone: url("../assets/theme/stone.svg") 0 0 / 240px 160px;
   --brick: url("../assets/theme/brick.svg") 0 0 / 32px 16px;
   --parchment: url("../assets/theme/parchment.svg") 0 0 / 300px 300px;
@@ -30,6 +33,9 @@
     radial-gradient(circle at calc(100% - 6px) 6px, #ffe3a0 0 1.1px, #6b4b1c 1.8px, transparent 2.4px),
     radial-gradient(circle at 6px calc(100% - 6px), #ffe3a0 0 1.1px, #6b4b1c 1.8px, transparent 2.4px),
     radial-gradient(circle at calc(100% - 6px) calc(100% - 6px), #ffe3a0 0 1.1px, #6b4b1c 1.8px, transparent 2.4px);
+}
+:root.classic-wood {
+  --wood: url("../assets/theme/wood.svg") 0 0 / 320px 80px;
 }
 * {
   scrollbar-color: #8a6a3acc transparent;

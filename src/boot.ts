@@ -13,6 +13,7 @@ try {
   const settings = JSON.parse(localStorage.getItem("towerdefense.v1") ?? "null")?.settings;
   document.documentElement.classList.toggle("reduce-motion", settings?.reduceMotion === true);
   document.documentElement.classList.toggle("pixel-font", settings?.pixelFont !== false);
+  document.documentElement.classList.toggle("classic-wood", settings?.pixelWood === false);
 } catch { /* Loading the game handles unavailable storage and malformed saves. */ }
 
 /** Fonts are cosmetic: start with fallbacks rather than wait on a stalled font request. */

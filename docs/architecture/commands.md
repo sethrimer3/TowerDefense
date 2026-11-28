@@ -3,6 +3,7 @@
 Per-feature browser checks (`.mjs`, need `npm run dev` running unless noted), focused Node tests, benchmarks and tools. Moved from `AGENTS.md`; the topic docs in this folder name the checks for each feature too.
 
 ```sh
+node --experimental-transform-types scripts/pixel-wood/build.ts # Redraw assets/theme/wood-pixel.svg, the pixel-art oak under buttons and panels (fixed seed)
 node tests/story-scroll.mjs # Zone story scrolls (zones 1-4 from Start, shown once, mid-run hold) and gold wave-unlock lettering; phone and desktop screenshots to test-results/ (needs dev server)
 node tests/tutorial.mjs     # First-time tutorial: build and battle lessons after the wave-1 scroll, Mine/Library placed and tab lessons, the 1-second tap lock, saved once; phone and desktop screenshots to test-results/ (needs dev server)
 node tests/mistwood.mjs # Mistwood floor, crowns and wisps, the mist rolling in over board and wilds, a blast clearing it, close-ups and night, desktop and phone, to test-results/ (needs dev server)
